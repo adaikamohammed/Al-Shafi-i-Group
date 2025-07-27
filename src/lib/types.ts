@@ -1,4 +1,4 @@
-export type StudentStatus = "نشط" | "مطرود" | "غائب طويل";
+export type StudentStatus = "نشط" | "مطرود" | "غائب طويل" | "محذوف";
 export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "أكثر";
 
 export interface Student {

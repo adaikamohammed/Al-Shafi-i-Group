@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,12 +9,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { students } from '@/lib/data';
+import { students as mockStudents } from '@/lib/data';
 import { surahs } from '@/lib/surahs';
-import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Surah } from '@/lib/types';
+import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Surah, Student } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, BookOpen } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
@@ -29,6 +29,12 @@ const sessionTypeDescriptions: { [key in SessionType]: string } = {
 };
 
 export default function DailySessionsPage() {
+  const [students, setStudents] = useState<Student[]>(mockStudents);
+
+  const activeStudents = useMemo(() => 
+    students.filter(s => s.status === "نشط" || s.status === "غائب طويل"), 
+  [students]);
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-headline font-bold">إدارة الحصص اليومية</h1>
@@ -45,7 +51,7 @@ export default function DailySessionsPage() {
               <AccordionItem value={day} key={day}>
                 <AccordionTrigger className="text-xl font-headline">{`يوم ${day}`}</AccordionTrigger>
                 <AccordionContent>
-                  <DailySessionForm day={day} />
+                  <DailySessionForm day={day} students={activeStudents} />
                 </AccordionContent>
               </AccordionItem>
             ))}
@@ -56,7 +62,7 @@ export default function DailySessionsPage() {
   );
 }
 
-function DailySessionForm({ day }: { day: string }) {
+function DailySessionForm({ day, students }: { day: string, students: Student[] }) {
   const [sessionType, setSessionType] = useState<SessionType>('حصة أساسية');
   const [records, setRecords] = useState<DailyRecord[]>(
     students.map(s => ({
@@ -134,7 +140,7 @@ function DailySessionForm({ day }: { day: string }) {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[120px]">الطالب</TableHead>
-                <TableHead className="w-[240px]">الحضور</TableHead>
+                <TableHead className="w-[240px]">الحضزر</TableHead>
                 {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">السورة</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">الآيات</TableHead>}
@@ -195,7 +201,16 @@ function DailySessionForm({ day }: { day: string }) {
                            <Select
                                 dir="rtl"
                                 value={record.surahId?.toString() ?? ''}
-                                onValueChange={(value) => handleRecordChange(student.id, 'surahId', parseInt(value))}
+                                onValueChange={(value) => {
+                                  const surahId = parseInt(value);
+                                  const surah = surahs.find(s => s.id === surahId);
+                                  if (surah) {
+                                      handleRecordChange(student.id, 'surahId', surahId);
+                                      // Reset verse numbers when surah changes
+                                      handleRecordChange(student.id, 'fromVerse', 1);
+                                      handleRecordChange(student.id, 'toVerse', null);
+                                  }
+                                }}
                                 disabled={isRowDisabled}
                             >
                                 <SelectTrigger>
@@ -214,8 +229,14 @@ function DailySessionForm({ day }: { day: string }) {
                                     type="number"
                                     placeholder="من"
                                     min={1}
+                                    max={selectedSurah?.verses}
                                     value={record.fromVerse ?? ''}
-                                    onChange={(e) => handleRecordChange(student.id, 'fromVerse', e.target.value ? parseInt(e.target.value) : null)}
+                                    onChange={(e) => {
+                                        const from = e.target.value ? parseInt(e.target.value) : null;
+                                        if (from === null || (selectedSurah && from <= (record.toVerse ?? selectedSurah.verses))) {
+                                            handleRecordChange(student.id, 'fromVerse', from);
+                                        }
+                                    }}
                                     disabled={isRowDisabled || !selectedSurah}
                                     className="w-16 h-9 text-center"
                                 />
@@ -226,14 +247,19 @@ function DailySessionForm({ day }: { day: string }) {
                                     min={record.fromVerse ?? 1}
                                     max={selectedSurah?.verses}
                                     value={record.toVerse ?? ''}
-                                    onChange={(e) => handleRecordChange(student.id, 'toVerse', e.target.value ? parseInt(e.target.value) : null)}
+                                     onChange={(e) => {
+                                        const to = e.target.value ? parseInt(e.target.value) : null;
+                                        if (to === null || (selectedSurah && to >= (record.fromVerse ?? 1) && to <= selectedSurah.verses)) {
+                                          handleRecordChange(student.id, 'toVerse', to);
+                                        }
+                                     }}
                                     disabled={isRowDisabled || !selectedSurah}
                                     className="w-16 h-9 text-center"
                                 />
                            </div>
                         </TableCell>
                         <TableCell>
-                            {selectedSurah && (
+                            {selectedSurah && record.fromVerse && record.toVerse && (
                                 <div className="flex items-center gap-2">
                                     <Progress value={progress} className="w-16" />
                                     <span className="text-xs text-muted-foreground">{progress}%</span>

@@ -22,11 +22,13 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
-const statusVariant: { [key in StudentStatus]: "default" | "destructive" | "secondary" } = {
+const statusVariant: { [key in StudentStatus]: "default" | "destructive" | "secondary" | "outline" } = {
   "نشط": "default",
   "مطرود": "destructive",
   "غائب طويل": "secondary",
+  "محذوف": "outline"
 };
+
 
 const calculateAge = (birthDate: Date) => {
   const ageDifMs = Date.now() - new Date(birthDate).getTime();
@@ -37,6 +39,14 @@ const calculateAge = (birthDate: Date) => {
 export default function StudentManagementPage() {
   const [students, setStudents] = useState<Student[]>(mockStudents);
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
+
+  const handleStatusChange = (studentId: string, status: StudentStatus, reason?: string) => {
+    setStudents(prevStudents =>
+      prevStudents.map(s =>
+        s.id === studentId ? { ...s, status } : s
+      )
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -88,7 +98,7 @@ export default function StudentManagementPage() {
                   </TableCell>
                   <TableCell className="hidden md:table-cell">{student.memorizedSurahsCount}</TableCell>
                   <TableCell>
-                    <StudentActions student={student} />
+                    <StudentActions student={student} onStatusChange={handleStatusChange} />
                   </TableCell>
                 </TableRow>
               ))}
@@ -100,8 +110,17 @@ export default function StudentManagementPage() {
   );
 }
 
-function StudentActions({ student }: { student: Student }) {
+function StudentActions({ student, onStatusChange }: { student: Student, onStatusChange: (studentId: string, status: StudentStatus, reason?: string) => void }) {
     const [isEditOpen, setEditOpen] = useState(false);
+    const [expelReason, setExpelReason] = useState('');
+
+    const handleDelete = () => {
+        onStatusChange(student.id, 'محذوف');
+    };
+
+    const handleExpel = () => {
+        onStatusChange(student.id, 'مطرود', expelReason);
+    };
 
     return (
         <DropdownMenu>
@@ -130,7 +149,7 @@ function StudentActions({ student }: { student: Student }) {
                 </Dialog>
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive">
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={student.status === 'محذوف'}>
                             <Trash2 className="ml-2 h-4 w-4" />
                             حذف
                         </DropdownMenuItem>
@@ -139,18 +158,18 @@ function StudentActions({ student }: { student: Student }) {
                         <AlertDialogHeader>
                             <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
                             <AlertDialogDescription>
-                                هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف بيانات الطالب بشكل دائم من خوادمنا.
+                                سيؤدي هذا إلى تغيير حالة الطالب إلى "محذوف" وإخفائه من القوائم النشطة، ولكن لن يتم حذف بياناته نهائيًا.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                            <AlertDialogAction>متابعة</AlertDialogAction>
+                            <AlertDialogAction onClick={handleDelete}>متابعة</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
                 <AlertDialog>
                      <AlertDialogTrigger asChild>
-                         <DropdownMenuItem className="text-destructive focus:text-destructive">
+                         <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={student.status === 'مطرود'}>
                             <UserX className="ml-2 h-4 w-4" />
                             طرد
                         </DropdownMenuItem>
@@ -159,16 +178,21 @@ function StudentActions({ student }: { student: Student }) {
                         <AlertDialogHeader>
                             <AlertDialogTitle>طرد الطالب {student.fullName}</AlertDialogTitle>
                             <AlertDialogDescription>
-                                الرجاء إدخال سبب الطرد. سيتم تسجيل هذا في سجل الطالب.
+                                الرجاء إدخال سبب الطرد. سيتم تسجيل هذا في سجل الطالب وتغيير حالته إلى "مطرود".
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <div className="py-4">
                             <Label htmlFor="expel-reason">سبب الطرد</Label>
-                            <Textarea id="expel-reason" placeholder="مثال: غياب متكرر بدون عذر..." />
+                            <Textarea 
+                                id="expel-reason" 
+                                placeholder="مثال: غياب متكرر بدون عذر..." 
+                                value={expelReason}
+                                onChange={(e) => setExpelReason(e.target.value)}
+                            />
                         </div>
                         <AlertDialogFooter>
                             <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                            <AlertDialogAction>تأكيد الطرد</AlertDialogAction>
+                            <AlertDialogAction onClick={handleExpel}>تأكيد الطرد</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
@@ -274,8 +298,9 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="نشط">✅ نشط</SelectItem>
-                        <SelectItem value="مطرود">❌ مطرود</SelectItem>
                         <SelectItem value="غائب طويل">⚠️ غائب طويل</SelectItem>
+                        <SelectItem value="مطرود">❌ مطرود</SelectItem>
+                        <SelectItem value="محذوف" disabled>🗑️ محذوف</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
