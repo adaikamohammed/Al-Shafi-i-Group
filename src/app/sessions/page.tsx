@@ -7,20 +7,22 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { useStudentContext } from '@/context/StudentContext';
 import { surahs } from '@/lib/surahs';
-import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Surah, Student } from '@/lib/types';
+import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Info, ArrowLeft, ArrowRight, ChevronsUpDown, Check } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { format, getMonth, getYear, setMonth, setYear, getDaysInMonth, startOfMonth, getDay, addMonths, subMonths } from 'date-fns';
+import { format, getMonth, getYear, setMonth, getDaysInMonth, startOfMonth, getDay, addMonths, subMonths } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+
 
 const sessionTypeDescriptions: { [key in SessionType]: string } = {
   'حصة أساسية': 'الحصة العادية لحفظ ومراجعة القرآن.',
@@ -36,7 +38,7 @@ export default function DailySessionsPage() {
   
   const { students } = useStudentContext();
   const activeStudents = useMemo(() => 
-    students.filter(s => s.status === "نشط" || s.status === "غائب طويل"), 
+    students.filter(s => s.status === "نشط"), 
   [students]);
 
   const handleDayClick = (day: number) => {
@@ -152,7 +154,58 @@ export default function DailySessionsPage() {
 }
 
 
-// This component remains largely the same, but is now used within the Dialog
+function SurahCombobox({ value, onSelect, disabled }: { value: number | null, onSelect: (surahId: number | null) => void, disabled?: boolean }) {
+  const [open, setOpen] = useState(false)
+  const selectedSurah = value ? surahs.find(s => s.id === value) : null;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+          disabled={disabled}
+        >
+          {selectedSurah
+            ? `${selectedSurah.id}. ${selectedSurah.name}`
+            : "اختر السورة..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+        <Command>
+          <CommandInput placeholder="ابحث عن سورة..." />
+          <CommandList>
+            <CommandEmpty>لم يتم العثور على سورة.</CommandEmpty>
+            <CommandGroup>
+              {surahs.map((surah) => (
+                <CommandItem
+                  key={surah.id}
+                  value={`${surah.id} ${surah.name}`}
+                  onSelect={() => {
+                    onSelect(surah.id)
+                    setOpen(false)
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === surah.id ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {surah.id}. {surah.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function DailySessionForm({ day, students }: { day: string, students: Student[] }) {
   const [sessionType, setSessionType] = useState<SessionType>('حصة أساسية');
   const [records, setRecords] = useState<DailyRecord[]>(
@@ -183,9 +236,12 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
             updatedRec.toVerse = null;
           }
            if (field === 'surahId') {
-            updatedRec.fromVerse = 1;
-            updatedRec.toVerse = null;
-          }
+              const surah = surahs.find(s => s.id === value);
+              if (surah) {
+                updatedRec.fromVerse = 1;
+                updatedRec.toVerse = surah.verses;
+              }
+           }
           return updatedRec;
         }
         return rec;
@@ -231,7 +287,7 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[120px]">الطالب</TableHead>
-                <TableHead className="w-[240px]">الحضور</TableHead>
+                <TableHead className="w-[240px]">الحاضر</TableHead>
                 {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">السورة</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">الآيات</TableHead>}
@@ -288,29 +344,11 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
                           </Select>
                         </TableCell>
                         <TableCell>
-                           <Select
-                                dir="rtl"
-                                value={record.surahId?.toString() ?? ''}
-                                onValueChange={(value) => {
-                                  const surahId = parseInt(value);
-                                  const surah = surahs.find(s => s.id === surahId);
-                                  if (surah) {
-                                      handleRecordChange(student.id, 'surahId', surahId);
-                                      handleRecordChange(student.id, 'fromVerse', 1);
-                                      handleRecordChange(student.id, 'toVerse', null);
-                                  }
-                                }}
+                            <SurahCombobox 
+                                value={record.surahId} 
+                                onSelect={(surahId) => handleRecordChange(student.id, 'surahId', surahId)}
                                 disabled={isRowDisabled}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="اختر السورة" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {surahs.map(surah => (
-                                        <SelectItem key={surah.id} value={surah.id.toString()}>{surah.id}. {surah.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            />
                         </TableCell>
                          <TableCell>
                            <div className="flex items-center gap-1">
@@ -399,4 +437,3 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
     </TooltipProvider>
   );
 }
-
