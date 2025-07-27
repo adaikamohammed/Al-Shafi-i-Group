@@ -34,6 +34,11 @@ export interface DailyRecord {
   toVerse?: number | null;
 }
 
+export interface SessionRecord extends DailyRecord {
+    date: string; // YYYY-MM-DD
+    sessionType: SessionType;
+}
+
 export type SurahStatus = 
   | "قيد الحفظ" 
   | "تم الحفظ" 

@@ -1,13 +1,12 @@
-
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useStudentContext } from '@/context/StudentContext';
 import { surahs } from '@/lib/surahs';
-import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student } from '@/lib/types';
+import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, SessionRecord } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Info, ArrowLeft, ArrowRight, ChevronsUpDown, Check } from 'lucide-react';
@@ -59,13 +58,10 @@ export default function DailySessionsPage() {
     const year = getYear(currentDate);
     const month = getMonth(currentDate);
     const daysInMonth = getDaysInMonth(currentDate);
-    const firstDayOfMonth = getDay(startOfMonth(currentDate)); // 0 = Sunday, 1 = Monday...
+    const firstDayOfMonth = getDay(startOfMonth(currentDate));
 
     const dayCells = [];
-
-    // Add empty cells for days before the first of the month
-    // We adjust for RTL layout, starting from Saturday (6)
-    const startDayIndex = (firstDayOfMonth + 1) % 7; // Convert Sunday=0 to Saturday=0 for our grid
+    const startDayIndex = (firstDayOfMonth + 1) % 7; 
     for (let i = 0; i < startDayIndex; i++) {
         dayCells.push(<div key={`empty-start-${i}`} className="p-2 border rounded-md"></div>);
     }
@@ -144,7 +140,11 @@ export default function DailySessionsPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="overflow-y-auto pr-4">
-              <DailySessionForm day={format(selectedDay, 'EEEE')} students={activeStudents} />
+              <DailySessionForm 
+                day={selectedDay} 
+                students={activeStudents}
+                onClose={() => setSessionDialogOpen(false)}
+              />
             </div>
           </DialogContent>
         </Dialog>
@@ -206,21 +206,34 @@ function SurahCombobox({ value, onSelect, disabled }: { value: number | null, on
   )
 }
 
-function DailySessionForm({ day, students }: { day: string, students: Student[] }) {
+function DailySessionForm({ day, students, onClose }: { day: Date, students: Student[], onClose: () => void }) {
+  const { addMultipleDailyRecords, getRecordsForDate } = useStudentContext();
   const [sessionType, setSessionType] = useState<SessionType>('حصة أساسية');
-  const [records, setRecords] = useState<DailyRecord[]>(
-    students.map(s => ({
-      studentId: s.id,
-      attendance: 'حاضر',
-      memorization: null,
-      review: null,
-      behavior: 'هادئ',
-      notes: '',
-      surahId: null,
-      fromVerse: null,
-      toVerse: null,
-    }))
-  );
+  const [records, setRecords] = useState<DailyRecord[]>([]);
+
+  useEffect(() => {
+    const formattedDate = format(day, 'yyyy-MM-dd');
+    const existingRecords = getRecordsForDate(formattedDate);
+    
+    const initialRecords = students.map(s => {
+      const existing = existingRecords.find(r => r.studentId === s.id);
+      if (existing) {
+        return existing;
+      }
+      return {
+        studentId: s.id,
+        attendance: 'حاضر',
+        memorization: null,
+        review: null,
+        behavior: 'هادئ',
+        notes: '',
+        surahId: null,
+        fromVerse: null,
+        toVerse: null,
+      };
+    });
+    setRecords(initialRecords);
+  }, [day, students, getRecordsForDate]);
 
   const handleRecordChange = <K extends keyof DailyRecord>(studentId: string, field: K, value: DailyRecord[K]) => {
     setRecords(prevRecords =>
@@ -228,18 +241,14 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
         if (rec.studentId === studentId) {
           const updatedRec = { ...rec, [field]: value };
           if (field === 'attendance' && (value === 'غير مطالب' || value === 'غائب')) {
-            updatedRec.memorization = null;
-            updatedRec.review = null;
-            updatedRec.behavior = null;
-            updatedRec.surahId = null;
-            updatedRec.fromVerse = null;
-            updatedRec.toVerse = null;
+            updatedRec.memorization = null; updatedRec.review = null;
+            updatedRec.behavior = null; updatedRec.surahId = null;
+            updatedRec.fromVerse = null; updatedRec.toVerse = null;
           }
            if (field === 'surahId') {
-              const surah = surahs.find(s => s.id === value);
+              const surah = surahs.find(s => s.id === (value as number));
               if (surah) {
-                updatedRec.fromVerse = 1;
-                updatedRec.toVerse = surah.verses;
+                updatedRec.fromVerse = 1; updatedRec.toVerse = surah.verses;
               }
            }
           return updatedRec;
@@ -249,16 +258,27 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
     );
   };
 
+  const handleSave = () => {
+    const formattedDate = format(day, 'yyyy-MM-dd');
+    const recordsToSave: SessionRecord[] = records.map(r => ({
+      ...r,
+      date: formattedDate,
+      sessionType: sessionType,
+    }));
+    addMultipleDailyRecords(recordsToSave);
+    onClose();
+  }
+
   const isActivitySession = sessionType === 'حصة أنشطة';
 
   return (
     <TooltipProvider>
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Label htmlFor={`session-type-${day}`} className="font-bold">نوع الحصة:</Label>
+          <Label className="font-bold">نوع الحصة:</Label>
           <div className="flex items-center gap-2">
             <Select dir="rtl" value={sessionType} onValueChange={(value: SessionType) => setSessionType(value)}>
-              <SelectTrigger id={`session-type-${day}`} className="w-[200px]">
+              <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="اختر نوع الحصة" />
               </SelectTrigger>
               <SelectContent>
@@ -287,7 +307,7 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[120px]">الطالب</TableHead>
-                <TableHead className="w-[240px]">الحاضر</TableHead>
+                <TableHead className="w-[240px]">الحضور</TableHead>
                 {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">السورة</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">الآيات</TableHead>}
@@ -309,120 +329,55 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
                   <TableRow key={student.id} className={cn((isNotRequired || isAbsent) && 'bg-muted/50')}>
                     <TableCell className="font-medium">{student.fullName}</TableCell>
                     <TableCell>
-                      <RadioGroup
-                        dir="rtl"
-                        value={record.attendance}
-                        onValueChange={(value: AttendanceStatus) => handleRecordChange(student.id, 'attendance', value)}
-                        className="flex gap-2 flex-wrap"
-                      >
-                        <div className="flex items-center space-x-2 space-x-reverse"><RadioGroupItem value="حاضر" id={`att-present-${student.id}-${day}`} /><Label htmlFor={`att-present-${student.id}-${day}`}>حاضر</Label></div>
-                        <div className="flex items-center space-x-2 space-x-reverse"><RadioGroupItem value="غائب" id={`att-absent-${student.id}-${day}`} /><Label htmlFor={`att-absent-${student.id}-${day}`}>غائب</Label></div>
-                        <div className="flex items-center space-x-2 space-x-reverse"><RadioGroupItem value="متأخر" id={`att-late-${student.id}-${day}`} /><Label htmlFor={`att-late-${student.id}-${day}`}>متأخر</Label></div>
-                        <div className="flex items-center space-x-2 space-x-reverse"><RadioGroupItem value="غير مطالب" id={`att-notreq-${student.id}-${day}`} /><Label htmlFor={`att-notreq-${student.id}-${day}`}>غير مطالب</Label></div>
+                      <RadioGroup dir="rtl" value={record.attendance} onValueChange={(value: AttendanceStatus) => handleRecordChange(student.id, 'attendance', value)} className="flex gap-2 flex-wrap">
+                        <div className="flex items-center space-x-2 space-x-reverse"><RadioGroupItem value="حاضر" id={`att-present-${student.id}`} /><Label htmlFor={`att-present-${student.id}`}>حاضر</Label></div>
+                        <div className="flex items-center space-x-2 space-x-reverse"><RadioGroupItem value="غائب" id={`att-absent-${student.id}`} /><Label htmlFor={`att-absent-${student.id}`}>غائب</Label></div>
+                        <div className="flex items-center space-x-2 space-x-reverse"><RadioGroupItem value="متأخر" id={`att-late-${student.id}`} /><Label htmlFor={`att-late-${student.id}`}>متأخر</Label></div>
+                        <div className="flex items-center space-x-2 space-x-reverse"><RadioGroupItem value="غير مطالب" id={`att-notreq-${student.id}`} /><Label htmlFor={`att-notreq-${student.id}`}>غير مطالب</Label></div>
                       </RadioGroup>
                     </TableCell>
                     
                     {!isActivitySession && (
                       <>
                         <TableCell>
-                          <Select
-                            dir="rtl"
-                            value={record.memorization ?? ''}
-                            onValueChange={(value: PerformanceLevel) => handleRecordChange(student.id, 'memorization', value)}
-                            disabled={isRowDisabled}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="التقييم" />
-                            </SelectTrigger>
+                          <Select dir="rtl" value={record.memorization ?? ''} onValueChange={(value: PerformanceLevel) => handleRecordChange(student.id, 'memorization', value)} disabled={isRowDisabled}>
+                            <SelectTrigger><SelectValue placeholder="التقييم" /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="ممتاز">ممتاز</SelectItem>
-                              <SelectItem value="جيد">جيد</SelectItem>
-                              <SelectItem value="متوسط">متوسط</SelectItem>
-                              <SelectItem value="ضعيف">ضعيف</SelectItem>
+                              <SelectItem value="ممتاز">ممتاز</SelectItem><SelectItem value="جيد">جيد</SelectItem>
+                              <SelectItem value="متوسط">متوسط</SelectItem><SelectItem value="ضعيف">ضعيف</SelectItem>
                               <SelectItem value="لا يوجد">لا يوجد</SelectItem>
                             </SelectContent>
                           </Select>
                         </TableCell>
                         <TableCell>
-                            <SurahCombobox 
-                                value={record.surahId} 
-                                onSelect={(surahId) => handleRecordChange(student.id, 'surahId', surahId)}
-                                disabled={isRowDisabled}
-                            />
+                            <SurahCombobox value={record.surahId} onSelect={(surahId) => handleRecordChange(student.id, 'surahId', surahId)} disabled={isRowDisabled}/>
                         </TableCell>
                          <TableCell>
                            <div className="flex items-center gap-1">
-                                <Input
-                                    type="number"
-                                    placeholder="من"
-                                    min={1}
-                                    max={selectedSurah?.verses}
-                                    value={record.fromVerse ?? ''}
-                                    onChange={(e) => {
-                                        const from = e.target.value ? parseInt(e.target.value) : null;
-                                        if (from === null || (selectedSurah && from <= (record.toVerse ?? selectedSurah.verses))) {
-                                            handleRecordChange(student.id, 'fromVerse', from);
-                                        }
-                                    }}
-                                    disabled={isRowDisabled || !selectedSurah}
-                                    className="w-16 h-9 text-center"
-                                />
+                                <Input type="number" placeholder="من" min={1} max={selectedSurah?.verses} value={record.fromVerse ?? ''} onChange={(e) => handleRecordChange(student.id, 'fromVerse', e.target.value ? parseInt(e.target.value) : null)} disabled={isRowDisabled || !selectedSurah} className="w-16 h-9 text-center"/>
                                 <span>-</span>
-                                <Input
-                                    type="number"
-                                    placeholder="إلى"
-                                    min={record.fromVerse ?? 1}
-                                    max={selectedSurah?.verses}
-                                    value={record.toVerse ?? ''}
-                                     onChange={(e) => {
-                                        const to = e.target.value ? parseInt(e.target.value) : null;
-                                        if (to === null || (selectedSurah && to >= (record.fromVerse ?? 1) && to <= selectedSurah.verses)) {
-                                          handleRecordChange(student.id, 'toVerse', to);
-                                        }
-                                     }}
-                                    disabled={isRowDisabled || !selectedSurah}
-                                    className="w-16 h-9 text-center"
-                                />
+                                <Input type="number" placeholder="إلى" min={record.fromVerse ?? 1} max={selectedSurah?.verses} value={record.toVerse ?? ''} onChange={(e) => handleRecordChange(student.id, 'toVerse', e.target.value ? parseInt(e.target.value) : null)} disabled={isRowDisabled || !selectedSurah} className="w-16 h-9 text-center"/>
                            </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2 space-x-reverse">
-                            <Switch
-                              id={`review-${student.id}-${day}`}
-                              checked={record.review ?? false}
-                              onCheckedChange={(checked) => handleRecordChange(student.id, 'review', checked)}
-                              disabled={isRowDisabled}
-                            />
-                            <Label htmlFor={`review-${student.id}-${day}`}>{record.review ? 'تمت' : 'لم تتم'}</Label>
+                            <Switch id={`review-${student.id}`} checked={record.review ?? false} onCheckedChange={(checked) => handleRecordChange(student.id, 'review', checked)} disabled={isRowDisabled}/>
+                            <Label htmlFor={`review-${student.id}`}>{record.review ? 'تمت' : 'لم تتم'}</Label>
                           </div>
                         </TableCell>
                       </>
                     )}
                     <TableCell>
-                      <Select
-                        dir="rtl"
-                        value={record.behavior ?? ''}
-                        onValueChange={(value: BehaviorLevel) => handleRecordChange(student.id, 'behavior', value)}
-                        disabled={isNotRequired || isAbsent}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="السلوك" />
-                        </SelectTrigger>
+                      <Select dir="rtl" value={record.behavior ?? ''} onValueChange={(value: BehaviorLevel) => handleRecordChange(student.id, 'behavior', value)} disabled={isNotRequired || isAbsent}>
+                        <SelectTrigger><SelectValue placeholder="السلوك" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="هادئ">هادئ</SelectItem>
-                          <SelectItem value="متوسط">متوسط</SelectItem>
+                          <SelectItem value="هادئ">هادئ</SelectItem><SelectItem value="متوسط">متوسط</SelectItem>
                           <SelectItem value="غير منضبط">غير منضبط</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Textarea
-                        placeholder="ملاحظة..."
-                        value={record.notes ?? ''}
-                        onChange={(e) => handleRecordChange(student.id, 'notes', e.target.value)}
-                        disabled={isNotRequired && !record.notes && !isAbsent}
-                        className="h-10"
-                      />
+                      <Textarea placeholder="ملاحظة..." value={record.notes ?? ''} onChange={(e) => handleRecordChange(student.id, 'notes', e.target.value)} disabled={isNotRequired && !record.notes && !isAbsent} className="h-10"/>
                     </TableCell>
                   </TableRow>
                 );
@@ -430,9 +385,10 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
             </TableBody>
           </Table>
         </div>
-        <div className="flex justify-end mt-6">
-          <Button>حفظ بيانات يوم {day}</Button>
-        </div>
+        <DialogFooter className="mt-6">
+            <Button variant="outline" onClick={onClose}>إلغاء</Button>
+            <Button onClick={handleSave}>حفظ بيانات اليوم</Button>
+        </DialogFooter>
       </div>
     </TooltipProvider>
   );

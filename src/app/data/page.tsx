@@ -4,19 +4,23 @@ import React, { useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { Upload, Download, FileText, FileSpreadsheet, History } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { Student } from '@/lib/types';
+import type { Student, SessionRecord } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
-
+import { format, parse } from 'date-fns';
+import { ar } from 'date-fns/locale';
+import { surahs } from '@/lib/surahs';
 
 export default function DataExchangePage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { students, addStudent } = useStudentContext();
+  const sessionFileInputRef = useRef<HTMLInputElement>(null);
+  const { students, addStudent, addMultipleDailyRecords } = useStudentContext();
+  const activeStudents = students.filter(s => s.status === 'نشط');
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStudentFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -30,27 +34,17 @@ export default function DataExchangePage() {
         const json = XLSX.utils.sheet_to_json<any>(worksheet);
         
         const newStudents: Student[] = json.map((row, index) => {
-           // Handle various date formats from Excel
            const parseDate = (dateInput: any): Date | null => {
                 if (!dateInput) return null;
-                // If it's already a JS Date object (from cellDates:true)
-                if (dateInput instanceof Date) {
-                    return dateInput;
-                }
-                // If it's a string (e.g., "dd/mm/yyyy" or "yyyy-mm-dd")
+                if (dateInput instanceof Date) return dateInput;
                 if (typeof dateInput === 'string') {
                     if (dateInput.includes('/')) {
                         const parts = dateInput.split('/');
-                        // Assuming dd/mm/yyyy
                         return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
                     }
-                    // For yyyy-mm-dd or other standard formats
                     return new Date(dateInput); 
                 }
-                 // If it's an Excel serial number
-                if (typeof dateInput === 'number') {
-                    return XLSX.SSF.parse_date_code(dateInput);
-                }
+                if (typeof dateInput === 'number') return XLSX.SSF.parse_date_code(dateInput);
                 return null;
            }
 
@@ -68,15 +62,14 @@ export default function DataExchangePage() {
               phone1: row['رقم الهاتف']?.toString() || 'N/A',
               birthDate: birthDate,
               registrationDate: registrationDate,
-              status: 'نشط', // All imported students are active by default
-              memorizedSurahsCount: 0, // Default value
-              dailyMemorizationAmount: 'صفحة', // Default value
+              status: 'نشط',
+              memorizedSurahsCount: 0,
+              dailyMemorizationAmount: 'صفحة',
               notes: row['ملاحظات'] || '',
               updatedAt: new Date()
            }
         });
 
-        // Add new students to the global context
         newStudents.forEach(student => addStudent(student));
         
         toast({
@@ -86,7 +79,7 @@ export default function DataExchangePage() {
 
       } catch (error) {
         console.error("Error parsing Excel file:", error);
-        const errorMessage = error instanceof Error ? error.message : "حدث خطأ أثناء قراءة الملف. يرجى التأكد من أن الملف بالصيغة الصحيحة وأن التواريخ مدخلة بشكل صحيح.";
+        const errorMessage = error instanceof Error ? error.message : "حدث خطأ أثناء قراءة الملف. يرجى التأكد من أن الملف بالصيغة الصحيحة.";
         toast({
           title: "خطأ في الاستيراد ❌",
           description: errorMessage,
@@ -95,71 +88,130 @@ export default function DataExchangePage() {
       }
     };
     reader.readAsArrayBuffer(file);
-    
-    // Reset file input
-    if(fileInputRef.current) {
-        fileInputRef.current.value = '';
-    }
+    if(fileInputRef.current) fileInputRef.current.value = '';
+  };
+  
+   const handleSessionFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json<any>(worksheet);
+        
+        const newRecords: SessionRecord[] = json.map((row, index) => {
+           const studentName = row['اسم الطالب'];
+           const student = students.find(s => s.fullName === studentName);
+           if (!student) {
+             console.warn(`لم يتم العثور على الطالب: ${studentName} في الصف ${index + 2}. سيتم تجاهل هذا السجل.`);
+             return null;
+           }
+           
+           const date = parse(row['التاريخ'], 'dd/MM/yyyy', new Date());
+           const surah = surahs.find(s => s.name === row['السورة']);
+
+           return {
+             date: format(date, 'yyyy-MM-dd'),
+             studentId: student.id,
+             sessionType: 'حصة أساسية', // Default for now
+             attendance: row['الحضور'],
+             behavior: row['السلوك'],
+             memorization: row['التقييم'],
+             review: row['مراجعة'] === 'نعم',
+             surahId: surah?.id,
+             fromVerse: row['من آية'],
+             toVerse: row['إلى آية'],
+             notes: row['ملاحظات'],
+           };
+        }).filter((r): r is SessionRecord => r !== null);
+        
+        addMultipleDailyRecords(newRecords);
+
+        toast({
+          title: "نجاح ✅",
+          description: `تم استيراد ${newRecords.length} سجل حصة بنجاح.`,
+        });
+
+      } catch (error) {
+        console.error("Error parsing session file:", error);
+        toast({
+          title: "خطأ في استيراد سجل الحصة ❌",
+          description: "حدث خطأ أثناء قراءة الملف. تأكد من تطابق أسماء الطلبة وصيغة التاريخ.",
+          variant: 'destructive',
+        });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    if (sessionFileInputRef.current) sessionFileInputRef.current.value = '';
   };
 
-  const handleDownloadTemplate = () => {
-    const headers = [
-      "الاسم الكامل", "اسم الولي", "رقم الهاتف", 
-      "تاريخ الميلاد", "تاريخ التسجيل", "ملاحظات"
-    ];
-    // Example row to guide the user. Using yyyy-mm-dd is more robust.
+  const handleDownloadStudentTemplate = () => {
+    const headers = ["الاسم الكامل", "اسم الولي", "رقم الهاتف", "تاريخ الميلاد", "تاريخ التسجيل", "ملاحظات"];
     const exampleRow = {
-      "الاسم الكامل": "عبدالله بن محمد",
-      "اسم الولي": "محمد الأحمد",
-      "رقم الهاتف": "0501234567",
-      "تاريخ الميلاد": "15/01/2012",
-      "تاريخ التسجيل": "01/09/2023",
-      "ملاحظات": "طالب مستجد"
+      "الاسم الكامل": "عبدالله بن محمد", "اسم الولي": "محمد الأحمد", "رقم الهاتف": "0501234567",
+      "تاريخ الميلاد": "15/01/2012", "تاريخ التسجيل": "01/09/2023", "ملاحظات": "طالب مستجد"
     };
-
     const ws = XLSX.utils.json_to_sheet([exampleRow], { header: headers });
-    
-    // Set column widths for better readability
-    ws['!cols'] = [
-        { wch: 20 }, { wch: 20 }, { wch: 15 },
-        { wch: 15 }, { wch: 15 }, { wch: 30 }
-    ];
-
+    ws['!cols'] = [ { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 30 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "نموذج الطلبة");
     XLSX.writeFile(wb, "نموذج_استيراد_الطلبة.xlsx");
   };
 
+  const handleDownloadSessionTemplate = () => {
+    const today = new Date();
+    const formattedDate = format(today, 'dd/MM/yyyy');
+    const dayName = format(today, 'EEEE', { locale: ar });
+
+    const data = activeStudents.map(student => ({
+      'التاريخ': formattedDate,
+      'اليوم': dayName,
+      'اسم الطالب': student.fullName,
+      'الحضور': '', 'التقييم': '', 'السلوك': '',
+      'السورة': '', 'من آية': '', 'إلى آية': '',
+      'مراجعة': 'لا', 'ملاحظات': ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [
+      { wch: 12 }, { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+      { wch: 12 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 30 }
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `سجل حصة ${format(today, 'yyyy-MM-dd')}`);
+    XLSX.writeFile(wb, `نموذج_حصة_${format(today, 'yyyy-MM-dd')}.xlsx`);
+  };
+
   return (
     <div className="space-y-6">
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileUpload}
-        accept=".xlsx, .xls"
-        className="hidden"
-      />
+      <input type="file" ref={fileInputRef} onChange={handleStudentFileUpload} accept=".xlsx, .xls" className="hidden" />
+      <input type="file" ref={sessionFileInputRef} onChange={handleSessionFileUpload} accept=".xlsx, .xls" className="hidden" />
+      
       <h1 className="text-3xl font-headline font-bold">استيراد وتصدير البيانات</h1>
+      
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>📥 استيراد البيانات</CardTitle>
+            <CardTitle>📥 بيانات الطلبة</CardTitle>
             <CardDescription>
-              رفع ملف Excel يحتوي على بيانات الطلبة لبدء العام الدراسي.
+              رفع ملف Excel يحتوي على بيانات الطلبة لبدء العام الدراسي أو إضافة طلبة جدد.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              قم بتحميل النموذج الفارغ، واملأه ببيانات الطلبة الجدد، ثم ارفعه هنا. سيتم تعيين حالتهم إلى "نشط" تلقائيًا. تأكد من أن التواريخ مدخلة بصيغة يفهمها Excel مثل (dd/mm/yyyy).
+              قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. سيتم تعيين حالتهم إلى "نشط" تلقائيًا.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button className="flex-grow" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="ml-2 h-4 w-4" />
-                رفع ملف Excel
+                <Upload className="ml-2 h-4 w-4" /> رفع ملف الطلبة
               </Button>
-               <Button variant="outline" onClick={handleDownloadTemplate}>
-                <Download className="ml-2 h-4 w-4" />
-                تحميل النموذج
+               <Button variant="outline" onClick={handleDownloadStudentTemplate}>
+                <Download className="ml-2 h-4 w-4" /> تحميل نموذج الطلبة
               </Button>
             </div>
           </CardContent>
@@ -167,56 +219,47 @@ export default function DataExchangePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>📤 تصدير البيانات</CardTitle>
+            <CardTitle>📤 تقارير وتصدير</CardTitle>
             <CardDescription>
               تصدير تقارير شاملة للفوج أو تقارير فردية للطلبة بصيغ مختلفة.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <h3 className="font-medium mb-2">تقرير الفوج الكامل</h3>
-              <p className="text-sm text-muted-foreground mb-3">
-                يشمل ملخصًا شاملاً لجميع الطلبة وأدائهم. (قيد التطوير)
-              </p>
-              <div className="flex gap-2">
-                <Button variant="secondary" disabled>
-                  <FileSpreadsheet className="ml-2 h-4 w-4" />
-                  تصدير Excel
-                </Button>
-                <Button variant="secondary" disabled>
-                  <FileText className="ml-2 h-4 w-4" />
-                  تصدير PDF
-                </Button>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-medium mb-2">تقرير طالب فردي</h3>
-               <p className="text-sm text-muted-foreground mb-3">
-                اختر طالبًا لتصدير تقريره المفصل. (قيد التطوير)
-              </p>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Select dir="rtl" disabled>
-                  <SelectTrigger className="flex-grow">
-                    <SelectValue placeholder="اختر طالبًا..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {students.map(student => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button variant="secondary" className="w-full sm:w-auto" disabled>
-                   <Download className="ml-2 h-4 w-4" />
-                   تصدير تقرير الطالب
-                </Button>
-              </div>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Button variant="secondary" disabled>
+                <FileSpreadsheet className="ml-2 h-4 w-4" /> تصدير ملخص الفوج (Excel)
+              </Button>
+              <Button variant="secondary" disabled>
+                <FileText className="ml-2 h-4 w-4" /> تصدير تقارير (PDF)
+              </Button>
             </div>
           </CardContent>
         </Card>
       </div>
+
+       <Card className="col-span-1 lg:col-span-2">
+          <CardHeader>
+            <CardTitle>🔄 بيانات الحصص اليومية</CardTitle>
+            <CardDescription>
+              تنزيل نموذج حصة يومية بأسماء الطلبة النشطين، وتعبئته، ثم رفعه لتسجيل الحصة دفعة واحدة.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+             <p className="text-sm text-muted-foreground">
+              هذه الميزة مفيدة لتسجيل بيانات الحصص بشكل غير متصل بالإنترنت. تأكد من أن تاريخ اليوم وأسماء الطلبة صحيحة في الملف قبل رفعه.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+               <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()}>
+                <History className="ml-2 h-4 w-4" /> رفع سجل حصة
+              </Button>
+              <Button variant="outline" onClick={handleDownloadSessionTemplate} disabled={activeStudents.length === 0}>
+                <Download className="ml-2 h-4 w-4" /> تحميل نموذج حصة اليوم
+              </Button>
+            </div>
+             {activeStudents.length === 0 && <p className="text-xs text-destructive text-center mt-2">يجب إضافة طلبة نشطين أولاً لتتمكن من تحميل النموذج.</p>}
+          </CardContent>
+        </Card>
+
     </div>
   );
 }
