@@ -15,16 +15,17 @@ export interface Student {
   notes?: string;
 }
 
-export type AttendanceStatus = "حاضر" | "غائب" | "متأخر";
+export type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "غير مطالب";
 export type PerformanceLevel = "ممتاز" | "جيد" | "متوسط" | "ضعيف";
 export type BehaviorLevel = "هادئ" | "متوسط" | "غير منضبط";
+export type SessionType = "حصة أساسية" | "حصة إضافية 1" | "حصة إضافية 2" | "حصة أنشطة";
 
 export interface DailyRecord {
   studentId: string;
   attendance: AttendanceStatus;
-  memorization: PerformanceLevel;
-  review: boolean;
-  behavior: BehaviorLevel;
+  memorization: PerformanceLevel | null; // Can be null for activity sessions or "not required"
+  review: boolean | null; // Can be null
+  behavior: BehaviorLevel | null; // Can be null
   notes?: string;
 }
 
