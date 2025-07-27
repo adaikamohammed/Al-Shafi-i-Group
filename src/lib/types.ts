@@ -10,17 +10,17 @@ export interface Student {
   birthDate: Date;
   registrationDate: Date;
   status: StudentStatus;
+  actionReason?: string; // Reason for deletion or expulsion
   memorizedSurahsCount: number;
   dailyMemorizationAmount: MemorizationAmount;
   notes?: string;
-  actionReason?: string; // Reason for deletion or expulsion
   updatedAt: Date;
 }
 
-export type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "غير مطالب";
+export type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "تعويض";
 export type PerformanceLevel = "ممتاز" | "جيد" | "متوسط" | "ضعيف" | "لا يوجد";
 export type BehaviorLevel = "هادئ" | "متوسط" | "غير منضبط";
-export type SessionType = "حصة أساسية" | "حصة إضافية 1" | "حصة إضافية 2" | "حصة أنشطة" | "يوم عطلة";
+export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة";
 
 export interface DailyRecord {
   studentId: string;

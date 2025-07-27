@@ -16,7 +16,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { format, getMonth, getYear, setMonth, getDaysInMonth, startOfMonth, getDay, addMonths, subMonths, isPast, isToday } from 'date-fns';
+import { format, getMonth, getYear, setMonth, getDaysInMonth, startOfMonth, getDay, addMonths, subMonths, isPast, isToday, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -24,11 +24,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 const sessionTypeDescriptions: { [key in SessionType]: string } = {
   'حصة أساسية': 'الحصة العادية لحفظ ومراجعة القرآن.',
-  'حصة إضافية 1': 'حصة إضافية مخصصة لبعض الطلبة لتقوية الحفظ أو المراجعة.',
-  'حصة إضافية 2': 'حصة إضافية ثانية حسب الحاجة.',
   'حصة أنشطة': 'حصة مخصصة للأنشطة والترفيه، لا تتضمن حفظاً أو مراجعة.',
   'يوم عطلة': 'يوم لا توجد فيه حصص دراسية لجميع الطلبة.',
 };
+
+const attendanceOptions: AttendanceStatus[] = ["حاضر", "غائب", "متأخر", "تعويض"];
+const sessionTypeOptions: SessionType[] = ["حصة أساسية", "حصة أنشطة", "يوم عطلة"];
+
 
 export default function DailySessionsPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -73,15 +75,14 @@ export default function DailySessionsPage() {
     for (let day = 1; day <= daysInMonth; day++) {
         const dayDate = new Date(year, month, day);
         const formattedDayDate = format(dayDate, 'yyyy-MM-dd');
-        const record = recordsForMonth.find(r => r.date === formattedDayDate);
+        const holidayRecord = recordsForMonth.find(r => r.date === formattedDayDate && r.studentId === 'holiday');
+        const dayHasRecords = recordsForMonth.some(r => r.date === formattedDayDate && r.studentId !== 'holiday');
         
         let dayStatusClass = '';
-        if (record) {
-             if(record.sessionType === 'يوم عطلة'){
-                dayStatusClass = 'bg-gray-200 dark:bg-gray-700';
-             } else {
-                dayStatusClass = 'bg-green-200 dark:bg-green-800';
-             }
+        if (holidayRecord) {
+            dayStatusClass = 'bg-gray-200 dark:bg-gray-700';
+        } else if (dayHasRecords) {
+            dayStatusClass = 'bg-green-200 dark:bg-green-800';
         } else if (isPast(dayDate) && !isToday(dayDate)) {
              dayStatusClass = 'bg-red-200 dark:bg-red-900';
         }
@@ -264,7 +265,7 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
       prevRecords.map(rec => {
         if (rec.studentId === studentId) {
           const updatedRec = { ...rec, [field]: value };
-          if (field === 'attendance' && (value === 'غير مطالب' || value === 'غائب')) {
+          if (field === 'attendance' && value === 'غائب') {
             updatedRec.memorization = null; updatedRec.review = null;
             updatedRec.behavior = null; updatedRec.surahId = null;
             updatedRec.fromVerse = null; updatedRec.toVerse = null;
@@ -286,12 +287,11 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
     const formattedDate = format(day, 'yyyy-MM-dd');
     
     if (sessionType === 'يوم عطلة') {
-      // Create a single record for the day to mark it as a holiday
       const holidayRecord: SessionRecord = {
           date: formattedDate,
           sessionType: 'يوم عطلة',
-          studentId: 'holiday', // Special ID for holiday records
-          attendance: 'غير مطالب',
+          studentId: 'holiday',
+          attendance: 'غائب',
           memorization: null,
           review: null,
           behavior: null,
@@ -322,7 +322,7 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
                 <SelectValue placeholder="اختر نوع الحصة" />
               </SelectTrigger>
               <SelectContent>
-                {Object.keys(sessionTypeDescriptions).map(type => (
+                {sessionTypeOptions.map(type => (
                   <SelectItem key={type} value={type}>
                     {type}
                   </SelectItem>
@@ -347,7 +347,7 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[120px]">الطالب</TableHead>
-                <TableHead className="w-[240px]">الحاضر</TableHead>
+                <TableHead className="w-[240px]">الحضور</TableHead>
                 {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">السورة</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">الآيات</TableHead>}
@@ -360,20 +360,21 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
               {students.map(student => {
                 const record = records.find(r => r.studentId === student.id);
                 if (!record) return null;
-                const isNotRequired = record.attendance === 'غير مطالب';
                 const isAbsent = record.attendance === 'غائب';
-                const isRowDisabled = isNotRequired || isActivitySession || isAbsent;
+                const isRowDisabled = isActivitySession || isAbsent;
                 const selectedSurah = record.surahId ? surahs.find(s => s.id === record.surahId) : null;
                 
                 return (
-                  <TableRow key={student.id} className={cn((isNotRequired || isAbsent) && 'bg-muted/50')}>
+                  <TableRow key={student.id} className={cn(isAbsent && 'bg-muted/50')}>
                     <TableCell className="font-medium">{student.fullName}</TableCell>
                     <TableCell>
                       <RadioGroup dir="rtl" value={record.attendance} onValueChange={(value: AttendanceStatus) => handleRecordChange(student.id, 'attendance', value)} className="flex gap-2 flex-wrap">
-                        <div className="flex items-center space-x-2 space-x-reverse"><RadioGroupItem value="حاضر" id={`att-present-${student.id}`} /><Label htmlFor={`att-present-${student.id}`}>حاضر</Label></div>
-                        <div className="flex items-center space-x-2 space-x-reverse"><RadioGroupItem value="غائب" id={`att-absent-${student.id}`} /><Label htmlFor={`att-absent-${student.id}`}>غائب</Label></div>
-                        <div className="flex items-center space-x-2 space-x-reverse"><RadioGroupItem value="متأخر" id={`att-late-${student.id}`} /><Label htmlFor={`att-late-${student.id}`}>متأخر</Label></div>
-                        <div className="flex items-center space-x-2 space-x-reverse"><RadioGroupItem value="غير مطالب" id={`att-notreq-${student.id}`} /><Label htmlFor={`att-notreq-${student.id}`}>غير مطالب</Label></div>
+                        {attendanceOptions.map(opt => (
+                           <div key={opt} className="flex items-center space-x-2 space-x-reverse">
+                             <RadioGroupItem value={opt} id={`att-${opt}-${student.id}`} />
+                             <Label htmlFor={`att-${opt}-${student.id}`}>{opt}</Label>
+                           </div>
+                        ))}
                       </RadioGroup>
                     </TableCell>
                     
@@ -408,7 +409,7 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
                       </>
                     )}
                     <TableCell>
-                      <Select dir="rtl" value={record.behavior ?? ''} onValueChange={(value: BehaviorLevel) => handleRecordChange(student.id, 'behavior', value)} disabled={isNotRequired || isAbsent}>
+                      <Select dir="rtl" value={record.behavior ?? ''} onValueChange={(value: BehaviorLevel) => handleRecordChange(student.id, 'behavior', value)} disabled={isAbsent}>
                         <SelectTrigger><SelectValue placeholder="السلوك" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="هادئ">هادئ</SelectItem><SelectItem value="متوسط">متوسط</SelectItem>
@@ -417,7 +418,7 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Textarea placeholder="ملاحظة..." value={record.notes ?? ''} onChange={(e) => handleRecordChange(student.id, 'notes', e.target.value)} disabled={isNotRequired && !record.notes && !isAbsent} className="h-10"/>
+                      <Textarea placeholder="ملاحظة..." value={record.notes ?? ''} onChange={(e) => handleRecordChange(student.id, 'notes', e.target.value)} disabled={isAbsent && !record.notes} className="h-10"/>
                     </TableCell>
                   </TableRow>
                 );

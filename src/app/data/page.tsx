@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Upload, Download, FileText, FileSpreadsheet, History } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { Student, SessionRecord } from '@/lib/types';
+import type { Student, SessionRecord, SessionType } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
-import { format, parse } from 'date-fns';
+import { format, parse, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { surahs } from '@/lib/surahs';
 
@@ -17,8 +17,12 @@ export default function DataExchangePage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sessionFileInputRef = useRef<HTMLInputElement>(null);
-  const { students, addStudent, addMultipleDailyRecords } = useStudentContext();
+  const { students, addStudent, addMultipleDailyRecords, getRecordsForDateRange } = useStudentContext();
   const activeStudents = students.filter(s => s.status === 'نشط');
+
+  const [exportMonth, setExportMonth] = useState(new Date().getMonth());
+  const [exportYear, setExportYear] = useState(new Date().getFullYear());
+
 
   const handleStudentFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -39,7 +43,7 @@ export default function DataExchangePage() {
                 if (dateInput instanceof Date) return dateInput;
                 if (typeof dateInput === 'string') {
                     if (dateInput.includes('/')) {
-                        const parts = dateInput.split('/');
+                        const parts = dateInput.split('/'); // dd/mm/yyyy
                         return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
                     }
                     return new Date(dateInput); 
@@ -106,8 +110,14 @@ export default function DataExchangePage() {
         
         const newRecords: SessionRecord[] = json.map((row, index) => {
            const studentName = row['اسم الطالب'];
+           // For non-holiday sessions, student name is required
+           if (row['نوع الحصة'] !== 'يوم عطلة' && !studentName) {
+             console.warn(`لا يوجد اسم طالب في الصف ${index + 2}. سيتم تجاهل هذا السجل.`);
+             return null;
+           }
+
            const student = students.find(s => s.fullName === studentName);
-           if (!student) {
+           if (row['نوع الحصة'] !== 'يوم عطلة' && !student) {
              console.warn(`لم يتم العثور على الطالب: ${studentName} في الصف ${index + 2}. سيتم تجاهل هذا السجل.`);
              return null;
            }
@@ -117,8 +127,8 @@ export default function DataExchangePage() {
 
            return {
              date: format(date, 'yyyy-MM-dd'),
-             studentId: student.id,
-             sessionType: 'حصة أساسية', // Default for now
+             studentId: row['نوع الحصة'] === 'يوم عطلة' ? 'holiday' : student!.id,
+             sessionType: row['نوع الحصة'] || 'حصة أساسية',
              attendance: row['الحضور'],
              behavior: row['السلوك'],
              memorization: row['التقييم'],
@@ -171,6 +181,7 @@ export default function DataExchangePage() {
     const data = activeStudents.map(student => ({
       'التاريخ': formattedDate,
       'اليوم': dayName,
+      'نوع الحصة': 'حصة أساسية',
       'اسم الطالب': student.fullName,
       'الحضور': '', 'التقييم': '', 'السلوك': '',
       'السورة': '', 'من آية': '', 'إلى آية': '',
@@ -179,13 +190,56 @@ export default function DataExchangePage() {
 
     const ws = XLSX.utils.json_to_sheet(data);
     ws['!cols'] = [
-      { wch: 12 }, { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+      { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
       { wch: 12 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 30 }
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `سجل حصة ${format(today, 'yyyy-MM-dd')}`);
     XLSX.writeFile(wb, `نموذج_حصة_${format(today, 'yyyy-MM-dd')}.xlsx`);
   };
+
+  const handleExportMonthlyReport = () => {
+        const startDate = startOfMonth(new Date(exportYear, exportMonth));
+        const endDate = endOfMonth(new Date(exportYear, exportMonth));
+        const records = getRecordsForDateRange(format(startDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd'));
+
+        if (records.length === 0) {
+            toast({
+                title: "لا توجد بيانات",
+                description: `لا توجد سجلات لهذا الشهر (${format(startDate, 'MMMM yyyy', {locale: ar})}).`,
+                variant: 'destructive'
+            });
+            return;
+        }
+
+        const dataForSheet = records.map(record => {
+            const student = students.find(s => s.id === record.studentId);
+            const surah = surahs.find(s => s.id === record.surahId);
+            return {
+                'التاريخ': format(parseISO(record.date), 'dd/MM/yyyy'),
+                'اليوم': format(parseISO(record.date), 'EEEE', { locale: ar }),
+                'نوع الحصة': record.sessionType,
+                'اسم الطالب': record.studentId === 'holiday' ? '-' : student?.fullName || 'غير معروف',
+                'الحضور': record.attendance || '',
+                'التقييم': record.memorization || '',
+                'السلوك': record.behavior || '',
+                'السورة': surah?.name || '',
+                'من آية': record.fromVerse || '',
+                'إلى آية': record.toVerse || '',
+                'مراجعة': record.review ? 'نعم' : 'لا',
+                'ملاحظات': record.notes || '',
+            }
+        });
+
+        const ws = XLSX.utils.json_to_sheet(dataForSheet);
+        ws['!cols'] = [
+            { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+            { wch: 12 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 30 }
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, `تقرير شهر ${format(startDate, 'MMMM yyyy', {locale: ar})}`);
+        XLSX.writeFile(wb, `تقرير_حصص_شهر_${format(startDate, 'yyyy-MM')}.xlsx`);
+  }
 
   return (
     <div className="space-y-6">
@@ -225,12 +279,31 @@ export default function DataExchangePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Button variant="secondary" disabled>
-                <FileSpreadsheet className="ml-2 h-4 w-4" /> تصدير ملخص الفوج (Excel)
-              </Button>
-              <Button variant="secondary" disabled>
-                <FileText className="ml-2 h-4 w-4" /> تصدير تقارير (PDF)
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                 <Select dir="rtl" value={exportMonth.toString()} onValueChange={(val) => setExportMonth(parseInt(val))}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="اختر الشهر" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {Array.from({length: 12}, (_, i) => (
+                             <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
+                        ))}
+                    </SelectContent>
+                 </Select>
+                  <Select dir="rtl" value={exportYear.toString()} onValueChange={(val) => setExportYear(parseInt(val))}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="اختر السنة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                         {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
+                              <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                         ))}
+                    </SelectContent>
+                 </Select>
+              </div>
+              <Button onClick={handleExportMonthlyReport}>
+                <FileSpreadsheet className="ml-2 h-4 w-4" /> تصدير الحصص لشهر كامل (Excel)
               </Button>
             </div>
           </CardContent>
