@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,10 +43,14 @@ export default function StudentManagementPage() {
   const handleStatusChange = (studentId: string, status: StudentStatus, reason?: string) => {
     setStudents(prevStudents =>
       prevStudents.map(s =>
-        s.id === studentId ? { ...s, status } : s
+        s.id === studentId ? { ...s, status, actionReason: reason } : s
       )
     );
   };
+
+  const visibleStudents = useMemo(() => {
+    return students.filter(s => s.status !== 'محذوف' && s.status !== 'مطرود');
+  }, [students]);
 
   return (
     <div className="space-y-6">
@@ -88,7 +92,7 @@ export default function StudentManagementPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {students.map((student) => (
+              {visibleStudents.map((student) => (
                 <TableRow key={student.id}>
                   <TableCell className="font-medium">{student.fullName}</TableCell>
                   <TableCell className="hidden md:table-cell">{student.guardianName}</TableCell>
@@ -112,16 +116,8 @@ export default function StudentManagementPage() {
 
 function StudentActions({ student, onStatusChange }: { student: Student, onStatusChange: (studentId: string, status: StudentStatus, reason?: string) => void }) {
     const [isEditOpen, setEditOpen] = useState(false);
-    const [expelReason, setExpelReason] = useState('');
-
-    const handleDelete = () => {
-        onStatusChange(student.id, 'محذوف');
-    };
-
-    const handleExpel = () => {
-        onStatusChange(student.id, 'مطرود', expelReason);
-    };
-
+    const [actionReason, setActionReason] = useState('');
+    
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -149,27 +145,36 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
                 </Dialog>
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={student.status === 'محذوف'}>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
                             <Trash2 className="ml-2 h-4 w-4" />
                             حذف
                         </DropdownMenuItem>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                            <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                            <AlertDialogTitle>هل أنت متأكد من حذف الطالب {student.fullName}؟</AlertDialogTitle>
                             <AlertDialogDescription>
-                                سيؤدي هذا إلى تغيير حالة الطالب إلى "محذوف" وإخفائه من القوائم النشطة، ولكن لن يتم حذف بياناته نهائيًا.
+                                سيؤدي هذا إلى تغيير حالة الطالب إلى "محذوف" وإخفائه من القوائم النشطة. الرجاء إدخال سبب الحذف.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
+                        <div className="py-4">
+                            <Label htmlFor="delete-reason">سبب الحذف</Label>
+                            <Textarea 
+                                id="delete-reason" 
+                                placeholder="مثال: انتقال إلى مدينة أخرى..." 
+                                value={actionReason}
+                                onChange={(e) => setActionReason(e.target.value)}
+                            />
+                        </div>
                         <AlertDialogFooter>
-                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleDelete}>متابعة</AlertDialogAction>
+                            <AlertDialogCancel onClick={() => setActionReason('')}>إلغاء</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => onStatusChange(student.id, 'محذوف', actionReason)}>تأكيد الحذف</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
                 <AlertDialog>
                      <AlertDialogTrigger asChild>
-                         <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={student.status === 'مطرود'}>
+                         <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
                             <UserX className="ml-2 h-4 w-4" />
                             طرد
                         </DropdownMenuItem>
@@ -178,7 +183,7 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
                         <AlertDialogHeader>
                             <AlertDialogTitle>طرد الطالب {student.fullName}</AlertDialogTitle>
                             <AlertDialogDescription>
-                                الرجاء إدخال سبب الطرد. سيتم تسجيل هذا في سجل الطالب وتغيير حالته إلى "مطرود".
+                                سيؤدي هذا إلى تغيير حالة الطالب إلى "مطرود" وإخفائه من القوائم النشطة. الرجاء إدخال سبب الطرد.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <div className="py-4">
@@ -186,13 +191,13 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
                             <Textarea 
                                 id="expel-reason" 
                                 placeholder="مثال: غياب متكرر بدون عذر..." 
-                                value={expelReason}
-                                onChange={(e) => setExpelReason(e.target.value)}
+                                value={actionReason}
+                                onChange={(e) => setActionReason(e.target.value)}
                             />
                         </div>
                         <AlertDialogFooter>
-                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleExpel}>تأكيد الطرد</AlertDialogAction>
+                            <AlertDialogCancel onClick={() => setActionReason('')}>إلغاء</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => onStatusChange(student.id, 'مطرود', actionReason)}>تأكيد الطرد</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
@@ -292,14 +297,14 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
                 <Label htmlFor="status">حالة الطالب</Label>
-                <Select dir="rtl" defaultValue={student?.status}>
+                <Select dir="rtl" defaultValue={student?.status ?? 'نشط'}>
                     <SelectTrigger id="status">
                         <SelectValue placeholder="اختر الحالة" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="نشط">✅ نشط</SelectItem>
                         <SelectItem value="غائب طويل">⚠️ غائب طويل</SelectItem>
-                        <SelectItem value="مطرود">❌ مطرود</SelectItem>
+                        <SelectItem value="مطرود" disabled>❌ مطرود</SelectItem>
                         <SelectItem value="محذوف" disabled>🗑️ محذوف</SelectItem>
                     </SelectContent>
                 </Select>

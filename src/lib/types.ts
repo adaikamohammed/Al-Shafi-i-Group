@@ -13,6 +13,7 @@ export interface Student {
   memorizedSurahsCount: number;
   dailyMemorizationAmount: MemorizationAmount;
   notes?: string;
+  actionReason?: string; // Reason for deletion or expulsion
 }
 
 export type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "غير مطالب";
