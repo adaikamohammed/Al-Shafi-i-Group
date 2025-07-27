@@ -231,11 +231,10 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[120px]">الطالب</TableHead>
-                <TableHead className="w-[240px]">الحاضر</TableHead>
+                <TableHead className="w-[240px]">الحضور</TableHead>
                 {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">السورة</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">الآيات</TableHead>}
-                {!isActivitySession && <TableHead className="w-[120px]">التقدم</TableHead>}
                 {!isActivitySession && <TableHead className="w-[120px]">المراجعة</TableHead>}
                 <TableHead className="w-[150px]">السلوك</TableHead>
                 <TableHead className="min-w-[200px]">الملاحظات</TableHead>
@@ -249,7 +248,6 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
                 const isAbsent = record.attendance === 'غائب';
                 const isRowDisabled = isNotRequired || isActivitySession || isAbsent;
                 const selectedSurah = record.surahId ? surahs.find(s => s.id === record.surahId) : null;
-                const progress = selectedSurah && record.toVerse ? Math.round((record.toVerse / selectedSurah.verses) * 100) : 0;
                 
                 return (
                   <TableRow key={student.id} className={cn((isNotRequired || isAbsent) && 'bg-muted/50')}>
@@ -348,14 +346,6 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
                                     className="w-16 h-9 text-center"
                                 />
                            </div>
-                        </TableCell>
-                        <TableCell>
-                            {selectedSurah && record.fromVerse && record.toVerse && (
-                                <div className="flex items-center gap-2">
-                                    <Progress value={progress} className="w-16" />
-                                    <span className="text-xs text-muted-foreground">{progress}%</span>
-                                </div>
-                            )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2 space-x-reverse">
