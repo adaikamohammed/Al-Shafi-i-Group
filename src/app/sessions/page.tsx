@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -10,11 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { students } from '@/lib/data';
-import type { DailyRecord, Student, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel } from '@/lib/types';
+import { surahs } from '@/lib/surahs';
+import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Surah } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info } from 'lucide-react';
+import { Info, BookOpen } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 
 const daysOfWeek = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 
@@ -59,10 +62,13 @@ function DailySessionForm({ day }: { day: string }) {
     students.map(s => ({
       studentId: s.id,
       attendance: 'حاضر',
-      memorization: 'جيد',
-      review: true,
+      memorization: null,
+      review: null,
       behavior: 'هادئ',
       notes: '',
+      surahId: null,
+      fromVerse: null,
+      toVerse: null,
     }))
   );
 
@@ -71,11 +77,17 @@ function DailySessionForm({ day }: { day: string }) {
       prevRecords.map(rec => {
         if (rec.studentId === studentId) {
           const updatedRec = { ...rec, [field]: value };
-          // If student is "Not Required", disable other fields
           if (field === 'attendance' && value === 'غير مطالب') {
             updatedRec.memorization = null;
             updatedRec.review = null;
             updatedRec.behavior = null;
+            updatedRec.surahId = null;
+            updatedRec.fromVerse = null;
+            updatedRec.toVerse = null;
+          }
+           if (field === 'surahId') {
+            updatedRec.fromVerse = 1;
+            updatedRec.toVerse = null;
           }
           return updatedRec;
         }
@@ -118,14 +130,17 @@ function DailySessionForm({ day }: { day: string }) {
         </div>
 
         <div className="overflow-x-auto">
-          <Table>
+          <Table className="min-w-full">
             <TableHeader>
               <TableRow>
-                <TableHead>الطالب</TableHead>
-                <TableHead className="w-[250px]">الحضور</TableHead>
-                {!isActivitySession && <TableHead>الحفظ</TableHead>}
-                {!isActivitySession && <TableHead>المراجعة</TableHead>}
-                <TableHead>السلوك</TableHead>
+                <TableHead className="w-[120px]">الطالب</TableHead>
+                <TableHead className="w-[240px]">الحضور</TableHead>
+                {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
+                {!isActivitySession && <TableHead className="w-[180px]">السورة</TableHead>}
+                {!isActivitySession && <TableHead className="w-[180px]">الآيات</TableHead>}
+                {!isActivitySession && <TableHead className="w-[120px]">التقدم</TableHead>}
+                {!isActivitySession && <TableHead className="w-[120px]">المراجعة</TableHead>}
+                <TableHead className="w-[150px]">السلوك</TableHead>
                 <TableHead className="min-w-[200px]">الملاحظات</TableHead>
               </TableRow>
             </TableHeader>
@@ -135,7 +150,9 @@ function DailySessionForm({ day }: { day: string }) {
                 if (!record) return null;
                 const isNotRequired = record.attendance === 'غير مطالب';
                 const isRowDisabled = isNotRequired || isActivitySession;
-
+                const selectedSurah = record.surahId ? surahs.find(s => s.id === record.surahId) : null;
+                const progress = selectedSurah && record.toVerse ? Math.round((record.toVerse / selectedSurah.verses) * 100) : 0;
+                
                 return (
                   <TableRow key={student.id} className={cn(isNotRequired && 'bg-muted/50')}>
                     <TableCell className="font-medium">{student.fullName}</TableCell>
@@ -152,38 +169,89 @@ function DailySessionForm({ day }: { day: string }) {
                         <div className="flex items-center space-x-2 space-x-reverse"><RadioGroupItem value="غير مطالب" id={`att-notreq-${student.id}-${day}`} /><Label htmlFor={`att-notreq-${student.id}-${day}`}>غير مطالب</Label></div>
                       </RadioGroup>
                     </TableCell>
+                    
                     {!isActivitySession && (
-                      <TableCell>
-                        <Select
-                          dir="rtl"
-                          value={record.memorization ?? ''}
-                          onValueChange={(value: PerformanceLevel) => handleRecordChange(student.id, 'memorization', value)}
-                          disabled={isNotRequired}
-                        >
-                          <SelectTrigger className="w-[120px]">
-                            <SelectValue placeholder="التقييم" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ممتاز">ممتاز</SelectItem>
-                            <SelectItem value="جيد">جيد</SelectItem>
-                            <SelectItem value="متوسط">متوسط</SelectItem>
-                            <SelectItem value="ضعيف">ضعيف</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                    )}
-                    {!isActivitySession && (
-                      <TableCell>
-                        <div className="flex items-center space-x-2 space-x-reverse">
-                          <Switch
-                            id={`review-${student.id}-${day}`}
-                            checked={record.review ?? false}
-                            onCheckedChange={(checked) => handleRecordChange(student.id, 'review', checked)}
-                            disabled={isNotRequired}
-                          />
-                          <Label htmlFor={`review-${student.id}-${day}`}>{record.review ? 'تمت' : 'لم تتم'}</Label>
-                        </div>
-                      </TableCell>
+                      <>
+                        <TableCell>
+                          <Select
+                            dir="rtl"
+                            value={record.memorization ?? ''}
+                            onValueChange={(value: PerformanceLevel) => handleRecordChange(student.id, 'memorization', value)}
+                            disabled={isRowDisabled}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="التقييم" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ممتاز">ممتاز</SelectItem>
+                              <SelectItem value="جيد">جيد</SelectItem>
+                              <SelectItem value="متوسط">متوسط</SelectItem>
+                              <SelectItem value="ضعيف">ضعيف</SelectItem>
+                              <SelectItem value="لا يوجد">لا يوجد</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                           <Select
+                                dir="rtl"
+                                value={record.surahId?.toString() ?? ''}
+                                onValueChange={(value) => handleRecordChange(student.id, 'surahId', parseInt(value))}
+                                disabled={isRowDisabled}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="اختر السورة" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {surahs.map(surah => (
+                                        <SelectItem key={surah.id} value={surah.id.toString()}>{surah.id}. {surah.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </TableCell>
+                         <TableCell>
+                           <div className="flex items-center gap-1">
+                                <Input
+                                    type="number"
+                                    placeholder="من"
+                                    min={1}
+                                    value={record.fromVerse ?? ''}
+                                    onChange={(e) => handleRecordChange(student.id, 'fromVerse', e.target.value ? parseInt(e.target.value) : null)}
+                                    disabled={isRowDisabled || !selectedSurah}
+                                    className="w-16 h-9 text-center"
+                                />
+                                <span>-</span>
+                                <Input
+                                    type="number"
+                                    placeholder="إلى"
+                                    min={record.fromVerse ?? 1}
+                                    max={selectedSurah?.verses}
+                                    value={record.toVerse ?? ''}
+                                    onChange={(e) => handleRecordChange(student.id, 'toVerse', e.target.value ? parseInt(e.target.value) : null)}
+                                    disabled={isRowDisabled || !selectedSurah}
+                                    className="w-16 h-9 text-center"
+                                />
+                           </div>
+                        </TableCell>
+                        <TableCell>
+                            {selectedSurah && (
+                                <div className="flex items-center gap-2">
+                                    <Progress value={progress} className="w-16" />
+                                    <span className="text-xs text-muted-foreground">{progress}%</span>
+                                </div>
+                            )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2 space-x-reverse">
+                            <Switch
+                              id={`review-${student.id}-${day}`}
+                              checked={record.review ?? false}
+                              onCheckedChange={(checked) => handleRecordChange(student.id, 'review', checked)}
+                              disabled={isRowDisabled}
+                            />
+                            <Label htmlFor={`review-${student.id}-${day}`}>{record.review ? 'تمت' : 'لم تتم'}</Label>
+                          </div>
+                        </TableCell>
+                      </>
                     )}
                     <TableCell>
                       <Select
@@ -192,7 +260,7 @@ function DailySessionForm({ day }: { day: string }) {
                         onValueChange={(value: BehaviorLevel) => handleRecordChange(student.id, 'behavior', value)}
                         disabled={isNotRequired}
                       >
-                        <SelectTrigger className="w-[120px]">
+                        <SelectTrigger>
                           <SelectValue placeholder="السلوك" />
                         </SelectTrigger>
                         <SelectContent>
@@ -217,7 +285,7 @@ function DailySessionForm({ day }: { day: string }) {
             </TableBody>
           </Table>
         </div>
-        <div className="flex justify-end">
+        <div className="flex justify-end mt-6">
           <Button>حفظ بيانات يوم {day}</Button>
         </div>
       </div>

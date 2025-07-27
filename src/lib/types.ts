@@ -16,17 +16,20 @@ export interface Student {
 }
 
 export type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "غير مطالب";
-export type PerformanceLevel = "ممتاز" | "جيد" | "متوسط" | "ضعيف";
+export type PerformanceLevel = "ممتاز" | "جيد" | "متوسط" | "ضعيف" | "لا يوجد";
 export type BehaviorLevel = "هادئ" | "متوسط" | "غير منضبط";
 export type SessionType = "حصة أساسية" | "حصة إضافية 1" | "حصة إضافية 2" | "حصة أنشطة";
 
 export interface DailyRecord {
   studentId: string;
   attendance: AttendanceStatus;
-  memorization: PerformanceLevel | null; // Can be null for activity sessions or "not required"
-  review: boolean | null; // Can be null
-  behavior: BehaviorLevel | null; // Can be null
+  memorization: PerformanceLevel | null;
+  review: boolean | null;
+  behavior: BehaviorLevel | null;
   notes?: string;
+  surahId?: number | null;
+  fromVerse?: number | null;
+  toVerse?: number | null;
 }
 
 export type SurahStatus = 
@@ -50,4 +53,10 @@ export interface SurahProgress {
     completionDate?: Date;
     retakeCount?: number;
     notes?: string;
+}
+
+export interface Surah {
+    id: number;
+    name: string;
+    verses: number;
 }

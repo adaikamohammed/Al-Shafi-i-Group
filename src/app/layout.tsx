@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { Users, ClipboardList, BookOpen, BarChart3, ArrowRightLeft, Settings, Menu } from 'lucide-react';
+import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,6 @@ import React from 'react';
 const navItems = [
   { href: '/', label: 'إدارة الطلبة', icon: Users },
   { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList },
-  { href: '/surahs', label: 'متابعة السور', icon: BookOpen },
   { href: '/stats', label: 'إحصائيات الفوج', icon: BarChart3 },
   { href: '/data', label: 'البيانات', icon: ArrowRightLeft },
   { href: '/settings', label: 'الإعدادات', icon: Settings },
