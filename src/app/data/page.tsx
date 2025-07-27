@@ -24,24 +24,30 @@ export default function DataExchangePage() {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        // We use cellDates: true to ask xlsx to parse dates for us
         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json<any>(worksheet);
         
-        const newStudents: Student[] = json.map((row, index) => ({
-          id: `imported-${Date.now()}-${index}`,
-          fullName: row['الاسم الكامل'] || 'N/A',
-          guardianName: row['اسم الولي'] || 'N/A',
-          phone1: row['رقم الهاتف']?.toString() || 'N/A',
-          birthDate: row['تاريخ الميلاد'] instanceof Date ? row['تاريخ الميلاد'] : new Date(),
-          registrationDate: row['تاريخ التسجيل'] instanceof Date ? row['تاريخ التسجيل'] : new Date(),
-          status: 'نشط', // All imported students are active by default
-          memorizedSurahsCount: 0, // Default value
-          dailyMemorizationAmount: 'صفحة', // Default value
-          notes: row['ملاحظات'] || '',
-          updatedAt: new Date()
-        }));
+        const newStudents: Student[] = json.map((row, index) => {
+           const birthDate = row['تاريخ الميلاد'] instanceof Date ? row['تاريخ الميلاد'] : new Date();
+           const registrationDate = row['تاريخ التسجيل'] instanceof Date ? row['تاريخ التسجيل'] : new Date();
+           
+           return {
+              id: `imported-${Date.now()}-${index}`,
+              fullName: row['الاسم الكامل'] || 'N/A',
+              guardianName: row['اسم الولي'] || 'N/A',
+              phone1: row['رقم الهاتف']?.toString() || 'N/A',
+              birthDate: birthDate,
+              registrationDate: registrationDate,
+              status: 'نشط', // All imported students are active by default
+              memorizedSurahsCount: 0, // Default value
+              dailyMemorizationAmount: 'صفحة', // Default value
+              notes: row['ملاحظات'] || '',
+              updatedAt: new Date()
+           }
+        });
 
         // Add new students to the global context
         newStudents.forEach(student => addStudent(student));
@@ -55,7 +61,7 @@ export default function DataExchangePage() {
         console.error("Error parsing Excel file:", error);
         toast({
           title: "خطأ في الاستيراد ❌",
-          description: "حدث خطأ أثناء قراءة الملف. يرجى التأكد من أن الملف بالصيغة الصحيحة.",
+          description: "حدث خطأ أثناء قراءة الملف. يرجى التأكد من أن الملف بالصيغة الصحيحة وأن التواريخ مدخلة بشكل صحيح.",
           variant: 'destructive',
         });
       }
@@ -73,7 +79,7 @@ export default function DataExchangePage() {
       "الاسم الكامل", "اسم الولي", "رقم الهاتف", 
       "تاريخ الميلاد", "تاريخ التسجيل", "ملاحظات"
     ];
-    // Example row to guide the user
+    // Example row to guide the user. Using yyyy-mm-dd is more robust.
     const exampleRow = {
       "الاسم الكامل": "عبدالله بن محمد",
       "اسم الولي": "محمد الأحمد",
@@ -116,7 +122,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              قم بتحميل النموذج الفارغ، واملأه ببيانات الطلبة الجدد، ثم ارفعه هنا. سيتم تعيين حالتهم إلى "نشط" تلقائيًا.
+              قم بتحميل النموذج الفارغ، واملأه ببيانات الطلبة الجدد، ثم ارفعه هنا. سيتم تعيين حالتهم إلى "نشط" تلقائيًا. تأكد من أن التواريخ مدخلة بصيغة يفهمها Excel.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button className="flex-grow" onClick={() => fileInputRef.current?.click()}>
