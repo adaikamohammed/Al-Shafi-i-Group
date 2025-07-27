@@ -1,25 +1,25 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { useStudentContext } from '@/context/StudentContext';
 import { surahs } from '@/lib/surahs';
 import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Surah, Student } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info } from 'lucide-react';
+import { Info, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-
-const daysOfWeek = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { format, getMonth, getYear, setMonth, setYear, getDaysInMonth, startOfMonth, getDay, addMonths, subMonths } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 const sessionTypeDescriptions: { [key in SessionType]: string } = {
   'حصة أساسية': 'الحصة العادية لحفظ ومراجعة القرآن.',
@@ -29,39 +29,129 @@ const sessionTypeDescriptions: { [key in SessionType]: string } = {
 };
 
 export default function DailySessionsPage() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [isSessionDialogOpen, setSessionDialogOpen] = useState(false);
+  
   const { students } = useStudentContext();
-
   const activeStudents = useMemo(() => 
     students.filter(s => s.status === "نشط" || s.status === "غائب طويل"), 
   [students]);
 
+  const handleDayClick = (day: number) => {
+    const newSelectedDay = new Date(getYear(currentDate), getMonth(currentDate), day);
+    setSelectedDay(newSelectedDay);
+    setSessionDialogOpen(true);
+  };
+  
+  const handleMonthChange = (monthIndex: number) => {
+    setCurrentDate(setMonth(currentDate, monthIndex));
+  };
+
+  const handleYearChange = (offset: number) => {
+      setCurrentDate(prev => offset > 0 ? addMonths(prev, 12) : subMonths(prev, 12));
+  }
+
+  const renderCalendar = () => {
+    const year = getYear(currentDate);
+    const month = getMonth(currentDate);
+    const daysInMonth = getDaysInMonth(currentDate);
+    const firstDayOfMonth = getDay(startOfMonth(currentDate)); // 0 = Sunday, 1 = Monday...
+
+    const dayCells = [];
+
+    // Add empty cells for days before the first of the month
+    // We adjust for RTL layout, starting from Saturday (6)
+    const startDayIndex = (firstDayOfMonth + 1) % 7; // Convert Sunday=0 to Saturday=0 for our grid
+    for (let i = 0; i < startDayIndex; i++) {
+        dayCells.push(<div key={`empty-start-${i}`} className="p-2 border rounded-md"></div>);
+    }
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      dayCells.push(
+        <button
+          key={day}
+          onClick={() => handleDayClick(day)}
+          className="p-2 text-center border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-20 flex flex-col items-start"
+        >
+          <span className="font-bold">{day}</span>
+           <span className="text-xs text-muted-foreground">{format(new Date(year, month, day), 'EEEE', { locale: ar })}</span>
+        </button>
+      );
+    }
+
+    return dayCells;
+  };
+  
+  const months = Array.from({ length: 12 }, (_, i) => format(new Date(2000, i), 'MMMM', { locale: ar }));
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-headline font-bold">إدارة الحصص اليومية</h1>
+      
       <Card>
         <CardHeader>
-          <CardTitle>سجل الحصص الأسبوعي</CardTitle>
-          <CardDescription>
-            قم بتسجيل أداء الطلبة لكل يوم من أيام الدراسة واختر نوع الحصة.
-          </CardDescription>
+           <div className="flex items-center justify-between">
+                <Button variant="ghost" size="icon" onClick={() => handleYearChange(-1)}>
+                    <ArrowRight className="h-4 w-4" />
+                </Button>
+                <CardTitle className="text-center text-2xl font-headline">
+                    {format(currentDate, 'yyyy', { locale: ar })}
+                </CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => handleYearChange(1)}>
+                    <ArrowLeft className="h-4 w-4" />
+                </Button>
+            </div>
+            <CardDescription className="text-center">
+              اختر الشهر لعرض أيامه، ثم اضغط على اليوم المطلوب لتسجيل الحصة.
+            </CardDescription>
         </CardHeader>
         <CardContent>
-          <Accordion type="single" collapsible className="w-full">
-            {daysOfWeek.map(day => (
-              <AccordionItem value={day} key={day}>
-                <AccordionTrigger className="text-xl font-headline">{`يوم ${day}`}</AccordionTrigger>
-                <AccordionContent>
-                  <DailySessionForm day={day} students={activeStudents} />
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mb-6">
+                {months.map((month, index) => (
+                    <Button
+                        key={month}
+                        variant={getMonth(currentDate) === index ? 'default' : 'outline'}
+                        onClick={() => handleMonthChange(index)}
+                        className={cn(getMonth(new Date()) === index && getYear(new Date()) === getYear(currentDate) && "ring-2 ring-ring ring-offset-2")}
+                    >
+                        {month}
+                    </Button>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-2 text-center font-bold mb-2">
+                 {['سبت', 'أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة'].map(d => <div key={d}>{d}</div>)}
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+                {renderCalendar()}
+            </div>
         </CardContent>
       </Card>
+      
+      {selectedDay && (
+        <Dialog open={isSessionDialogOpen} onOpenChange={setSessionDialogOpen}>
+          <DialogContent className="max-w-7xl h-[90vh]">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-headline">
+                {`سجل الحصة ليوم: ${format(selectedDay, 'EEEE, d MMMM yyyy', { locale: ar })}`}
+              </DialogTitle>
+              <DialogDescription>
+                قم بتسجيل بيانات الحصة للطلبة النشطين في هذا اليوم.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="overflow-y-auto pr-4">
+              <DailySessionForm day={format(selectedDay, 'EEEE')} students={activeStudents} />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
 
+
+// This component remains largely the same, but is now used within the Dialog
 function DailySessionForm({ day, students }: { day: string, students: Student[] }) {
   const [sessionType, setSessionType] = useState<SessionType>('حصة أساسية');
   const [records, setRecords] = useState<DailyRecord[]>(
@@ -140,7 +230,7 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[120px]">الطالب</TableHead>
-                <TableHead className="w-[240px]">الحاضر</TableHead>
+                <TableHead className="w-[240px]">الحضور</TableHead>
                 {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">السورة</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">الآيات</TableHead>}
@@ -207,7 +297,6 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
                                   const surah = surahs.find(s => s.id === surahId);
                                   if (surah) {
                                       handleRecordChange(student.id, 'surahId', surahId);
-                                      // Reset verse numbers when surah changes
                                       handleRecordChange(student.id, 'fromVerse', 1);
                                       handleRecordChange(student.id, 'toVerse', null);
                                   }
@@ -319,3 +408,4 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
     </TooltipProvider>
   );
 }
+
