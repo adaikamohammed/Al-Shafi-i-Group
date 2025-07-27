@@ -29,7 +29,14 @@ export interface DailyRecord {
   notes?: string;
 }
 
-export type SurahStatus = "قيد الحفظ" | "تم الحفظ" | "تم التلقين" | "مراجعة";
+export type SurahStatus = 
+  | "قيد الحفظ" 
+  | "تم الحفظ" 
+  | "تمت المراجعة"
+  | "تمت التلقين" 
+  | "إعادة حفظ" 
+  | "مراجعة جماعية"
+  | "مؤجلة مؤقتًا";
 
 export interface SurahProgress {
     studentId: string;
@@ -39,4 +46,8 @@ export interface SurahProgress {
     fromVerse: number;
     toVerse: number;
     totalVerses: number;
+    startDate?: Date;
+    completionDate?: Date;
+    retakeCount?: number;
+    notes?: string;
 }
