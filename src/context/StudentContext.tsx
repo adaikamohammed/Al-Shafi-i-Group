@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import type { Student, SessionRecord } from '@/lib/types';
 import { students as initialStudents } from '@/lib/data';
+import { isWithinInterval, parseISO } from 'date-fns';
 
 interface StudentContextType {
   students: Student[];
@@ -13,6 +14,7 @@ interface StudentContextType {
   addOrUpdateDailyRecord: (record: SessionRecord) => void;
   addMultipleDailyRecords: (records: SessionRecord[]) => void;
   getRecordsForDate: (date: string) => SessionRecord[];
+  getRecordsForDateRange: (startDate: string, endDate: string) => SessionRecord[];
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -48,10 +50,30 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
   const addMultipleDailyRecords = (newRecords: SessionRecord[]) => {
       setDailyRecords(prevRecords => {
-          const recordsMap = new Map(prevRecords.map(r => [`${r.date}-${r.studentId}`, r]));
+          const recordsMap = new Map(prevRecords.map(r => {
+              const key = r.studentId === 'holiday' ? r.date : `${r.date}-${r.studentId}`;
+              return [key, r];
+          }));
+          
           newRecords.forEach(nr => {
-              recordsMap.set(`${nr.date}-${nr.studentId}`, nr);
+              // If we are adding a holiday, remove all other records for that day.
+              if (nr.sessionType === 'يوم عطلة' && nr.studentId === 'holiday') {
+                  recordsMap.forEach((val, key) => {
+                      if (key.startsWith(nr.date)) {
+                          recordsMap.delete(key);
+                      }
+                  });
+                   recordsMap.set(nr.date, nr);
+              } 
+              // If we are adding a normal session, ensure no holiday record exists for that day.
+              else if (nr.sessionType !== 'يوم عطلة') {
+                   if (recordsMap.has(nr.date)) {
+                       recordsMap.delete(nr.date);
+                   }
+                   recordsMap.set(`${nr.date}-${nr.studentId}`, nr);
+              }
           });
+
           return Array.from(recordsMap.values());
       });
   };
@@ -60,8 +82,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return dailyRecords.filter(r => r.date === date);
   }
 
+  const getRecordsForDateRange = (startDate: string, endDate: string) => {
+      const start = parseISO(startDate);
+      const end = parseISO(endDate);
+      return dailyRecords.filter(r => isWithinInterval(parseISO(r.date), { start, end }));
+  }
+
   return (
-    <StudentContext.Provider value={{ students, setStudents, addStudent, updateStudent, dailyRecords, addOrUpdateDailyRecord, addMultipleDailyRecords, getRecordsForDate }}>
+    <StudentContext.Provider value={{ students, setStudents, addStudent, updateStudent, dailyRecords, addOrUpdateDailyRecord, addMultipleDailyRecords, getRecordsForDate, getRecordsForDateRange }}>
       {children}
     </StudentContext.Provider>
   );

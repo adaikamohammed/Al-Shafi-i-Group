@@ -20,7 +20,7 @@ export interface Student {
 export type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "غير مطالب";
 export type PerformanceLevel = "ممتاز" | "جيد" | "متوسط" | "ضعيف" | "لا يوجد";
 export type BehaviorLevel = "هادئ" | "متوسط" | "غير منضبط";
-export type SessionType = "حصة أساسية" | "حصة إضافية 1" | "حصة إضافية 2" | "حصة أنشطة";
+export type SessionType = "حصة أساسية" | "حصة إضافية 1" | "حصة إضافية 2" | "حصة أنشطة" | "يوم عطلة";
 
 export interface DailyRecord {
   studentId: string;
