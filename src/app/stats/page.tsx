@@ -3,24 +3,33 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Users, UserX, UserCheck, BarChart2 } from 'lucide-react';
+import { Users, UserX, UserCheck, BarChart2, AlertTriangle } from 'lucide-react';
 import { students } from '@/lib/data';
 import { Progress } from '@/components/ui/progress';
 
 const chartData = [
-  { name: 'الأسبوع 1', حفظ: 40, مراجعة: 24 },
-  { name: 'الأسبوع 2', حفظ: 30, مراجعة: 13 },
-  { name: 'الأسبوع 3', حفظ: 20, مراجعة: 98 },
-  { name: 'الأسبوع 4', حفظ: 27, مراجعة: 39 },
-  { name: 'الأسبوع 5', حفظ: 18, مراجعة: 48 },
-  { name: 'الأسبوع 6', حفظ: 23, مراجعة: 38 },
-  { name: 'الأسبوع 7', حفظ: 34, مراجعة: 43 },
+  // This data will be dynamic in the future.
 ];
 
 const activeStudents = students.filter(s => s.status === 'نشط').length;
 const expelledStudents = students.filter(s => s.status === 'مطرود').length;
 
 export default function StatisticsPage() {
+
+  const noData = students.length === 0;
+
+  if (noData) {
+    return (
+        <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+            <AlertTriangle className="h-16 w-16 text-yellow-400" />
+            <h1 className="text-3xl font-headline font-bold text-center">لا توجد بيانات لعرضها</h1>
+            <p className="text-muted-foreground text-center">
+                يرجى استيراد بيانات الطلبة من صفحة "البيانات" أولاً.
+            </p>
+        </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-headline font-bold">إحصائيات الفوج</h1>
@@ -29,7 +38,7 @@ export default function StatisticsPage() {
         <StatCard title="الطلبة النشطون" value={activeStudents.toString()} icon={<UserCheck className="h-4 w-4 text-muted-foreground" />} />
         <StatCard title="الطلبة المطرودون" value={expelledStudents.toString()} icon={<UserX className="h-4 w-4 text-muted-foreground" />} />
         <StatCard title="إجمالي الطلبة" value={students.length.toString()} icon={<Users className="h-4 w-4 text-muted-foreground" />} />
-        <StatCard title="متوسط الأداء" value="85%" icon={<BarChart2 className="h-4 w-4 text-muted-foreground" />} />
+        <StatCard title="متوسط الأداء" value="N/A" icon={<BarChart2 className="h-4 w-4 text-muted-foreground" />} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
