@@ -24,15 +24,42 @@ export default function DataExchangePage() {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        // We use cellDates: true to ask xlsx to parse dates for us
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json<any>(worksheet);
         
         const newStudents: Student[] = json.map((row, index) => {
-           const birthDate = row['تاريخ الميلاد'] instanceof Date ? row['تاريخ الميلاد'] : new Date();
-           const registrationDate = row['تاريخ التسجيل'] instanceof Date ? row['تاريخ التسجيل'] : new Date();
+           // Handle various date formats from Excel
+           const parseDate = (dateInput: any): Date | null => {
+                if (!dateInput) return null;
+                // If it's already a JS Date object (from cellDates:true)
+                if (dateInput instanceof Date) {
+                    return dateInput;
+                }
+                // If it's a string (e.g., "dd/mm/yyyy" or "yyyy-mm-dd")
+                if (typeof dateInput === 'string') {
+                    if (dateInput.includes('/')) {
+                        const parts = dateInput.split('/');
+                        // Assuming dd/mm/yyyy
+                        return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                    }
+                    // For yyyy-mm-dd or other standard formats
+                    return new Date(dateInput); 
+                }
+                 // If it's an Excel serial number
+                if (typeof dateInput === 'number') {
+                    return XLSX.SSF.parse_date_code(dateInput);
+                }
+                return null;
+           }
+
+           const birthDate = parseDate(row['تاريخ الميلاد']);
+           const registrationDate = parseDate(row['تاريخ التسجيل']);
+
+           if (!birthDate || !registrationDate) {
+             throw new Error(`التواريخ غير صالحة في الصف رقم ${index + 2} للطالب: ${row['الاسم الكامل'] || 'غير معروف'}`);
+           }
            
            return {
               id: `imported-${Date.now()}-${index}`,
@@ -59,9 +86,10 @@ export default function DataExchangePage() {
 
       } catch (error) {
         console.error("Error parsing Excel file:", error);
+        const errorMessage = error instanceof Error ? error.message : "حدث خطأ أثناء قراءة الملف. يرجى التأكد من أن الملف بالصيغة الصحيحة وأن التواريخ مدخلة بشكل صحيح.";
         toast({
           title: "خطأ في الاستيراد ❌",
-          description: "حدث خطأ أثناء قراءة الملف. يرجى التأكد من أن الملف بالصيغة الصحيحة وأن التواريخ مدخلة بشكل صحيح.",
+          description: errorMessage,
           variant: 'destructive',
         });
       }
@@ -84,8 +112,8 @@ export default function DataExchangePage() {
       "الاسم الكامل": "عبدالله بن محمد",
       "اسم الولي": "محمد الأحمد",
       "رقم الهاتف": "0501234567",
-      "تاريخ الميلاد": "2012-01-15",
-      "تاريخ التسجيل": "2023-09-01",
+      "تاريخ الميلاد": "15/01/2012",
+      "تاريخ التسجيل": "01/09/2023",
       "ملاحظات": "طالب مستجد"
     };
 
@@ -122,7 +150,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              قم بتحميل النموذج الفارغ، واملأه ببيانات الطلبة الجدد، ثم ارفعه هنا. سيتم تعيين حالتهم إلى "نشط" تلقائيًا. تأكد من أن التواريخ مدخلة بصيغة يفهمها Excel.
+              قم بتحميل النموذج الفارغ، واملأه ببيانات الطلبة الجدد، ثم ارفعه هنا. سيتم تعيين حالتهم إلى "نشط" تلقائيًا. تأكد من أن التواريخ مدخلة بصيغة يفهمها Excel مثل (dd/mm/yyyy).
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button className="flex-grow" onClick={() => fileInputRef.current?.click()}>
