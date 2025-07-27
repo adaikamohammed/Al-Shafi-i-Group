@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { Student, StudentStatus, MemorizationAmount } from '@/lib/types';
-import { students as mockStudents } from '@/lib/data';
+import { useStudentContext } from '@/context/StudentContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
@@ -37,17 +37,16 @@ const calculateAge = (birthDate: Date) => {
 };
 
 export default function StudentManagementPage() {
-  const [students, setStudents] = useState<Student[]>(mockStudents);
+  const { students, updateStudent } = useStudentContext();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
 
   const handleStatusChange = (studentId: string, status: StudentStatus, reason?: string) => {
-    setStudents(prevStudents =>
-      prevStudents.map(s =>
-        s.id === studentId ? { ...s, status, actionReason: reason } : s
-      )
-    );
+    const student = students.find(s => s.id === studentId);
+    if (student) {
+        updateStudent(studentId, { ...student, status, actionReason: reason, updatedAt: new Date() });
+    }
   };
-
+  
   const visibleStudents = useMemo(() => {
     return students.filter(s => s.status !== 'محذوف' && s.status !== 'مطرود');
   }, [students]);
@@ -145,7 +144,7 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
                 </Dialog>
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => {e.preventDefault(); setActionReason('')}}>
                             <Trash2 className="ml-2 h-4 w-4" />
                             حذف
                         </DropdownMenuItem>
@@ -174,7 +173,7 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
                 </AlertDialog>
                 <AlertDialog>
                      <AlertDialogTrigger asChild>
-                         <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
+                         <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => {e.preventDefault(); setActionReason('')}}>
                             <UserX className="ml-2 h-4 w-4" />
                             طرد
                         </DropdownMenuItem>
@@ -207,12 +206,41 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
 }
 
 function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSuccess: () => void, onCancel: () => void }) {
+  const { addStudent, updateStudent } = useStudentContext();
   const [birthDate, setBirthDate] = useState<Date | undefined>(student?.birthDate);
   const [registrationDate, setRegistrationDate] = useState<Date | undefined>(student?.registrationDate);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Logic to add/update student
+    const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData.entries()) as any;
+
+    const studentData: Partial<Student> = {
+        fullName: data.fullName,
+        guardianName: data.guardianName,
+        phone1: data.phone1,
+        phone2: data.phone2,
+        birthDate: birthDate,
+        registrationDate: registrationDate,
+        status: data.status,
+        dailyMemorizationAmount: data.memorizationAmount,
+        notes: data.notes,
+        updatedAt: new Date(),
+    };
+
+    if (student) {
+        // Update existing student
+        updateStudent(student.id, studentData);
+    } else {
+        // Add new student
+        const newStudent: Student = {
+            id: `new-${Date.now()}`,
+            memorizedSurahsCount: 0,
+            ...studentData,
+        } as Student;
+        addStudent(newStudent);
+    }
+    
     onSuccess();
   };
 
@@ -228,21 +256,21 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">الاسم الكامل</Label>
-            <Input id="fullName" defaultValue={student?.fullName} required />
+            <Input name="fullName" id="fullName" defaultValue={student?.fullName} required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="guardianName">اسم الولي</Label>
-            <Input id="guardianName" defaultValue={student?.guardianName} required />
+            <Input name="guardianName" id="guardianName" defaultValue={student?.guardianName} required />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="phone1">رقم الهاتف 1</Label>
-            <Input id="phone1" type="tel" defaultValue={student?.phone1} required />
+            <Input name="phone1" id="phone1" type="tel" defaultValue={student?.phone1} required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone2">رقم الهاتف 2 (اختياري)</Label>
-            <Input id="phone2" type="tel" defaultValue={student?.phone2} />
+            <Input name="phone2" id="phone2" type="tel" defaultValue={student?.phone2} />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -297,7 +325,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
                 <Label htmlFor="status">حالة الطالب</Label>
-                <Select dir="rtl" defaultValue={student?.status ?? 'نشط'}>
+                <Select dir="rtl" name="status" defaultValue={student?.status ?? 'نشط'}>
                     <SelectTrigger id="status">
                         <SelectValue placeholder="اختر الحالة" />
                     </SelectTrigger>
@@ -311,7 +339,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
             </div>
              <div className="space-y-2">
                 <Label htmlFor="memorizationAmount">مقدار الحفظ اليومي</Label>
-                <Select dir="rtl" defaultValue={student?.dailyMemorizationAmount}>
+                <Select dir="rtl" name="memorizationAmount" defaultValue={student?.dailyMemorizationAmount}>
                     <SelectTrigger id="memorizationAmount">
                         <SelectValue placeholder="اختر المقدار" />
                     </SelectTrigger>
@@ -327,7 +355,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         </div>
         <div className="space-y-2">
             <Label htmlFor="notes">ملاحظات عامة</Label>
-            <Textarea id="notes" defaultValue={student?.notes} placeholder="أي ملاحظات إضافية حول الطالب..." />
+            <Textarea name="notes" id="notes" defaultValue={student?.notes} placeholder="أي ملاحظات إضافية حول الطالب..." />
         </div>
       </div>
       <DialogFooter>

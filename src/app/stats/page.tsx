@@ -4,17 +4,18 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, UserX, UserCheck, BarChart2, AlertTriangle } from 'lucide-react';
-import { students } from '@/lib/data';
+import { useStudentContext } from '@/context/StudentContext';
 import { Progress } from '@/components/ui/progress';
 
 const chartData = [
   // This data will be dynamic in the future.
 ];
 
-const activeStudents = students.filter(s => s.status === 'نشط').length;
-const expelledStudents = students.filter(s => s.status === 'مطرود').length;
-
 export default function StatisticsPage() {
+  const { students } = useStudentContext();
+
+  const activeStudents = students.filter(s => s.status === 'نشط').length;
+  const expelledStudents = students.filter(s => s.status === 'مطرود').length;
 
   const noData = students.length === 0;
 

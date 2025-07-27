@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { students as mockStudents } from '@/lib/data';
+import { useStudentContext } from '@/context/StudentContext';
 import { surahs } from '@/lib/surahs';
 import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Surah, Student } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -29,7 +29,7 @@ const sessionTypeDescriptions: { [key in SessionType]: string } = {
 };
 
 export default function DailySessionsPage() {
-  const [students, setStudents] = useState<Student[]>(mockStudents);
+  const { students } = useStudentContext();
 
   const activeStudents = useMemo(() => 
     students.filter(s => s.status === "نشط" || s.status === "غائب طويل"), 
@@ -83,7 +83,7 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
       prevRecords.map(rec => {
         if (rec.studentId === studentId) {
           const updatedRec = { ...rec, [field]: value };
-          if (field === 'attendance' && value === 'غير مطالب') {
+          if (field === 'attendance' && (value === 'غير مطالب' || value === 'غائب')) {
             updatedRec.memorization = null;
             updatedRec.review = null;
             updatedRec.behavior = null;
@@ -140,7 +140,7 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[120px]">الطالب</TableHead>
-                <TableHead className="w-[240px]">الحضور</TableHead>
+                <TableHead className="w-[240px]">الحاضر</TableHead>
                 {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">السورة</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">الآيات</TableHead>}
@@ -155,12 +155,13 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
                 const record = records.find(r => r.studentId === student.id);
                 if (!record) return null;
                 const isNotRequired = record.attendance === 'غير مطالب';
-                const isRowDisabled = isNotRequired || isActivitySession;
+                const isAbsent = record.attendance === 'غائب';
+                const isRowDisabled = isNotRequired || isActivitySession || isAbsent;
                 const selectedSurah = record.surahId ? surahs.find(s => s.id === record.surahId) : null;
                 const progress = selectedSurah && record.toVerse ? Math.round((record.toVerse / selectedSurah.verses) * 100) : 0;
                 
                 return (
-                  <TableRow key={student.id} className={cn(isNotRequired && 'bg-muted/50')}>
+                  <TableRow key={student.id} className={cn((isNotRequired || isAbsent) && 'bg-muted/50')}>
                     <TableCell className="font-medium">{student.fullName}</TableCell>
                     <TableCell>
                       <RadioGroup
@@ -284,7 +285,7 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
                         dir="rtl"
                         value={record.behavior ?? ''}
                         onValueChange={(value: BehaviorLevel) => handleRecordChange(student.id, 'behavior', value)}
-                        disabled={isNotRequired}
+                        disabled={isNotRequired || isAbsent}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="السلوك" />
@@ -301,7 +302,7 @@ function DailySessionForm({ day, students }: { day: string, students: Student[] 
                         placeholder="ملاحظة..."
                         value={record.notes ?? ''}
                         onChange={(e) => handleRecordChange(student.id, 'notes', e.target.value)}
-                        disabled={isNotRequired && !record.notes}
+                        disabled={isNotRequired && !record.notes && !isAbsent}
                         className="h-10"
                       />
                     </TableCell>

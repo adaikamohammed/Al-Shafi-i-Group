@@ -6,14 +6,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Upload, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { students as mockStudents } from '@/lib/data'; // Will be empty now
 import { useToast } from '@/hooks/use-toast';
 import type { Student } from '@/lib/types';
+import { useStudentContext } from '@/context/StudentContext';
 
 
 export default function DataExchangePage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { students, addStudent } = useStudentContext();
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -28,10 +29,6 @@ export default function DataExchangePage() {
         const worksheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json<any>(worksheet);
         
-        // This is where you would typically send the data to your backend/DB
-        // For now, we'll just log it and show a success message.
-        console.log("Parsed Students:", json);
-        
         const newStudents: Student[] = json.map((row, index) => ({
           id: `imported-${Date.now()}-${index}`,
           fullName: row['الاسم الكامل'] || 'N/A',
@@ -39,14 +36,15 @@ export default function DataExchangePage() {
           phone1: row['رقم الهاتف']?.toString() || 'N/A',
           birthDate: row['تاريخ الميلاد'] instanceof Date ? row['تاريخ الميلاد'] : new Date(),
           registrationDate: row['تاريخ التسجيل'] instanceof Date ? row['تاريخ التسجيل'] : new Date(),
-          status: 'نشط', // All imported students are active
+          status: 'نشط', // All imported students are active by default
           memorizedSurahsCount: 0, // Default value
           dailyMemorizationAmount: 'صفحة', // Default value
           notes: row['ملاحظات'] || '',
+          updatedAt: new Date()
         }));
 
-        // Here you would typically update your global state or database
-        console.log("Formatted new students:", newStudents);
+        // Add new students to the global context
+        newStudents.forEach(student => addStudent(student));
         
         toast({
           title: "نجاح ✅",
@@ -169,7 +167,7 @@ export default function DataExchangePage() {
                     <SelectValue placeholder="اختر طالبًا..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockStudents.map(student => (
+                    {students.map(student => (
                       <SelectItem key={student.id} value={student.id}>
                         {student.fullName}
                       </SelectItem>

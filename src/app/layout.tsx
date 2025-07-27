@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import React from 'react';
+import { StudentProvider } from '@/context/StudentContext';
 
 const navItems = [
   { href: '/', label: 'إدارة الطلبة', icon: Users },
@@ -40,7 +41,7 @@ export default function RootLayout({
         <SidebarMenu>
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
+               <SidebarMenuButton
                 asChild
                 isActive={pathname === item.href}
                 tooltip={{ children: item.label, side: 'right', align: 'center' }}
@@ -67,43 +68,45 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@400;700&family=Belleza&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <SidebarProvider>
-          {isMobile ? (
-            <Sheet>
-              <div className="flex flex-col">
-                <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
-                   <SheetTrigger asChild>
-                    <Button variant="outline" size="icon" className="shrink-0">
-                      <Menu className="h-5 w-5" />
-                      <span className="sr-only">فتح قائمة التنقل</span>
-                    </Button>
-                  </SheetTrigger>
-                  <h1 className="font-headline text-lg font-semibold text-primary">
-                    مدرسة الإمام الشافعي
-                  </h1>
-                </header>
-                <main className="flex-grow p-4">
-                  {children}
-                </main>
-              </div>
-              <SheetContent side="right" className="flex flex-col p-0">
-                {sidebarContent}
-              </SheetContent>
-            </Sheet>
-          ) : (
-            <>
-              <Sidebar side="right">
-                {sidebarContent}
-              </Sidebar>
-              <SidebarInset>
-                <main className="p-4 sm:p-6 lg:p-8">
-                  {children}
-                </main>
-              </SidebarInset>
-            </>
-          )}
-          <Toaster />
-        </SidebarProvider>
+        <StudentProvider>
+          <SidebarProvider>
+            {isMobile ? (
+              <Sheet>
+                <div className="flex flex-col">
+                  <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
+                    <SheetTrigger asChild>
+                      <Button variant="outline" size="icon" className="shrink-0">
+                        <Menu className="h-5 w-5" />
+                        <span className="sr-only">فتح قائمة التنقل</span>
+                      </Button>
+                    </SheetTrigger>
+                    <h1 className="font-headline text-lg font-semibold text-primary">
+                      مدرسة الإمام الشافعي
+                    </h1>
+                  </header>
+                  <main className="flex-grow p-4">
+                    {children}
+                  </main>
+                </div>
+                <SheetContent side="right" className="flex flex-col p-0">
+                  {sidebarContent}
+                </SheetContent>
+              </Sheet>
+            ) : (
+              <>
+                <Sidebar side="right">
+                  {sidebarContent}
+                </Sidebar>
+                <SidebarInset>
+                  <main className="p-4 sm:p-6 lg:p-8">
+                    {children}
+                  </main>
+                </SidebarInset>
+              </>
+            )}
+            <Toaster />
+          </SidebarProvider>
+        </StudentProvider>
       </body>
     </html>
   );
