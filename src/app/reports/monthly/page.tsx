@@ -5,11 +5,13 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, Users, CalendarDays, BarChart, AlertTriangle } from 'lucide-react';
-import { format, parseISO, getMonth, getYear, getDaysInMonth } from 'date-fns';
+import { Loader2, Users, CalendarDays, BarChart, AlertTriangle, CheckCircle, XCircle, Clock, Replace, Plane } from 'lucide-react';
+import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, getDate, getDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Bar, XAxis, YAxis, CartesianGrid, Legend, BarChart as RechartsBarChart } from 'recharts';
-import type { Student } from '@/lib/types';
+import type { Student, DailySession, SessionRecord } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import { Tooltip as ShadTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 const ATTENDANCE_COLORS: { [key: string]: string } = { 'حاضر': '#10B981', 'غائب': '#EF4444', 'متأخر': '#F59E0B', 'تعويض': '#3B82F6' };
@@ -38,14 +40,12 @@ export default function MonthlyStatisticsPage() {
             return sessionDate >= startDate && sessionDate <= endDate;
         });
 
-        let records = filteredSessions.flatMap(s => s.records);
-
-        if (selectedStudentId !== 'all') {
-            records = records.filter(r => r.studentId === selectedStudentId);
-        }
+        let recordsSource = selectedStudentId === 'all' 
+            ? filteredSessions.flatMap(s => s.records)
+            : filteredSessions.flatMap(s => s.records.filter(r => r.studentId === selectedStudentId));
 
         const stats = {
-            totalRecords: records.length,
+            totalRecords: recordsSource.length,
             attendance: { 'حاضر': 0, 'غائب': 0, 'متأخر': 0, 'تعويض': 0 },
             behavior: { 'هادئ': 0, 'متوسط': 0, 'غير منضبط': 0 },
             evaluation: { 'ممتاز': 0, 'جيد': 0, 'متوسط': 0, 'ضعيف': 0, 'لا يوجد': 0 },
@@ -54,21 +54,100 @@ export default function MonthlyStatisticsPage() {
             sessionTypes: { 'حصة أساسية': 0, 'حصة أنشطة': 0, 'حصة تعويضية': 0 }
         };
 
-        records.forEach(record => {
+        recordsSource.forEach(record => {
             if (record.attendance) stats.attendance[record.attendance]++;
             if (record.behavior) stats.behavior[record.behavior]++;
             if (record.memorization) stats.evaluation[record.memorization]++;
         });
 
-        filteredSessions.forEach(session => {
-           if(session.sessionType !== 'يوم عطلة') {
-               stats.sessionTypes[session.sessionType]++;
-           }
-        });
+        if (selectedStudentId === 'all') {
+            filteredSessions.forEach(session => {
+               if(session.sessionType !== 'يوم عطلة') {
+                   stats.sessionTypes[session.sessionType]++;
+               }
+            });
+        }
+        
+        const studentSpecificRecords: { [key: string]: SessionRecord & {sessionType: string} } = {};
+        if (selectedStudentId !== 'all') {
+            filteredSessions.forEach(session => {
+                 const record = session.records.find(r => r.studentId === selectedStudentId);
+                 if (record) {
+                     studentSpecificRecords[session.date] = {...record, sessionType: session.sessionType};
+                 } else if (session.sessionType === 'يوم عطلة') {
+                     studentSpecificRecords[session.date] = { studentId: selectedStudentId, attendance: 'يوم عطلة', behavior: null, memorization: null, review: null, notes: 'يوم عطلة', sessionType: 'يوم عطلة' };
+                 }
+            });
+        }
 
-        return stats;
+
+        return { ...stats, studentSpecificRecords };
 
     }, [dailySessions, selectedMonth, selectedYear, selectedStudentId]);
+    
+    
+     const renderStudentCalendar = () => {
+        const daysInMonth = getDaysInMonth(new Date(selectedYear, selectedMonth));
+        const firstDayOfMonth = getDay(startOfMonth(new Date(selectedYear, selectedMonth)));
+        const startDayIndex = (firstDayOfMonth + 1) % 7; 
+
+        const dayCells = [];
+        for (let i = 0; i < startDayIndex; i++) {
+            dayCells.push(<div key={`empty-${i}`}></div>);
+        }
+
+        for(let day = 1; day <= daysInMonth; day++) {
+            const dateStr = format(new Date(selectedYear, selectedMonth, day), 'yyyy-MM-dd');
+            const record = monthlyData.studentSpecificRecords[dateStr];
+            
+            let cellClass = 'bg-gray-200 text-gray-700';
+            let tooltipText = 'لا يوجد تسجيل لهذا اليوم';
+
+            if (record) {
+                switch(record.attendance) {
+                    case 'حاضر': 
+                        cellClass = 'bg-green-500 text-white'; 
+                        tooltipText = 'حاضر';
+                        break;
+                    case 'غائب': 
+                        cellClass = 'bg-red-500 text-white';
+                        tooltipText = record.notes ? `غائب: ${record.notes}` : 'غائب (بدون سبب)';
+                        break;
+                    case 'متأخر': 
+                        cellClass = 'bg-yellow-400 text-black';
+                        tooltipText = 'متأخر';
+                        break;
+                    case 'تعويض': 
+                        cellClass = 'bg-blue-400 text-white';
+                        tooltipText = 'حصة تعويضية';
+                        break;
+                    case 'يوم عطلة':
+                        cellClass = 'bg-gray-400 text-white';
+                        tooltipText = 'يوم عطلة';
+                        break;
+                    default: 
+                        break;
+                }
+            }
+            
+            dayCells.push(
+                <TooltipProvider key={day}>
+                    <ShadTooltip>
+                        <TooltipTrigger asChild>
+                            <div className={cn("h-14 rounded-md font-bold flex items-center justify-center", cellClass)}>
+                                {day}
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                           <p>{tooltipText}</p>
+                        </TooltipContent>
+                    </ShadTooltip>
+                </TooltipProvider>
+            );
+        }
+        return dayCells;
+    }
+
 
     const attendanceData: ChartData[] = Object.entries(monthlyData.attendance)
         .filter(([, value]) => value > 0)
@@ -81,10 +160,6 @@ export default function MonthlyStatisticsPage() {
     const evaluationData = Object.entries(monthlyData.evaluation)
         .map(([name, value]) => ({ name, value }));
         
-    const sessionTypeData = Object.entries(monthlyData.sessionTypes)
-         .map(([name, value]) => ({ name, value }));
-
-
     if (loading) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-200px)]">
@@ -142,53 +217,76 @@ export default function MonthlyStatisticsPage() {
                 </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">إجمالي الطلبة</CardTitle>
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{selectedStudentId === 'all' ? activeStudents.length : 1}</div>
-                        <p className="text-xs text-muted-foreground">طالب نشط</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">الأيام المسجلة</CardTitle>
-                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.sessions}</div>
-                        <p className="text-xs text-muted-foreground">من أصل {getDaysInMonth(new Date(selectedYear, selectedMonth))} يومًا في الشهر</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">إجمالي الحضور</CardTitle>
-                        <BarChart className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium">حاضر</CardTitle>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{monthlyData.attendance['حاضر']}</div>
-                        <p className="text-xs text-muted-foreground">
-                          من إجمالي {monthlyData.totalRecords} سجل
-                        </p>
+                        <p className="text-xs text-muted-foreground">يوم حضور</p>
                     </CardContent>
                 </Card>
                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">أيام العطل</CardTitle>
-                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium">غائب</CardTitle>
+                        <XCircle className="h-4 w-4 text-red-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{monthlyData.attendance['غائب']}</div>
+                        <p className="text-xs text-muted-foreground">يوم غياب</p>
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">متأخر</CardTitle>
+                        <Clock className="h-4 w-4 text-yellow-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{monthlyData.attendance['متأخر']}</div>
+                        <p className="text-xs text-muted-foreground">يوم تأخر</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">تعويض</CardTitle>
+                        <Replace className="h-4 w-4 text-blue-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{monthlyData.attendance['تعويض']}</div>
+                        <p className="text-xs text-muted-foreground">حصة تعويضية</p>
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">عطلة</CardTitle>
+                        <Plane className="h-4 w-4 text-gray-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{monthlyData.holidays}</div>
-                         <p className="text-xs text-muted-foreground">
-                          أيام عطلة مسجلة هذا الشهر
-                        </p>
+                         <p className="text-xs text-muted-foreground">أيام عطلة مسجلة</p>
                     </CardContent>
                 </Card>
             </div>
             
+             {selectedStudentId !== 'all' && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>تقويم الطالب: {activeStudents.find(s => s.id === selectedStudentId)?.fullName}</CardTitle>
+                        <CardDescription>نظرة سريعة على حضور الطالب خلال الشهر المحدد.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         <div className="grid grid-cols-7 gap-2 text-center text-sm font-semibold mb-2">
+                            {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map(d => <div key={d}>{d}</div>)}
+                        </div>
+                        <div className="grid grid-cols-7 gap-2">
+                            {renderStudentCalendar()}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {monthlyData.totalRecords > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2">
                     <Card>
@@ -241,7 +339,7 @@ export default function MonthlyStatisticsPage() {
                                 <RechartsBarChart data={evaluationData}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="name" />
-                                    <YAxis />
+                                    <YAxis allowDecimals={false} />
                                     <Tooltip cursor={{fill: 'rgba(206, 206, 206, 0.2)'}} formatter={(value) => [`${value} مرة`, 'العدد']} />
                                     <Bar dataKey="value">
                                         {evaluationData.map((entry, index) => (
@@ -266,4 +364,3 @@ export default function MonthlyStatisticsPage() {
     );
 }
 
-    
