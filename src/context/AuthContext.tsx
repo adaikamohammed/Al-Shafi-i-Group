@@ -42,7 +42,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const newUser = userCredential.user;
     
+    // Update the user's profile in Firebase Auth
     await updateProfile(newUser, { displayName });
+
+    // Create the user document in Firestore
     const userRef = doc(db, "users", newUser.uid);
     const newAppUser: Omit<AppUser, 'uid'> = {
         name: displayName,
@@ -53,12 +56,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     await setDoc(userRef, newAppUser);
     
-    // onAuthStateChanged will handle setting the user state
+    // Manually update the user state to reflect the new profile information immediately
+    setUser({ ...newUser, displayName });
   };
   
   const signInWithEmail = async (email: string, password: string) => {
      await signInWithEmailAndPassword(auth, email, password);
-     // onAuthStateChanged will handle setting the user
+     // onAuthStateChanged will handle setting the user state
   }
 
   const logout = async () => {
