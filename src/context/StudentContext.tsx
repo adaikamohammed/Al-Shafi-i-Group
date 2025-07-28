@@ -2,22 +2,12 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import type { Student, SessionRecord } from '@/lib/types';
+import type { Student, SessionRecord, AppUser } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDocs, writeBatch, Timestamp, onSnapshot, setDoc, where, query, getDoc, collectionGroup } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-
-// This type is now defined here and shared with AuthContext
-export interface AppUser {
-    uid: string;
-    name: string;
-    email: string | null;
-    photoURL?: string | null;
-    createdAt: any;
-    role: 'شيخ' | 'إدارة';
-}
 
 interface StudentContextType {
   students: Student[];
@@ -42,16 +32,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // We start loading whenever auth state changes
-    setLoading(true);
-
     if (authLoading) {
-      // If auth is loading, we are definitely loading.
+      setLoading(true);
       return;
     }
 
     if (!user) {
-      // If no user, clear data and stop loading.
       setStudents([]);
       setDailyRecords([]);
       setAppUser(null);
@@ -59,72 +45,72 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Auth is done and we have a user. Now, let's fetch user's role.
-    const userDocRef = doc(db, 'users', user.uid);
     const unsubscribes: (() => void)[] = [];
 
-    getDoc(userDocRef).then(userDocSnap => {
-        if (!userDocSnap.exists()) {
-            console.error("User document not found!");
-            setLoading(false);
-            return;
-        }
+    const fetchUserDataAndSubscribe = async () => {
+        setLoading(true);
+        try {
+            const userDocRef = doc(db, 'users', user.uid);
+            const userDocSnap = await getDoc(userDocRef);
 
-        const currentUser = userDocSnap.data() as AppUser;
-        setAppUser(currentUser);
-        
-        let studentsQuery;
-        let recordsQuery;
+            if (!userDocSnap.exists()) {
+                console.error("User document not found!");
+                setLoading(false);
+                return;
+            }
 
-        if (currentUser.role === 'إدارة') {
-            // Admin can see all students and records
-            // Note: This requires Firestore index configuration.
-            // collectionGroup('students') and collectionGroup('records')
-            // For now, let's show a message on the relevant pages.
-            // We will load no data for admin to prevent errors until UI is ready.
-             studentsQuery = query(collectionGroup(db, 'students'));
-             recordsQuery = query(collectionGroup(db, 'records'));
-        } else {
-            // Teacher sees their own data
-            studentsQuery = query(collection(db, 'users', user.uid, 'students'));
-            recordsQuery = query(collection(db, 'users', user.uid, 'records'));
-        }
+            const currentUser = { uid: user.uid, ...userDocSnap.data() } as AppUser;
+            setAppUser(currentUser);
 
-        const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
-            const studentsData = snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    ...data,
-                    id: doc.id,
-                    birthDate: (data.birthDate as Timestamp)?.toDate(),
-                    registrationDate: (data.registrationDate as Timestamp)?.toDate(),
-                    updatedAt: (data.updatedAt as Timestamp)?.toDate(),
-                } as Student;
+            let studentsQuery;
+            let recordsQuery;
+
+            if (currentUser.role === 'إدارة') {
+                studentsQuery = query(collectionGroup(db, 'students'));
+                recordsQuery = query(collectionGroup(db, 'records'));
+            } else {
+                studentsQuery = query(collection(db, 'users', user.uid, 'students'));
+                recordsQuery = query(collection(db, 'users', user.uid, 'records'));
+            }
+
+            const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
+                const studentsData = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        ...data,
+                        id: doc.id,
+                        birthDate: (data.birthDate as Timestamp)?.toDate(),
+                        registrationDate: (data.registrationDate as Timestamp)?.toDate(),
+                        updatedAt: (data.updatedAt as Timestamp)?.toDate(),
+                    } as Student;
+                });
+                studentsData.sort((a, b) => a.fullName.localeCompare(b.fullName));
+                setStudents(studentsData);
+                setLoading(false); 
+            }, (error) => {
+                console.error("Error fetching students:", error);
+                toast({ title: "خطأ", description: "لم نتمكن من تحميل بيانات الطلبة.", variant: "destructive"});
+                setLoading(false);
             });
-            studentsData.sort((a, b) => a.fullName.localeCompare(b.fullName));
-            setStudents(studentsData);
-            setLoading(false); // Stop loading only after the first successful fetch
-        }, (error) => {
-            console.error("Error fetching students:", error);
-            toast({ title: "خطأ", description: "لم نتمكن من تحميل بيانات الطلبة.", variant: "destructive"});
+
+            const unsubscribeRecords = onSnapshot(recordsQuery, (snapshot) => {
+                const recordsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as SessionRecord);
+                setDailyRecords(recordsData);
+            }, (error) => {
+                console.error("Error fetching records:", error);
+                toast({ title: "خطأ", description: "لم نتمكن من تحميل سجلات الحصص.", variant: "destructive"});
+            });
+
+            unsubscribes.push(unsubscribeStudents, unsubscribeRecords);
+
+        } catch (error) {
+            console.error("Error fetching user data:", error);
+            toast({ title: "خطأ", description: "لم نتمكن من تحميل بيانات المستخدم.", variant: "destructive"});
             setLoading(false);
-        });
-
-        const unsubscribeRecords = onSnapshot(recordsQuery, (snapshot) => {
-            const recordsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as SessionRecord);
-            setDailyRecords(recordsData);
-        }, (error) => {
-            console.error("Error fetching records:", error);
-            toast({ title: "خطأ", description: "لم نتمكن من تحميل سجلات الحصص.", variant: "destructive"});
-        });
-
-        unsubscribes.push(unsubscribeStudents, unsubscribeRecords);
-
-    }).catch(error => {
-        console.error("Error fetching user role:", error);
-        toast({ title: "خطأ", description: "لم نتمكن من تحديد صلاحيات المستخدم.", variant: "destructive"});
-        setLoading(false);
-    });
+        }
+    };
+    
+    fetchUserDataAndSubscribe();
 
     return () => {
         unsubscribes.forEach(unsub => unsub());
@@ -145,7 +131,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
   const updateStudent = async (studentId: string, updatedData: Partial<Student>) => {
     if (!user) throw new Error("User not logged in");
-    // For admins, the path would be different. This needs more logic for admin role.
     const studentRef = doc(db, 'users', user.uid, 'students', studentId);
     const finalData = { ...updatedData, updatedAt: new Date() };
     await setDoc(studentRef, finalData, { merge: true });

@@ -3,18 +3,17 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
-  getAuth, 
-  onAuthStateChanged, 
   User, 
   signOut, 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  onAuthStateChanged
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import type { AppUser } from './StudentContext';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import type { AppUser } from '@/lib/types';
 
 interface AuthContextType {
   user: User | null;
@@ -26,18 +25,16 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -47,18 +44,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     await updateProfile(newUser, { displayName });
     const userRef = doc(db, "users", newUser.uid);
-    const newAppUser: AppUser = {
-        uid: newUser.uid,
+    const newAppUser: Omit<AppUser, 'uid'> = {
         name: displayName,
         email: newUser.email,
         photoURL: newUser.photoURL,
         createdAt: serverTimestamp(),
-        role: 'شيخ'
+        role: 'شيخ' // Default role for new sign-ups
     };
     await setDoc(userRef, newAppUser);
     
-    // Manually set user to trigger context update
-    setUser(newUser);
+    // onAuthStateChanged will handle setting the user state
   };
   
   const signInWithEmail = async (email: string, password: string) => {

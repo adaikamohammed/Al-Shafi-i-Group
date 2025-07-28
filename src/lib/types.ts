@@ -1,3 +1,4 @@
+
 export type StudentStatus = "نشط" | "مطرود" | "غائب طويل" | "محذوف";
 export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "أكثر";
 
@@ -66,4 +67,14 @@ export interface Surah {
     id: number;
     name: string;
     verses: number;
+}
+
+// This type is now defined here and shared with AuthContext
+export interface AppUser {
+    uid: string;
+    name: string;
+    email: string | null;
+    photoURL?: string | null;
+    createdAt: any;
+    role: 'شيخ' | 'إدارة';
 }

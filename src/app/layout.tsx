@@ -60,11 +60,11 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         return children;
     }
     
-    // This should not happen if logic is correct, but as a fallback
-    if (!user || !appUser) {
+    if (!appUser) {
         return (
-             <div className="flex items-center justify-center min-h-screen bg-background">
-                <p>خطأ في تحميل بيانات المستخدم. جار إعادة التوجيه...</p>
+             <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-4">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <p>جارِ تحميل بيانات المستخدم...</p>
             </div>
         )
     }
@@ -75,14 +75,14 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
       <SidebarHeader className="p-4">
          <div className="flex items-center gap-3">
              <Avatar>
-                <AvatarImage src={user.photoURL || ''} alt={appUser.name || ''} />
+                <AvatarImage src={user?.photoURL || ''} alt={appUser.name || ''} />
                 <AvatarFallback>{appUser.name?.charAt(0).toUpperCase()}</AvatarFallback>
              </Avatar>
              <div>
                 <h1 className="font-headline text-lg font-bold text-primary">
                     {appUser.name || "مستخدم"}
                 </h1>
-                <p className="text-xs text-muted-foreground">{user.email}</p>
+                <p className="text-xs text-muted-foreground">{appUser.email}</p>
              </div>
          </div>
       </SidebarHeader>
@@ -131,7 +131,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
                         </h1>
                     </div>
                      <Avatar>
-                        <AvatarImage src={user.photoURL || ''} alt={appUser.name || ''} />
+                        <AvatarImage src={user?.photoURL || ''} alt={appUser.name || ''} />
                         <AvatarFallback>{appUser.name?.charAt(0).toUpperCase()}</AvatarFallback>
                      </Avatar>
                   </header>
