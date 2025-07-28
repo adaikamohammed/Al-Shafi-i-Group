@@ -10,7 +10,7 @@ import { surahs } from '@/lib/surahs';
 import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, SessionRecord } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, ArrowLeft, ArrowRight, ChevronsUpDown, Check, Loader2 } from 'lucide-react';
+import { Info, ArrowLeft, ArrowRight, ChevronsUpDown, Check, Loader2, Download } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -22,6 +22,9 @@ import { ar } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import * as XLSX from 'xlsx';
+import { useToast } from '@/hooks/use-toast';
+
 
 const sessionTypeDescriptions: { [key in SessionType]: string } = {
   'حصة أساسية': 'الحصة العادية لحفظ ومراجعة القرآن.',
@@ -37,8 +40,9 @@ export default function DailySessionsPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [isSessionDialogOpen, setSessionDialogOpen] = useState(false);
+  const { toast } = useToast();
   
-  const { students, dailyRecords, loading } = useStudentContext();
+  const { students, dailyRecords, loading, getRecordsForDate } = useStudentContext();
   const activeStudents = useMemo(() => 
     students.filter(s => s.status === "نشط"), 
   [students]);
@@ -55,6 +59,58 @@ export default function DailySessionsPage() {
 
   const handleYearChange = (offset: number) => {
       setCurrentDate(prev => offset > 0 ? addMonths(prev, 12) : subMonths(prev, 12));
+  }
+
+  const handleExportDay = (e: React.MouseEvent, day: number) => {
+    e.stopPropagation(); // Prevent dialog from opening
+    const date = new Date(getYear(currentDate), getMonth(currentDate), day);
+    const formattedDate = format(date, 'yyyy-MM-dd');
+    const records = getRecordsForDate(formattedDate);
+
+    if (records.length === 0) {
+        toast({ title: "لا توجد بيانات", description: "لا توجد سجلات لهذا اليوم لتصديرها.", variant: "destructive" });
+        return;
+    }
+
+    const holidayRecord = records.find(r => r.studentId === 'holiday');
+    
+    let dataForSheet;
+
+    if (holidayRecord) {
+        dataForSheet = [{
+            'التاريخ': format(date, 'dd/MM/yyyy'),
+            'اليوم': format(date, 'EEEE', { locale: ar }),
+            'نوع الحصة': 'يوم عطلة',
+        }];
+    } else {
+        dataForSheet = records.map(record => {
+            const student = students.find(s => s.id === record.studentId);
+            const surah = surahs.find(s => s.id === record.surahId);
+            return {
+                'التاريخ': format(date, 'dd/MM/yyyy'),
+                'اليوم': format(date, 'EEEE', { locale: ar }),
+                'نوع الحصة': record.sessionType || 'حصة أساسية',
+                'اسم الطالب': student?.fullName || 'غير معروف',
+                'الحضور': record.attendance || '',
+                'التقييم': record.memorization || '',
+                'السلوك': record.behavior || '',
+                'السورة': surah?.name || '',
+                'من آية': record.fromVerse ?? '',
+                'إلى آية': record.toVerse ?? '',
+                'مراجعة': record.review ? 'نعم' : 'لا',
+                'ملاحظات': record.notes || '',
+            }
+        });
+    }
+
+    const ws = XLSX.utils.json_to_sheet(dataForSheet);
+    ws['!cols'] = [
+        { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+        { wch: 12 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 30 }
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `سجل حصة ${formattedDate}`);
+    XLSX.writeFile(wb, `سجل_حصة_${formattedDate}.xlsx`);
   }
 
   const renderCalendar = () => {
@@ -74,13 +130,14 @@ export default function DailySessionsPage() {
     for (let day = 1; day <= daysInMonth; day++) {
         const dayDate = new Date(year, month, day);
         const formattedDayDate = format(dayDate, 'yyyy-MM-dd');
-        const holidayRecord = dailyRecords.find(r => r.date === formattedDayDate && r.studentId === 'holiday');
-        const dayHasRecords = dailyRecords.some(r => r.date === formattedDayDate && r.studentId !== 'holiday');
+        const dayRecords = dailyRecords.filter(r => r.date === formattedDayDate);
+        const isHoliday = dayRecords.some(r => r.studentId === 'holiday');
+        const hasRecords = dayRecords.length > 0;
         
         let dayStatusClass = '';
-        if (holidayRecord) {
+        if (isHoliday) {
             dayStatusClass = 'bg-yellow-200 dark:bg-yellow-800';
-        } else if (dayHasRecords) {
+        } else if (hasRecords) {
             dayStatusClass = 'bg-green-200 dark:bg-green-800';
         } else if (isPast(dayDate) && !isToday(dayDate)) {
              dayStatusClass = 'bg-red-200 dark:bg-red-900';
@@ -91,11 +148,32 @@ export default function DailySessionsPage() {
           key={day}
           onClick={() => handleDayClick(day)}
           className={cn(
-            "p-2 text-center border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col items-start justify-between",
+            "p-2 text-center border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col items-start justify-between relative",
             dayStatusClass
           )}
         >
-          <span className="font-bold">{day}</span>
+            <div className="flex justify-between w-full items-start">
+                 <span className="font-bold">{day}</span>
+                 {hasRecords && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-foreground/60 hover:text-foreground"
+                                onClick={(e) => handleExportDay(e, day)}
+                            >
+                                <Download className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                           <p>تحميل بيانات اليوم</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                 )}
+            </div>
            <span className="text-xs text-muted-foreground self-end">{format(dayDate, 'EEEE', { locale: ar })}</span>
         </button>
       );
@@ -378,7 +456,7 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[120px]">الطالب</TableHead>
-                <TableHead className="w-[240px]">الحضور</TableHead>
+                <TableHead className="w-[240px]">الحاضر</TableHead>
                 {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">السورة</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">الآيات</TableHead>}
