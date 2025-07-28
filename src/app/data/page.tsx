@@ -5,12 +5,12 @@ import React, { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, History, Loader2 } from 'lucide-react';
+import { Upload, Download, History, Loader2, CalendarClock } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Student, SessionRecord, SessionType } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
-import { format, parse, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { surahs } from '@/lib/surahs';
 
@@ -18,13 +18,23 @@ export default function DataExchangePage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sessionFileInputRef = useRef<HTMLInputElement>(null);
+  const monthlySessionFileInputRef = useRef<HTMLInputElement>(null);
+
   const { students, addDailySession, getRecordsForDateRange, importStudents } = useStudentContext();
   const activeStudents = students.filter(s => s.status === 'نشط');
 
+  // State for monthly export
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
   const [exportYear, setExportYear] = useState(new Date().getFullYear());
+  
+  // State for monthly import
+  const [importMonth, setImportMonth] = useState(new Date().getMonth());
+  const [importYear, setImportYear] = useState(new Date().getFullYear());
+
+
   const [isImportingStudents, setIsImportingStudents] = useState(false);
   const [isImportingSessions, setIsImportingSessions] = useState(false);
+  const [isImportingMonthly, setIsImportingMonthly] = useState(false);
 
 
  const parseDate = (dateInput: any): Date | null => {
@@ -248,6 +258,89 @@ export default function DataExchangePage() {
     reader.readAsArrayBuffer(file);
   };
 
+  const handleMonthlySessionUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setIsImportingMonthly(true);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        let successCount = 0;
+        let errors: string[] = [];
+        try {
+            const data = new Uint8Array(e.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+            const daysInSelectedMonth = getDaysInMonth(new Date(importYear, importMonth));
+            const monthStr = (importMonth + 1).toString().padStart(2, '0');
+
+            for(let day = 1; day <= daysInSelectedMonth; day++) {
+                const dayStr = day.toString().padStart(2, '0');
+                const sheetName = `${importYear}-${monthStr}-${dayStr}`;
+
+                if (workbook.SheetNames.includes(sheetName)) {
+                    const worksheet = workbook.Sheets[sheetName];
+                    const json = XLSX.utils.sheet_to_json<any>(worksheet);
+
+                    if (json.length === 0) continue;
+
+                    let sessionType: SessionType | null = null;
+                    const recordsToSave: SessionRecord[] = [];
+
+                    json.forEach((row, index) => {
+                       const currentSessionType = row['نوع الحصة'] as SessionType;
+                       if(index === 0) sessionType = currentSessionType;
+                       if (currentSessionType === 'يوم عطلة') return;
+
+                       const studentName = row['اسم الطالب']?.trim();
+                       if (!studentName) return; // Skip if no student name
+
+                       const student = students.find(s => s.fullName === studentName);
+                       if (!student) {
+                           errors.push(`لم يتم العثور على الطالب "${studentName}" في ورقة ${sheetName}`);
+                           return;
+                       }
+                       const surah = surahs.find(s => s.name === row['السورة']);
+                       recordsToSave.push({
+                           studentId: student.id,
+                           attendance: row['الحضور'], behavior: row['السلوك'],
+                           memorization: row['التقييم'], review: row['مراجعة'] === 'نعم',
+                           surahId: surah?.id, fromVerse: row['من آية'], toVerse: row['إلى آية'],
+                           notes: row['ملاحظات'],
+                       });
+                    });
+                    
+                     if(sessionType) {
+                        addDailySession({ date: sheetName, sessionType, records: recordsToSave });
+                        successCount++;
+                     }
+                }
+            }
+
+            if (errors.length > 0) {
+                throw new Error(errors.join('\n'));
+            }
+
+            toast({
+                title: "اكتمل الاستيراد الشهري ✅",
+                description: `تم استيراد ${successCount} يومًا بنجاح.`,
+            });
+
+        } catch (error) {
+            console.error("Error parsing monthly session file:", error);
+            const errorMessage = error instanceof Error ? error.message : "حدث خطأ أثناء قراءة الملف. تأكد من تطابق أسماء الأوراق وأسماء الطلبة.";
+            toast({
+                title: "خطأ في استيراد الملف الشهري ❌",
+                description: errorMessage,
+                variant: 'destructive',
+            });
+        } finally {
+            setIsImportingMonthly(false);
+            if (monthlySessionFileInputRef.current) monthlySessionFileInputRef.current.value = '';
+        }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
   const handleDownloadStudentTemplate = () => {
     const headers = ["الاسم الكامل", "اسم الولي", "رقم الهاتف", "تاريخ الميلاد", "تاريخ التسجيل", "ملاحظات"];
     const exampleRow = {
@@ -348,10 +441,11 @@ export default function DataExchangePage() {
     <div className="space-y-6">
       <input type="file" ref={fileInputRef} onChange={handleStudentFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingStudents}/>
       <input type="file" ref={sessionFileInputRef} onChange={handleSessionFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingSessions}/>
+      <input type="file" ref={monthlySessionFileInputRef} onChange={handleMonthlySessionUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingMonthly}/>
       
       <h1 className="text-3xl font-headline font-bold">استيراد وتصدير البيانات</h1>
       
-      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>📥 بيانات الطلبة</CardTitle>
@@ -361,7 +455,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. لن يتم إضافة طالب إذا كان موجودًا بالفعل.
+              لن يتم إضافة طالب إذا كان اسمه الكامل موجودًا بالفعل في النظام.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button className="flex-grow" onClick={() => fileInputRef.current?.click()} disabled={isImportingStudents}>
@@ -377,69 +471,90 @@ export default function DataExchangePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>📤 تقارير وتصدير</CardTitle>
-            <CardDescription>
-              تصدير تقارير شاملة للفوج أو تقارير فردية للطلبة بصيغ مختلفة.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col gap-2">
-              <div className="flex gap-2">
-                 <Select dir="rtl" value={exportMonth.toString()} onValueChange={(val) => setExportMonth(parseInt(val))}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="اختر الشهر" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {Array.from({length: 12}, (_, i) => (
-                             <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
-                        ))}
-                    </SelectContent>
-                 </Select>
-                  <Select dir="rtl" value={exportYear.toString()} onValueChange={(val) => setExportYear(parseInt(val))}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="اختر السنة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                         {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
-                              <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                         ))}
-                    </SelectContent>
-                 </Select>
-              </div>
-              <Button onClick={handleExportMonthlyReport}>
-                 تصدير الحصص لشهر كامل (Excel)
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-       <Card className="col-span-1 lg:col-span-2">
-          <CardHeader>
             <CardTitle>🔄 بيانات الحصص اليومية</CardTitle>
             <CardDescription>
-              تنزيل نموذج حصة يومية بأسماء الطلبة النشطين، وتعبئته، ثم رفعه لتسجيل الحصة دفعة واحدة.
+              تنزيل نموذج ليوم واحد أو رفع سجل حصة ليوم واحد تم تعبئته مسبقًا.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
              <p className="text-sm text-muted-foreground">
-              هذه الميزة مفيدة لتسجيل بيانات الحصص بشكل غير متصل بالإنترنت. سيتم حفظ البيانات في المتصفح عند الرفع.
+              لتسجيل البيانات بشكل غير متصل. سيتم حفظ البيانات عند الرفع.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
                <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()} disabled={isImportingSessions}>
                 {isImportingSessions ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
-                {isImportingSessions ? 'جاري الاستيراد...' : 'رفع سجل حصة'}
+                {isImportingSessions ? 'جاري الاستيراد...' : 'رفع سجل حصة اليوم'}
               </Button>
               <Button variant="outline" onClick={handleDownloadSessionTemplate} disabled={activeStudents.length === 0}>
                 <Download className="ml-2 h-4 w-4" /> تحميل نموذج حصة اليوم
               </Button>
             </div>
-             {activeStudents.length === 0 && <p className="text-xs text-destructive text-center mt-2">يجب إضافة طلبة نشطين أولاً لتتمكن من تحميل النموذج.</p>}
+             {activeStudents.length === 0 && <p className="text-xs text-destructive text-center mt-2">يجب إضافة طلبة نشطين أولاً.</p>}
           </CardContent>
         </Card>
+      </div>
 
+       <Card className="col-span-1 md:col-span-2">
+          <CardHeader>
+            <CardTitle>🗓️ بيانات شهر كامل</CardTitle>
+            <CardDescription>
+              استيراد أو تصدير ملف Excel واحد يحتوي على بيانات شهر كامل، حيث تكون كل ورقة (sheet) يومًا منفصلاً.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+                <h4 className="font-semibold">استيراد بيانات شهر كامل</h4>
+                 <div className="flex gap-2">
+                    <Select dir="rtl" value={importMonth.toString()} onValueChange={(val) => setImportMonth(parseInt(val))}>
+                        <SelectTrigger><SelectValue placeholder="اختر الشهر" /></SelectTrigger>
+                        <SelectContent>
+                            {Array.from({length: 12}, (_, i) => (
+                                <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select dir="rtl" value={importYear.toString()} onValueChange={(val) => setImportYear(parseInt(val))}>
+                        <SelectTrigger><SelectValue placeholder="اختر السنة" /></SelectTrigger>
+                        <SelectContent>
+                            {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                 </div>
+                 <Button className="w-full" onClick={() => monthlySessionFileInputRef.current?.click()} disabled={isImportingMonthly}>
+                    {isImportingMonthly ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CalendarClock className="ml-2 h-4 w-4" />}
+                    {isImportingMonthly ? 'جاري الاستيراد...' : 'رفع ملف الشهر'}
+                 </Button>
+            </div>
+             <div className="space-y-4">
+                <h4 className="font-semibold">تصدير بيانات شهر كامل</h4>
+                <div className="flex gap-2">
+                    <Select dir="rtl" value={exportMonth.toString()} onValueChange={(val) => setExportMonth(parseInt(val))}>
+                        <SelectTrigger><SelectValue placeholder="اختر الشهر" /></SelectTrigger>
+                        <SelectContent>
+                            {Array.from({length: 12}, (_, i) => (
+                                <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select dir="rtl" value={exportYear.toString()} onValueChange={(val) => setExportYear(parseInt(val))}>
+                        <SelectTrigger><SelectValue placeholder="اختر السنة" /></SelectTrigger>
+                        <SelectContent>
+                            {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <Button className="w-full" onClick={handleExportMonthlyReport}>
+                    <Download className="ml-2 h-4 w-4" />
+                    تصدير تقرير الشهر المحدد (Excel)
+                </Button>
+            </div>
+          </CardContent>
+        </Card>
     </div>
   );
 }
 
-    
