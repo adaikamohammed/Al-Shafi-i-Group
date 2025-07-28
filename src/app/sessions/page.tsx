@@ -42,7 +42,7 @@ export default function DailySessionsPage() {
   const [isSessionDialogOpen, setSessionDialogOpen] = useState(false);
   const { toast } = useToast();
   
-  const { students, dailyRecords, loading, getRecordsForDate } = useStudentContext();
+  const { students, dailyRecords, loading, getRecordsForDate, addMultipleDailyRecords } = useStudentContext();
   const activeStudents = useMemo(() => 
     students.filter(s => s.status === "نشط"), 
   [students]);
@@ -144,11 +144,11 @@ export default function DailySessionsPage() {
         }
 
       dayCells.push(
-        <button
+        <div
           key={day}
           onClick={() => handleDayClick(day)}
           className={cn(
-            "p-2 text-center border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col items-start justify-between relative",
+            "p-2 text-center border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col items-start justify-between relative cursor-pointer",
             dayStatusClass
           )}
         >
@@ -175,7 +175,7 @@ export default function DailySessionsPage() {
                  )}
             </div>
            <span className="text-xs text-muted-foreground self-end">{format(dayDate, 'EEEE', { locale: ar })}</span>
-        </button>
+        </div>
       );
     }
 
@@ -257,6 +257,8 @@ export default function DailySessionsPage() {
                 day={selectedDay} 
                 students={activeStudents}
                 onClose={() => setSessionDialogOpen(false)}
+                addMultipleDailyRecords={addMultipleDailyRecords}
+                getRecordsForDate={getRecordsForDate}
               />
             </div>
           </DialogContent>
@@ -319,8 +321,16 @@ function SurahCombobox({ value, onSelect, disabled }: { value?: number | null, o
   )
 }
 
-function DailySessionForm({ day, students, onClose }: { day: Date, students: Student[], onClose: () => void }) {
-  const { addMultipleDailyRecords, getRecordsForDate } = useStudentContext();
+interface DailySessionFormProps {
+    day: Date;
+    students: Student[];
+    onClose: () => void;
+    addMultipleDailyRecords: (records: SessionRecord[]) => void;
+    getRecordsForDate: (date: string) => SessionRecord[];
+}
+
+
+function DailySessionForm({ day, students, onClose, addMultipleDailyRecords, getRecordsForDate }: DailySessionFormProps) {
   const [sessionType, setSessionType] = useState<SessionType>('حصة أساسية');
   const [records, setRecords] = useState<DailyRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -383,7 +393,7 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
     );
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     setIsLoading(true);
     const formattedDate = format(day, 'yyyy-MM-dd');
     
@@ -408,7 +418,7 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
     }
     
     try {
-        await addMultipleDailyRecords(recordsToSave);
+        addMultipleDailyRecords(recordsToSave);
         onClose();
     } catch (error) {
         console.error("Failed to save session records:", error);
@@ -554,3 +564,5 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
     </TooltipProvider>
   );
 }
+
+    
