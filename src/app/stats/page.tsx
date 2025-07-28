@@ -3,88 +3,117 @@
 
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, Users, CalendarDays, BarChart, AlertTriangle } from 'lucide-react';
-import { format, parseISO, getMonth, getYear, getDaysInMonth } from 'date-fns';
+import { Loader2, AlertTriangle, ArrowLeft, ArrowRight } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, addDays, subDays, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Bar, XAxis, YAxis, CartesianGrid, Legend, BarChart as RechartsBarChart } from 'recharts';
-import type { Student } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import type { Student, DailySession, SessionRecord } from '@/lib/types';
 
 
-const ATTENDANCE_COLORS: { [key: string]: string } = { 'حاضر': '#10B981', 'غائب': '#EF4444', 'متأخر': '#F59E0B', 'تعويض': '#3B82F6' };
-const BEHAVIOR_COLORS: { [key: string]: string } = { 'هادئ': '#3B82F6', 'متوسط': '#F59E0B', 'غير منضبط': '#EF4444' };
-const EVALUATION_COLORS: { [key: string]: string } = { 'ممتاز': '#10B981', 'جيد': '#34D399', 'متوسط': '#F59E0B', 'ضعيف': '#EF4444', 'لا يوجد': '#9CA3AF' };
+const getAttendanceColor = (status?: string) => {
+  switch (status) {
+    case "حاضر": return "bg-green-300";
+    case "غائب": return "bg-red-400";
+    case "متأخر": return "bg-yellow-400";
+    case "تعويض": return "bg-blue-300";
+    default: return "bg-gray-100";
+  }
+};
 
-interface ChartData {
-  name: string;
-  value: number;
+const getBehaviorClass = (behavior?: string) => {
+    switch(behavior) {
+        case 'هادئ': return 'border-blue-500';
+        case 'متوسط': return 'border-yellow-500';
+        case 'غير منضبط': return 'border-red-500';
+        default: return 'border-transparent';
+    }
 }
 
-export default function StatisticsPage() {
+const DayCell = ({ session, record, date }: { session?: DailySession, record?: SessionRecord, date: Date }) => {
+    const status = session?.sessionType === 'يوم عطلة' ? 'عطلة' : record?.attendance;
+    const behavior = record?.behavior;
+    const sessionType = session?.sessionType;
+    
+    const attendanceColor = getAttendanceColor(status);
+    const behaviorClass = getBehaviorClass(behavior);
+
+    let content;
+    if (session?.sessionType === 'يوم عطلة') {
+        content = (
+            <div className="flex items-center justify-center h-full">
+                <span className="text-xs text-gray-500">عطلة</span>
+            </div>
+        );
+    } else if (record) {
+        content = (
+             <div className="text-center">
+                 <span className="text-xs font-bold">{status}</span>
+             </div>
+        );
+    } else {
+         content = <div className="h-full"></div>;
+    }
+
+    const tooltipContent = (
+         <div className="text-right">
+            <p><span className="font-bold">التاريخ:</span> {format(date, 'd MMMM yyyy', { locale: ar })}</p>
+            <p><span className="font-bold">نوع الحصة:</span> {sessionType || 'غير مسجلة'}</p>
+            {session?.sessionType !== 'يوم عطلة' && record && (
+                <>
+                    <p><span className="font-bold">الحضور:</span> {record.attendance}</p>
+                    <p><span className="font-bold">السلوك:</span> {record.behavior}</p>
+                    <p><span className="font-bold">التقييم:</span> {record.memorization || 'لم يقيم'}</p>
+                    <p><span className="font-bold">المراجعة:</span> {record.review ? 'نعم ✅' : 'لا ❌'}</p>
+                    {record.notes && <p><span className="font-bold">ملاحظات:</span> {record.notes}</p>}
+                </>
+            )}
+        </div>
+    );
+
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <div className={cn("h-16 w-full rounded-md p-1 border-2 transition-all", attendanceColor, behaviorClass)}>
+                    {content}
+                </div>
+            </TooltipTrigger>
+            <TooltipContent>
+                {tooltipContent}
+            </TooltipContent>
+        </Tooltip>
+    );
+};
+
+export default function WeeklyFollowUpPage() {
     const { students, dailySessions, loading } = useStudentContext();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
-    const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
-    const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-    
-    const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
+    const [currentDate, setCurrentDate] = useState(new Date());
 
-    const monthlyData = useMemo(() => {
-        const startDate = new Date(selectedYear, selectedMonth, 1);
-        const endDate = new Date(selectedYear, selectedMonth, getDaysInMonth(startDate));
-        
-        const filteredSessions = Object.values(dailySessions).filter(session => {
-            const sessionDate = parseISO(session.date);
-            return sessionDate >= startDate && sessionDate <= endDate;
-        });
-
-        let records = filteredSessions.flatMap(s => s.records);
-
+    const activeStudents = useMemo(() => {
+        const filtered = students.filter(s => s.status === 'نشط');
         if (selectedStudentId !== 'all') {
-            records = records.filter(r => r.studentId === selectedStudentId);
+            return filtered.filter(s => s.id === selectedStudentId);
         }
+        return filtered;
+    }, [students, selectedStudentId]);
+    
+    const weekDates = useMemo(() => {
+        const start = startOfWeek(currentDate, { weekStartsOn: 6 }); // Saturday
+        return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
+    }, [currentDate]);
 
-        const stats = {
-            totalRecords: records.length,
-            attendance: { 'حاضر': 0, 'غائب': 0, 'متأخر': 0, 'تعويض': 0 },
-            behavior: { 'هادئ': 0, 'متوسط': 0, 'غير منضبط': 0 },
-            evaluation: { 'ممتاز': 0, 'جيد': 0, 'متوسط': 0, 'ضعيف': 0, 'لا يوجد': 0 },
-            sessions: filteredSessions.length,
-            holidays: filteredSessions.filter(s => s.sessionType === 'يوم عطلة').length,
-            sessionTypes: { 'حصة أساسية': 0, 'حصة أنشطة': 0, 'حصة تعويضية': 0 }
-        };
+    const handlePreviousWeek = () => {
+        setCurrentDate(subDays(currentDate, 7));
+    };
 
-        records.forEach(record => {
-            if (record.attendance) stats.attendance[record.attendance]++;
-            if (record.behavior) stats.behavior[record.behavior]++;
-            if (record.memorization) stats.evaluation[record.memorization]++;
-        });
-
-        filteredSessions.forEach(session => {
-           if(session.sessionType !== 'يوم عطلة') {
-               stats.sessionTypes[session.sessionType]++;
-           }
-        });
-
-        return stats;
-
-    }, [dailySessions, selectedMonth, selectedYear, selectedStudentId]);
-
-    const attendanceData: ChartData[] = Object.entries(monthlyData.attendance)
-        .filter(([, value]) => value > 0)
-        .map(([name, value]) => ({ name, value }));
-
-    const behaviorData: ChartData[] = Object.entries(monthlyData.behavior)
-        .filter(([, value]) => value > 0)
-        .map(([name, value]) => ({ name, value }));
-
-    const evaluationData = Object.entries(monthlyData.evaluation)
-        .map(([name, value]) => ({ name, value }));
-        
-    const sessionTypeData = Object.entries(monthlyData.sessionTypes)
-         .map(([name, value]) => ({ name, value }));
-
-
+    const handleNextWeek = () => {
+        setCurrentDate(addDays(currentDate, 7));
+    };
+    
     if (loading) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-200px)]">
@@ -93,7 +122,7 @@ export default function StatisticsPage() {
         );
     }
     
-     if (activeStudents.length === 0 && !loading) {
+     if (students.filter(s => s.status === 'نشط').length === 0 && !loading) {
         return (
             <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
                 <AlertTriangle className="h-16 w-16 text-yellow-400" />
@@ -106,164 +135,95 @@ export default function StatisticsPage() {
     }
     
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <h1 className="text-3xl font-headline font-bold">لوحة الإحصائيات الشهرية</h1>
-                 <div className="flex gap-2 w-full md:w-auto">
-                    <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                        <SelectTrigger className="w-full md:w-[200px]">
-                            <SelectValue placeholder="اختر طالبًا" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">كل الطلبة النشطين</SelectItem>
-                            {activeStudents.map(student => (
-                                <SelectItem key={student.id} value={student.id}>
-                                    {student.fullName}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
-                        <SelectTrigger className="w-full md:w-[120px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
-                        <SelectContent>
-                            {Array.from({length: 12}, (_, i) => (
-                                <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
-                        <SelectTrigger className="w-full md:w-[100px]"><SelectValue placeholder="السنة" /></SelectTrigger>
-                        <SelectContent>
-                            {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
-                                <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+        <TooltipProvider>
+            <div className="space-y-6">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                    <h1 className="text-3xl font-headline font-bold">لوحة المتابعة الأسبوعية</h1>
+                    <div className="flex gap-2 w-full md:w-auto items-center">
+                         <Button variant="outline" size="icon" onClick={handlePreviousWeek}><ArrowRight className="h-4 w-4" /></Button>
+                         <span className="font-semibold text-center w-48">
+                            {format(weekDates[0], 'd MMM', { locale: ar })} - {format(weekDates[6], 'd MMM yyyy', { locale: ar })}
+                         </span>
+                         <Button variant="outline" size="icon" onClick={handleNextWeek}><ArrowLeft className="h-4 w-4" /></Button>
+                    </div>
+                     <div className="flex gap-2 w-full md:w-auto">
+                        <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                            <SelectTrigger className="w-full md:w-[200px]">
+                                <SelectValue placeholder="اختر طالبًا" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">كل الطلبة النشطين</SelectItem>
+                                {students.filter(s => s.status === 'نشط').map(student => (
+                                    <SelectItem key={student.id} value={student.id}>
+                                        {student.fullName}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
-            </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">إجمالي الطلبة</CardTitle>
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{selectedStudentId === 'all' ? activeStudents.length : 1}</div>
-                        <p className="text-xs text-muted-foreground">طالب نشط</p>
+                    <CardContent className="p-4">
+                        <div className="grid grid-cols-8 gap-2">
+                             <div className="font-bold text-center self-center">الطالب</div>
+                             {weekDates.map(date => (
+                                 <div key={date.toISOString()} className="font-bold text-center">
+                                     <div>{format(date, 'EEEE', { locale: ar })}</div>
+                                     <div className="text-sm text-muted-foreground">{format(date, 'dd/MM')}</div>
+                                 </div>
+                             ))}
+
+                             {activeStudents.map(student => (
+                                 <React.Fragment key={student.id}>
+                                    <div className="font-semibold self-center text-center p-2 bg-muted rounded-md">{student.fullName}</div>
+                                    {weekDates.map(date => {
+                                         const dateString = format(date, 'yyyy-MM-dd');
+                                         const session = dailySessions[dateString];
+                                         const record = session?.records.find(r => r.studentId === student.id);
+                                         return (
+                                            <DayCell key={date.toISOString()} session={session} record={record} date={date}/>
+                                         )
+                                    })}
+                                 </React.Fragment>
+                             ))}
+                        </div>
                     </CardContent>
                 </Card>
+
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">الأيام المسجلة</CardTitle>
-                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.sessions}</div>
-                        <p className="text-xs text-muted-foreground">من أصل {getDaysInMonth(new Date(selectedYear, selectedMonth))} يومًا في الشهر</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">إجمالي الحضور</CardTitle>
-                        <BarChart className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.attendance['حاضر']}</div>
-                        <p className="text-xs text-muted-foreground">
-                          من إجمالي {monthlyData.totalRecords} سجل
-                        </p>
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">أيام العطل</CardTitle>
-                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.holidays}</div>
-                         <p className="text-xs text-muted-foreground">
-                          أيام عطلة مسجلة هذا الشهر
-                        </p>
+                    <CardHeader><CardTitle>مفتاح الدلالات</CardTitle></CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <h4 className="font-semibold mb-2">🟩 الحضور (لون الخلفية)</h4>
+                            <ul className="space-y-1 text-sm">
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-green-300"></div> حاضر</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-red-400"></div> غائب</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-yellow-400"></div> متأخر</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-blue-300"></div> تعويض</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-gray-100"></div> يوم عطلة / لم يسجل</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold mb-2">📏 السلوك (لون الإطار)</h4>
+                             <ul className="space-y-1 text-sm">
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-blue-500"></div> هادئ</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-yellow-500"></div> متوسط</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-red-500"></div> غير منضبط</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold mb-2">🏷️ نوع الحصة</h4>
+                             <ul className="space-y-1 text-sm">
+                                <li>حصة أساسية</li>
+                                <li>حصة أنشطة</li>
+                                <li>حصة تعويضية</li>
+                                <li>يوم عطلة</li>
+                            </ul>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
-            
-            {monthlyData.totalRecords > 0 ? (
-                <div className="grid gap-6 md:grid-cols-2">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>📊 توزيع الحضور</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <PieChart>
-                                    <Pie data={attendanceData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-                                        {attendanceData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={ATTENDANCE_COLORS[entry.name]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip formatter={(value, name) => [`${value} يوم`, name]} />
-                                    <Legend />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>😊 توزيع السلوك</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <PieChart>
-                                    <Pie data={behaviorData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={100} label>
-                                        {behaviorData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={BEHAVIOR_COLORS[entry.name]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip formatter={(value, name) => [`${value} مرة`, name]} />
-                                    <Legend />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-                    <Card className="md:col-span-2">
-                         <CardHeader>
-                            <CardTitle>📚 توزيع التقييم</CardTitle>
-                             <CardDescription>
-                                {selectedStudentId === 'all' 
-                                ? 'متوسط تقييم جميع الطلاب خلال الشهر المحدد' 
-                                : `تقييمات الطالب ${students.find(s=>s.id === selectedStudentId)?.fullName} خلال الشهر`}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                             <ResponsiveContainer width="100%" height={300}>
-                                <RechartsBarChart data={evaluationData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" />
-                                    <YAxis />
-                                    <Tooltip cursor={{fill: 'rgba(206, 206, 206, 0.2)'}} formatter={(value) => [`${value} مرة`, 'العدد']} />
-                                    <Bar dataKey="value">
-                                        {evaluationData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={EVALUATION_COLORS[entry.name]} />
-                                        ))}
-                                    </Bar>
-                                </RechartsBarChart>
-                            </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-                </div>
-            ) : (
-                 <div className="space-y-6 flex flex-col items-center justify-center h-60 border border-dashed rounded-lg">
-                    <AlertTriangle className="h-16 w-16 text-muted-foreground" />
-                    <h2 className="text-xl font-headline font-bold text-center">لا توجد بيانات مسجلة لهذا الشهر</h2>
-                    <p className="text-muted-foreground text-center">
-                        يرجى اختيار شهر آخر أو تسجيل بيانات في صفحة "الحصص اليومية".
-                    </p>
-                </div>
-            )}
-        </div>
+        </TooltipProvider>
     );
 }
-
-    

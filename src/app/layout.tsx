@@ -6,7 +6,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2 } from 'lucide-react';
+import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 const navItems = [
   { href: '/', label: 'إدارة الطلبة', icon: Users },
   { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList },
-  { href: '/stats', label: 'إحصائيات الفوج', icon: BarChart3 },
+  { href: '/stats', label: 'المتابعة الأسبوعية', icon: Calendar },
+  { href: '/reports/monthly', label: 'الإحصائيات الشهرية', icon: BarChart3 },
   { href: '/data', label: 'البيانات', icon: ArrowRightLeft },
   { href: '/settings', label: 'الإعدادات', icon: Settings },
 ];
