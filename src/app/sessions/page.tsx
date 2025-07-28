@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -9,7 +10,7 @@ import { surahs } from '@/lib/surahs';
 import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, SessionRecord } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, ArrowLeft, ArrowRight, ChevronsUpDown, Check } from 'lucide-react';
+import { Info, ArrowLeft, ArrowRight, ChevronsUpDown, Check, Loader2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -37,7 +38,7 @@ export default function DailySessionsPage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [isSessionDialogOpen, setSessionDialogOpen] = useState(false);
   
-  const { students, getRecordsForDateRange } = useStudentContext();
+  const { students, dailyRecords } = useStudentContext();
   const activeStudents = useMemo(() => 
     students.filter(s => s.status === "نشط"), 
   [students]);
@@ -62,12 +63,10 @@ export default function DailySessionsPage() {
     const daysInMonth = getDaysInMonth(currentDate);
     const firstDayOfMonth = getDay(startOfMonth(currentDate));
     
-    const monthStartDate = format(new Date(year, month, 1), 'yyyy-MM-dd');
-    const monthEndDate = format(new Date(year, month, daysInMonth), 'yyyy-MM-dd');
-    const recordsForMonth = getRecordsForDateRange(monthStartDate, monthEndDate);
-
     const dayCells = [];
+    // Adjust startDayIndex for Arabic calendar (Saturday is the first day)
     const startDayIndex = (firstDayOfMonth + 1) % 7; 
+
     for (let i = 0; i < startDayIndex; i++) {
         dayCells.push(<div key={`empty-start-${i}`} className="p-2 border rounded-md"></div>);
     }
@@ -75,12 +74,12 @@ export default function DailySessionsPage() {
     for (let day = 1; day <= daysInMonth; day++) {
         const dayDate = new Date(year, month, day);
         const formattedDayDate = format(dayDate, 'yyyy-MM-dd');
-        const holidayRecord = recordsForMonth.find(r => r.date === formattedDayDate && r.studentId === 'holiday');
-        const dayHasRecords = recordsForMonth.some(r => r.date === formattedDayDate && r.studentId !== 'holiday');
+        const holidayRecord = dailyRecords.find(r => r.date === formattedDayDate && r.studentId === 'holiday');
+        const dayHasRecords = dailyRecords.some(r => r.date === formattedDayDate && r.studentId !== 'holiday');
         
         let dayStatusClass = '';
         if (holidayRecord) {
-            dayStatusClass = 'bg-gray-200 dark:bg-gray-700';
+            dayStatusClass = 'bg-yellow-200 dark:bg-yellow-800';
         } else if (dayHasRecords) {
             dayStatusClass = 'bg-green-200 dark:bg-green-800';
         } else if (isPast(dayDate) && !isToday(dayDate)) {
@@ -92,12 +91,12 @@ export default function DailySessionsPage() {
           key={day}
           onClick={() => handleDayClick(day)}
           className={cn(
-            "p-2 text-center border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-20 flex flex-col items-start",
+            "p-2 text-center border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col items-start justify-between",
             dayStatusClass
           )}
         >
           <span className="font-bold">{day}</span>
-           <span className="text-xs text-muted-foreground">{format(dayDate, 'EEEE', { locale: ar })}</span>
+           <span className="text-xs text-muted-foreground self-end">{format(dayDate, 'EEEE', { locale: ar })}</span>
         </button>
       );
     }
@@ -141,12 +140,17 @@ export default function DailySessionsPage() {
                     </Button>
                 ))}
             </div>
-
-            <div className="grid grid-cols-7 gap-2 text-center font-bold mb-2">
-                 {['سبت', 'أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة'].map(d => <div key={d}>{d}</div>)}
+            <div dir="rtl" className="grid grid-cols-7 gap-2 text-center font-bold mb-2">
+                 {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map(d => <div key={d}>{d}</div>)}
             </div>
             <div className="grid grid-cols-7 gap-2">
                 {renderCalendar()}
+            </div>
+             <div className="mt-6 flex flex-wrap justify-center gap-4 text-sm">
+                <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-green-200 border"></div><span>يوم مسجل</span></div>
+                <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-yellow-200 border"></div><span>يوم عطلة</span></div>
+                <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-red-200 border"></div><span>يوم فائت</span></div>
+                <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-background border"></div><span>يوم قادم</span></div>
             </div>
         </CardContent>
       </Card>
@@ -159,7 +163,7 @@ export default function DailySessionsPage() {
                 {`سجل الحصة ليوم: ${format(selectedDay, 'EEEE, d MMMM yyyy', { locale: ar })}`}
               </DialogTitle>
               <DialogDescription>
-                قم بتسجيل بيانات الحصة للطلبة النشطين في هذا اليوم.
+                قم بتسجيل بيانات الحصة للطلبة النشطين في هذا اليوم. سيتم الحفظ تلقائيًا في قاعدة البيانات.
               </DialogDescription>
             </DialogHeader>
             <div className="overflow-y-auto pr-4">
@@ -177,7 +181,7 @@ export default function DailySessionsPage() {
 }
 
 
-function SurahCombobox({ value, onSelect, disabled }: { value: number | null, onSelect: (surahId: number | null) => void, disabled?: boolean }) {
+function SurahCombobox({ value, onSelect, disabled }: { value?: number | null, onSelect: (surahId: number | null) => void, disabled?: boolean }) {
   const [open, setOpen] = useState(false)
   const selectedSurah = value ? surahs.find(s => s.id === value) : null;
 
@@ -233,31 +237,38 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
   const { addMultipleDailyRecords, getRecordsForDate } = useStudentContext();
   const [sessionType, setSessionType] = useState<SessionType>('حصة أساسية');
   const [records, setRecords] = useState<DailyRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const formattedDate = format(day, 'yyyy-MM-dd');
     const existingRecords = getRecordsForDate(formattedDate);
-    const existingSessionType = existingRecords.find(r => r.sessionType)?.sessionType;
+    const holidayRecord = existingRecords.find(r => r.studentId === 'holiday');
+    const existingSessionType = holidayRecord?.sessionType || existingRecords.find(r => r.sessionType)?.sessionType;
+
     if(existingSessionType) setSessionType(existingSessionType);
     
-    const initialRecords = students.map(s => {
-      const existing = existingRecords.find(r => r.studentId === s.id);
-      if (existing) {
-        return existing;
-      }
-      return {
-        studentId: s.id,
-        attendance: 'حاضر',
-        memorization: null,
-        review: null,
-        behavior: 'هادئ',
-        notes: '',
-        surahId: null,
-        fromVerse: null,
-        toVerse: null,
-      };
-    });
-    setRecords(initialRecords);
+    if (holidayRecord) {
+        setRecords([]);
+    } else {
+        const initialRecords = students.map(s => {
+          const existing = existingRecords.find(r => r.studentId === s.id);
+          if (existing) {
+            return { ...existing };
+          }
+          return {
+            studentId: s.id,
+            attendance: 'حاضر',
+            memorization: null,
+            review: false,
+            behavior: 'هادئ',
+            notes: '',
+            surahId: null,
+            fromVerse: null,
+            toVerse: null,
+          };
+        });
+        setRecords(initialRecords);
+    }
   }, [day, students, getRecordsForDate]);
 
   const handleRecordChange = <K extends keyof DailyRecord>(studentId: string, field: K, value: DailyRecord[K]) => {
@@ -266,14 +277,17 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
         if (rec.studentId === studentId) {
           const updatedRec = { ...rec, [field]: value };
           if (field === 'attendance' && value === 'غائب') {
-            updatedRec.memorization = null; updatedRec.review = null;
-            updatedRec.behavior = null; updatedRec.surahId = null;
+            updatedRec.memorization = null; updatedRec.review = false;
+            updatedRec.behavior = 'هادئ'; updatedRec.surahId = null;
             updatedRec.fromVerse = null; updatedRec.toVerse = null;
+            updatedRec.notes = '';
           }
            if (field === 'surahId') {
               const surah = surahs.find(s => s.id === (value as number));
               if (surah) {
                 updatedRec.fromVerse = 1; updatedRec.toVerse = surah.verses;
+              } else {
+                updatedRec.fromVerse = null; updatedRec.toVerse = null;
               }
            }
           return updatedRec;
@@ -283,11 +297,14 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setIsLoading(true);
     const formattedDate = format(day, 'yyyy-MM-dd');
     
+    let recordsToSave: SessionRecord[] = [];
+
     if (sessionType === 'يوم عطلة') {
-      const holidayRecord: SessionRecord = {
+      recordsToSave.push({
           date: formattedDate,
           sessionType: 'يوم عطلة',
           studentId: 'holiday',
@@ -295,17 +312,23 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
           memorization: null,
           review: null,
           behavior: null,
-      };
-       addMultipleDailyRecords([holidayRecord]);
+      });
     } else {
-        const recordsToSave: SessionRecord[] = records.map(r => ({
+        recordsToSave = records.map(r => ({
           ...r,
           date: formattedDate,
           sessionType: sessionType,
         }));
-        addMultipleDailyRecords(recordsToSave);
     }
-    onClose();
+    
+    try {
+        await addMultipleDailyRecords(recordsToSave);
+        onClose();
+    } catch (error) {
+        console.error("Failed to save session records:", error);
+    } finally {
+        setIsLoading(false);
+    }
   }
 
   const isActivitySession = sessionType === 'حصة أنشطة';
@@ -436,7 +459,10 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
 
         <DialogFooter className="mt-6">
             <Button variant="outline" onClick={onClose}>إلغاء</Button>
-            <Button onClick={handleSave}>حفظ بيانات اليوم</Button>
+            <Button onClick={handleSave} disabled={isLoading}>
+                {isLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+                حفظ بيانات اليوم
+            </Button>
         </DialogFooter>
       </div>
     </TooltipProvider>

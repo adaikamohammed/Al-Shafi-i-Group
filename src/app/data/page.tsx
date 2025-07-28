@@ -45,15 +45,18 @@ export default function DataExchangePage() {
                 if (!dateInput) return null;
                 if (dateInput instanceof Date) return dateInput;
                 if (typeof dateInput === 'string') {
-                     // Handles DD/MM/YYYY and MM/DD/YYYY by trying to parse it as international format first
                     if (dateInput.includes('/')) {
                        const parts = dateInput.split('/'); // dd/mm/yyyy
-                       return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                       // Check if format is MM/DD/YYYY or DD/MM/YYYY
+                       const month = parseInt(parts[1]) - 1;
+                       const day = parseInt(parts[0]);
+                       if (month > 11) { // Likely MM/DD/YYYY
+                          return new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+                       }
+                       return new Date(parseInt(parts[2]), month, day);
                     }
-                    // For YYYY-MM-DD
                     return parseISO(dateInput); 
                 }
-                // For excel dates (numbers)
                 if (typeof dateInput === 'number') return XLSX.SSF.parse_date_code(dateInput);
                 return null;
            }
@@ -65,7 +68,7 @@ export default function DataExchangePage() {
              throw new Error(`التواريخ غير صالحة في الصف رقم ${index + 2}. تأكد من أنها بصيغة DD/MM/YYYY.`);
            }
            
-           const studentData = {
+           const studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> = {
               fullName: row['الاسم الكامل'] || 'N/A',
               guardianName: row['اسم الولي'] || 'N/A',
               phone1: row['رقم الهاتف']?.toString() || 'N/A',
@@ -74,7 +77,7 @@ export default function DataExchangePage() {
               status: 'نشط',
               dailyMemorizationAmount: 'صفحة',
               notes: row['ملاحظات'] || '',
-           } as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>;
+           };
            
            await addStudent(studentData);
         });
@@ -83,7 +86,7 @@ export default function DataExchangePage() {
         
         toast({
           title: "نجاح ✅",
-          description: `تم استيراد ${json.length} طالبًا بنجاح.`,
+          description: `تم استيراد ${json.length} طالبًا بنجاح وحفظهم في قاعدة البيانات.`,
         });
 
       } catch (error) {
@@ -118,7 +121,6 @@ export default function DataExchangePage() {
         
         const newRecords: SessionRecord[] = json.map((row, index) => {
            const studentName = row['اسم الطالب'];
-           // For non-holiday sessions, student name is required
            if (row['نوع الحصة'] !== 'يوم عطلة' && !studentName) {
              console.warn(`لا يوجد اسم طالب في الصف ${index + 2}. سيتم تجاهل هذا السجل.`);
              return null;
@@ -148,14 +150,14 @@ export default function DataExchangePage() {
              fromVerse: row['من آية'],
              toVerse: row['إلى آية'],
              notes: row['ملاحظات'],
-           };
+           } as SessionRecord;
         }).filter((r): r is SessionRecord => r !== null);
         
         await addMultipleDailyRecords(newRecords);
 
         toast({
           title: "نجاح ✅",
-          description: `تم استيراد ${newRecords.length} سجل حصة بنجاح.`,
+          description: `تم استيراد وحفظ ${newRecords.length} سجل حصة بنجاح.`,
         });
 
       } catch (error) {
@@ -230,8 +232,8 @@ export default function DataExchangePage() {
             const student = students.find(s => s.id === record.studentId);
             const surah = surahs.find(s => s.id === record.surahId);
             return {
-                'التاريخ': format(parseISO(record.date), 'dd/MM/yyyy'),
-                'اليوم': format(parseISO(record.date), 'EEEE', { locale: ar }),
+                'التاريخ': record.date ? format(parseISO(record.date), 'dd/MM/yyyy') : '',
+                'اليوم': record.date ? format(parseISO(record.date), 'EEEE', { locale: ar }) : '',
                 'نوع الحصة': record.sessionType,
                 'اسم الطالب': record.studentId === 'holiday' ? '-' : student?.fullName || 'غير معروف',
                 'الحضور': record.attendance || '',
@@ -272,7 +274,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. سيتم تعيين حالتهم إلى "نشط" تلقائيًا.
+              قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. سيتم حفظ البيانات مباشرة في قاعدة البيانات.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button className="flex-grow" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
@@ -334,7 +336,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
              <p className="text-sm text-muted-foreground">
-              هذه الميزة مفيدة لتسجيل بيانات الحصص بشكل غير متصل بالإنترنت. تأكد من أن تاريخ اليوم وأسماء الطلبة صحيحة في الملف قبل رفعه.
+              هذه الميزة مفيدة لتسجيل بيانات الحصص بشكل غير متصل بالإنترنت. سيتم حفظ البيانات في قاعدة البيانات عند الرفع.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
                <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()} disabled={isImporting}>

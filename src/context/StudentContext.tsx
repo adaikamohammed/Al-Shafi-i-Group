@@ -6,11 +6,12 @@ import type { Student, SessionRecord } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, writeBatch, Timestamp, onSnapshot, setDoc, where, query, deleteDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, writeBatch, Timestamp, onSnapshot, setDoc, where, query } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 interface StudentContextType {
   students: Student[];
+  dailyRecords: SessionRecord[];
   loading: boolean;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => Promise<void>;
   updateStudent: (studentId: string, updatedData: Partial<Student>) => Promise<void>;
@@ -52,6 +53,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             updatedAt: (data.updatedAt as Timestamp)?.toDate(),
           } as Student;
       });
+      // Sort students alphabetically by name
+      studentsData.sort((a, b) => a.fullName.localeCompare(b.fullName));
       setStudents(studentsData);
       setLoading(false);
     }, (error) => {
@@ -83,7 +86,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => {
     if (!user) throw new Error("User not logged in");
     const newStudentRef = doc(collection(db, 'users', user.uid, 'students'));
-    const newStudent: Omit<Student, 'id'> = {
+    const newStudent = {
       ...studentData,
       memorizedSurahsCount: 0,
       updatedAt: new Date(),
@@ -105,23 +108,25 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const batch = writeBatch(db);
       const recordsCollectionRef = collection(db, 'users', user.uid, 'records');
       
-      // If it's a holiday, we need to delete any existing student records for that day.
-      const isHoliday = newRecords[0].sessionType === 'يوم عطلة';
       const date = newRecords[0].date;
+      const isHoliday = newRecords.some(r => r.sessionType === 'يوم عطلة');
 
-      if(isHoliday) {
-          const q = query(recordsCollectionRef, where("date", "==", date));
-          const existingRecordsSnap = await getDocs(q);
-          existingRecordsSnap.forEach(doc => {
-              batch.delete(doc.ref);
-          });
-      }
-
+      // First, delete all existing records for the specific date to avoid duplicates or orphaned data.
+      const q = query(recordsCollectionRef, where("date", "==", date));
+      const existingRecordsSnap = await getDocs(q);
+      existingRecordsSnap.forEach(doc => {
+          batch.delete(doc.ref);
+      });
+      
+      // Now, add the new records.
       newRecords.forEach(record => {
-          // Use a consistent and unique ID for each record
           const recordId = `${record.date}_${record.studentId}`;
           const recordRef = doc(recordsCollectionRef, recordId);
-          batch.set(recordRef, record);
+          // Convert date objects from student data back to Timestamps for Firestore
+          const a = record as any;
+          if (a.birthDate) a.birthDate = Timestamp.fromDate(a.birthDate);
+          if (a.registrationDate) a.registrationDate = Timestamp.fromDate(a.registrationDate);
+          batch.set(recordRef, a);
       });
       
       await batch.commit();
@@ -136,6 +141,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const end = parseISO(endDate);
       return dailyRecords.filter(r => {
         try {
+            if (!r.date || typeof r.date !== 'string') return false;
             return isWithinInterval(parseISO(r.date), { start, end })
         } catch (e) {
             console.warn(`Invalid date found in records: ${r.date}`);
@@ -145,7 +151,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <StudentContext.Provider value={{ students, loading, addStudent, updateStudent, addMultipleDailyRecords, getRecordsForDate, getRecordsForDateRange }}>
+    <StudentContext.Provider value={{ students, dailyRecords, loading, addStudent, updateStudent, addMultipleDailyRecords, getRecordsForDate, getRecordsForDateRange }}>
       {children}
     </StudentContext.Provider>
   );
