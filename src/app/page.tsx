@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
+import { DailyInspiration } from '@/components/ui/DailyInspiration';
 
 
 const statusVariant: { [key in StudentStatus]: "default" | "destructive" | "secondary" | "outline" } = {
@@ -90,6 +91,8 @@ export default function StudentManagementPage() {
 
   return (
     <div className="space-y-6">
+       <DailyInspiration />
+       
       <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
         <h1 className="text-3xl font-headline font-bold">إدارة الطلبة</h1>
         <div className="flex w-full sm:w-auto items-center gap-2">
@@ -440,3 +443,5 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
+    
