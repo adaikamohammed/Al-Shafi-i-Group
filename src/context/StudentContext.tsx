@@ -6,7 +6,7 @@ import type { Student, SessionRecord } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, writeBatch, Timestamp, onSnapshot, setDoc, where, query } from 'firebase/firestore';
+import { collection, doc, getDocs, writeBatch, Timestamp, onSnapshot, setDoc, where, query, collectionGroup } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 interface StudentContextType {
@@ -23,14 +23,14 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  const { user, appUser } = useAuth();
   const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
   const [dailyRecords, setDailyRecords] = useState<SessionRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !appUser) {
       setStudents([]);
       setDailyRecords([]);
       setLoading(false);
@@ -39,6 +39,15 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     setLoading(true);
 
+    let studentsQuery;
+    let recordsQuery;
+    
+    // The current data structure isolates student data under each user.
+    // An admin role would ideally need a different data structure (e.g., top-level collections)
+    // to query across all users efficiently. For now, an admin will see the same as a teacher.
+    // This can be expanded upon in the future.
+    
+    // Teacher and Admin both query their own data for now.
     const studentsCollectionRef = collection(db, 'users', user.uid, 'students');
     const recordsCollectionRef = collection(db, 'users', user.uid, 'records');
 
@@ -53,7 +62,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             updatedAt: (data.updatedAt as Timestamp)?.toDate(),
           } as Student;
       });
-      // Sort students alphabetically by name
       studentsData.sort((a, b) => a.fullName.localeCompare(b.fullName));
       setStudents(studentsData);
       setLoading(false);
@@ -81,7 +89,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         unsubscribeStudents();
         unsubscribeRecords();
     }
-  }, [user, toast]);
+  }, [user, appUser, toast]);
 
   const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => {
     if (!user) throw new Error("User not logged in");
@@ -109,20 +117,16 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const recordsCollectionRef = collection(db, 'users', user.uid, 'records');
       
       const date = newRecords[0].date;
-      const isHoliday = newRecords.some(r => r.sessionType === 'يوم عطلة');
 
-      // First, delete all existing records for the specific date to avoid duplicates or orphaned data.
       const q = query(recordsCollectionRef, where("date", "==", date));
       const existingRecordsSnap = await getDocs(q);
       existingRecordsSnap.forEach(doc => {
           batch.delete(doc.ref);
       });
       
-      // Now, add the new records.
       newRecords.forEach(record => {
           const recordId = `${record.date}_${record.studentId}`;
           const recordRef = doc(recordsCollectionRef, recordId);
-          // Convert date objects from student data back to Timestamps for Firestore
           const a = record as any;
           if (a.birthDate) a.birthDate = Timestamp.fromDate(a.birthDate);
           if (a.registrationDate) a.registrationDate = Timestamp.fromDate(a.registrationDate);
