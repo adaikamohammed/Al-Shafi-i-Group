@@ -15,7 +15,7 @@ import { ar } from 'date-fns/locale';
 import { surahs } from '@/lib/surahs';
 import { v4 as uuidv4 } from 'uuid';
 import { db, auth } from '@/lib/firebase';
-import { ref, set } from 'firebase/database';
+import { ref, update } from 'firebase/database';
 
 
 export default function DataExchangePage() {
@@ -100,7 +100,7 @@ export default function DataExchangePage() {
            };
         });
 
-        await set(ref(db), studentUpdates);
+        await update(ref(db), studentUpdates);
         
         toast({
           title: "نجاح ✅",
@@ -372,3 +372,5 @@ export default function DataExchangePage() {
     </div>
   );
 }
+
+    
