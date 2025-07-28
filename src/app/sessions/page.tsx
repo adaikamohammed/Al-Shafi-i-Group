@@ -150,7 +150,7 @@ export default function DailySessionsPage() {
           key={day}
           onClick={() => handleDayClick(day)}
           className={cn(
-            "p-2 text-center border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col items-start justify-between relative cursor-pointer",
+            "p-2 text-start border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col justify-between relative cursor-pointer",
             dayStatusClass
           )}
         >
@@ -555,5 +555,3 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
     </TooltipProvider>
   );
 }
-
-    
