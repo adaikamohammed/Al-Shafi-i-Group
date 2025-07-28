@@ -2,8 +2,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import type { Student, SessionRecord } from '@/lib/types';
-import { isWithinInterval, parseISO, format } from 'date-fns';
+import type { Student, SessionRecord, DailySession } from '@/lib/types';
+import { isWithinInterval, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,7 +13,12 @@ const getLocalStorage = (key: string, defaultValue: any) => {
     return defaultValue;
   }
   const storedValue = localStorage.getItem(key);
-  return storedValue ? JSON.parse(storedValue) : defaultValue;
+  try {
+     return storedValue ? JSON.parse(storedValue) : defaultValue;
+  } catch (error) {
+    console.error("Error parsing JSON from localStorage", key, error);
+    return defaultValue;
+  }
 };
 
 const setLocalStorage = (key: string, value: any) => {
@@ -25,14 +30,14 @@ const setLocalStorage = (key: string, value: any) => {
 
 interface StudentContextType {
   students: Student[];
-  dailyRecords: SessionRecord[];
+  dailySessions: Record<string, DailySession>;
   loading: boolean;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => void;
   updateStudent: (studentId: string, updatedData: Partial<Student>) => void;
   deleteStudent: (studentId: string) => void;
-  addMultipleDailyRecords: (records: SessionRecord[]) => void;
-  getRecordsForDate: (date: string) => SessionRecord[];
-  getRecordsForDateRange: (startDate: string, endDate: string) => SessionRecord[];
+  addDailySession: (session: DailySession) => void;
+  getSessionForDate: (date: string) => DailySession | undefined;
+  getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[]) => void;
 }
 
@@ -41,7 +46,7 @@ const StudentContext = createContext<StudentContextType | undefined>(undefined);
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
-  const [dailyRecords, setDailyRecords] = useState<SessionRecord[]>([]);
+  const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
   const [loading, setLoading] = useState(true);
 
   // Load data from localStorage when user is authenticated
@@ -54,13 +59,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             registrationDate: new Date(s.registrationDate),
             updatedAt: new Date(s.updatedAt)
         }));
-        const storedRecords = getLocalStorage(`dailyRecords_${user.uid}`, []);
+        const storedSessions = getLocalStorage(`dailySessions_${user.uid}`, {});
         setStudents(storedStudents);
-        setDailyRecords(storedRecords);
+        setDailySessions(storedSessions);
       } else {
         // Clear data if user logs out
         setStudents([]);
-        setDailyRecords([]);
+        setDailySessions({});
       }
       setLoading(false);
     }
@@ -68,17 +73,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   
   // Save students to localStorage whenever they change
   useEffect(() => {
-    if (user) {
+    if (user && !loading) {
       setLocalStorage(`students_${user.uid}`, students);
     }
-  }, [students, user]);
+  }, [students, user, loading]);
 
   // Save records to localStorage whenever they change
   useEffect(() => {
-    if (user) {
-      setLocalStorage(`dailyRecords_${user.uid}`, dailyRecords);
+    if (user && !loading) {
+      setLocalStorage(`dailySessions_${user.uid}`, dailySessions);
     }
-  }, [dailyRecords, user]);
+  }, [dailySessions, user, loading]);
 
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => {
@@ -113,37 +118,37 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setStudents(prev => prev.filter(s => s.id !== studentId));
   }
 
-  const addMultipleDailyRecords = (newRecords: SessionRecord[]) => {
-    if (newRecords.length === 0) return;
-    const date = newRecords[0].date;
-    
-    // Remove old records for the same date to avoid duplicates
-    const otherDateRecords = dailyRecords.filter(r => r.date !== date);
-
-    setDailyRecords([...otherDateRecords, ...newRecords]);
+  const addDailySession = (session: DailySession) => {
+    setDailySessions(prev => ({
+        ...prev,
+        [session.date]: session
+    }));
   };
   
-  const getRecordsForDate = (date: string): SessionRecord[] => {
-      return dailyRecords.filter(r => r.date === date);
+  const getSessionForDate = (date: string): DailySession | undefined => {
+      return dailySessions[date];
   }
 
-  const getRecordsForDateRange = (startDate: string, endDate: string): SessionRecord[] => {
-      const start = parseISO(startDate);
-      const end = parseISO(endDate);
-      return dailyRecords.filter(r => {
-        try {
-            if (!r.date || typeof r.date !== 'string') return false;
-            return isWithinInterval(parseISO(r.date), { start, end })
-        } catch (e) {
-            console.warn(`Invalid date found in records: ${r.date}`);
-            return false;
-        }
-      });
+  const getRecordsForDateRange = (startDate: string, endDate: string): Record<string, DailySession> => {
+      const start = startOfMonth(parseISO(startDate));
+      const end = endOfMonth(parseISO(endDate));
+      const filteredSessions: Record<string, DailySession> = {};
+
+       Object.entries(dailySessions).forEach(([date, session]) => {
+           try {
+                if(isWithinInterval(parseISO(date), { start, end })) {
+                    filteredSessions[date] = session;
+                }
+           } catch(e) {
+                console.warn(`Invalid date found in records: ${date}`);
+           }
+       });
+       return filteredSessions;
   }
 
 
   return (
-    <StudentContext.Provider value={{ students, dailyRecords, loading, addStudent, updateStudent, deleteStudent, addMultipleDailyRecords, getRecordsForDate, getRecordsForDateRange, importStudents }}>
+    <StudentContext.Provider value={{ students, dailySessions, loading, addStudent, updateStudent, deleteStudent, addDailySession, getSessionForDate, getRecordsForDateRange, importStudents }}>
       {children}
     </StudentContext.Provider>
   );
@@ -156,3 +161,5 @@ export const useStudentContext = () => {
   }
   return context;
 };
+
+    

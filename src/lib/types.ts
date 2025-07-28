@@ -21,7 +21,7 @@ export interface Student {
 export type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "تعويض";
 export type PerformanceLevel = "ممتاز" | "جيد" | "متوسط" | "ضعيف" | "لا يوجد";
 export type BehaviorLevel = "هادئ" | "متوسط" | "غير منضبط";
-export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة";
+export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة" | "حصة تعويضية";
 
 export interface DailyRecord {
   studentId: string;
@@ -35,9 +35,17 @@ export interface DailyRecord {
   toVerse?: number | null;
 }
 
-export interface SessionRecord extends DailyRecord {
+// This represents the entire session for a given day
+export interface DailySession {
     date: string; // YYYY-MM-DD
     sessionType: SessionType;
+    records: SessionRecord[];
+}
+
+
+export interface SessionRecord extends DailyRecord {
+  // SessionRecord is now the same as DailyRecord
+  // but we keep it for potential future differences
 }
 
 export type SurahStatus = 
@@ -77,3 +85,5 @@ export interface AppUser {
     photoURL?: string | null;
     role: 'شيخ' | 'إدارة';
 }
+
+    

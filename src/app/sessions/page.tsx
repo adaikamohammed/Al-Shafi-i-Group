@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useStudentContext } from '@/context/StudentContext';
 import { surahs } from '@/lib/surahs';
-import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, SessionRecord } from '@/lib/types';
+import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, SessionRecord, DailySession } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Info, ArrowLeft, ArrowRight, ChevronsUpDown, Check, Loader2, Download } from 'lucide-react';
@@ -30,10 +30,11 @@ const sessionTypeDescriptions: { [key in SessionType]: string } = {
   'حصة أساسية': 'الحصة العادية لحفظ ومراجعة القرآن.',
   'حصة أنشطة': 'حصة مخصصة للأنشطة والترفيه، لا تتضمن حفظاً أو مراجعة.',
   'يوم عطلة': 'يوم لا توجد فيه حصص دراسية لجميع الطلبة.',
+  'حصة تعويضية': 'حصة لتعويض طالب أو أكثر عن يوم غابوا فيه.'
 };
 
 const attendanceOptions: AttendanceStatus[] = ["حاضر", "غائب", "متأخر", "تعويض"];
-const sessionTypeOptions: SessionType[] = ["حصة أساسية", "حصة أنشطة", "يوم عطلة"];
+const sessionTypeOptions: SessionType[] = ["حصة أساسية", "حصة أنشطة", "يوم عطلة", "حصة تعويضية"];
 
 
 export default function DailySessionsPage() {
@@ -42,7 +43,7 @@ export default function DailySessionsPage() {
   const [isSessionDialogOpen, setSessionDialogOpen] = useState(false);
   const { toast } = useToast();
   
-  const { students, dailyRecords, loading, getRecordsForDate, addMultipleDailyRecords } = useStudentContext();
+  const { students, dailySessions, loading, getSessionForDate, addDailySession } = useStudentContext();
   const activeStudents = useMemo(() => 
     students.filter(s => s.status === "نشط"), 
   [students]);
@@ -65,31 +66,32 @@ export default function DailySessionsPage() {
     e.stopPropagation(); // Prevent dialog from opening
     const date = new Date(getYear(currentDate), getMonth(currentDate), day);
     const formattedDate = format(date, 'yyyy-MM-dd');
-    const records = getRecordsForDate(formattedDate);
+    const session = getSessionForDate(formattedDate);
 
-    if (records.length === 0) {
+    if (!session) {
         toast({ title: "لا توجد بيانات", description: "لا توجد سجلات لهذا اليوم لتصديرها.", variant: "destructive" });
         return;
     }
 
-    const holidayRecord = records.find(r => r.studentId === 'holiday');
+    const dayName = format(date, 'EEEE', { locale: ar });
+    const readableDate = format(date, 'dd/MM/yyyy');
     
     let dataForSheet;
-
-    if (holidayRecord) {
+    
+    if (session.sessionType === 'يوم عطلة') {
         dataForSheet = [{
-            'التاريخ': format(date, 'dd/MM/yyyy'),
-            'اليوم': format(date, 'EEEE', { locale: ar }),
+            'التاريخ': readableDate,
+            'اليوم': dayName,
             'نوع الحصة': 'يوم عطلة',
         }];
     } else {
-        dataForSheet = records.map(record => {
+        dataForSheet = session.records.map(record => {
             const student = students.find(s => s.id === record.studentId);
             const surah = surahs.find(s => s.id === record.surahId);
             return {
-                'التاريخ': format(date, 'dd/MM/yyyy'),
-                'اليوم': format(date, 'EEEE', { locale: ar }),
-                'نوع الحصة': record.sessionType || 'حصة أساسية',
+                'التاريخ': readableDate,
+                'اليوم': dayName,
+                'نوع الحصة': session.sessionType,
                 'اسم الطالب': student?.fullName || 'غير معروف',
                 'الحضور': record.attendance || '',
                 'التقييم': record.memorization || '',
@@ -130,14 +132,14 @@ export default function DailySessionsPage() {
     for (let day = 1; day <= daysInMonth; day++) {
         const dayDate = new Date(year, month, day);
         const formattedDayDate = format(dayDate, 'yyyy-MM-dd');
-        const dayRecords = dailyRecords.filter(r => r.date === formattedDayDate);
-        const isHoliday = dayRecords.some(r => r.studentId === 'holiday');
-        const hasRecords = dayRecords.length > 0;
+        const session = dailySessions[formattedDayDate];
+        const isHoliday = session?.sessionType === 'يوم عطلة';
+        const hasRecords = session && session.records.length > 0;
         
         let dayStatusClass = '';
         if (isHoliday) {
             dayStatusClass = 'bg-yellow-200 dark:bg-yellow-800';
-        } else if (hasRecords) {
+        } else if (session) { // Covers both records and activities sessions
             dayStatusClass = 'bg-green-200 dark:bg-green-800';
         } else if (isPast(dayDate) && !isToday(dayDate)) {
              dayStatusClass = 'bg-red-200 dark:bg-red-900';
@@ -154,7 +156,7 @@ export default function DailySessionsPage() {
         >
             <div className="flex justify-between w-full items-start">
                  <span className="font-bold">{day}</span>
-                 {hasRecords && (
+                 {session && (
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -257,8 +259,8 @@ export default function DailySessionsPage() {
                 day={selectedDay} 
                 students={activeStudents}
                 onClose={() => setSessionDialogOpen(false)}
-                addMultipleDailyRecords={addMultipleDailyRecords}
-                getRecordsForDate={getRecordsForDate}
+                addDailySession={addDailySession}
+                getSessionForDate={getSessionForDate}
               />
             </div>
           </DialogContent>
@@ -325,47 +327,49 @@ interface DailySessionFormProps {
     day: Date;
     students: Student[];
     onClose: () => void;
-    addMultipleDailyRecords: (records: SessionRecord[]) => void;
-    getRecordsForDate: (date: string) => SessionRecord[];
+    addDailySession: (session: DailySession) => void;
+    getSessionForDate: (date: string) => DailySession | undefined;
 }
 
 
-function DailySessionForm({ day, students, onClose, addMultipleDailyRecords, getRecordsForDate }: DailySessionFormProps) {
+function DailySessionForm({ day, students, onClose, addDailySession, getSessionForDate }: DailySessionFormProps) {
   const [sessionType, setSessionType] = useState<SessionType>('حصة أساسية');
   const [records, setRecords] = useState<DailyRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const formattedDate = format(day, 'yyyy-MM-dd');
-    const existingRecords = getRecordsForDate(formattedDate);
-    const holidayRecord = existingRecords.find(r => r.studentId === 'holiday');
-    const existingSessionType = holidayRecord?.sessionType || existingRecords.find(r => r.sessionType)?.sessionType;
+    const existingSession = getSessionForDate(formattedDate);
 
-    if(existingSessionType) setSessionType(existingSessionType as SessionType);
-    
-    if (holidayRecord) {
-        setRecords([]);
+    if (existingSession) {
+        setSessionType(existingSession.sessionType);
+        if (existingSession.sessionType === 'يوم عطلة') {
+            setRecords([]);
+        } else {
+            // Re-map to ensure all active students are present
+             const updatedRecords = students.map(s => {
+                const existingRec = existingSession.records.find(r => r.studentId === s.id);
+                return existingRec || {
+                    studentId: s.id,
+                    attendance: 'حاضر',
+                    memorization: null, review: false, behavior: 'هادئ',
+                    notes: '', surahId: null, fromVerse: null, toVerse: null,
+                };
+            });
+            setRecords(updatedRecords);
+        }
     } else {
-        const initialRecords = students.map(s => {
-          const existing = existingRecords.find(r => r.studentId === s.id);
-          if (existing) {
-            return { ...existing };
-          }
-          return {
+        // No existing session, create fresh records for all active students
+        const initialRecords = students.map(s => ({
             studentId: s.id,
             attendance: 'حاضر',
-            memorization: null,
-            review: false,
-            behavior: 'هادئ',
-            notes: '',
-            surahId: null,
-            fromVerse: null,
-            toVerse: null,
-          };
-        });
+            memorization: null, review: false, behavior: 'هادئ',
+            notes: '', surahId: null, fromVerse: null, toVerse: null,
+        }));
         setRecords(initialRecords);
+        setSessionType('حصة أساسية');
     }
-  }, [day, students, getRecordsForDate]);
+  }, [day, students, getSessionForDate]);
 
   const handleRecordChange = <K extends keyof DailyRecord>(studentId: string, field: K, value: DailyRecord[K]) => {
     setRecords(prevRecords =>
@@ -397,28 +401,14 @@ function DailySessionForm({ day, students, onClose, addMultipleDailyRecords, get
     setIsLoading(true);
     const formattedDate = format(day, 'yyyy-MM-dd');
     
-    let recordsToSave: SessionRecord[] = [];
-
-    if (sessionType === 'يوم عطلة') {
-      recordsToSave.push({
-          date: formattedDate,
-          sessionType: 'يوم عطلة',
-          studentId: 'holiday',
-          attendance: 'غائب',
-          memorization: null,
-          review: null,
-          behavior: null,
-      });
-    } else {
-        recordsToSave = records.map(r => ({
-          ...r,
-          date: formattedDate,
-          sessionType: sessionType,
-        }));
-    }
+    const sessionToSave: DailySession = {
+        date: formattedDate,
+        sessionType: sessionType,
+        records: sessionType === 'يوم عطلة' ? [] : records,
+    };
     
     try {
-        addMultipleDailyRecords(recordsToSave);
+        addDailySession(sessionToSave);
         onClose();
     } catch (error) {
         console.error("Failed to save session records:", error);
@@ -429,6 +419,7 @@ function DailySessionForm({ day, students, onClose, addMultipleDailyRecords, get
 
   const isActivitySession = sessionType === 'حصة أنشطة';
   const isHoliday = sessionType === 'يوم عطلة';
+  const isMakeupSession = sessionType === 'حصة تعويضية';
 
   return (
     <TooltipProvider>
@@ -466,7 +457,7 @@ function DailySessionForm({ day, students, onClose, addMultipleDailyRecords, get
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[120px]">الطالب</TableHead>
-                <TableHead className="w-[240px]">الحاضر</TableHead>
+                <TableHead className="w-[240px]">الحضور</TableHead>
                 {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">السورة</TableHead>}
                 {!isActivitySession && <TableHead className="w-[180px]">الآيات</TableHead>}
@@ -480,7 +471,7 @@ function DailySessionForm({ day, students, onClose, addMultipleDailyRecords, get
                 const record = records.find(r => r.studentId === student.id);
                 if (!record) return null;
                 const isAbsent = record.attendance === 'غائب';
-                const isRowDisabled = isActivitySession || isAbsent;
+                const isRowDisabled = isAbsent || (isActivitySession && !isMakeupSession);
                 const selectedSurah = record.surahId ? surahs.find(s => s.id === record.surahId) : null;
                 
                 return (

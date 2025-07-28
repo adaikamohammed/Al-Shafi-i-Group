@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, Download, History, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { Student, SessionRecord } from '@/lib/types';
+import type { Student, SessionRecord, SessionType } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
 import { format, parse, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -18,18 +18,48 @@ export default function DataExchangePage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sessionFileInputRef = useRef<HTMLInputElement>(null);
-  const { students, addMultipleDailyRecords, getRecordsForDateRange, importStudents } = useStudentContext();
+  const { students, addDailySession, getRecordsForDateRange, importStudents } = useStudentContext();
   const activeStudents = students.filter(s => s.status === 'نشط');
 
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
   const [exportYear, setExportYear] = useState(new Date().getFullYear());
-  const [isImporting, setIsImporting] = useState(false);
+  const [isImportingStudents, setIsImportingStudents] = useState(false);
+  const [isImportingSessions, setIsImportingSessions] = useState(false);
+
+
+ const parseDate = (dateInput: any): Date | null => {
+    if (!dateInput) return null;
+    if (dateInput instanceof Date) return dateInput;
+    if (typeof dateInput === 'string') {
+        // Handle DD/MM/YYYY or MM/DD/YYYY
+        if (dateInput.includes('/')) {
+            const parts = dateInput.split('/');
+            if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1;
+                const year = parseInt(parts[2], 10);
+                 // Simple check for MM/DD vs DD/MM. If month > 12, it's likely DD/MM.
+                if (month > 11) {
+                     return new Date(year, parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
+                }
+                return new Date(year, month, day);
+            }
+        }
+        // Handle ISO date string
+        return parseISO(dateInput);
+    }
+    if (typeof dateInput === 'number') {
+         // Handle Excel serial date
+        return XLSX.SSF.parse_date_code(dateInput);
+    }
+    return null;
+ };
 
 
   const handleStudentFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    setIsImporting(true);
+    setIsImportingStudents(true);
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -43,25 +73,6 @@ export default function DataExchangePage() {
         const newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[] = [];
 
         json.forEach((row, index) => {
-           const parseDate = (dateInput: any): Date | null => {
-                if (!dateInput) return null;
-                if (dateInput instanceof Date) return dateInput;
-                if (typeof dateInput === 'string') {
-                    if (dateInput.includes('/')) {
-                       const parts = dateInput.split('/'); 
-                       const month = parseInt(parts[1]) - 1;
-                       const day = parseInt(parts[0]);
-                       if (month > 11) { 
-                          return new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
-                       }
-                       return new Date(parseInt(parts[2]), month, day);
-                    }
-                    return parseISO(dateInput); 
-                }
-                if (typeof dateInput === 'number') return XLSX.SSF.parse_date_code(dateInput);
-                return null;
-           }
-
            const birthDate = parseDate(row['تاريخ الميلاد']);
            const registrationDate = parseDate(row['تاريخ التسجيل']);
 
@@ -99,7 +110,7 @@ export default function DataExchangePage() {
           variant: 'destructive',
         });
       } finally {
-        setIsImporting(false);
+        setIsImportingStudents(false);
          if(fileInputRef.current) fileInputRef.current.value = '';
       }
     };
@@ -109,7 +120,7 @@ export default function DataExchangePage() {
    const handleSessionFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    setIsImporting(true);
+    setIsImportingSessions(true);
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -119,48 +130,92 @@ export default function DataExchangePage() {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json<any>(worksheet);
-        
-        const newRecords: SessionRecord[] = json.map((row, index) => {
-           const studentName = row['اسم الطالب'];
-           if (row['نوع الحصة'] !== 'يوم عطلة' && !studentName) {
-             console.warn(`لا يوجد اسم طالب في الصف ${index + 2}. سيتم تجاهل هذا السجل.`);
-             return null;
-           }
 
-           const student = students.find(s => s.fullName === studentName);
-           if (row['نوع الحصة'] !== 'يوم عطلة' && !student) {
-             console.warn(`لم يتم العثور على الطالب: ${studentName} في الصف ${index + 2}. سيتم تجاهل هذا السجل.`);
-             return null;
-           }
-           
-           const date = parse(row['التاريخ'], 'dd/MM/yyyy', new Date());
-           if (isNaN(date.getTime())) {
-               throw new Error(`تاريخ غير صالح في الصف ${index + 2}: ${row['التاريخ']}`);
-           }
-           const surah = surahs.find(s => s.name === row['السورة']);
+        const errors: string[] = [];
+        const validSessionTypes: SessionType[] = ["حصة أساسية", "حصة أنشطة", "يوم عطلة", "حصة تعويضية"];
 
-           return {
-             date: format(date, 'yyyy-MM-dd'),
-             studentId: row['نوع الحصة'] === 'يوم عطلة' ? 'holiday' : student!.id,
-             sessionType: row['نوع الحصة'] || 'حصة أساسية',
-             attendance: row['الحضور'],
-             behavior: row['السلوك'],
-             memorization: row['التقييم'],
-             review: row['مراجعة'] === 'نعم',
-             surahId: surah?.id,
-             fromVerse: row['من آية'],
-             toVerse: row['إلى آية'],
-             notes: row['ملاحظات'],
-           } as SessionRecord;
-        }).filter((r): r is SessionRecord => r !== null);
-        
-        addMultipleDailyRecords(newRecords);
+        let sessionDateStr = '';
+        let sessionType: SessionType | null = null;
+        const recordsToSave: SessionRecord[] = [];
 
-        toast({
-          title: "نجاح ✅",
-          description: `تم استيراد وحفظ ${newRecords.length} سجل حصة بنجاح.`,
+        json.forEach((row, index) => {
+            const currentSessionType = row['نوع الحصة'] as SessionType;
+            const currentStudentName = row['اسم الطالب'];
+            const currentDateStr = row['التاريخ'];
+
+             if (!currentDateStr) {
+                errors.push(`❌ الصف رقم ${index + 2}: عمود التاريخ فارغ.`);
+                return;
+            }
+
+            if (!sessionDateStr) {
+                sessionDateStr = format(parse(currentDateStr, 'dd/MM/yyyy', new Date()), 'yyyy-MM-dd');
+            }
+
+            if (!currentSessionType || !validSessionTypes.includes(currentSessionType)) {
+                errors.push(`❌ الصف رقم ${index + 2}: نوع الحصة "${currentSessionType}" غير صالح.`);
+                return;
+            }
+            
+            if (!sessionType) {
+                 sessionType = currentSessionType;
+            }
+
+            if (currentSessionType === 'يوم عطلة') {
+                return; // Skip holiday rows
+            }
+
+            if (!currentStudentName) {
+                errors.push(`❌ الصف رقم ${index + 2}: اسم الطالب فارغ.`);
+                return;
+            }
+            
+            const student = students.find(s => s.fullName === currentStudentName);
+            if (!student) {
+                errors.push(`⚠️ الصف رقم ${index + 2}: لم يتم العثور على الطالب "${currentStudentName}".`);
+                return;
+            }
+            
+            const surah = surahs.find(s => s.name === row['السورة']);
+
+            recordsToSave.push({
+                studentId: student.id,
+                attendance: row['الحضور'],
+                behavior: row['السلوك'],
+                memorization: row['التقييم'],
+                review: row['مراجعة'] === 'نعم',
+                surahId: surah?.id,
+                fromVerse: row['من آية'],
+                toVerse: row['إلى آية'],
+                notes: row['ملاحظات'],
+            });
         });
 
+        if (errors.length > 0) {
+            throw new Error(errors.join('\n'));
+        }
+
+        if (sessionDateStr && sessionType) {
+             addDailySession({ date: sessionDateStr, sessionType, records: recordsToSave });
+             toast({
+                title: "نجاح ✅",
+                description: `تم استيراد وحفظ ${recordsToSave.length} سجل حصة بنجاح ليوم ${sessionDateStr}.`,
+            });
+        } else if (recordsToSave.length === 0 && sessionType === 'يوم عطلة' && sessionDateStr) {
+             addDailySession({ date: sessionDateStr, sessionType: 'يوم عطلة', records: [] });
+             toast({
+                title: "نجاح ✅",
+                description: `تم تسجيل يوم ${sessionDateStr} كـ "يوم عطلة".`,
+            });
+        }
+         else {
+            toast({
+                title: "لم يتم الاستيراد",
+                description: "لم يتم العثور على بيانات صالحة للحفظ.",
+                variant: 'destructive',
+            });
+        }
+        
       } catch (error) {
         console.error("Error parsing session file:", error);
         const errorMessage = error instanceof Error ? error.message : "حدث خطأ أثناء قراءة الملف. تأكد من تطابق أسماء الطلبة وصيغة التاريخ.";
@@ -170,7 +225,7 @@ export default function DataExchangePage() {
           variant: 'destructive',
         });
       } finally {
-        setIsImporting(false);
+        setIsImportingSessions(false);
          if (sessionFileInputRef.current) sessionFileInputRef.current.value = '';
       }
     };
@@ -218,9 +273,9 @@ export default function DataExchangePage() {
   const handleExportMonthlyReport = () => {
         const startDate = startOfMonth(new Date(exportYear, exportMonth));
         const endDate = endOfMonth(new Date(exportYear, exportMonth));
-        const records = getRecordsForDateRange(format(startDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd'));
+        const monthRecords = getRecordsForDateRange(format(startDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd'));
 
-        if (records.length === 0) {
+        if (Object.keys(monthRecords).length === 0) {
             toast({
                 title: "لا توجد بيانات",
                 description: `لا توجد سجلات لهذا الشهر (${format(startDate, 'MMMM yyyy', {locale: ar})}).`,
@@ -228,25 +283,35 @@ export default function DataExchangePage() {
             });
             return;
         }
-
-        const dataForSheet = records.map(record => {
-            const student = students.find(s => s.id === record.studentId);
-            const surah = surahs.find(s => s.id === record.surahId);
-            return {
-                'التاريخ': record.date ? format(parseISO(record.date), 'dd/MM/yyyy') : '',
-                'اليوم': record.date ? format(parseISO(record.date), 'EEEE', { locale: ar }) : '',
-                'نوع الحصة': record.sessionType,
-                'اسم الطالب': record.studentId === 'holiday' ? '-' : student?.fullName || 'غير معروف',
-                'الحضور': record.attendance || '',
-                'التقييم': record.memorization || '',
-                'السلوك': record.behavior || '',
-                'السورة': surah?.name || '',
-                'من آية': record.fromVerse || '',
-                'إلى آية': record.toVerse || '',
-                'مراجعة': record.review ? 'نعم' : 'لا',
-                'ملاحظات': record.notes || '',
+        
+        const dataForSheet = Object.entries(monthRecords).flatMap(([date, session]) => {
+            if (session.sessionType === 'يوم عطلة') {
+                return [{
+                    'التاريخ': format(parseISO(date), 'dd/MM/yyyy'),
+                    'اليوم': format(parseISO(date), 'EEEE', { locale: ar }),
+                    'نوع الحصة': 'يوم عطلة',
+                }];
             }
+            return session.records.map(record => {
+                const student = students.find(s => s.id === record.studentId);
+                const surah = surahs.find(s => s.id === record.surahId);
+                return {
+                    'التاريخ': format(parseISO(date), 'dd/MM/yyyy'),
+                    'اليوم': format(parseISO(date), 'EEEE', { locale: ar }),
+                    'نوع الحصة': session.sessionType,
+                    'اسم الطالب': student?.fullName || 'غير معروف',
+                    'الحضور': record.attendance || '',
+                    'التقييم': record.memorization || '',
+                    'السلوك': record.behavior || '',
+                    'السورة': surah?.name || '',
+                    'من آية': record.fromVerse || '',
+                    'إلى آية': record.toVerse || '',
+                    'مراجعة': record.review ? 'نعم' : 'لا',
+                    'ملاحظات': record.notes || '',
+                }
+            })
         });
+
 
         const ws = XLSX.utils.json_to_sheet(dataForSheet);
         ws['!cols'] = [
@@ -260,8 +325,8 @@ export default function DataExchangePage() {
 
   return (
     <div className="space-y-6">
-      <input type="file" ref={fileInputRef} onChange={handleStudentFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImporting}/>
-      <input type="file" ref={sessionFileInputRef} onChange={handleSessionFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImporting}/>
+      <input type="file" ref={fileInputRef} onChange={handleStudentFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingStudents}/>
+      <input type="file" ref={sessionFileInputRef} onChange={handleSessionFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingSessions}/>
       
       <h1 className="text-3xl font-headline font-bold">استيراد وتصدير البيانات</h1>
       
@@ -278,9 +343,9 @@ export default function DataExchangePage() {
               قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. سيتم حفظ البيانات في المتصفح.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
-              <Button className="flex-grow" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
-                {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Upload className="ml-2 h-4 w-4" />}
-                {isImporting ? 'جاري الاستيراد...' : 'رفع ملف الطلبة'}
+              <Button className="flex-grow" onClick={() => fileInputRef.current?.click()} disabled={isImportingStudents}>
+                {isImportingStudents ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Upload className="ml-2 h-4 w-4" />}
+                {isImportingStudents ? 'جاري الاستيراد...' : 'رفع ملف الطلبة'}
               </Button>
                <Button variant="outline" onClick={handleDownloadStudentTemplate}>
                 <Download className="ml-2 h-4 w-4" /> تحميل نموذج الطلبة
@@ -340,9 +405,9 @@ export default function DataExchangePage() {
               هذه الميزة مفيدة لتسجيل بيانات الحصص بشكل غير متصل بالإنترنت. سيتم حفظ البيانات في المتصفح عند الرفع.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
-               <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()} disabled={isImporting}>
-                {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
-                {isImporting ? 'جاري الاستيراد...' : 'رفع سجل حصة'}
+               <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()} disabled={isImportingSessions}>
+                {isImportingSessions ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
+                {isImportingSessions ? 'جاري الاستيراد...' : 'رفع سجل حصة'}
               </Button>
               <Button variant="outline" onClick={handleDownloadSessionTemplate} disabled={activeStudents.length === 0}>
                 <Download className="ml-2 h-4 w-4" /> تحميل نموذج حصة اليوم
@@ -355,3 +420,5 @@ export default function DataExchangePage() {
     </div>
   );
 }
+
+    
