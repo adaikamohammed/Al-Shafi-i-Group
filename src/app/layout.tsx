@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import type { Metadata } from 'next';
@@ -12,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import React, { useEffect } from 'react';
-import { StudentProvider } from '@/context/StudentContext';
+import { StudentProvider, useStudentContext } from '@/context/StudentContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -25,18 +26,21 @@ const navItems = [
 ];
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
-    const { user, loading, logout } = useAuth();
+    const { user, loading: authLoading, logout } = useAuth();
+    const { appUser, loading: studentLoading } = useStudentContext();
     const router = useRouter();
     const pathname = usePathname();
     const isMobile = useIsMobile();
+    
+    const loading = authLoading || studentLoading;
 
     useEffect(() => {
-        if (!loading && !user && pathname !== '/login') {
+        if (!authLoading && !user && pathname !== '/login') {
             router.push('/login');
         }
-    }, [user, loading, router, pathname]);
+    }, [user, authLoading, router, pathname]);
 
-    if (loading) {
+    if (loading && pathname !== '/login') {
         return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -44,26 +48,39 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         );
     }
     
-    if (!user) {
-        // Render children for the login page, or a loader for other pages
-        return pathname === '/login' ? children : (
-            <div className="flex items-center justify-center min-h-screen bg-background">
+    if (!user && pathname !== '/login') {
+        return (
+             <div className="flex items-center justify-center min-h-screen bg-background">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
             </div>
         );
     }
+
+     if (pathname === '/login') {
+        return children;
+    }
+    
+    // This should not happen if logic is correct, but as a fallback
+    if (!user || !appUser) {
+        return (
+             <div className="flex items-center justify-center min-h-screen bg-background">
+                <p>خطأ في تحميل بيانات المستخدم. جار إعادة التوجيه...</p>
+            </div>
+        )
+    }
+
 
     const sidebarContent = (
     <>
       <SidebarHeader className="p-4">
          <div className="flex items-center gap-3">
              <Avatar>
-                <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} />
-                <AvatarFallback>{user.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
+                <AvatarImage src={user.photoURL || ''} alt={appUser.name || ''} />
+                <AvatarFallback>{appUser.name?.charAt(0).toUpperCase()}</AvatarFallback>
              </Avatar>
              <div>
                 <h1 className="font-headline text-lg font-bold text-primary">
-                    {user.displayName || "مستخدم"}
+                    {appUser.name || "مستخدم"}
                 </h1>
                 <p className="text-xs text-muted-foreground">{user.email}</p>
              </div>
@@ -114,8 +131,8 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
                         </h1>
                     </div>
                      <Avatar>
-                        <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} />
-                        <AvatarFallback>{user.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
+                        <AvatarImage src={user.photoURL || ''} alt={appUser.name || ''} />
+                        <AvatarFallback>{appUser.name?.charAt(0).toUpperCase()}</AvatarFallback>
                      </Avatar>
                   </header>
                   <main className="flex-grow p-4">

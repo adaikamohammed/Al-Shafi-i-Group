@@ -6,14 +6,23 @@ import type { Student, SessionRecord } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, writeBatch, Timestamp, onSnapshot, setDoc, where, query, collectionGroup } from 'firebase/firestore';
+import { collection, doc, getDocs, writeBatch, Timestamp, onSnapshot, setDoc, where, query, getDoc, collectionGroup } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { AppUser } from './AuthContext';
 
+// This type is now defined here and shared with AuthContext
+export interface AppUser {
+    uid: string;
+    name: string;
+    email: string | null;
+    photoURL?: string | null;
+    createdAt: any;
+    role: 'شيخ' | 'إدارة';
+}
 
 interface StudentContextType {
   students: Student[];
   dailyRecords: SessionRecord[];
+  appUser: AppUser | null;
   loading: boolean;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => Promise<void>;
   updateStudent: (studentId: string, updatedData: Partial<Student>) => Promise<void>;
@@ -25,71 +34,103 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user, appUser, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
   const [dailyRecords, setDailyRecords] = useState<SessionRecord[]>([]);
+  const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Wait until auth is no longer loading and we have a user and their profile
-    if (authLoading || !user || !appUser) {
-      setLoading(authLoading);
-      if (!authLoading) {
-          setStudents([]);
-          setDailyRecords([]);
-      }
+    // We start loading whenever auth state changes
+    setLoading(true);
+
+    if (authLoading) {
+      // If auth is loading, we are definitely loading.
       return;
     }
 
-    setLoading(true);
-    
-    // For now, an admin will see the same as a teacher.
-    // The query needs to be structured differently for a true admin view (e.g., collectionGroup)
-    // which requires index configuration in Firestore.
-    
-    const studentsCollectionRef = collection(db, 'users', user.uid, 'students');
-    const recordsCollectionRef = collection(db, 'users', user.uid, 'records');
-
-    const unsubscribeStudents = onSnapshot(studentsCollectionRef, (snapshot) => {
-      const studentsData = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            ...data,
-            id: doc.id,
-            birthDate: (data.birthDate as Timestamp)?.toDate(),
-            registrationDate: (data.registrationDate as Timestamp)?.toDate(),
-            updatedAt: (data.updatedAt as Timestamp)?.toDate(),
-          } as Student;
-      });
-      studentsData.sort((a, b) => a.fullName.localeCompare(b.fullName));
-      setStudents(studentsData);
+    if (!user) {
+      // If no user, clear data and stop loading.
+      setStudents([]);
+      setDailyRecords([]);
+      setAppUser(null);
       setLoading(false);
-    }, (error) => {
-        console.error("Error fetching students:", error);
-        toast({ title: "خطأ", description: "لم نتمكن من تحميل بيانات الطلبة.", variant: "destructive"});
-        setLoading(false);
-    });
-    
-    const unsubscribeRecords = onSnapshot(recordsCollectionRef, (snapshot) => {
-        const recordsData = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                ...data,
-                id: doc.id,
-            } as SessionRecord;
+      return;
+    }
+
+    // Auth is done and we have a user. Now, let's fetch user's role.
+    const userDocRef = doc(db, 'users', user.uid);
+    const unsubscribes: (() => void)[] = [];
+
+    getDoc(userDocRef).then(userDocSnap => {
+        if (!userDocSnap.exists()) {
+            console.error("User document not found!");
+            setLoading(false);
+            return;
+        }
+
+        const currentUser = userDocSnap.data() as AppUser;
+        setAppUser(currentUser);
+        
+        let studentsQuery;
+        let recordsQuery;
+
+        if (currentUser.role === 'إدارة') {
+            // Admin can see all students and records
+            // Note: This requires Firestore index configuration.
+            // collectionGroup('students') and collectionGroup('records')
+            // For now, let's show a message on the relevant pages.
+            // We will load no data for admin to prevent errors until UI is ready.
+             studentsQuery = query(collectionGroup(db, 'students'));
+             recordsQuery = query(collectionGroup(db, 'records'));
+        } else {
+            // Teacher sees their own data
+            studentsQuery = query(collection(db, 'users', user.uid, 'students'));
+            recordsQuery = query(collection(db, 'users', user.uid, 'records'));
+        }
+
+        const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
+            const studentsData = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    ...data,
+                    id: doc.id,
+                    birthDate: (data.birthDate as Timestamp)?.toDate(),
+                    registrationDate: (data.registrationDate as Timestamp)?.toDate(),
+                    updatedAt: (data.updatedAt as Timestamp)?.toDate(),
+                } as Student;
+            });
+            studentsData.sort((a, b) => a.fullName.localeCompare(b.fullName));
+            setStudents(studentsData);
+            setLoading(false); // Stop loading only after the first successful fetch
+        }, (error) => {
+            console.error("Error fetching students:", error);
+            toast({ title: "خطأ", description: "لم نتمكن من تحميل بيانات الطلبة.", variant: "destructive"});
+            setLoading(false);
         });
-        setDailyRecords(recordsData);
-    }, (error) => {
-        console.error("Error fetching records:", error);
-        toast({ title: "خطأ", description: "لم نتمكن من تحميل سجلات الحصص.", variant: "destructive"});
+
+        const unsubscribeRecords = onSnapshot(recordsQuery, (snapshot) => {
+            const recordsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as SessionRecord);
+            setDailyRecords(recordsData);
+        }, (error) => {
+            console.error("Error fetching records:", error);
+            toast({ title: "خطأ", description: "لم نتمكن من تحميل سجلات الحصص.", variant: "destructive"});
+        });
+
+        unsubscribes.push(unsubscribeStudents, unsubscribeRecords);
+
+    }).catch(error => {
+        console.error("Error fetching user role:", error);
+        toast({ title: "خطأ", description: "لم نتمكن من تحديد صلاحيات المستخدم.", variant: "destructive"});
+        setLoading(false);
     });
 
     return () => {
-        unsubscribeStudents();
-        unsubscribeRecords();
+        unsubscribes.forEach(unsub => unsub());
     }
-  }, [user, appUser, authLoading, toast]);
+  }, [user, authLoading, toast]);
+
 
   const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => {
     if (!user) throw new Error("User not logged in");
@@ -104,6 +145,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
   const updateStudent = async (studentId: string, updatedData: Partial<Student>) => {
     if (!user) throw new Error("User not logged in");
+    // For admins, the path would be different. This needs more logic for admin role.
     const studentRef = doc(db, 'users', user.uid, 'students', studentId);
     const finalData = { ...updatedData, updatedAt: new Date() };
     await setDoc(studentRef, finalData, { merge: true });
@@ -155,7 +197,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <StudentContext.Provider value={{ students, dailyRecords, loading, addStudent, updateStudent, addMultipleDailyRecords, getRecordsForDate, getRecordsForDateRange }}>
+    <StudentContext.Provider value={{ students, dailyRecords, appUser, loading, addStudent, updateStudent, addMultipleDailyRecords, getRecordsForDate, getRecordsForDateRange }}>
       {children}
     </StudentContext.Provider>
   );
