@@ -69,19 +69,27 @@ export default function DataExchangePage() {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json<any>(worksheet);
-        
+
+        const existingStudentNames = new Set(students.map(s => s.fullName.trim()));
         const newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[] = [];
 
         json.forEach((row, index) => {
+           const fullName = (row['الاسم الكامل'] || '').trim();
+           if (!fullName) return; // Skip empty rows
+           
+           if (existingStudentNames.has(fullName)) {
+               return; // Skip duplicate student
+           }
+           
            const birthDate = parseDate(row['تاريخ الميلاد']);
            const registrationDate = parseDate(row['تاريخ التسجيل']);
 
            if (!birthDate || !registrationDate || isNaN(birthDate.getTime()) || isNaN(registrationDate.getTime())) {
-             throw new Error(`التواريخ غير صالحة في الصف رقم ${index + 2}. تأكد من أنها بصيغة DD/MM/YYYY.`);
+             throw new Error(`التواريخ غير صالحة في الصف رقم ${index + 2} للطالب ${fullName}. تأكد من أنها بصيغة DD/MM/YYYY.`);
            }
            
            const studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> = {
-              fullName: row['الاسم الكامل'] || 'N/A',
+              fullName: fullName,
               guardianName: row['اسم الولي'] || 'N/A',
               phone1: row['رقم الهاتف']?.toString() || 'N/A',
               birthDate: birthDate,
@@ -92,14 +100,22 @@ export default function DataExchangePage() {
            };
            
            newStudents.push(studentData);
+           existingStudentNames.add(fullName); // Add to set to prevent duplicates within the same file
         });
-
-        importStudents(newStudents);
         
-        toast({
-          title: "نجاح ✅",
-          description: `تم استيراد ${json.length} طالبًا بنجاح.`,
-        });
+        if (newStudents.length > 0) {
+            importStudents(newStudents);
+            toast({
+              title: "نجاح ✅",
+              description: `تم استيراد ${newStudents.length} طالبًا جديدًا بنجاح.`,
+            });
+        } else {
+             toast({
+              title: "لم تتم إضافة طلاب جدد",
+              description: "جميع الطلبة في الملف موجودون بالفعل في النظام.",
+            });
+        }
+
 
       } catch (error) {
         console.error("Error parsing Excel file:", error);
@@ -345,7 +361,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. سيتم حفظ البيانات في المتصفح.
+              قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. لن يتم إضافة طالب إذا كان موجودًا بالفعل.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button className="flex-grow" onClick={() => fileInputRef.current?.click()} disabled={isImportingStudents}>
@@ -425,3 +441,5 @@ export default function DataExchangePage() {
     </div>
   );
 }
+
+    

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,6 +22,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import * as XLSX from 'xlsx';
+
 
 const statusVariant: { [key in StudentStatus]: "default" | "destructive" | "secondary" | "outline" } = {
   "نشط": "default",
@@ -50,8 +52,28 @@ export default function StudentManagementPage() {
     }
   };
   
+  const handleExportStudents = () => {
+    const dataToExport = students.map(s => ({
+        "الاسم الكامل": s.fullName,
+        "اسم الولي": s.guardianName,
+        "رقم الهاتف 1": s.phone1,
+        "رقم الهاتف 2": s.phone2 || '',
+        "تاريخ الميلاد": format(s.birthDate, 'dd/MM/yyyy'),
+        "تاريخ التسجيل": format(s.registrationDate, 'dd/MM/yyyy'),
+        "الحالة": s.status,
+        "مقدار الحفظ اليومي": s.dailyMemorizationAmount,
+        "السور المحفوظة": s.memorizedSurahsCount,
+        "ملاحظات": s.notes || '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    ws['!cols'] = [ { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 30 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "قائمة الطلبة");
+    XLSX.writeFile(wb, "قائمة_الطلبة_الحالية.xlsx");
+  };
+
   const visibleStudents = useMemo(() => {
-    // With localStorage, all students are visible.
     return students;
   }, [students]);
 
@@ -65,22 +87,28 @@ export default function StudentManagementPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h1 className="text-3xl font-headline font-bold">إدارة الطلبة</h1>
-        <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="ml-2 h-4 w-4" />
-              إضافة طالب جديد
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
-            <StudentForm 
-              onSuccess={() => setAddStudentDialogOpen(false)} 
-              onCancel={() => setAddStudentDialogOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+           <Button variant="outline" onClick={handleExportStudents} disabled={students.length === 0}>
+              <Download className="ml-2 h-4 w-4" />
+              تصدير كل الطلبة (Excel)
+           </Button>
+           <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
+            <DialogTrigger asChild>
+                <Button>
+                <PlusCircle className="ml-2 h-4 w-4" />
+                إضافة طالب جديد
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+                <StudentForm 
+                onSuccess={() => setAddStudentDialogOpen(false)} 
+                onCancel={() => setAddStudentDialogOpen(false)}
+                />
+            </DialogContent>
+            </Dialog>
+        </div>
       </div>
 
       <Card>
@@ -366,3 +394,5 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
+    
