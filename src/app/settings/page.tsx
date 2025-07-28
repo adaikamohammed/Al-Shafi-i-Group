@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Clock, Database, Lock, Users, Smartphone } from 'lucide-react';
+import { CheckCircle, Clock, Database, Lock, Users, Smartphone, Palette, Search, BarChartHorizontal, FileDown, CalendarDays } from 'lucide-react';
 
 export default function SettingsPage() {
   return (
@@ -9,62 +9,74 @@ export default function SettingsPage() {
       <h1 className="text-3xl font-headline font-bold">الإعدادات</h1>
       <Card>
         <CardHeader>
-          <CardTitle>نظرة عامة على التطبيق</CardTitle>
+          <CardTitle>✨ نظرة عامة على التطبيق</CardTitle>
           <CardDescription>
-            هذه الصفحة تعرض الميزات الحالية والمستقبلية المخطط لها لتطوير التطبيق.
+            هذه الصفحة تعرض الميزات المفعّلة حاليًا، بالإضافة إلى الميزات التقنية المخطط إضافتها في المستقبل لتطوير المنصة.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
+          <div className="grid md:grid-cols-2 gap-8">
             <div>
-                <h3 className="font-semibold text-lg font-headline mb-3">الميزات الحالية:</h3>
-                <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                    <li className="flex items-center">
-                        <Lock className="ml-2 h-4 w-4 text-green-500" />
-                        <span>نظام مصادقة آمن باستخدام البريد الإلكتروني وكلمة المرور.</span>
+                <h3 className="font-semibold text-lg font-headline mb-4">الميزات الحالية المفعّلة ✅</h3>
+                <ul className="space-y-3">
+                    <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
+                        <Lock className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
+                        <span><strong>نظام تسجيل دخول آمن</strong> يعتمد على البريد وكلمة المرور مع حفظ الجلسة.</span>
                     </li>
-                    <li className="flex items-center">
-                        <Users className="ml-2 h-4 w-4 text-green-500" />
-                        <span>إدارة كاملة للطلبة (إضافة, تعديل, حذف, طرد).</span>
+                    <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
+                        <Users className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
+                        <span><strong>إدارة كاملة للطلبة</strong> (إضافة، تعديل، حذف، طرد، وتصدير).</span>
                     </li>
-                    <li className="flex items-center">
-                        <CheckCircle className="ml-2 h-4 w-4 text-green-500" />
-                        <span>تسجيل الحصص اليومية وتتبع الحضور والأداء.</span>
+                    <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
+                        <CalendarDays className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
+                        <span><strong>واجهة الحصص اليومية</strong> لتسجيل الأداء والمراجعة في الوقت الفعلي.</span>
                     </li>
-                    <li className="flex items-center">
-                        <Smartphone className="ml-2 h-4 w-4 text-green-500" />
-                        <span>تخزين جميع البيانات بشكل آمن في التخزين المحلي للمتصفح (LocalStorage).</span>
+                     <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
+                        <BarChartHorizontal className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
+                        <span><strong>تقارير مرئية</strong> شهرية وأسبوعية لمتابعة الحضور والسلوك والتقييم.</span>
                     </li>
-                    <li className="flex items-center">
-                        <CheckCircle className="ml-2 h-4 w-4 text-green-500" />
-                        <span>استيراد وتصدير بيانات الطلبة والحصص باستخدام ملفات Excel.</span>
+                    <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
+                        <Search className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
+                        <span><strong>فلترة متقدمة</strong> في كل الصفحات (حسب الطالب، التاريخ، الحالة).</span>
                     </li>
-                    <li className="flex items-center">
-                        <CheckCircle className="ml-2 h-4 w-4 text-green-500" />
-                        <span>لوحة إحصائيات تفاعلية لمتابعة تقدم الفوج.</span>
+                    <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
+                        <Smartphone className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
+                        <span><strong>تخزين محلي ذكي</strong> (LocalStorage) لضمان السرعة عند التنقل بين الصفحات.</span>
+                    </li>
+                    <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
+                        <FileDown className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
+                        <span><strong>دعم تصدير واستيراد Excel</strong> لتنظيم بيانات الطلبة والحصص.</span>
                     </li>
                 </ul>
             </div>
 
             <div>
-                <h3 className="font-semibold text-lg font-headline mt-6 mb-3">الميزات المخطط لها:</h3>
-                <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                <li className="flex items-center">
-                    <Database className="ml-2 h-4 w-4 text-yellow-500" />
-                    <span>الربط مع قاعدة بيانات سحابية (مثل Appwrite, NocoBase, أو Supabase).</span>
-                </li>
-                <li className="flex items-center">
-                    <Clock className="ml-2 h-4 w-4 text-yellow-500" />
-                    <span>تخصيص أكبر لحساب المعلم (تغيير الصورة، كلمة المرور).</span>
-                </li>
-                <li className="flex items-center">
-                    <Clock className="ml-2 h-4 w-4 text-yellow-500" />
-                    <span>إرسال تقارير تلقائيًا إلى لوحة تحكم الإدارة.</span>
-                </li>
-                <li className="flex items-center">
-                    <Clock className="ml-2 h-4 w-4 text-yellow-500" />
-                    <span>نظام إشعارات وتنبيهات لأولياء الأمور عبر التطبيق.</span>
-                </li>
+                <h3 className="font-semibold text-lg font-headline mt-0 mb-4">الميزات القادمة في التحديثات المستقبلية 📌</h3>
+                <ul className="space-y-3">
+                    <li className="flex items-start p-3 bg-amber-50 rounded-md border-r-4 border-amber-400">
+                        <Database className="ml-3 h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
+                        <span><strong>ربط مباشر بقاعدة بيانات سحابية</strong> (مثل Firebase أو Supabase) لمزامنة البيانات.</span>
+                    </li>
+                    <li className="flex items-start p-3 bg-amber-50 rounded-md border-r-4 border-amber-400">
+                        <Clock className="ml-3 h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
+                        <span><strong>إرسال تقارير PDF تلقائيًا</strong> إلى البريد الإلكتروني للإدارة أو أولياء الأمور.</span>
+                    </li>
+                    <li className="flex items-start p-3 bg-amber-50 rounded-md border-r-4 border-amber-400">
+                        <Clock className="ml-3 h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
+                        <span><strong>نظام إشعارات ذكي</strong> لتنبيه المعلم، المدير، وأولياء الأمور بالأحداث المهمة.</span>
+                    </li>
+                     <li className="flex items-start p-3 bg-amber-50 rounded-md border-r-4 border-amber-400">
+                        <Clock className="ml-3 h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
+                        <span><strong>تخصيص الملف الشخصي للمعلم</strong> (صورة، اسم العرض، بريد التواصل).</span>
+                    </li>
+                    <li className="flex items-start p-3 bg-amber-50 rounded-md border-r-4 border-amber-400">
+                        <Clock className="ml-3 h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
+                        <span><strong>لوحة تحكم متقدمة للمدير</strong> مع صلاحيات مخصصة لمتابعة الأفواج.</span>
+                    </li>
+                    <li className="flex items-start p-3 bg-amber-50 rounded-md border-r-4 border-amber-400">
+                        <Clock className="ml-3 h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
+                        <span><strong>وضع مراجعة جماعية</strong> يتيح تتبع السور الأكثر ضعفًا على مستوى الفوج.</span>
+                    </li>
                 </ul>
             </div>
           </div>
