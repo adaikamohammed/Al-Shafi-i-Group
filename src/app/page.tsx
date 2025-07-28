@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -41,8 +41,9 @@ const calculateAge = (birthDate?: Date) => {
 };
 
 export default function StudentManagementPage() {
-  const { students, updateStudent, deleteStudent, loading } = useStudentContext();
+  const { students, updateStudent, deleteStudent, loading, deleteAllStudents } = useStudentContext();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const handleStatusChange = (studentId: string, status: StudentStatus, reason?: string) => {
     if (status === 'محذوف') {
@@ -73,9 +74,11 @@ export default function StudentManagementPage() {
     XLSX.writeFile(wb, "قائمة_الطلبة_الحالية.xlsx");
   };
 
-  const visibleStudents = useMemo(() => {
-    return students;
-  }, [students]);
+  const filteredStudents = useMemo(() => {
+    return students.filter(student => 
+        student.fullName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [students, searchTerm]);
 
   if (loading) {
     return (
@@ -87,16 +90,12 @@ export default function StudentManagementPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
         <h1 className="text-3xl font-headline font-bold">إدارة الطلبة</h1>
-        <div className="flex items-center gap-2">
-           <Button variant="outline" onClick={handleExportStudents} disabled={students.length === 0}>
-              <Download className="ml-2 h-4 w-4" />
-              تصدير كل الطلبة (Excel)
-           </Button>
+        <div className="flex w-full sm:w-auto items-center gap-2">
            <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
             <DialogTrigger asChild>
-                <Button>
+                <Button className="w-full sm:w-auto">
                 <PlusCircle className="ml-2 h-4 w-4" />
                 إضافة طالب جديد
                 </Button>
@@ -111,9 +110,48 @@ export default function StudentManagementPage() {
         </div>
       </div>
 
+       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+         <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+                placeholder="بحث باسم الطالب..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+            />
+         </div>
+         <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleExportStudents} disabled={students.length === 0}>
+                <Download className="ml-2 h-4 w-4" />
+                تصدير الطلبة (Excel)
+            </Button>
+             <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={students.length === 0}>
+                        <Trash2 className="ml-2 h-4 w-4" />
+                        حذف كل الطلبة
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            سيؤدي هذا إلى حذف جميع بيانات الطلبة نهائيًا من هذا المتصفح.
+                            هذا الإجراء لا يمكن التراجع عنه.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={deleteAllStudents}>نعم، قم بحذف الكل</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+             </AlertDialog>
+         </div>
+       </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>قائمة الطلبة</CardTitle>
+          <CardTitle>قائمة الطلبة ({filteredStudents.length})</CardTitle>
           <CardDescription>فوج الشيخ أحمد بن عمر</CardDescription>
         </CardHeader>
         <CardContent>
@@ -131,20 +169,28 @@ export default function StudentManagementPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visibleStudents.map((student) => (
-                <TableRow key={student.id}>
-                  <TableCell className="font-medium">{student.fullName}</TableCell>
-                  <TableCell className="hidden md:table-cell">{student.guardianName}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{calculateAge(student.birthDate)}</TableCell>
-                  <TableCell>
-                    <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">{student.memorizedSurahsCount}</TableCell>
-                  <TableCell>
-                    <StudentActions student={student} onStatusChange={handleStatusChange} />
-                  </TableCell>
+             {filteredStudents.length > 0 ? (
+                filteredStudents.map((student) => (
+                    <TableRow key={student.id}>
+                    <TableCell className="font-medium">{student.fullName}</TableCell>
+                    <TableCell className="hidden md:table-cell">{student.guardianName}</TableCell>
+                    <TableCell className="hidden lg:table-cell">{calculateAge(student.birthDate)}</TableCell>
+                    <TableCell>
+                        <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">{student.memorizedSurahsCount}</TableCell>
+                    <TableCell>
+                        <StudentActions student={student} onStatusChange={handleStatusChange} />
+                    </TableCell>
+                    </TableRow>
+                ))
+             ) : (
+                <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center">
+                       {searchTerm ? "لم يتم العثور على طلاب مطابقين للبحث." : "لا يوجد طلبة حاليًا. قم بإضافة طالب جديد."}
+                    </TableCell>
                 </TableRow>
-              ))}
+             )}
             </TableBody>
           </Table>
         </CardContent>
@@ -394,5 +440,3 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
-
-    

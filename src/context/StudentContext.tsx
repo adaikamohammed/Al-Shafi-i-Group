@@ -35,6 +35,7 @@ interface StudentContextType {
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => void;
   updateStudent: (studentId: string, updatedData: Partial<Student>) => void;
   deleteStudent: (studentId: string) => void;
+  deleteAllStudents: () => void;
   addDailySession: (session: DailySession) => void;
   getSessionForDate: (date: string) => DailySession | undefined;
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession>;
@@ -117,6 +118,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const deleteStudent = (studentId: string) => {
       setStudents(prev => prev.filter(s => s.id !== studentId));
   }
+  
+  const deleteAllStudents = () => {
+      setStudents([]);
+  }
 
   const addDailySession = (session: DailySession) => {
     setDailySessions(prev => ({
@@ -148,7 +153,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <StudentContext.Provider value={{ students, dailySessions, loading, addStudent, updateStudent, deleteStudent, addDailySession, getSessionForDate, getRecordsForDateRange, importStudents }}>
+    <StudentContext.Provider value={{ students, dailySessions, loading, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, getSessionForDate, getRecordsForDateRange, importStudents }}>
       {children}
     </StudentContext.Provider>
   );
