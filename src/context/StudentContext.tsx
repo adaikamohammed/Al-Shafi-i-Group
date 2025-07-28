@@ -5,9 +5,10 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import type { Student, SessionRecord, AppUser } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { collection, doc, getDocs, writeBatch, Timestamp, onSnapshot, setDoc, where, query, getDoc, collectionGroup } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface StudentContextType {
   students: Student[];
@@ -24,7 +25,7 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
   const [dailyRecords, setDailyRecords] = useState<SessionRecord[]>([]);
@@ -32,95 +33,88 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
+    // onAuthStateChanged is the recommended way to get the current user.
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+        if (currentUser) {
+            setLoading(true);
+            const userDocRef = doc(db, 'users', currentUser.uid);
 
-    if (!user) {
-      setStudents([]);
-      setDailyRecords([]);
-      setAppUser(null);
-      setLoading(false);
-      return;
-    }
+            const unsubscribeUser = onSnapshot(userDocRef, (userDocSnap) => {
+                if (userDocSnap.exists()) {
+                    const userData = { uid: currentUser.uid, ...userDocSnap.data() } as AppUser;
+                    setAppUser(userData);
 
-    const unsubscribes: (() => void)[] = [];
+                    let studentsQuery;
+                    let recordsQuery;
 
-    const fetchUserDataAndSubscribe = async () => {
-        setLoading(true);
-        try {
-            const userDocRef = doc(db, 'users', user.uid);
-            const userDocSnap = await getDoc(userDocRef);
+                    if (userData.role === 'إدارة') {
+                        studentsQuery = query(collectionGroup(db, 'students'));
+                        recordsQuery = query(collectionGroup(db, 'records'));
+                    } else {
+                        studentsQuery = query(collection(db, 'users', currentUser.uid, 'students'));
+                        recordsQuery = query(collection(db, 'users', currentUser.uid, 'records'));
+                    }
 
-            if (!userDocSnap.exists()) {
-                console.error("User document not found!");
-                setLoading(false);
-                return;
-            }
+                    const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
+                        const studentsData = snapshot.docs.map(doc => {
+                            const data = doc.data();
+                            return {
+                                ...data,
+                                id: doc.id,
+                                birthDate: (data.birthDate as Timestamp)?.toDate(),
+                                registrationDate: (data.registrationDate as Timestamp)?.toDate(),
+                                updatedAt: (data.updatedAt as Timestamp)?.toDate(),
+                            } as Student;
+                        });
+                        studentsData.sort((a, b) => a.fullName.localeCompare(b.fullName));
+                        setStudents(studentsData);
+                        setLoading(false);
+                    }, (error) => {
+                        console.error("Error fetching students:", error);
+                        toast({ title: "خطأ", description: "لم نتمكن من تحميل بيانات الطلبة.", variant: "destructive" });
+                        setLoading(false);
+                    });
 
-            const currentUser = { uid: user.uid, ...userDocSnap.data() } as AppUser;
-            setAppUser(currentUser);
+                    const unsubscribeRecords = onSnapshot(recordsQuery, (snapshot) => {
+                        const recordsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as SessionRecord);
+                        setDailyRecords(recordsData);
+                    }, (error) => {
+                        console.error("Error fetching records:", error);
+                        toast({ title: "خطأ", description: "لم نتمكن من تحميل سجلات الحصص.", variant: "destructive" });
+                    });
+                    
+                    // Return cleanup functions for student and record listeners
+                    return () => {
+                        unsubscribeStudents();
+                        unsubscribeRecords();
+                    };
 
-            let studentsQuery;
-            let recordsQuery;
-
-            if (currentUser.role === 'إدارة') {
-                studentsQuery = query(collectionGroup(db, 'students'));
-                recordsQuery = query(collectionGroup(db, 'records'));
-            } else {
-                studentsQuery = query(collection(db, 'users', user.uid, 'students'));
-                recordsQuery = query(collection(db, 'users', user.uid, 'records'));
-            }
-
-            const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
-                const studentsData = snapshot.docs.map(doc => {
-                    const data = doc.data();
-                    return {
-                        ...data,
-                        id: doc.id,
-                        birthDate: (data.birthDate as Timestamp)?.toDate(),
-                        registrationDate: (data.registrationDate as Timestamp)?.toDate(),
-                        updatedAt: (data.updatedAt as Timestamp)?.toDate(),
-                    } as Student;
-                });
-                studentsData.sort((a, b) => a.fullName.localeCompare(b.fullName));
-                setStudents(studentsData);
-                setLoading(false); 
+                } else {
+                    console.error("User document not found!");
+                    setAppUser(null);
+                    setLoading(false);
+                }
             }, (error) => {
-                console.error("Error fetching students:", error);
-                toast({ title: "خطأ", description: "لم نتمكن من تحميل بيانات الطلبة.", variant: "destructive"});
+                console.error("Error fetching user document:", error);
                 setLoading(false);
             });
-
-            const unsubscribeRecords = onSnapshot(recordsQuery, (snapshot) => {
-                const recordsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as SessionRecord);
-                setDailyRecords(recordsData);
-            }, (error) => {
-                console.error("Error fetching records:", error);
-                toast({ title: "خطأ", description: "لم نتمكن من تحميل سجلات الحصص.", variant: "destructive"});
-            });
-
-            unsubscribes.push(unsubscribeStudents, unsubscribeRecords);
-
-        } catch (error) {
-            console.error("Error fetching user data:", error);
-            toast({ title: "خطأ", description: "لم نتمكن من تحميل بيانات المستخدم.", variant: "destructive"});
+             return () => unsubscribeUser();
+        } else {
+            // User is signed out
+            setStudents([]);
+            setDailyRecords([]);
+            setAppUser(null);
             setLoading(false);
         }
-    };
-    
-    fetchUserDataAndSubscribe();
+    });
 
-    return () => {
-        unsubscribes.forEach(unsub => unsub());
-    }
-  }, [user, authLoading, toast]);
+    return () => unsubscribeAuth();
+  }, [toast]);
 
 
   const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => {
-    if (!user) throw new Error("User not logged in");
-    const newStudentRef = doc(collection(db, 'users', user.uid, 'students'));
+    if (!auth.currentUser) throw new Error("User not logged in");
+    const newStudentRef = doc(collection(db, 'users', auth.currentUser.uid, 'students'));
     const newStudent = {
       ...studentData,
       memorizedSurahsCount: 0,
@@ -130,18 +124,18 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateStudent = async (studentId: string, updatedData: Partial<Student>) => {
-    if (!user) throw new Error("User not logged in");
-    const studentRef = doc(db, 'users', user.uid, 'students', studentId);
+    if (!auth.currentUser) throw new Error("User not logged in");
+    const studentRef = doc(db, 'users', auth.currentUser.uid, 'students', studentId);
     const finalData = { ...updatedData, updatedAt: new Date() };
     await setDoc(studentRef, finalData, { merge: true });
   };
   
   const addMultipleDailyRecords = async (newRecords: SessionRecord[]) => {
-      if (!user) throw new Error("User not logged in");
+      if (!auth.currentUser) throw new Error("User not logged in");
       if (newRecords.length === 0) return;
       
       const batch = writeBatch(db);
-      const recordsCollectionRef = collection(db, 'users', user.uid, 'records');
+      const recordsCollectionRef = collection(db, 'users', auth.currentUser.uid, 'records');
       
       const date = newRecords[0].date;
 

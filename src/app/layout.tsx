@@ -27,16 +27,19 @@ const navItems = [
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
     const { user, loading: authLoading, logout } = useAuth();
-    const { appUser, loading: studentLoading } = useStudentContext();
+    const { appUser, loading: studentContextLoading } = useStudentContext();
     const router = useRouter();
     const pathname = usePathname();
     const isMobile = useIsMobile();
     
-    const loading = authLoading || studentLoading;
+    const loading = authLoading || studentContextLoading;
 
     useEffect(() => {
         if (!authLoading && !user && pathname !== '/login') {
             router.push('/login');
+        }
+         if (!authLoading && user && pathname === '/login') {
+            router.push('/');
         }
     }, [user, authLoading, router, pathname]);
 
@@ -49,22 +52,19 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     }
     
     if (!user && pathname !== '/login') {
-        return (
-             <div className="flex items-center justify-center min-h-screen bg-background">
-                <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            </div>
-        );
+        return null;
     }
 
      if (pathname === '/login') {
         return children;
     }
     
-    if (!appUser) {
+    if (!appUser && !loading) {
+         router.push('/login');
         return (
              <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-4">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <p>جارِ تحميل بيانات المستخدم...</p>
+                <p>خطأ في تحميل بيانات المستخدم، جارٍ إعادة التوجيه...</p>
             </div>
         )
     }
@@ -75,14 +75,14 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
       <SidebarHeader className="p-4">
          <div className="flex items-center gap-3">
              <Avatar>
-                <AvatarImage src={user?.photoURL || ''} alt={appUser.name || ''} />
-                <AvatarFallback>{appUser.name?.charAt(0).toUpperCase()}</AvatarFallback>
+                <AvatarImage src={user?.photoURL || ''} alt={appUser?.name || ''} />
+                <AvatarFallback>{appUser?.name?.charAt(0).toUpperCase()}</AvatarFallback>
              </Avatar>
              <div>
                 <h1 className="font-headline text-lg font-bold text-primary">
-                    {appUser.name || "مستخدم"}
+                    {appUser?.name || "مستخدم"}
                 </h1>
-                <p className="text-xs text-muted-foreground">{appUser.email}</p>
+                <p className="text-xs text-muted-foreground">{appUser?.email}</p>
              </div>
          </div>
       </SidebarHeader>
@@ -131,8 +131,8 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
                         </h1>
                     </div>
                      <Avatar>
-                        <AvatarImage src={user?.photoURL || ''} alt={appUser.name || ''} />
-                        <AvatarFallback>{appUser.name?.charAt(0).toUpperCase()}</AvatarFallback>
+                        <AvatarImage src={user?.photoURL || ''} alt={appUser?.name || ''} />
+                        <AvatarFallback>{appUser?.name?.charAt(0).toUpperCase()}</AvatarFallback>
                      </Avatar>
                   </header>
                   <main className="flex-grow p-4">
