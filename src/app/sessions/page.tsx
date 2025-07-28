@@ -18,6 +18,8 @@ import { Switch } from '@/components/ui/switch';
 import { format, getMonth, getYear, setMonth, getDaysInMonth, startOfMonth, getDay, addMonths, subMonths, isPast, isToday, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import * as XLSX from 'xlsx';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 
 const sessionTypeDescriptions: { [key in SessionType]: string } = {
@@ -385,7 +387,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[120px]">الطالب</TableHead>
-                <TableHead className="w-[240px]">الحضوصر</TableHead>
+                <TableHead className="w-[240px]">الحضور</TableHead>
                 {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
                 {!isActivitySession && <TableHead className="w-[120px]">المراجعة</TableHead>}
                 <TableHead className="w-[150px]">السلوك</TableHead>
