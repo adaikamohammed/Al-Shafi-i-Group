@@ -69,7 +69,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
              </Avatar>
              <div>
                 <h1 className="font-headline text-lg font-bold text-primary">
-                    {user?.displayName || "مستخدم"}
+                    إدارة فوج - الإمام الشافعي
                 </h1>
                 <p className="text-xs text-muted-foreground">{user?.email}</p>
              </div>
