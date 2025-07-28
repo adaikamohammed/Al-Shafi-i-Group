@@ -13,12 +13,16 @@ import { useStudentContext } from '@/context/StudentContext';
 import { format, parse, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { surahs } from '@/lib/surahs';
+import { v4 as uuidv4 } from 'uuid';
+import { db, auth } from '@/lib/firebase';
+import { ref, set } from 'firebase/database';
+
 
 export default function DataExchangePage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sessionFileInputRef = useRef<HTMLInputElement>(null);
-  const { students, addStudent, addMultipleDailyRecords, getRecordsForDateRange } = useStudentContext();
+  const { students, addMultipleDailyRecords, getRecordsForDateRange } = useStudentContext();
   const activeStudents = students.filter(s => s.status === 'نشط');
 
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
@@ -29,6 +33,11 @@ export default function DataExchangePage() {
   const handleStudentFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const user = auth.currentUser;
+    if (!user) {
+        toast({ title: "خطأ", description: "يجب تسجيل الدخول أولاً.", variant: "destructive" });
+        return;
+    }
     setIsImporting(true);
 
     const reader = new FileReader();
@@ -40,17 +49,18 @@ export default function DataExchangePage() {
         const worksheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json<any>(worksheet);
         
-        const newStudentsPromises = json.map(async (row, index) => {
+        const studentUpdates: { [key: string]: any } = {};
+
+        json.forEach((row, index) => {
            const parseDate = (dateInput: any): Date | null => {
                 if (!dateInput) return null;
                 if (dateInput instanceof Date) return dateInput;
                 if (typeof dateInput === 'string') {
                     if (dateInput.includes('/')) {
-                       const parts = dateInput.split('/'); // dd/mm/yyyy
-                       // Check if format is MM/DD/YYYY or DD/MM/YYYY
+                       const parts = dateInput.split('/'); 
                        const month = parseInt(parts[1]) - 1;
                        const day = parseInt(parts[0]);
-                       if (month > 11) { // Likely MM/DD/YYYY
+                       if (month > 11) { 
                           return new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
                        }
                        return new Date(parseInt(parts[2]), month, day);
@@ -68,7 +78,9 @@ export default function DataExchangePage() {
              throw new Error(`التواريخ غير صالحة في الصف رقم ${index + 2}. تأكد من أنها بصيغة DD/MM/YYYY.`);
            }
            
-           const studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> = {
+           const studentId = uuidv4();
+           const studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { id: string, updatedAt: string, memorizedSurahsCount: number } = {
+              id: studentId,
               fullName: row['الاسم الكامل'] || 'N/A',
               guardianName: row['اسم الولي'] || 'N/A',
               phone1: row['رقم الهاتف']?.toString() || 'N/A',
@@ -77,12 +89,18 @@ export default function DataExchangePage() {
               status: 'نشط',
               dailyMemorizationAmount: 'صفحة',
               notes: row['ملاحظات'] || '',
+              updatedAt: new Date().toISOString(),
+              memorizedSurahsCount: 0
            };
            
-           await addStudent(studentData);
+           studentUpdates[`students/${user.uid}/${studentId}`] = {
+             ...studentData,
+             birthDate: birthDate.toISOString(),
+             registrationDate: registrationDate.toISOString(),
+           };
         });
 
-        await Promise.all(newStudentsPromises);
+        await set(ref(db), studentUpdates);
         
         toast({
           title: "نجاح ✅",
@@ -274,7 +292,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. سيتم حفظ البيانات مباشرة في المتصفح.
+              قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. سيتم حفظ البيانات مباشرة في قاعدة البيانات.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button className="flex-grow" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
@@ -336,7 +354,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
              <p className="text-sm text-muted-foreground">
-              هذه الميزة مفيدة لتسجيل بيانات الحصص بشكل غير متصل بالإنترنت. سيتم حفظ البيانات في المتصفح عند الرفع.
+              هذه الميزة مفيدة لتسجيل بيانات الحصص بشكل غير متصل بالإنترنت. سيتم حفظ البيانات في قاعدة البيانات عند الرفع.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
                <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()} disabled={isImporting}>

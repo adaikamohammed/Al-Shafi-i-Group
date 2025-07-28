@@ -22,6 +22,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { db } from '@/lib/firebase';
+import { ref, remove } from 'firebase/database';
+import { useAuth } from '@/context/AuthContext';
 
 const statusVariant: { [key in StudentStatus]: "default" | "destructive" | "secondary" | "outline" } = {
   "نشط": "default",
@@ -40,14 +43,21 @@ const calculateAge = (birthDate?: Date) => {
 
 export default function StudentManagementPage() {
   const { students, updateStudent, loading } = useStudentContext();
+  const { user } = useAuth();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
 
   const handleStatusChange = (studentId: string, status: StudentStatus, reason?: string) => {
-    updateStudent(studentId, { status, actionReason: reason });
+    if (status === 'محذوف' && user) {
+        const studentRef = ref(db, `students/${user.uid}/${studentId}`);
+        remove(studentRef);
+    } else {
+        updateStudent(studentId, { status, actionReason: reason });
+    }
   };
   
   const visibleStudents = useMemo(() => {
-    return students.filter(s => s.status !== 'محذوف');
+    // محذوف status is handled by physical deletion in RealtimeDB now
+    return students;
   }, [students]);
 
   if (loading) {
@@ -160,21 +170,12 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
                         <AlertDialogHeader>
                             <AlertDialogTitle>هل أنت متأكد من حذف الطالب {student.fullName}؟</AlertDialogTitle>
                             <AlertDialogDescription>
-                                سيؤدي هذا إلى تغيير حالة الطالب إلى "محذوف" وإخفائه من القوائم النشطة. الرجاء إدخال سبب الحذف.
+                                سيؤدي هذا إلى حذف بيانات الطالب نهائيًا من قاعدة البيانات. هذا الإجراء لا يمكن التراجع عنه.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <div className="py-4">
-                            <Label htmlFor="delete-reason">سبب الحذف</Label>
-                            <Textarea 
-                                id="delete-reason" 
-                                placeholder="مثال: انتقال إلى مدينة أخرى..." 
-                                value={actionReason}
-                                onChange={(e) => setActionReason(e.target.value)}
-                            />
-                        </div>
                         <AlertDialogFooter>
-                            <AlertDialogCancel onClick={() => setActionReason('')}>إلغاء</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => onStatusChange(student.id, 'محذوف', actionReason)}>تأكيد الحذف</AlertDialogAction>
+                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => onStatusChange(student.id, 'محذوف')}>تأكيد الحذف</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
@@ -189,7 +190,7 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
                         <AlertDialogHeader>
                             <AlertDialogTitle>طرد الطالب {student.fullName}</AlertDialogTitle>
                             <AlertDialogDescription>
-                                سيؤدي هذا إلى تغيير حالة الطالب إلى "مطرود" وإخفائه من القوائم النشطة. الرجاء إدخال سبب الطرد.
+                                سيؤدي هذا إلى تغيير حالة الطالب إلى "مطرود". الرجاء إدخال سبب الطرد.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <div className="py-4">
@@ -214,8 +215,8 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
 
 function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSuccess: () => void, onCancel: () => void }) {
   const { addStudent, updateStudent } = useStudentContext();
-  const [birthDate, setBirthDate] = useState<Date | undefined>(student?.birthDate);
-  const [registrationDate, setRegistrationDate] = useState<Date | undefined>(student?.registrationDate);
+  const [birthDate, setBirthDate] = useState<Date | undefined>(student?.birthDate ? new Date(student.birthDate) : undefined);
+  const [registrationDate, setRegistrationDate] = useState<Date | undefined>(student?.registrationDate ? new Date(student.registrationDate) : undefined);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -339,7 +340,6 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
                         <SelectItem value="نشط">✅ نشط</SelectItem>
                         <SelectItem value="غائب طويل">⚠️ غائب طويل</SelectItem>
                         <SelectItem value="مطرود">❌ مطرود</SelectItem>
-                        <SelectItem value="محذوف" disabled>🗑️ محذوف</SelectItem>
                     </SelectContent>
                 </Select>
             </div>

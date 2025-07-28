@@ -171,7 +171,7 @@ export default function DailySessionsPage() {
                 {`سجل الحصة ليوم: ${format(selectedDay, 'EEEE, d MMMM yyyy', { locale: ar })}`}
               </DialogTitle>
               <DialogDescription>
-                قم بتسجيل بيانات الحصة للطلبة النشطين في هذا اليوم. سيتم الحفظ تلقائيًا في المتصفح.
+                قم بتسجيل بيانات الحصة للطلبة النشطين في هذا اليوم. سيتم الحفظ تلقائيًا في قاعدة البيانات.
               </DialogDescription>
             </DialogHeader>
             <div className="overflow-y-auto pr-4">
@@ -253,7 +253,7 @@ function DailySessionForm({ day, students, onClose }: { day: Date, students: Stu
     const holidayRecord = existingRecords.find(r => r.studentId === 'holiday');
     const existingSessionType = holidayRecord?.sessionType || existingRecords.find(r => r.sessionType)?.sessionType;
 
-    if(existingSessionType) setSessionType(existingSessionType);
+    if(existingSessionType) setSessionType(existingSessionType as SessionType);
     
     if (holidayRecord) {
         setRecords([]);
