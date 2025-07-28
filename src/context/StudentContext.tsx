@@ -8,6 +8,8 @@ import { useAuth } from './AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDocs, writeBatch, Timestamp, onSnapshot, setDoc, where, query, collectionGroup } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import type { AppUser } from './AuthContext';
+
 
 interface StudentContextType {
   students: Student[];
@@ -23,31 +25,29 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user, appUser } = useAuth();
+  const { user, appUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
   const [dailyRecords, setDailyRecords] = useState<SessionRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !appUser) {
-      setStudents([]);
-      setDailyRecords([]);
-      setLoading(false);
+    // Wait until auth is no longer loading and we have a user and their profile
+    if (authLoading || !user || !appUser) {
+      setLoading(authLoading);
+      if (!authLoading) {
+          setStudents([]);
+          setDailyRecords([]);
+      }
       return;
     }
 
     setLoading(true);
-
-    let studentsQuery;
-    let recordsQuery;
     
-    // The current data structure isolates student data under each user.
-    // An admin role would ideally need a different data structure (e.g., top-level collections)
-    // to query across all users efficiently. For now, an admin will see the same as a teacher.
-    // This can be expanded upon in the future.
+    // For now, an admin will see the same as a teacher.
+    // The query needs to be structured differently for a true admin view (e.g., collectionGroup)
+    // which requires index configuration in Firestore.
     
-    // Teacher and Admin both query their own data for now.
     const studentsCollectionRef = collection(db, 'users', user.uid, 'students');
     const recordsCollectionRef = collection(db, 'users', user.uid, 'records');
 
@@ -89,7 +89,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         unsubscribeStudents();
         unsubscribeRecords();
     }
-  }, [user, appUser, toast]);
+  }, [user, appUser, authLoading, toast]);
 
   const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => {
     if (!user) throw new Error("User not logged in");
