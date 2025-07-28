@@ -6,43 +6,35 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, User, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, getMonth, getYear, isSameMonth, parseISO } from 'date-fns';
+import { Loader2, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import type { DailySession, Student, SessionRecord } from '@/lib/types';
+import type { DailySession, StudentStat } from '@/lib/types';
 
-
-type StudentStat = {
-    date: string;
-    attendance: string;
-    behavior: string | null;
-    memorization: string | null;
-    notes?: string;
-    sessionType: string;
-};
-
+// Enhanced color and style mappings
 const attendanceColors: { [key: string]: string } = {
     'حاضر': 'bg-green-400',
     'غائب': 'bg-red-500',
     'متأخر': 'bg-orange-400',
     'تعويض': 'bg-blue-400',
     'يوم عطلة': 'bg-gray-300',
-     '—': 'bg-muted/30'
+    '—': 'bg-muted/30'
 };
 
 const behaviorBorders: { [key: string]: string } = {
-    'هادئ': 'border-blue-500',
+    'هادئ': 'border-blue-600',
     'متوسط': 'border-yellow-500',
-    'غير منضبط': 'border-red-500',
+    'غير منضبط': 'border-red-600',
 };
 
 const sessionTypeBadge: { [key: string]: string } = {
-  'حصة أساسية': 'bg-blue-100 text-blue-800',
-  'حصة أنشطة': 'bg-purple-100 text-purple-800',
-  'حصة تعويضية': 'bg-indigo-100 text-indigo-800',
-  'يوم عطلة': 'bg-gray-100 text-gray-800',
+  'حصة أساسية': 'bg-blue-800 text-blue-100',
+  'حصة أنشطة': 'bg-purple-800 text-purple-100',
+  'حصة تعويضية': 'bg-green-800 text-green-100',
+  'يوم عطلة': 'bg-gray-600 text-gray-100',
+  'لا يوجد': 'hidden'
 }
 
 
@@ -55,9 +47,10 @@ export default function StatisticsPage() {
 
     const currentWeek = useMemo(() => {
         const today = addWeeks(new Date(), weekOffset);
+        // Start week on Saturday
         return {
-            start: startOfWeek(today, { locale: ar }),
-            end: endOfWeek(today, { locale: ar }),
+            start: startOfWeek(today, { weekStartsOn: 6, locale: ar }),
+            end: endOfWeek(today, { weekStartsOn: 6, locale: ar }),
         };
     }, [weekOffset]);
 
@@ -68,12 +61,7 @@ export default function StatisticsPage() {
     const weeklyStudentStats = useMemo(() => {
         const weekMatrix: Record<string, StudentStat[]> = {};
         
-        // Ensure all selected students have a row
-        const studentsToDisplay = selectedStudentId 
-            ? activeStudents.filter(s => s.id === selectedStudentId)
-            : activeStudents;
-            
-        studentsToDisplay.forEach(student => {
+        activeStudents.forEach(student => {
              weekMatrix[student.id] = [];
         });
 
@@ -83,16 +71,14 @@ export default function StatisticsPage() {
             
             if (session) {
                  if (session.sessionType === 'يوم عطلة') {
-                    // Add holiday entry for all students
-                    studentsToDisplay.forEach(student => {
+                    activeStudents.forEach(student => {
                         weekMatrix[student.id].push({
                             date: dateStr, attendance: 'يوم عطلة', behavior: null, memorization: null,
                             sessionType: 'يوم عطلة'
                         });
                     });
                 } else {
-                     // Add records for students present in the session
-                    studentsToDisplay.forEach(student => {
+                    activeStudents.forEach(student => {
                         const record = session.records.find(r => r.studentId === student.id);
                         if (record) {
                              weekMatrix[student.id].push({
@@ -109,8 +95,7 @@ export default function StatisticsPage() {
             }
         });
         
-         // Fill in the gaps for days with no records for any student
-        studentsToDisplay.forEach(student => {
+        activeStudents.forEach(student => {
             const studentDays = new Set(weekMatrix[student.id].map(s => s.date));
             weekDays.forEach(day => {
                 const dateStr = format(day, 'yyyy-MM-dd');
@@ -121,12 +106,11 @@ export default function StatisticsPage() {
                     });
                 }
             });
-             // Sort records by date for each student
             weekMatrix[student.id].sort((a, b) => a.date.localeCompare(b.date));
         });
 
         return weekMatrix;
-    }, [dailySessions, weekDays, activeStudents, selectedStudentId]);
+    }, [dailySessions, weekDays, activeStudents]);
 
 
     if (loading) {
@@ -192,12 +176,12 @@ export default function StatisticsPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="overflow-x-auto">
-                        <table className="w-full border-collapse">
+                        <table className="w-full border-collapse min-w-[800px]">
                             <thead>
                                 <tr className="border-b">
                                     <th className="p-2 text-right font-semibold text-muted-foreground min-w-[150px]">الطالب</th>
                                     {weekDays.map(day => (
-                                        <th key={day.toString()} className="p-2 text-center font-semibold text-muted-foreground min-w-[80px]">
+                                        <th key={day.toString()} className="p-2 text-center font-semibold text-muted-foreground min-w-[90px]">
                                             <div>{format(day, 'EEEE', { locale: ar })}</div>
                                             <div className="text-xs font-normal">{format(day, 'M/d', { locale: ar })}</div>
                                         </th>
@@ -206,18 +190,15 @@ export default function StatisticsPage() {
                             </thead>
                             <tbody>
                                 {studentsToDisplay.map(student => {
-                                    const studentStats = weeklyStudentStats[student.id];
+                                    const stats = weeklyStudentStats[student.id] || [];
                                     return (
                                          <tr key={student.id} className="border-b">
                                             <td className="p-2 font-medium">{student.fullName}</td>
-                                            {studentStats && studentStats.length > 0 ? studentStats.map(stat => (
+                                            {stats.map(stat => (
                                                 <td key={stat.date} className="p-1">
                                                      <DayCell stat={stat} />
                                                 </td>
-                                            )) : (
-                                                // Fallback if stats are not ready
-                                                Array(7).fill(0).map((_, i) => <td key={i} className="p-1 h-12"></td>)
-                                            )}
+                                            ))}
                                         </tr>
                                     )
                                 })}
@@ -230,32 +211,35 @@ export default function StatisticsPage() {
                     <CardHeader>
                         <CardTitle>مفتاح الدلالات</CardTitle>
                     </CardHeader>
-                    <CardContent className="flex flex-wrap gap-x-6 gap-y-4 text-sm">
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 text-sm">
                          <div className="space-y-2">
-                            <h4 className="font-semibold mb-1">الحضور</h4>
+                            <h4 className="font-semibold mb-2">🟩 الحضور (لون الخلفية)</h4>
                              {Object.entries(attendanceColors).map(([status, colorClass]) => (
                                  <div key={status} className="flex items-center gap-2">
-                                     <div className={cn("w-4 h-4 rounded-full", colorClass)}></div>
+                                     <div className={cn("w-4 h-4 rounded-full", colorClass, status === '—' && 'border')}></div>
                                      <span>{status === '—' ? 'لا يوجد تسجيل' : status}</span>
                                  </div>
                              ))}
                         </div>
                         <div className="space-y-2">
-                             <h4 className="font-semibold mb-1">السلوك (إطار الخلية)</h4>
+                             <h4 className="font-semibold mb-2">📏 السلوك (إطار الخلية)</h4>
                              {Object.entries(behaviorBorders).map(([status, borderClass]) => (
                                 <div key={status} className="flex items-center gap-2">
-                                    <div className={cn("w-4 h-4 rounded-md border-2", borderClass)}></div>
+                                    <div className={cn("w-5 h-4 rounded-sm border-2", borderClass)}></div>
                                     <span>{status}</span>
                                 </div>
                              ))}
                         </div>
-                         <div className="space-y-2">
-                             <h4 className="font-semibold mb-1">نوع الحصة (شارة)</h4>
-                            {Object.entries(sessionTypeBadge).map(([type, className]) => (
+                         <div className="space-y-2 md:col-span-2 lg:col-span-1">
+                             <h4 className="font-semibold mb-2">🏷️ نوع الحصة (شارة)</h4>
+                            {Object.entries(sessionTypeBadge).filter(([type]) => type !== 'لا يوجد' && type !== 'يوم عطلة').map(([type, className]) => (
                                  <div key={type} className="flex items-center gap-2">
                                     <span className={cn("px-2 py-0.5 rounded-full text-xs", className)}>{type}</span>
                                  </div>
                             ))}
+                             <div className="flex items-center gap-2">
+                                    <span className={cn("px-2 py-0.5 rounded-full text-xs", sessionTypeBadge['يوم عطلة'])}>يوم عطلة</span>
+                                 </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -267,14 +251,14 @@ export default function StatisticsPage() {
 
 function DayCell({ stat }: { stat: StudentStat }) {
     if (!stat || stat.attendance === '—') {
-        return <div className="h-12 w-full rounded-md bg-muted/30"></div>;
+        return <div className="h-12 w-full rounded-md bg-muted/30 border"></div>;
     }
 
     if (stat.attendance === 'يوم عطلة') {
         return (
              <Tooltip>
                 <TooltipTrigger asChild>
-                    <div className="h-12 w-full rounded-md bg-gray-300 flex items-center justify-center text-white font-bold text-xs p-1">
+                    <div className="h-12 w-full rounded-md bg-gray-300 flex items-center justify-center text-gray-600 font-bold text-xs p-1">
                         عطلة
                     </div>
                 </TooltipTrigger>
@@ -296,21 +280,22 @@ function DayCell({ stat }: { stat: StudentStat }) {
                    {stat.attendance}
                 </div>
             </TooltipTrigger>
-            <TooltipContent className="text-right" dir="rtl">
+            <TooltipContent className="text-right max-w-xs" dir="rtl">
                 <p><span className="font-bold">التاريخ:</span> {format(parseISO(stat.date), 'd MMMM yyyy', { locale: ar })}</p>
                 <p><span className="font-bold">الحضور:</span> {stat.attendance}</p>
                 {stat.memorization && <p><span className="font-bold">التقييم:</span> {stat.memorization}</p>}
                 {stat.behavior && <p><span className="font-bold">السلوك:</span> {stat.behavior}</p>}
-                {stat.notes && <p><span className="font-bold">ملاحظات:</span> {stat.notes}</p>}
-                {stat.sessionType !== 'لا يوجد' && <p className="mt-1">
-                    <span className={cn("px-2 py-0.5 rounded-full text-xs", sessionTypeBadge[stat.sessionType])}>
+                {stat.notes && <p className="mt-1"><span className="font-bold">ملاحظات:</span> <span className="break-words">{stat.notes}</span></p>}
+                {stat.sessionType !== 'لا يوجد' && (
+                  <p className="mt-2">
+                    <span className={cn("px-2 py-1 rounded-full text-xs font-medium", sessionTypeBadge[stat.sessionType])}>
                         {stat.sessionType}
                     </span>
-                </p>}
+                  </p>
+                )}
             </TooltipContent>
         </Tooltip>
     );
 }
-
 
     
