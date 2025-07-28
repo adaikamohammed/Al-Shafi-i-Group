@@ -380,7 +380,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
             updatedRec.memorization = null; updatedRec.review = false;
             updatedRec.behavior = 'هادئ'; updatedRec.surahId = null;
             updatedRec.fromVerse = null; updatedRec.toVerse = null;
-            updatedRec.notes = '';
+            // Do not clear notes for absent students
           }
            if (field === 'surahId') {
               const surah = surahs.find(s => s.id === (value as number));
@@ -528,7 +528,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Textarea placeholder="ملاحظة..." value={record.notes ?? ''} onChange={(e) => handleRecordChange(student.id, 'notes', e.target.value)} disabled={isAbsent && !record.notes} className="h-10"/>
+                      <Textarea placeholder="ملاحظة (مثل سبب الغياب)..." value={record.notes ?? ''} onChange={(e) => handleRecordChange(student.id, 'notes', e.target.value)} className="h-10"/>
                     </TableCell>
                   </TableRow>
                 );
