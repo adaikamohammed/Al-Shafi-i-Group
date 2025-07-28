@@ -3,8 +3,9 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getAuth, onAuthStateChanged, User, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -36,6 +37,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (allowedEmails.includes(currentUser.email || '')) {
           setUser(currentUser);
           setIsAuthorized(true);
+          // Check and save user to Firestore if they don't exist
+          const userRef = doc(db, "users", currentUser.uid);
+          const userSnap = await getDoc(userRef);
+          if (!userSnap.exists()) {
+            await setDoc(userRef, {
+              uid: currentUser.uid,
+              name: currentUser.displayName,
+              email: currentUser.email,
+              photo: currentUser.photoURL,
+              createdAt: serverTimestamp(),
+            });
+          }
         } else {
           setUser(null);
           setIsAuthorized(false);

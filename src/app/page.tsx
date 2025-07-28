@@ -30,7 +30,8 @@ const statusVariant: { [key in StudentStatus]: "default" | "destructive" | "seco
 };
 
 
-const calculateAge = (birthDate: Date) => {
+const calculateAge = (birthDate?: Date) => {
+  if (!birthDate) return 'N/A';
   const ageDifMs = Date.now() - new Date(birthDate).getTime();
   const ageDate = new Date(ageDifMs);
   return Math.abs(ageDate.getUTCFullYear() - 1970);
@@ -41,10 +42,7 @@ export default function StudentManagementPage() {
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
 
   const handleStatusChange = (studentId: string, status: StudentStatus, reason?: string) => {
-    const student = students.find(s => s.id === studentId);
-    if (student) {
-        updateStudent(studentId, { ...student, status, actionReason: reason, updatedAt: new Date() });
-    }
+    updateStudent(studentId, { status, actionReason: reason });
   };
   
   const visibleStudents = useMemo(() => {
@@ -210,10 +208,15 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
   const [birthDate, setBirthDate] = useState<Date | undefined>(student?.birthDate);
   const [registrationDate, setRegistrationDate] = useState<Date | undefined>(student?.registrationDate);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries()) as any;
+
+    if (!birthDate || !registrationDate) {
+      // Handle error - dates are required
+      return;
+    }
 
     const studentData: Partial<Student> = {
         fullName: data.fullName,
@@ -225,20 +228,14 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         status: data.status,
         dailyMemorizationAmount: data.memorizationAmount,
         notes: data.notes,
-        updatedAt: new Date(),
     };
 
     if (student) {
         // Update existing student
-        updateStudent(student.id, studentData);
+        await updateStudent(student.id, studentData);
     } else {
         // Add new student
-        const newStudent: Student = {
-            id: `new-${Date.now()}`,
-            memorizedSurahsCount: 0,
-            ...studentData,
-        } as Student;
-        addStudent(newStudent);
+        await addStudent(studentData as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>);
     }
     
     onSuccess();

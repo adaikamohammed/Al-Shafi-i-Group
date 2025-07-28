@@ -4,12 +4,12 @@ import React, { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, FileText, FileSpreadsheet, History } from 'lucide-react';
+import { Upload, Download, History } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { Student, SessionRecord, SessionType } from '@/lib/types';
+import type { Student, SessionRecord } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
-import { format, parse, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { format, parse, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { surahs } from '@/lib/surahs';
 
@@ -17,7 +17,7 @@ export default function DataExchangePage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sessionFileInputRef = useRef<HTMLInputElement>(null);
-  const { students, addStudent, addMultipleDailyRecords, getRecordsForDateRange } = useStudentContext();
+  const { students, addStudent, updateStudent, addMultipleDailyRecords, getRecordsForDateRange } = useStudentContext();
   const activeStudents = students.filter(s => s.status === 'نشط');
 
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
@@ -29,7 +29,7 @@ export default function DataExchangePage() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
@@ -37,7 +37,7 @@ export default function DataExchangePage() {
         const worksheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json<any>(worksheet);
         
-        const newStudents: Student[] = json.map((row, index) => {
+        const newStudentsPromises = json.map(async (row, index) => {
            const parseDate = (dateInput: any): Date | null => {
                 if (!dateInput) return null;
                 if (dateInput instanceof Date) return dateInput;
@@ -59,26 +59,25 @@ export default function DataExchangePage() {
              throw new Error(`التواريخ غير صالحة في الصف رقم ${index + 2} للطالب: ${row['الاسم الكامل'] || 'غير معروف'}`);
            }
            
-           return {
-              id: `imported-${Date.now()}-${index}`,
+           const studentData = {
               fullName: row['الاسم الكامل'] || 'N/A',
               guardianName: row['اسم الولي'] || 'N/A',
               phone1: row['رقم الهاتف']?.toString() || 'N/A',
               birthDate: birthDate,
               registrationDate: registrationDate,
               status: 'نشط',
-              memorizedSurahsCount: 0,
               dailyMemorizationAmount: 'صفحة',
               notes: row['ملاحظات'] || '',
-              updatedAt: new Date()
-           }
+           } as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>;
+           
+           await addStudent(studentData);
         });
 
-        newStudents.forEach(student => addStudent(student));
+        await Promise.all(newStudentsPromises);
         
         toast({
           title: "نجاح ✅",
-          description: `تم استيراد ${newStudents.length} طالبًا بنجاح.`,
+          description: `تم استيراد ${json.length} طالبًا بنجاح.`,
         });
 
       } catch (error) {
@@ -95,12 +94,12 @@ export default function DataExchangePage() {
     if(fileInputRef.current) fileInputRef.current.value = '';
   };
   
-   const handleSessionFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+   const handleSessionFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
@@ -140,7 +139,7 @@ export default function DataExchangePage() {
            };
         }).filter((r): r is SessionRecord => r !== null);
         
-        addMultipleDailyRecords(newRecords);
+        await addMultipleDailyRecords(newRecords);
 
         toast({
           title: "نجاح ✅",
@@ -303,7 +302,7 @@ export default function DataExchangePage() {
                  </Select>
               </div>
               <Button onClick={handleExportMonthlyReport}>
-                <FileSpreadsheet className="ml-2 h-4 w-4" /> تصدير الحصص لشهر كامل (Excel)
+                 تصدير الحصص لشهر كامل (Excel)
               </Button>
             </div>
           </CardContent>
