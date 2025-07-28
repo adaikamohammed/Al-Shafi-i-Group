@@ -22,9 +22,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { db } from '@/lib/firebase';
-import { ref, remove } from 'firebase/database';
-import { useAuth } from '@/context/AuthContext';
 
 const statusVariant: { [key in StudentStatus]: "default" | "destructive" | "secondary" | "outline" } = {
   "نشط": "default",
@@ -42,21 +39,19 @@ const calculateAge = (birthDate?: Date) => {
 };
 
 export default function StudentManagementPage() {
-  const { students, updateStudent, loading } = useStudentContext();
-  const { user } = useAuth();
+  const { students, updateStudent, deleteStudent, loading } = useStudentContext();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
 
   const handleStatusChange = (studentId: string, status: StudentStatus, reason?: string) => {
-    if (status === 'محذوف' && user) {
-        const studentRef = ref(db, `students/${user.uid}/${studentId}`);
-        remove(studentRef);
+    if (status === 'محذوف') {
+        deleteStudent(studentId);
     } else {
         updateStudent(studentId, { status, actionReason: reason });
     }
   };
   
   const visibleStudents = useMemo(() => {
-    // محذوف status is handled by physical deletion in RealtimeDB now
+    // With localStorage, all students are visible.
     return students;
   }, [students]);
 
@@ -170,7 +165,7 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
                         <AlertDialogHeader>
                             <AlertDialogTitle>هل أنت متأكد من حذف الطالب {student.fullName}؟</AlertDialogTitle>
                             <AlertDialogDescription>
-                                سيؤدي هذا إلى حذف بيانات الطالب نهائيًا من قاعدة البيانات. هذا الإجراء لا يمكن التراجع عنه.
+                                سيؤدي هذا إلى حذف بيانات الطالب نهائيًا. هذا الإجراء لا يمكن التراجع عنه.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -218,7 +213,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
   const [birthDate, setBirthDate] = useState<Date | undefined>(student?.birthDate ? new Date(student.birthDate) : undefined);
   const [registrationDate, setRegistrationDate] = useState<Date | undefined>(student?.registrationDate ? new Date(student.registrationDate) : undefined);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries()) as any;
@@ -242,10 +237,10 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 
     if (student) {
         // Update existing student
-        await updateStudent(student.id, studentData);
+        updateStudent(student.id, studentData);
     } else {
         // Add new student
-        await addStudent(studentData as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>);
+        addStudent(studentData as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>);
     }
     
     onSuccess();

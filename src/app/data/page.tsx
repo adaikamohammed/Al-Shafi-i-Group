@@ -13,16 +13,12 @@ import { useStudentContext } from '@/context/StudentContext';
 import { format, parse, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { surahs } from '@/lib/surahs';
-import { v4 as uuidv4 } from 'uuid';
-import { db, auth } from '@/lib/firebase';
-import { ref, update } from 'firebase/database';
-
 
 export default function DataExchangePage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sessionFileInputRef = useRef<HTMLInputElement>(null);
-  const { students, addMultipleDailyRecords, getRecordsForDateRange } = useStudentContext();
+  const { students, addMultipleDailyRecords, getRecordsForDateRange, importStudents } = useStudentContext();
   const activeStudents = students.filter(s => s.status === 'نشط');
 
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
@@ -33,15 +29,10 @@ export default function DataExchangePage() {
   const handleStudentFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const user = auth.currentUser;
-    if (!user) {
-        toast({ title: "خطأ", description: "يجب تسجيل الدخول أولاً.", variant: "destructive" });
-        return;
-    }
     setIsImporting(true);
 
     const reader = new FileReader();
-    reader.onload = async (e) => {
+    reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
@@ -49,7 +40,7 @@ export default function DataExchangePage() {
         const worksheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json<any>(worksheet);
         
-        const studentUpdates: { [key: string]: any } = {};
+        const newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[] = [];
 
         json.forEach((row, index) => {
            const parseDate = (dateInput: any): Date | null => {
@@ -78,9 +69,7 @@ export default function DataExchangePage() {
              throw new Error(`التواريخ غير صالحة في الصف رقم ${index + 2}. تأكد من أنها بصيغة DD/MM/YYYY.`);
            }
            
-           const studentId = uuidv4();
-           const studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { id: string, updatedAt: string, memorizedSurahsCount: number } = {
-              id: studentId,
+           const studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> = {
               fullName: row['الاسم الكامل'] || 'N/A',
               guardianName: row['اسم الولي'] || 'N/A',
               phone1: row['رقم الهاتف']?.toString() || 'N/A',
@@ -89,18 +78,12 @@ export default function DataExchangePage() {
               status: 'نشط',
               dailyMemorizationAmount: 'صفحة',
               notes: row['ملاحظات'] || '',
-              updatedAt: new Date().toISOString(),
-              memorizedSurahsCount: 0
            };
            
-           studentUpdates[`students/${user.uid}/${studentId}`] = {
-             ...studentData,
-             birthDate: birthDate.toISOString(),
-             registrationDate: registrationDate.toISOString(),
-           };
+           newStudents.push(studentData);
         });
 
-        await update(ref(db), studentUpdates);
+        importStudents(newStudents);
         
         toast({
           title: "نجاح ✅",
@@ -123,13 +106,13 @@ export default function DataExchangePage() {
     reader.readAsArrayBuffer(file);
   };
   
-   const handleSessionFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+   const handleSessionFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     setIsImporting(true);
 
     const reader = new FileReader();
-    reader.onload = async (e) => {
+    reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
@@ -171,7 +154,7 @@ export default function DataExchangePage() {
            } as SessionRecord;
         }).filter((r): r is SessionRecord => r !== null);
         
-        await addMultipleDailyRecords(newRecords);
+        addMultipleDailyRecords(newRecords);
 
         toast({
           title: "نجاح ✅",
@@ -292,7 +275,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. سيتم حفظ البيانات مباشرة في قاعدة البيانات.
+              قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. سيتم حفظ البيانات في المتصفح.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button className="flex-grow" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
@@ -354,7 +337,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
              <p className="text-sm text-muted-foreground">
-              هذه الميزة مفيدة لتسجيل بيانات الحصص بشكل غير متصل بالإنترنت. سيتم حفظ البيانات في قاعدة البيانات عند الرفع.
+              هذه الميزة مفيدة لتسجيل بيانات الحصص بشكل غير متصل بالإنترنت. سيتم حفظ البيانات في المتصفح عند الرفع.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
                <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()} disabled={isImporting}>
@@ -372,5 +355,3 @@ export default function DataExchangePage() {
     </div>
   );
 }
-
-    

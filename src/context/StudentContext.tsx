@@ -2,27 +2,41 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import type { Student, SessionRecord, AppUser } from '@/lib/types';
-import { isWithinInterval, parseISO } from 'date-fns';
+import type { Student, SessionRecord } from '@/lib/types';
+import { isWithinInterval, parseISO, format } from 'date-fns';
 import { useAuth } from './AuthContext';
-import { db } from '@/lib/firebase';
-import { ref, onValue, set, remove, update } from 'firebase/database';
 import { v4 as uuidv4 } from 'uuid';
+
+// Helper functions to interact with localStorage
+const getLocalStorage = (key: string, defaultValue: any) => {
+  if (typeof window === 'undefined') {
+    return defaultValue;
+  }
+  const storedValue = localStorage.getItem(key);
+  return storedValue ? JSON.parse(storedValue) : defaultValue;
+};
+
+const setLocalStorage = (key: string, value: any) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+};
 
 
 interface StudentContextType {
   students: Student[];
   dailyRecords: SessionRecord[];
   loading: boolean;
-  addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => Promise<void>;
-  updateStudent: (studentId: string, updatedData: Partial<Student>) => Promise<void>;
-  addMultipleDailyRecords: (records: SessionRecord[]) => Promise<void>;
+  addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => void;
+  updateStudent: (studentId: string, updatedData: Partial<Student>) => void;
+  deleteStudent: (studentId: string) => void;
+  addMultipleDailyRecords: (records: SessionRecord[]) => void;
   getRecordsForDate: (date: string) => SessionRecord[];
   getRecordsForDateRange: (startDate: string, endDate: string) => SessionRecord[];
+  importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[]) => void;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
-
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
@@ -30,112 +44,85 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [dailyRecords, setDailyRecords] = useState<SessionRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Load data from localStorage when user is authenticated
   useEffect(() => {
-    setLoading(authLoading);
-    if (authLoading || !user) {
+    if (!authLoading) {
+      if (user) {
+        const storedStudents = getLocalStorage(`students_${user.uid}`, []).map((s: any) => ({
+            ...s,
+            birthDate: new Date(s.birthDate),
+            registrationDate: new Date(s.registrationDate),
+            updatedAt: new Date(s.updatedAt)
+        }));
+        const storedRecords = getLocalStorage(`dailyRecords_${user.uid}`, []);
+        setStudents(storedStudents);
+        setDailyRecords(storedRecords);
+      } else {
+        // Clear data if user logs out
         setStudents([]);
         setDailyRecords([]);
-        setLoading(false);
-        return;
+      }
+      setLoading(false);
     }
-    
-    const studentsRef = ref(db, `students/${user.uid}`);
-    const recordsRef = ref(db, `sessions/${user.uid}`);
-
-    const unsubscribeStudents = onValue(studentsRef, (snapshot) => {
-        const data = snapshot.val();
-        const studentsList: Student[] = data 
-            ? Object.entries(data).map(([id, studentData]: [string, any]) => ({
-                ...studentData,
-                id,
-                birthDate: studentData.birthDate ? new Date(studentData.birthDate) : new Date(),
-                registrationDate: studentData.registrationDate ? new Date(studentData.registrationDate) : new Date(),
-                updatedAt: studentData.updatedAt ? new Date(studentData.updatedAt) : new Date(),
-            })) 
-            : [];
-        setStudents(studentsList);
-        setLoading(false);
-    }, (error) => {
-        console.error("Firebase student read failed: ", error);
-        setLoading(false);
-    });
-
-    const unsubscribeRecords = onValue(recordsRef, (snapshot) => {
-        const data = snapshot.val();
-        const recordsList: SessionRecord[] = [];
-        if (data) {
-            Object.entries(data).forEach(([date, dateRecords]: [string, any]) => {
-                Object.values(dateRecords as object).forEach((record: any) => {
-                    recordsList.push({ ...record, date });
-                });
-            });
-        }
-        setDailyRecords(recordsList);
-    }, (error) => {
-        console.error("Firebase session read failed: ", error);
-    });
-
-    return () => {
-        unsubscribeStudents();
-        unsubscribeRecords();
-    };
-
   }, [user, authLoading]);
+  
+  // Save students to localStorage whenever they change
+  useEffect(() => {
+    if (user) {
+      setLocalStorage(`students_${user.uid}`, students);
+    }
+  }, [students, user]);
+
+  // Save records to localStorage whenever they change
+  useEffect(() => {
+    if (user) {
+      setLocalStorage(`dailyRecords_${user.uid}`, dailyRecords);
+    }
+  }, [dailyRecords, user]);
 
 
-  const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => {
-    if (!user) throw new Error("User not authenticated");
-    const newStudentId = uuidv4();
-    const newStudentData = {
+  const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => {
+    const newStudent: Student = {
       ...studentData,
-      id: newStudentId,
+      id: uuidv4(),
       memorizedSurahsCount: 0,
-      updatedAt: new Date().toISOString(),
-      birthDate: studentData.birthDate.toISOString(),
-      registrationDate: studentData.registrationDate.toISOString(),
+      updatedAt: new Date(),
     };
-    const studentRef = ref(db, `students/${user.uid}/${newStudentId}`);
-    await set(studentRef, newStudentData);
-  };
-
-  const updateStudent = async (studentId: string, updatedData: Partial<Student>) => {
-    if (!user) throw new Error("User not authenticated");
-    
-    const studentRef = ref(db, `students/${user.uid}/${studentId}`);
-    
-    const existingStudent = students.find(s => s.id === studentId);
-    if (!existingStudent) throw new Error("Student not found");
-
-    const dataToUpdate = {
-        ...existingStudent,
-        ...updatedData,
-        updatedAt: new Date().toISOString(),
-        birthDate: (updatedData.birthDate || existingStudent.birthDate).toISOString(),
-        registrationDate: (updatedData.registrationDate || existingStudent.registrationDate).toISOString(),
-    };
-
-    await set(studentRef, dataToUpdate);
+    setStudents(prev => [...prev, newStudent]);
   };
   
-  const addMultipleDailyRecords = async (newRecords: SessionRecord[]) => {
-    if (!user) throw new Error("User not authenticated");
-    if (newRecords.length === 0) return;
+  const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[]) => {
+     const studentsToSave: Student[] = newStudents.map(s => ({
+         ...s,
+         id: uuidv4(),
+         memorizedSurahsCount: 0,
+         updatedAt: new Date(),
+     }));
+     setStudents(prev => [...prev, ...studentsToSave]);
+  }
 
-    const updates: { [key: string]: any } = {};
-    const date = newRecords[0].date;
-    const recordsForDate: { [key: string]: any } = {};
-
-    newRecords.forEach(record => {
-      const recordId = record.studentId === 'holiday' ? 'holiday_record' : record.studentId;
-      const recordToSave = { ...record };
-      delete (recordToSave as Partial<SessionRecord>).date; 
-      recordsForDate[recordId] = recordToSave;
-    });
-
-    const dateRecordsRef = ref(db, `sessions/${user.uid}/${date}`);
-    await set(dateRecordsRef, recordsForDate);
+  const updateStudent = (studentId: string, updatedData: Partial<Student>) => {
+    setStudents(prev =>
+      prev.map(s =>
+        s.id === studentId ? { ...s, ...updatedData, updatedAt: new Date() } : s
+      )
+    );
   };
+  
+  const deleteStudent = (studentId: string) => {
+      setStudents(prev => prev.filter(s => s.id !== studentId));
+  }
 
+  const addMultipleDailyRecords = (newRecords: SessionRecord[]) => {
+    if (newRecords.length === 0) return;
+    const date = newRecords[0].date;
+    
+    // Remove old records for the same date to avoid duplicates
+    const otherDateRecords = dailyRecords.filter(r => r.date !== date);
+
+    setDailyRecords([...otherDateRecords, ...newRecords]);
+  };
+  
   const getRecordsForDate = (date: string): SessionRecord[] => {
       return dailyRecords.filter(r => r.date === date);
   }
@@ -154,8 +141,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       });
   }
 
+
   return (
-    <StudentContext.Provider value={{ students, dailyRecords, loading, addStudent, updateStudent, addMultipleDailyRecords, getRecordsForDate, getRecordsForDateRange }}>
+    <StudentContext.Provider value={{ students, dailyRecords, loading, addStudent, updateStudent, deleteStudent, addMultipleDailyRecords, getRecordsForDate, getRecordsForDateRange, importStudents }}>
       {children}
     </StudentContext.Provider>
   );
@@ -168,5 +156,3 @@ export const useStudentContext = () => {
   }
   return context;
 };
-
-    
