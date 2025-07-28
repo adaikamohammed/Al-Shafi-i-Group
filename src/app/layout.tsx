@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import React, { useEffect } from 'react';
-import { StudentProvider, useStudentContext } from '@/context/StudentContext';
+import { StudentProvider } from '@/context/StudentContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -26,14 +26,11 @@ const navItems = [
 ];
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
-    const { user, loading: authLoading, logout } = useAuth();
-    const { appUser, loading: studentContextLoading } = useStudentContext();
+    const { user, appUser, loading: authLoading, logout } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
     const isMobile = useIsMobile();
     
-    const loading = authLoading || studentContextLoading;
-
     useEffect(() => {
         if (!authLoading && !user && pathname !== '/login') {
             router.push('/login');
@@ -43,7 +40,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         }
     }, [user, authLoading, router, pathname]);
 
-    if (loading && pathname !== '/login') {
+    if (authLoading && pathname !== '/login') {
         return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -59,7 +56,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         return children;
     }
     
-    if (!appUser && !loading) {
+    if (!appUser && !authLoading) {
          router.push('/login');
         return (
              <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-4">

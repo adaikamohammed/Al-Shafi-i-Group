@@ -12,11 +12,12 @@ import {
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import type { AppUser } from '@/lib/types';
 
 interface AuthContextType {
   user: User | null;
+  appUser: AppUser | null;
   loading: boolean;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -27,12 +28,27 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        const userDocRef = doc(db, "users", currentUser.uid);
+        try {
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+                setAppUser({ uid: currentUser.uid, ...userDocSnap.data() } as AppUser);
+            }
+        } catch (error) {
+            console.error("Error fetching user document on auth change:", error);
+            // This might happen if offline, let's not clear the user right away
+        }
+      } else {
+        setAppUser(null);
+      }
       setLoading(false);
     });
     return () => unsubscribe();
@@ -42,21 +58,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const newUser = userCredential.user;
     
-    // Update the user's profile in Firebase Auth
     await updateProfile(newUser, { displayName });
 
-    // Create the user document in Firestore
     const userRef = doc(db, "users", newUser.uid);
-    const newAppUser: Omit<AppUser, 'uid'> = {
+    const newAppUserData: Omit<AppUser, 'uid'> = {
         name: displayName,
         email: newUser.email,
         photoURL: newUser.photoURL,
         createdAt: serverTimestamp(),
-        role: 'شيخ' // Default role for new sign-ups
+        role: 'شيخ'
     };
-    await setDoc(userRef, newAppUser);
+    await setDoc(userRef, newAppUserData);
     
-    // Manually update the user state to reflect the new profile information immediately
+    // Manually set the app user state to avoid race condition
+    setAppUser({ ...newAppUserData, uid: newUser.uid, createdAt: new Date() });
     setUser({ ...newUser, displayName });
   };
   
@@ -67,11 +82,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     await signOut(auth);
-    // User state will be cleared by onAuthStateChanged
+    setUser(null);
+    setAppUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUpWithEmail, signInWithEmail, logout }}>
+    <AuthContext.Provider value={{ user, appUser, loading, signUpWithEmail, signInWithEmail, logout }}>
       {children}
     </AuthContext.Provider>
   );
