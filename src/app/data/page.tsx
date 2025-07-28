@@ -86,7 +86,7 @@ export default function DataExchangePage() {
         
         toast({
           title: "نجاح ✅",
-          description: `تم استيراد ${json.length} طالبًا بنجاح وحفظهم في قاعدة البيانات.`,
+          description: `تم استيراد ${json.length} طالبًا بنجاح.`,
         });
 
       } catch (error) {
@@ -274,7 +274,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. سيتم حفظ البيانات مباشرة في قاعدة البيانات.
+              قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. سيتم حفظ البيانات مباشرة في المتصفح.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button className="flex-grow" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
@@ -336,7 +336,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
              <p className="text-sm text-muted-foreground">
-              هذه الميزة مفيدة لتسجيل بيانات الحصص بشكل غير متصل بالإنترنت. سيتم حفظ البيانات في قاعدة البيانات عند الرفع.
+              هذه الميزة مفيدة لتسجيل بيانات الحصص بشكل غير متصل بالإنترنت. سيتم حفظ البيانات في المتصفح عند الرفع.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
                <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()} disabled={isImporting}>

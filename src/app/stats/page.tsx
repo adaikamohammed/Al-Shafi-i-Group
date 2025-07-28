@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart as BarChartIcon, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, UserX, UserCheck, BarChart2, AlertTriangle, Loader2 } from 'lucide-react';
 import { useStudentContext } from '@/context/StudentContext';
-import { useAuth } from '@/context/AuthContext';
 import { Progress } from '@/components/ui/progress';
 
 const chartData = [
@@ -15,12 +14,11 @@ const chartData = [
 
 export default function StatisticsPage() {
   const { students, loading: studentsLoading } = useStudentContext();
-  const { appUser } = useAuth();
 
   const { activeStudents, expelledStudents, totalStudents } = useMemo(() => {
      const active = students.filter(s => s.status === 'نشط').length;
      const expelled = students.filter(s => s.status === 'مطرود').length;
-     const total = students.length;
+     const total = students.filter(s => s.status !== 'محذوف').length;
      return { activeStudents: active, expelledStudents: expelled, totalStudents: total };
   }, [students]);
 
@@ -48,13 +46,6 @@ export default function StatisticsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-headline font-bold">إحصائيات الفوج</h1>
-         {appUser?.role === 'إدارة' && (
-            <Card className="border-destructive">
-                <CardContent className="p-3">
-                    <p className="text-sm text-destructive">أنت في وضع الإدارة (ميزة تحت التطوير)</p>
-                </CardContent>
-            </Card>
-        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

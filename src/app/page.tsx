@@ -1,7 +1,8 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -38,7 +39,7 @@ const calculateAge = (birthDate?: Date) => {
 };
 
 export default function StudentManagementPage() {
-  const { students, updateStudent } = useStudentContext();
+  const { students, updateStudent, loading } = useStudentContext();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
 
   const handleStatusChange = (studentId: string, status: StudentStatus, reason?: string) => {
@@ -46,8 +47,16 @@ export default function StudentManagementPage() {
   };
   
   const visibleStudents = useMemo(() => {
-    return students.filter(s => s.status !== 'محذوف' && s.status !== 'مطرود');
+    return students.filter(s => s.status !== 'محذوف');
   }, [students]);
+
+  if (loading) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -329,7 +338,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
                     <SelectContent>
                         <SelectItem value="نشط">✅ نشط</SelectItem>
                         <SelectItem value="غائب طويل">⚠️ غائب طويل</SelectItem>
-                        <SelectItem value="مطرود" disabled>❌ مطرود</SelectItem>
+                        <SelectItem value="مطرود">❌ مطرود</SelectItem>
                         <SelectItem value="محذوف" disabled>🗑️ محذوف</SelectItem>
                     </SelectContent>
                 </Select>

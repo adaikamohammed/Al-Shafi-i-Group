@@ -1,13 +1,10 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import type { Student, SessionRecord, AppUser } from '@/lib/types';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import type { Student, SessionRecord } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
-import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, writeBatch, Timestamp, onSnapshot, setDoc, where, query, collectionGroup } from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast';
 
 interface StudentContextType {
   students: Student[];
@@ -22,117 +19,100 @@ interface StudentContextType {
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
+const getSafeLocalStorage = (key: string, defaultValue: any) => {
+    if (typeof window === 'undefined') {
+        return defaultValue;
+    }
+    try {
+        const item = window.localStorage.getItem(key);
+        return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+        console.warn(`Error reading localStorage key "${key}":`, error);
+        return defaultValue;
+    }
+};
+
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user, appUser, loading: authLoading } = useAuth();
-  const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [dailyRecords, setDailyRecords] = useState<SessionRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const getStorageKey = useCallback((dataType: 'students' | 'records') => {
+    if (!user) return null;
+    return `${user.uid}_${dataType}`;
+  }, [user]);
+
   useEffect(() => {
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
+    setLoading(authLoading);
+    if (!authLoading && user) {
+        const studentKey = getStorageKey('students');
+        const recordsKey = getStorageKey('records');
 
-    if (user && appUser) {
-        setLoading(true);
-        let studentsQuery;
-        let recordsQuery;
+        if (studentKey && recordsKey) {
+            const storedStudents = getSafeLocalStorage(studentKey, []);
+            const storedRecords = getSafeLocalStorage(recordsKey, []);
+            
+            // Dates are stored as strings in JSON, need to convert them back
+            const parsedStudents = storedStudents.map((s: any) => ({
+                ...s,
+                birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
+                registrationDate: s.registrationDate ? new Date(s.registrationDate) : undefined,
+                updatedAt: s.updatedAt ? new Date(s.updatedAt) : undefined,
+            }));
 
-        if (appUser.role === 'إدارة') {
-            studentsQuery = query(collectionGroup(db, 'students'));
-            recordsQuery = query(collectionGroup(db, 'records'));
-        } else {
-            studentsQuery = query(collection(db, 'users', user.uid, 'students'));
-            recordsQuery = query(collection(db, 'users', user.uid, 'records'));
+            setStudents(parsedStudents);
+            setDailyRecords(storedRecords);
         }
-
-        const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
-            const studentsData = snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    ...data,
-                    id: doc.id,
-                    birthDate: (data.birthDate as Timestamp)?.toDate(),
-                    registrationDate: (data.registrationDate as Timestamp)?.toDate(),
-                    updatedAt: (data.updatedAt as Timestamp)?.toDate(),
-                } as Student;
-            });
-            studentsData.sort((a, b) => a.fullName.localeCompare(b.fullName));
-            setStudents(studentsData);
-            setLoading(false);
-        }, (error) => {
-            console.error("Error fetching students:", error);
-            toast({ title: "خطأ", description: "لم نتمكن من تحميل بيانات الطلبة.", variant: "destructive" });
-            setLoading(false);
-        });
-
-        const unsubscribeRecords = onSnapshot(recordsQuery, (snapshot) => {
-            const recordsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as SessionRecord);
-            setDailyRecords(recordsData);
-        }, (error) => {
-            console.error("Error fetching records:", error);
-            toast({ title: "خطأ", description: "لم نتمكن من تحميل سجلات الحصص.", variant: "destructive" });
-        });
-        
-        return () => {
-            unsubscribeStudents();
-            unsubscribeRecords();
-        };
-
-    } else {
-        // User is signed out or appUser is not loaded yet
+        setLoading(false);
+    } else if (!authLoading && !user) {
         setStudents([]);
         setDailyRecords([]);
         setLoading(false);
     }
-  }, [user, appUser, authLoading, toast]);
+  }, [user, authLoading, getStorageKey]);
 
+  useEffect(() => {
+    const studentKey = getStorageKey('students');
+    if (studentKey) {
+        localStorage.setItem(studentKey, JSON.stringify(students));
+    }
+  }, [students, getStorageKey]);
+
+  useEffect(() => {
+    const recordsKey = getStorageKey('records');
+    if (recordsKey) {
+        localStorage.setItem(recordsKey, JSON.stringify(dailyRecords));
+    }
+  }, [dailyRecords, getStorageKey]);
 
   const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => {
-    if (!user) throw new Error("User not logged in");
-    const newStudentRef = doc(collection(db, 'users', user.uid, 'students'));
-    const newStudent = {
-      ...studentData,
-      memorizedSurahsCount: 0,
-      updatedAt: new Date(),
-    };
-    await setDoc(newStudentRef, newStudent);
+    setStudents(prev => [
+        ...prev,
+        {
+            ...studentData,
+            id: new Date().toISOString(), // Simple unique ID
+            memorizedSurahsCount: 0,
+            updatedAt: new Date(),
+        }
+    ]);
   };
 
   const updateStudent = async (studentId: string, updatedData: Partial<Student>) => {
-    if (!user) throw new Error("User not logged in");
-    const studentRef = doc(db, 'users', user.uid, 'students', studentId);
-    const finalData = { ...updatedData, updatedAt: new Date() };
-    await setDoc(studentRef, finalData, { merge: true });
+    setStudents(prev => prev.map(s => 
+        s.id === studentId ? { ...s, ...updatedData, updatedAt: new Date() } : s
+    ));
   };
   
   const addMultipleDailyRecords = async (newRecords: SessionRecord[]) => {
-      if (!user) throw new Error("User not logged in");
-      if (newRecords.length === 0) return;
-      
-      const batch = writeBatch(db);
-      const recordsCollectionRef = collection(db, 'users', user.uid, 'records');
-      
-      const date = newRecords[0].date;
+    if (newRecords.length === 0) return;
+    const date = newRecords[0].date;
 
-      const q = query(recordsCollectionRef, where("date", "==", date));
-      const existingRecordsSnap = await getDocs(q);
-      existingRecordsSnap.forEach(doc => {
-          batch.delete(doc.ref);
-      });
-      
-      newRecords.forEach(record => {
-          const recordId = `${record.date}_${record.studentId}`;
-          const recordRef = doc(recordsCollectionRef, recordId);
-          const a = record as any;
-          if (a.birthDate) a.birthDate = Timestamp.fromDate(a.birthDate);
-          if (a.registrationDate) a.registrationDate = Timestamp.fromDate(a.registrationDate);
-          batch.set(recordRef, a);
-      });
-      
-      await batch.commit();
+    // Remove old records for the same day and add new ones
+    setDailyRecords(prev => [
+        ...prev.filter(r => r.date !== date),
+        ...newRecords
+    ]);
   };
 
   const getRecordsForDate = (date: string): SessionRecord[] => {

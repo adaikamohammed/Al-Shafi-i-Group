@@ -69,12 +69,11 @@ export interface Surah {
     verses: number;
 }
 
-// This type is now defined here and shared with AuthContext
+// This is no longer tied to a firestore document
 export interface AppUser {
     uid: string;
     name: string;
     email: string | null;
     photoURL?: string | null;
-    createdAt: any;
     role: 'شيخ' | 'إدارة';
 }

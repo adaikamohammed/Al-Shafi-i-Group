@@ -38,7 +38,7 @@ export default function DailySessionsPage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [isSessionDialogOpen, setSessionDialogOpen] = useState(false);
   
-  const { students, dailyRecords } = useStudentContext();
+  const { students, dailyRecords, loading } = useStudentContext();
   const activeStudents = useMemo(() => 
     students.filter(s => s.status === "نشط"), 
   [students]);
@@ -106,6 +106,14 @@ export default function DailySessionsPage() {
   
   const months = Array.from({ length: 12 }, (_, i) => format(new Date(2000, i), 'MMMM', { locale: ar }));
 
+  if (loading) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-headline font-bold">إدارة الحصص اليومية</h1>
@@ -163,7 +171,7 @@ export default function DailySessionsPage() {
                 {`سجل الحصة ليوم: ${format(selectedDay, 'EEEE, d MMMM yyyy', { locale: ar })}`}
               </DialogTitle>
               <DialogDescription>
-                قم بتسجيل بيانات الحصة للطلبة النشطين في هذا اليوم. سيتم الحفظ تلقائيًا في قاعدة البيانات.
+                قم بتسجيل بيانات الحصة للطلبة النشطين في هذا اليوم. سيتم الحفظ تلقائيًا في المتصفح.
               </DialogDescription>
             </DialogHeader>
             <div className="overflow-y-auto pr-4">
