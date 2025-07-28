@@ -122,25 +122,18 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     if (newRecords.length === 0) return;
 
     const updates: { [key: string]: any } = {};
+    const date = newRecords[0].date;
+    const recordsForDate: { [key: string]: any } = {};
 
     newRecords.forEach(record => {
-      const date = record.date;
-      const recordId = record.studentId === 'holiday' ? 'holiday_record' : uuidv4();
-      
+      const recordId = record.studentId === 'holiday' ? 'holiday_record' : record.studentId;
       const recordToSave = { ...record };
-      delete (recordToSave as Partial<SessionRecord>).date; // Don't store date inside the record object
-
-      updates[`sessions/${user.uid}/${date}/${recordId}`] = recordToSave;
+      delete (recordToSave as Partial<SessionRecord>).date; 
+      recordsForDate[recordId] = recordToSave;
     });
 
-    // We clear all records for the dates being updated first
-    const datesToClear = [...new Set(newRecords.map(r => r.date))];
-    for (const date of datesToClear) {
-        const dateRecordsRef = ref(db, `sessions/${user.uid}/${date}`);
-        await remove(dateRecordsRef);
-    }
-    
-    await update(ref(db), updates);
+    const dateRecordsRef = ref(db, `sessions/${user.uid}/${date}`);
+    await set(dateRecordsRef, recordsForDate);
   };
 
   const getRecordsForDate = (date: string): SessionRecord[] => {
