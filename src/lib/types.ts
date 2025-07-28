@@ -30,9 +30,6 @@ export interface DailyRecord {
   review: boolean | null;
   behavior: BehaviorLevel | null;
   notes?: string;
-  surahId?: number | null;
-  fromVerse?: number | null;
-  toVerse?: number | null;
 }
 
 // This represents the entire session for a given day
@@ -86,4 +83,8 @@ export interface AppUser {
     role: 'شيخ' | 'إدارة';
 }
 
+export interface StudentStat extends Partial<SessionRecord> {
+  date: string;
+  sessionType: string;
+}
     

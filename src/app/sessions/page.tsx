@@ -6,23 +6,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useStudentContext } from '@/context/StudentContext';
-import { surahs } from '@/lib/surahs';
-import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, SessionRecord, DailySession } from '@/lib/types';
+import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, DailySession } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, ArrowLeft, ArrowRight, ChevronsUpDown, Check, Loader2, Download } from 'lucide-react';
+import { Info, ArrowLeft, ArrowRight, Loader2, Download } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { format, getMonth, getYear, setMonth, getDaysInMonth, startOfMonth, getDay, addMonths, subMonths, isPast, isToday, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -87,7 +81,6 @@ export default function DailySessionsPage() {
     } else {
         dataForSheet = session.records.map(record => {
             const student = students.find(s => s.id === record.studentId);
-            const surah = surahs.find(s => s.id === record.surahId);
             return {
                 'التاريخ': readableDate,
                 'اليوم': dayName,
@@ -96,9 +89,6 @@ export default function DailySessionsPage() {
                 'الحضور': record.attendance || '',
                 'التقييم': record.memorization || '',
                 'السلوك': record.behavior || '',
-                'السورة': surah?.name || '',
-                'من آية': record.fromVerse ?? '',
-                'إلى آية': record.toVerse ?? '',
                 'مراجعة': record.review ? 'نعم' : 'لا',
                 'ملاحظات': record.notes || '',
             }
@@ -108,7 +98,7 @@ export default function DailySessionsPage() {
     const ws = XLSX.utils.json_to_sheet(dataForSheet);
     ws['!cols'] = [
         { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
-        { wch: 12 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 30 }
+        { wch: 12 }, { wch: 10 }, { wch: 30 }
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `سجل حصة ${formattedDate}`);
@@ -134,7 +124,6 @@ export default function DailySessionsPage() {
         const formattedDayDate = format(dayDate, 'yyyy-MM-dd');
         const session = dailySessions[formattedDayDate];
         const isHoliday = session?.sessionType === 'يوم عطلة';
-        const hasRecords = session && session.records.length > 0;
         
         let dayStatusClass = '';
         if (isHoliday) {
@@ -271,58 +260,6 @@ export default function DailySessionsPage() {
 }
 
 
-function SurahCombobox({ value, onSelect, disabled }: { value?: number | null, onSelect: (surahId: number | null) => void, disabled?: boolean }) {
-  const [open, setOpen] = useState(false)
-  const selectedSurah = value ? surahs.find(s => s.id === value) : null;
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between"
-          disabled={disabled}
-        >
-          {selectedSurah
-            ? `${selectedSurah.id}. ${selectedSurah.name}`
-            : "اختر السورة..."}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
-          <CommandInput placeholder="ابحث عن سورة..." />
-          <CommandList>
-            <CommandEmpty>لم يتم العثور على سورة.</CommandEmpty>
-            <CommandGroup>
-              {surahs.map((surah) => (
-                <CommandItem
-                  key={surah.id}
-                  value={`${surah.id} ${surah.name}`}
-                  onSelect={() => {
-                    onSelect(surah.id)
-                    setOpen(false)
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === surah.id ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {surah.id}. {surah.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
 interface DailySessionFormProps {
     day: Date;
     students: Student[];
@@ -353,7 +290,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
                     studentId: s.id,
                     attendance: 'حاضر',
                     memorization: null, review: false, behavior: 'هادئ',
-                    notes: '', surahId: null, fromVerse: null, toVerse: null,
+                    notes: '',
                 };
             });
             setRecords(updatedRecords);
@@ -364,7 +301,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
             studentId: s.id,
             attendance: 'حاضر',
             memorization: null, review: false, behavior: 'هادئ',
-            notes: '', surahId: null, fromVerse: null, toVerse: null,
+            notes: '',
         }));
         setRecords(initialRecords);
         setSessionType('حصة أساسية');
@@ -378,18 +315,9 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
           const updatedRec = { ...rec, [field]: value };
           if (field === 'attendance' && value === 'غائب') {
             updatedRec.memorization = null; updatedRec.review = false;
-            updatedRec.behavior = 'هادئ'; updatedRec.surahId = null;
-            updatedRec.fromVerse = null; updatedRec.toVerse = null;
+            updatedRec.behavior = 'هادئ';
             // Do not clear notes for absent students
           }
-           if (field === 'surahId') {
-              const surah = surahs.find(s => s.id === (value as number));
-              if (surah) {
-                updatedRec.fromVerse = 1; updatedRec.toVerse = surah.verses;
-              } else {
-                updatedRec.fromVerse = null; updatedRec.toVerse = null;
-              }
-           }
           return updatedRec;
         }
         return rec;
@@ -457,10 +385,8 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[120px]">الطالب</TableHead>
-                <TableHead className="w-[240px]">الحضور</TableHead>
+                <TableHead className="w-[240px]">الحضوصر</TableHead>
                 {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
-                {!isActivitySession && <TableHead className="w-[180px]">السورة</TableHead>}
-                {!isActivitySession && <TableHead className="w-[180px]">الآيات</TableHead>}
                 {!isActivitySession && <TableHead className="w-[120px]">المراجعة</TableHead>}
                 <TableHead className="w-[150px]">السلوك</TableHead>
                 <TableHead className="min-w-[200px]">الملاحظات</TableHead>
@@ -472,7 +398,6 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
                 if (!record) return null;
                 const isAbsent = record.attendance === 'غائب';
                 const isRowDisabled = isAbsent || (isActivitySession && !isMakeupSession);
-                const selectedSurah = record.surahId ? surahs.find(s => s.id === record.surahId) : null;
                 
                 return (
                   <TableRow key={student.id} className={cn(isAbsent && 'bg-muted/50')}>
@@ -499,16 +424,6 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
                               <SelectItem value="لا يوجد">لا يوجد</SelectItem>
                             </SelectContent>
                           </Select>
-                        </TableCell>
-                        <TableCell>
-                            <SurahCombobox value={record.surahId} onSelect={(surahId) => handleRecordChange(student.id, 'surahId', surahId)} disabled={isRowDisabled}/>
-                        </TableCell>
-                         <TableCell>
-                           <div className="flex items-center gap-1">
-                                <Input type="number" placeholder="من" min={1} max={selectedSurah?.verses} value={record.fromVerse ?? ''} onChange={(e) => handleRecordChange(student.id, 'fromVerse', e.target.value ? parseInt(e.target.value) : null)} disabled={isRowDisabled || !selectedSurah} className="w-16 h-9 text-center"/>
-                                <span>-</span>
-                                <Input type="number" placeholder="إلى" min={record.fromVerse ?? 1} max={selectedSurah?.verses} value={record.toVerse ?? ''} onChange={(e) => handleRecordChange(student.id, 'toVerse', e.target.value ? parseInt(e.target.value) : null)} disabled={isRowDisabled || !selectedSurah} className="w-16 h-9 text-center"/>
-                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2 space-x-reverse">

@@ -12,7 +12,6 @@ import type { Student, SessionRecord, SessionType } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
 import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { surahs } from '@/lib/surahs';
 
 export default function DataExchangePage() {
   const { toast } = useToast();
@@ -80,14 +79,16 @@ export default function DataExchangePage() {
         const worksheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json<any>(worksheet);
 
-        const existingStudentNames = new Set(students.map(s => s.fullName.trim()));
+        const existingStudentNames = new Set(students.map(s => s.fullName.trim().toLowerCase()));
         const newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[] = [];
+        let skippedCount = 0;
 
         json.forEach((row, index) => {
            const fullName = (row['الاسم الكامل'] || '').trim();
            if (!fullName) return; // Skip empty rows
            
-           if (existingStudentNames.has(fullName)) {
+           if (existingStudentNames.has(fullName.toLowerCase())) {
+               skippedCount++;
                return; // Skip duplicate student
            }
            
@@ -110,19 +111,19 @@ export default function DataExchangePage() {
            };
            
            newStudents.push(studentData);
-           existingStudentNames.add(fullName); // Add to set to prevent duplicates within the same file
+           existingStudentNames.add(fullName.toLowerCase()); // Add to set to prevent duplicates within the same file
         });
         
         if (newStudents.length > 0) {
             importStudents(newStudents);
             toast({
               title: "نجاح ✅",
-              description: `تم استيراد ${newStudents.length} طالبًا جديدًا بنجاح.`,
+              description: `تم استيراد ${newStudents.length} طالبًا جديدًا. تم تخطي ${skippedCount} طالبًا لوجودهم مسبقًا.`,
             });
         } else {
              toast({
               title: "لم تتم إضافة طلاب جدد",
-              description: "جميع الطلبة في الملف موجودون بالفعل في النظام.",
+              description: `تم تخطي ${skippedCount} طالبًا لوجودهم مسبقًا في النظام.`,
             });
         }
 
@@ -202,17 +203,12 @@ export default function DataExchangePage() {
                 return;
             }
             
-            const surah = surahs.find(s => s.name === row['السورة']);
-
             recordsToSave.push({
                 studentId: student.id,
                 attendance: row['الحضور'],
                 behavior: row['السلوك'],
                 memorization: row['التقييم'],
                 review: row['مراجعة'] === 'نعم',
-                surahId: surah?.id,
-                fromVerse: row['من آية'],
-                toVerse: row['إلى آية'],
                 notes: row['ملاحظات'],
             });
         });
@@ -299,12 +295,10 @@ export default function DataExchangePage() {
                            errors.push(`لم يتم العثور على الطالب "${studentName}" في ورقة ${sheetName}`);
                            return;
                        }
-                       const surah = surahs.find(s => s.name === row['السورة']);
                        recordsToSave.push({
                            studentId: student.id,
                            attendance: row['الحضور'], behavior: row['السلوك'],
                            memorization: row['التقييم'], review: row['مراجعة'] === 'نعم',
-                           surahId: surah?.id, fromVerse: row['من آية'], toVerse: row['إلى آية'],
                            notes: row['ملاحظات'],
                        });
                     });
@@ -365,14 +359,13 @@ export default function DataExchangePage() {
       'نوع الحصة': 'حصة أساسية',
       'اسم الطالب': student.fullName,
       'الحضور': '', 'التقييم': '', 'السلوك': '',
-      'السورة': '', 'من آية': '', 'إلى آية': '',
       'مراجعة': 'لا', 'ملاحظات': ''
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
     ws['!cols'] = [
       { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
-      { wch: 12 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 30 }
+      { wch: 12 }, { wch: 10 }, { wch: 30 }
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `سجل حصة ${format(today, 'yyyy-MM-dd')}`);
@@ -408,7 +401,6 @@ export default function DataExchangePage() {
             } else {
                  dataForSheet = session.records.map(record => {
                     const student = students.find(s => s.id === record.studentId);
-                    const surah = surahs.find(s => s.id === record.surahId);
                     return {
                         'التاريخ': format(parseISO(date), 'dd/MM/yyyy'),
                         'اليوم': format(parseISO(date), 'EEEE', { locale: ar }),
@@ -417,9 +409,6 @@ export default function DataExchangePage() {
                         'الحضور': record.attendance || '',
                         'التقييم': record.memorization || '',
                         'السلوك': record.behavior || '',
-                        'السورة': surah?.name || '',
-                        'من آية': record.fromVerse || '',
-                        'إلى آية': record.toVerse || '',
                         'مراجعة': record.review ? 'نعم' : 'لا',
                         'ملاحظات': record.notes || '',
                     }
@@ -429,7 +418,7 @@ export default function DataExchangePage() {
             const ws = XLSX.utils.json_to_sheet(dataForSheet);
              ws['!cols'] = [
                 { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
-                { wch: 12 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 30 }
+                { wch: 12 }, { wch: 10 }, { wch: 30 }
             ];
             XLSX.utils.book_append_sheet(workbook, ws, formattedDate);
         });
@@ -557,4 +546,3 @@ export default function DataExchangePage() {
     </div>
   );
 }
-

@@ -194,7 +194,7 @@ export default function StatisticsPage() {
                              <h4 className="font-semibold mb-2">📏 السلوك (إطار الخلية)</h4>
                              {Object.entries(behaviorBorders).map(([status, borderClass]) => (
                                 <div key={status} className="flex items-center gap-2">
-                                    <div className={cn("w-5 h-4 rounded-sm border-2", borderClass)}></div>
+                                    <div className={cn("w-5 h-4 rounded-sm border-[3px]", borderClass)}></div>
                                     <span>{status}</span>
                                 </div>
                              ))}
@@ -215,7 +215,7 @@ export default function StatisticsPage() {
 }
 
 
-function DayCell({ stat }: { stat: Partial<SessionRecord> & { date: string, sessionType: string } }) {
+function DayCell({ stat }: { stat: StudentStat }) {
     if (!stat || stat.attendance === '—') {
         return <div className="h-16 w-full rounded-md bg-muted/30 border"></div>;
     }
@@ -240,6 +240,7 @@ function DayCell({ stat }: { stat: Partial<SessionRecord> & { date: string, sess
                 <p><span className="font-bold">التاريخ:</span> {format(parseISO(stat.date), 'd MMMM yyyy', { locale: ar })}</p>
                 {stat.attendance && <p><span className="font-bold">الحضور:</span> {stat.attendance}</p>}
                 {stat.memorization && <p><span className="font-bold">التقييم:</span> {stat.memorization}</p>}
+                {typeof stat.review === 'boolean' && <p><span className="font-bold">المراجعة:</span> {stat.review ? '✅ نعم' : '❌ لا'}</p>}
                 {stat.behavior && <p><span className="font-bold">السلوك:</span> {stat.behavior}</p>}
                 {stat.notes && <p className="mt-1"><span className="font-bold">ملاحظات:</span> <span className="break-words">{stat.notes}</span></p>}
                 {stat.sessionType && (
