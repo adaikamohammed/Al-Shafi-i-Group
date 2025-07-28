@@ -1,10 +1,11 @@
+
 "use client";
 
 import React, { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, History } from 'lucide-react';
+import { Upload, Download, History, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Student, SessionRecord } from '@/lib/types';
@@ -17,16 +18,18 @@ export default function DataExchangePage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sessionFileInputRef = useRef<HTMLInputElement>(null);
-  const { students, addStudent, updateStudent, addMultipleDailyRecords, getRecordsForDateRange } = useStudentContext();
+  const { students, addStudent, addMultipleDailyRecords, getRecordsForDateRange } = useStudentContext();
   const activeStudents = students.filter(s => s.status === 'نشط');
 
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
   const [exportYear, setExportYear] = useState(new Date().getFullYear());
+  const [isImporting, setIsImporting] = useState(false);
 
 
   const handleStudentFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setIsImporting(true);
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -42,12 +45,15 @@ export default function DataExchangePage() {
                 if (!dateInput) return null;
                 if (dateInput instanceof Date) return dateInput;
                 if (typeof dateInput === 'string') {
+                     // Handles DD/MM/YYYY and MM/DD/YYYY by trying to parse it as international format first
                     if (dateInput.includes('/')) {
-                        const parts = dateInput.split('/'); // dd/mm/yyyy
-                        return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                       const parts = dateInput.split('/'); // dd/mm/yyyy
+                       return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
                     }
-                    return new Date(dateInput); 
+                    // For YYYY-MM-DD
+                    return parseISO(dateInput); 
                 }
+                // For excel dates (numbers)
                 if (typeof dateInput === 'number') return XLSX.SSF.parse_date_code(dateInput);
                 return null;
            }
@@ -55,8 +61,8 @@ export default function DataExchangePage() {
            const birthDate = parseDate(row['تاريخ الميلاد']);
            const registrationDate = parseDate(row['تاريخ التسجيل']);
 
-           if (!birthDate || !registrationDate) {
-             throw new Error(`التواريخ غير صالحة في الصف رقم ${index + 2} للطالب: ${row['الاسم الكامل'] || 'غير معروف'}`);
+           if (!birthDate || !registrationDate || isNaN(birthDate.getTime()) || isNaN(registrationDate.getTime())) {
+             throw new Error(`التواريخ غير صالحة في الصف رقم ${index + 2}. تأكد من أنها بصيغة DD/MM/YYYY.`);
            }
            
            const studentData = {
@@ -88,15 +94,18 @@ export default function DataExchangePage() {
           description: errorMessage,
           variant: 'destructive',
         });
+      } finally {
+        setIsImporting(false);
+         if(fileInputRef.current) fileInputRef.current.value = '';
       }
     };
     reader.readAsArrayBuffer(file);
-    if(fileInputRef.current) fileInputRef.current.value = '';
   };
   
    const handleSessionFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setIsImporting(true);
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -122,6 +131,9 @@ export default function DataExchangePage() {
            }
            
            const date = parse(row['التاريخ'], 'dd/MM/yyyy', new Date());
+           if (isNaN(date.getTime())) {
+               throw new Error(`تاريخ غير صالح في الصف ${index + 2}: ${row['التاريخ']}`);
+           }
            const surah = surahs.find(s => s.name === row['السورة']);
 
            return {
@@ -148,15 +160,18 @@ export default function DataExchangePage() {
 
       } catch (error) {
         console.error("Error parsing session file:", error);
+        const errorMessage = error instanceof Error ? error.message : "حدث خطأ أثناء قراءة الملف. تأكد من تطابق أسماء الطلبة وصيغة التاريخ.";
         toast({
           title: "خطأ في استيراد سجل الحصة ❌",
-          description: "حدث خطأ أثناء قراءة الملف. تأكد من تطابق أسماء الطلبة وصيغة التاريخ.",
+          description: errorMessage,
           variant: 'destructive',
         });
+      } finally {
+        setIsImporting(false);
+         if (sessionFileInputRef.current) sessionFileInputRef.current.value = '';
       }
     };
     reader.readAsArrayBuffer(file);
-    if (sessionFileInputRef.current) sessionFileInputRef.current.value = '';
   };
 
   const handleDownloadStudentTemplate = () => {
@@ -242,8 +257,8 @@ export default function DataExchangePage() {
 
   return (
     <div className="space-y-6">
-      <input type="file" ref={fileInputRef} onChange={handleStudentFileUpload} accept=".xlsx, .xls" className="hidden" />
-      <input type="file" ref={sessionFileInputRef} onChange={handleSessionFileUpload} accept=".xlsx, .xls" className="hidden" />
+      <input type="file" ref={fileInputRef} onChange={handleStudentFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImporting}/>
+      <input type="file" ref={sessionFileInputRef} onChange={handleSessionFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImporting}/>
       
       <h1 className="text-3xl font-headline font-bold">استيراد وتصدير البيانات</h1>
       
@@ -260,8 +275,9 @@ export default function DataExchangePage() {
               قم بتحميل النموذج، واملأه ببيانات الطلبة، ثم ارفعه هنا. سيتم تعيين حالتهم إلى "نشط" تلقائيًا.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
-              <Button className="flex-grow" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="ml-2 h-4 w-4" /> رفع ملف الطلبة
+              <Button className="flex-grow" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
+                {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Upload className="ml-2 h-4 w-4" />}
+                {isImporting ? 'جاري الاستيراد...' : 'رفع ملف الطلبة'}
               </Button>
                <Button variant="outline" onClick={handleDownloadStudentTemplate}>
                 <Download className="ml-2 h-4 w-4" /> تحميل نموذج الطلبة
@@ -321,8 +337,9 @@ export default function DataExchangePage() {
               هذه الميزة مفيدة لتسجيل بيانات الحصص بشكل غير متصل بالإنترنت. تأكد من أن تاريخ اليوم وأسماء الطلبة صحيحة في الملف قبل رفعه.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
-               <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()}>
-                <History className="ml-2 h-4 w-4" /> رفع سجل حصة
+               <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()} disabled={isImporting}>
+                {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
+                {isImporting ? 'جاري الاستيراد...' : 'رفع سجل حصة'}
               </Button>
               <Button variant="outline" onClick={handleDownloadSessionTemplate} disabled={activeStudents.length === 0}>
                 <Download className="ml-2 h-4 w-4" /> تحميل نموذج حصة اليوم
