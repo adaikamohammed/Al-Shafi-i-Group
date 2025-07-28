@@ -4,7 +4,7 @@ import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCVZOpgoz76g5AQDnPyRTzPB6UoT2YYKL8",
-  authDomain: "al-shafi-i-quran-school.firebaseapp.com",
+  authDomain: "al-shafi-i-quran-school.web.app",
   projectId: "al-shafi-i-quran-school",
   storageBucket: "al-shafi-i-quran-school.appspot.com",
   messagingSenderId: "833438544513",
