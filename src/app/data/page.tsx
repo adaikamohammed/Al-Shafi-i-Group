@@ -283,44 +283,49 @@ export default function DataExchangePage() {
             });
             return;
         }
-        
-        const dataForSheet = Object.entries(monthRecords).flatMap(([date, session]) => {
+
+        const workbook = XLSX.utils.book_new();
+
+        Object.entries(monthRecords).sort(([dateA], [dateB]) => dateA.localeCompare(dateB)).forEach(([date, session]) => {
+            const formattedDate = format(parseISO(date), 'yyyy-MM-dd');
+            let dataForSheet;
+
             if (session.sessionType === 'يوم عطلة') {
-                return [{
+                 dataForSheet = [{
                     'التاريخ': format(parseISO(date), 'dd/MM/yyyy'),
                     'اليوم': format(parseISO(date), 'EEEE', { locale: ar }),
                     'نوع الحصة': 'يوم عطلة',
                 }];
+            } else {
+                 dataForSheet = session.records.map(record => {
+                    const student = students.find(s => s.id === record.studentId);
+                    const surah = surahs.find(s => s.id === record.surahId);
+                    return {
+                        'التاريخ': format(parseISO(date), 'dd/MM/yyyy'),
+                        'اليوم': format(parseISO(date), 'EEEE', { locale: ar }),
+                        'نوع الحصة': session.sessionType,
+                        'اسم الطالب': student?.fullName || 'غير معروف',
+                        'الحضور': record.attendance || '',
+                        'التقييم': record.memorization || '',
+                        'السلوك': record.behavior || '',
+                        'السورة': surah?.name || '',
+                        'من آية': record.fromVerse || '',
+                        'إلى آية': record.toVerse || '',
+                        'مراجعة': record.review ? 'نعم' : 'لا',
+                        'ملاحظات': record.notes || '',
+                    }
+                });
             }
-            return session.records.map(record => {
-                const student = students.find(s => s.id === record.studentId);
-                const surah = surahs.find(s => s.id === record.surahId);
-                return {
-                    'التاريخ': format(parseISO(date), 'dd/MM/yyyy'),
-                    'اليوم': format(parseISO(date), 'EEEE', { locale: ar }),
-                    'نوع الحصة': session.sessionType,
-                    'اسم الطالب': student?.fullName || 'غير معروف',
-                    'الحضور': record.attendance || '',
-                    'التقييم': record.memorization || '',
-                    'السلوك': record.behavior || '',
-                    'السورة': surah?.name || '',
-                    'من آية': record.fromVerse || '',
-                    'إلى آية': record.toVerse || '',
-                    'مراجعة': record.review ? 'نعم' : 'لا',
-                    'ملاحظات': record.notes || '',
-                }
-            })
+            
+            const ws = XLSX.utils.json_to_sheet(dataForSheet);
+             ws['!cols'] = [
+                { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+                { wch: 12 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 30 }
+            ];
+            XLSX.utils.book_append_sheet(workbook, ws, formattedDate);
         });
 
-
-        const ws = XLSX.utils.json_to_sheet(dataForSheet);
-        ws['!cols'] = [
-            { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
-            { wch: 12 }, { wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 30 }
-        ];
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, `تقرير شهر ${format(startDate, 'MMMM yyyy', {locale: ar})}`);
-        XLSX.writeFile(wb, `تقرير_حصص_شهر_${format(startDate, 'yyyy-MM')}.xlsx`);
+        XLSX.writeFile(workbook, `تقرير_حصص_شهر_${format(startDate, 'yyyy-MM')}.xlsx`);
   }
 
   return (
@@ -420,5 +425,7 @@ export default function DataExchangePage() {
     </div>
   );
 }
+
+    
 
     
