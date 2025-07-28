@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import type { Student, SessionRecord, DailySession } from '@/lib/types';
+import type { Student, SessionRecord, DailySession, DailyReport } from '@/lib/types';
 import { isWithinInterval, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -31,6 +31,7 @@ const setLocalStorage = (key: string, value: any) => {
 interface StudentContextType {
   students: Student[];
   dailySessions: Record<string, DailySession>;
+  dailyReports: Record<string, DailyReport>;
   loading: boolean;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => void;
   updateStudent: (studentId: string, updatedData: Partial<Student>) => void;
@@ -40,6 +41,7 @@ interface StudentContextType {
   getSessionForDate: (date: string) => DailySession | undefined;
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[]) => void;
+  saveDailyReport: (report: DailyReport) => void;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -48,6 +50,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
+  const [dailyReports, setDailyReports] = useState<Record<string, DailyReport>>({});
   const [loading, setLoading] = useState(true);
 
   // Load data from localStorage when user is authenticated
@@ -61,12 +64,16 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             updatedAt: new Date(s.updatedAt)
         }));
         const storedSessions = getLocalStorage(`dailySessions_${user.uid}`, {});
+        const storedReports = getLocalStorage(`dailyReports_${user.uid}`, {});
+        
         setStudents(storedStudents);
         setDailySessions(storedSessions);
+        setDailyReports(storedReports);
       } else {
         // Clear data if user logs out
         setStudents([]);
         setDailySessions({});
+        setDailyReports({});
       }
       setLoading(false);
     }
@@ -79,12 +86,19 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [students, user, loading]);
 
-  // Save records to localStorage whenever they change
+  // Save sessions to localStorage whenever they change
   useEffect(() => {
     if (user && !loading) {
       setLocalStorage(`dailySessions_${user.uid}`, dailySessions);
     }
   }, [dailySessions, user, loading]);
+
+  // Save reports to localStorage whenever they change
+  useEffect(() => {
+    if (user && !loading) {
+        setLocalStorage(`dailyReports_${user.uid}`, dailyReports);
+    }
+  }, [dailyReports, user, loading]);
 
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => {
@@ -150,10 +164,16 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
        });
        return filteredSessions;
   }
-
+  
+  const saveDailyReport = (report: DailyReport) => {
+    setDailyReports(prev => ({
+        ...prev,
+        [report.date]: report
+    }));
+  }
 
   return (
-    <StudentContext.Provider value={{ students, dailySessions, loading, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, getSessionForDate, getRecordsForDateRange, importStudents }}>
+    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport }}>
       {children}
     </StudentContext.Provider>
   );

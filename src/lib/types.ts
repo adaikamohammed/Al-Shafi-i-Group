@@ -1,4 +1,5 @@
 
+
 export type StudentStatus = "نشط" | "مطرود" | "غائب طويل" | "محذوف";
 export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "أكثر";
 
@@ -37,6 +38,14 @@ export interface DailySession {
     date: string; // YYYY-MM-DD
     sessionType: SessionType;
     records: SessionRecord[];
+}
+
+export interface DailyReport {
+  date: string; // YYYY-MM-DD
+  note: string;
+  timestamp: string; // ISO string
+  authorName: string;
+  authorId: string;
 }
 
 
