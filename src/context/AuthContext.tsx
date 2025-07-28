@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getAuth, onAuthStateChanged, User, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, User, GoogleAuthProvider, signInWithRedirect, signOut, getRedirectResult } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -29,62 +29,72 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const { toast } = useToast();
 
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setLoading(true);
       if (currentUser) {
-        if (allowedEmails.includes(currentUser.email || '')) {
-          setUser(currentUser);
-          setIsAuthorized(true);
-          // Check and save user to Firestore if they don't exist
-          const userRef = doc(db, "users", currentUser.uid);
-          const userSnap = await getDoc(userRef);
-          if (!userSnap.exists()) {
-            await setDoc(userRef, {
-              uid: currentUser.uid,
-              name: currentUser.displayName,
-              email: currentUser.email,
-              photo: currentUser.photoURL,
-              createdAt: serverTimestamp(),
-            });
-          }
-        } else {
-          setUser(null);
-          setIsAuthorized(false);
-          toast({
-            title: "🚫 حساب غير مصرح به",
-            description: "هذا الحساب غير مخول للدخول. سيتم تسجيل خروجك.",
-            variant: 'destructive',
-          });
-          await signOut(auth);
-        }
+        await handleAuthUser(currentUser);
       } else {
-        setUser(null);
-        setIsAuthorized(null);
+        // Handle the redirect result when the user comes back
+        try {
+          const result = await getRedirectResult(auth);
+          if (result && result.user) {
+            await handleAuthUser(result.user);
+          } else {
+            setUser(null);
+            setIsAuthorized(null);
+            setLoading(false);
+          }
+        } catch (error) {
+            console.error("Error getting redirect result:", error);
+            setUser(null);
+            setIsAuthorized(null);
+            setLoading(false);
+        }
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, [toast]);
 
+  const handleAuthUser = async (authUser: User) => {
+      if (allowedEmails.includes(authUser.email || '')) {
+        setUser(authUser);
+        setIsAuthorized(true);
+        const userRef = doc(db, "users", authUser.uid);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) {
+          await setDoc(userRef, {
+            uid: authUser.uid,
+            name: authUser.displayName,
+            email: authUser.email,
+            photo: authUser.photoURL,
+            createdAt: serverTimestamp(),
+          });
+        }
+      } else {
+        setUser(null);
+        setIsAuthorized(false);
+        toast({
+          title: "🚫 حساب غير مصرح به",
+          description: "هذا الحساب غير مخول للدخول. سيتم تسجيل خروجك.",
+          variant: 'destructive',
+        });
+        await signOut(auth);
+      }
+      setLoading(false);
+  }
+
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Error during Google sign-in:", error);
-       toast({
-        title: "خطأ في تسجيل الدخول",
-        description: "حدث خطأ أثناء محاولة تسجيل الدخول باستخدام جوجل.",
-        variant: 'destructive',
-      });
-    }
+    setLoading(true);
+    await signInWithRedirect(auth, provider);
   };
 
   const logout = async () => {
     await signOut(auth);
+    setUser(null);
+    setIsAuthorized(null);
   };
 
   return (
