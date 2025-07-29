@@ -8,7 +8,8 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
   updateProfile,
-  onAuthStateChanged
+  onAuthStateChanged,
+  FirebaseError
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import type { AppUser } from '@/lib/types';
@@ -77,7 +78,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const signInWithEmail = async (email: string, password: string) => {
-     await signInWithEmailAndPassword(auth, email, password);
+    if (!email || !password) {
+      throw new FirebaseError("auth/invalid-argument", "Email and password must not be empty.");
+    }
+    try {
+       await signInWithEmailAndPassword(auth, email, password);
+    } catch (error) {
+        if (error instanceof FirebaseError) {
+             console.error("Firebase Login Error:", error.code, error.message);
+        } else {
+            console.error("An unexpected error occurred during login:", error);
+        }
+        // Re-throw the error to be caught by the UI component
+        throw error;
+    }
   }
 
   const logout = async () => {

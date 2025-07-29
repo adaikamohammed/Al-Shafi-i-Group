@@ -30,10 +30,25 @@ export default function LoginPage() {
       await signInWithEmail(loginEmail, loginPassword);
       router.push('/');
     } catch (error: any) {
-      console.error(error);
+      console.error("Login Error Code:", error.code);
+      let description = "فشل تسجيل الدخول. يرجى التأكد من صحة البريد الإلكتروني وكلمة المرور.";
+      switch (error.code) {
+        case 'auth/user-not-found':
+        case 'auth/invalid-credential':
+          description = "البريد الإلكتروني أو كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى أو إنشاء حساب جديد.";
+          break;
+        case 'auth/wrong-password':
+          description = "كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.";
+          break;
+        case 'auth/invalid-email':
+            description = "صيغة البريد الإلكتروني غير صالحة.";
+            break;
+        default:
+          description = `حدث خطأ غير متوقع: ${error.message}`;
+      }
       toast({
         title: "خطأ في تسجيل الدخول",
-        description: "فشل تسجيل الدخول. يرجى التأكد من صحة البريد الإلكتروني وكلمة المرور، أو قم بإنشاء حساب جديد إذا لم يكن لديك واحد.",
+        description: description,
         variant: 'destructive',
       });
     } finally {
@@ -56,7 +71,7 @@ export default function LoginPage() {
       await signUpWithEmail(signupEmail, signupPassword, signupName);
       router.push('/');
     } catch (error: any) {
-        console.error(error);
+        console.error("Signup Error:", error.code, error.message);
         toast({
             title: "خطأ في إنشاء الحساب",
             description: error.code === 'auth/email-already-in-use' ? "هذا البريد الإلكتروني مستخدم بالفعل." : "حدث خطأ غير متوقع.",
