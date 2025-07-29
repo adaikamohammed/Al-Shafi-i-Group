@@ -96,4 +96,9 @@ export interface StudentStat extends Partial<SessionRecord> {
   date: string;
   sessionType: string;
 }
-    
+
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}

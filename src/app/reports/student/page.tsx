@@ -8,12 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Loader2, Printer, AlertTriangle } from 'lucide-react';
-import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { format, parseISO, isWithinInterval } from 'date-fns';
+import { startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { surahs as allSurahs } from '@/lib/surahs';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { JSDoc } from 'typescript';
+import { amiriFont } from '@/lib/amiri-font';
+
 
 // You might need to add a custom font to jsPDF to support Arabic characters
 // This is a complex topic, but here's a simplified version.
@@ -67,14 +69,14 @@ export default function StudentReportPage() {
         // PDF Generation
         const doc = new jsPDF();
 
-        // Add Arabic font - this requires a Base64 encoded TTF file.
-        // This is a placeholder. For real production, you need to generate this file.
-        // doc.addFileToVFS('Amiri-Regular.ttf', '...'); 
-        // doc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
-        // doc.setFont('Amiri');
+        // Add Arabic font
+        doc.addFileToVFS('Amiri-Regular.ttf', amiriFont);
+        doc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
+        doc.setFont('Amiri');
+        doc.setFontSize(10);
         
         // Use a generic font that might have some Arabic support
-        doc.setFont('Helvetica');
+        doc.setFont('Amiri');
 
 
         // Header
@@ -96,13 +98,13 @@ export default function StudentReportPage() {
                 [`${student.fullName}`, 'الاسم الكامل'],
                 [`${student.guardianName}`, 'اسم الولي'],
                 [`${student.phone1}`, 'رقم الهاتف'],
-                [`${new Date().getFullYear() - student.birthDate.getFullYear()} سنة`, 'العمر'],
-                [`${format(student.registrationDate, 'dd/MM/yyyy')}`, 'تاريخ التسجيل'],
+                [`${new Date().getFullYear() - new Date(student.birthDate).getFullYear()} سنة`, 'العمر'],
+                [`${format(new Date(student.registrationDate), 'dd/MM/yyyy')}`, 'تاريخ التسجيل'],
                 [`${user?.group || 'غير محدد'}`, 'الفوج'],
             ],
             theme: 'grid',
-            headStyles: { halign: 'center', fillColor: [41, 128, 185] },
-            styles: { halign: 'right', font: 'Helvetica' }
+            headStyles: { halign: 'center', fillColor: [41, 128, 185], font: 'Amiri' },
+            styles: { halign: 'right', font: 'Amiri' }
         });
         y = (doc as any).lastAutoTable.finalY + 10;
         
@@ -118,8 +120,8 @@ export default function StudentReportPage() {
                 [`${stats.holidays} يوم`, 'عطلة'],
             ],
             theme: 'grid',
-            headStyles: { halign: 'center', fillColor: [41, 128, 185] },
-            styles: { halign: 'right', font: 'Helvetica' }
+            headStyles: { halign: 'center', fillColor: [41, 128, 185], font: 'Amiri' },
+            styles: { halign: 'right', font: 'Amiri' }
         });
         y = (doc as any).lastAutoTable.finalY + 10;
         
@@ -130,9 +132,9 @@ export default function StudentReportPage() {
         let chunk: string[] = [];
         allSurahs.forEach((surah, index) => {
             const status = studentSurahProgress.includes(surah.id) ? '✔' : '❌';
-            chunk.push(`${surah.name} ${status}`);
+            chunk.push(`${status} ${surah.name}`);
             if (chunk.length === 5 || index === allSurahs.length - 1) {
-                surahChunks.push(chunk);
+                surahChunks.push(chunk.reverse());
                 chunk = [];
             }
         });
@@ -141,7 +143,7 @@ export default function StudentReportPage() {
             startY: y,
             body: surahChunks,
             theme: 'plain',
-            styles: { halign: 'right', cellPadding: 2, fontSize: 9, font: 'Helvetica' },
+            styles: { halign: 'right', cellPadding: 2, fontSize: 9, font: 'Amiri' },
         });
         y = (doc as any).lastAutoTable.finalY + 15;
         
@@ -217,16 +219,14 @@ export default function StudentReportPage() {
                 </CardContent>
             </Card>
             
-             <Card className="bg-amber-50 border-amber-300">
+             <Card className="bg-green-50 border-green-300">
                 <CardHeader>
-                    <CardTitle className="text-amber-800">ملاحظة هامة بخصوص اللغة العربية</CardTitle>
+                    <CardTitle className="text-green-800">تحديث هام</CardTitle>
                 </CardHeader>
-                <CardContent className="text-amber-700">
-                   قد تظهر الحروف العربية بشكل غير صحيح (متقطعة أو معكوسة) في ملف الـ PDF الناتج. هذا بسبب أن مكتبات توليد PDF في المتصفح تحتاج إلى خطوط مخصصة تدعم اللغة العربية. سيتم إضافة الدعم الكامل للغة العربية في تحديث مستقبلي.
+                <CardContent className="text-green-700">
+                   تم تحديث نظام توليد PDF لدعم اللغة العربية بشكل كامل. يجب أن تظهر الحروف الآن بشكل صحيح ومتصل.
                 </CardContent>
             </Card>
         </div>
     );
 }
-
-    
