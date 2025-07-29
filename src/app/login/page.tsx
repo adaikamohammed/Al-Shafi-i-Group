@@ -33,7 +33,7 @@ export default function LoginPage() {
       console.error(error);
       toast({
         title: "خطأ في تسجيل الدخول",
-        description: "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+        description: "فشل تسجيل الدخول. يرجى التأكد من صحة البريد الإلكتروني وكلمة المرور، أو قم بإنشاء حساب جديد إذا لم يكن لديك واحد.",
         variant: 'destructive',
       });
     } finally {
