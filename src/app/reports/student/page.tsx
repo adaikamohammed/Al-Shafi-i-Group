@@ -13,6 +13,7 @@ import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endO
 import { ar } from 'date-fns/locale';
 import { surahs as allSurahs } from '@/lib/surahs';
 import { Badge } from '@/components/ui/badge';
+import html2pdf from 'html2pdf.js';
 
 
 const calculateAge = (birthDate?: Date) => {
@@ -64,30 +65,36 @@ export default function StudentReportPage() {
         
         const sessionDates = new Set(filteredSessions.map(s => s.date));
         
-        // Count holidays first from actual session days
         filteredSessions.forEach(session => {
              if (session.sessionType === 'يوم عطلة') {
                 stats.holidays++;
              }
         });
 
-        filteredSessions.forEach(session => {
-            if (session.sessionType === 'يوم عطلة') return;
+        for (let i = 1; i <= stats.totalMonthDays; i++) {
+            const currentDate = new Date(selectedYear, selectedMonth, i);
+            const dateString = format(currentDate, 'yyyy-MM-dd');
+            const session = dailySessions[dateString];
 
-            const record = session.records.find(r => r.studentId === selectedStudentId);
-            if (record && record.attendance) {
-                switch(record.attendance) {
-                    case 'حاضر': stats.present++; break;
-                    case 'متأخر': stats.late++; break;
-                    case 'تعويض': stats.makeup++; break;
-                    case 'غائب': stats.absent++; break;
+            if (session) {
+                if (session.sessionType !== 'يوم عطلة') {
+                    const record = session.records.find(r => r.studentId === selectedStudentId);
+                     if (record) {
+                        switch(record.attendance) {
+                            case 'حاضر': stats.present++; break;
+                            case 'متأخر': stats.late++; break;
+                            case 'تعويض': stats.makeup++; break;
+                            case 'غائب': stats.absent++; break;
+                        }
+                    } else {
+                        stats.absent++;
+                    }
                 }
-            } else if (!record) {
-                // If a session exists for the day but the student is not in it, they are absent.
-                 stats.absent++;
+            } else {
+                 // If there's no session for a day (and it's not a holiday, though holidays are sessions), it's absence.
+                 // This logic might need refinement depending on school's policy for non-session days.
             }
-        });
-        
+        }
         
         const studentSurahs = surahProgress[selectedStudentId] || [];
         const memorizedSurahObjects = allSurahs.filter(s => studentSurahs.includes(s.id));
@@ -102,7 +109,17 @@ export default function StudentReportPage() {
 
 
     const handlePrint = () => {
-        window.print();
+        const reportElement = document.getElementById('report-content');
+        if (reportElement && reportData) {
+            const opt = {
+                margin:       0.5,
+                filename:     `تقرير_${reportData.student.fullName}_${format(new Date(selectedYear, selectedMonth), 'MMMM-yyyy', { locale: ar })}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().from(reportElement).set(opt).save();
+        }
     };
 
     if (loading) {
@@ -121,7 +138,7 @@ export default function StudentReportPage() {
 
     return (
         <div className="space-y-6">
-             <Card className="print:hidden">
+             <Card className="no-print">
                 <CardHeader>
                     <CardTitle>إنشاء تقرير طالب شهري</CardTitle>
                     <CardDescription>اختر الطالب والشهر المطلوب ثم اضغط على زر الطباعة لإنشاء التقرير.</CardDescription>
@@ -158,7 +175,7 @@ export default function StudentReportPage() {
                 </CardContent>
             </Card>
             
-            <Card className="print:hidden">
+            <Card className="no-print">
                 <CardHeader><CardTitle>ملاحظات الشيخ للتقرير</CardTitle></CardHeader>
                 <CardContent>
                     <Textarea 
@@ -172,12 +189,12 @@ export default function StudentReportPage() {
 
             <div id="report-container">
                 {reportData && (
-                    <div id="report-content" className="p-6 md:p-8 bg-white rounded-lg shadow-lg print:shadow-none space-y-6 border">
+                    <div id="report-content" className="p-6 md:p-8 bg-white rounded-lg shadow-lg print-container space-y-6 border font-body">
                         <header className="text-center border-b-2 pb-4 border-primary/50">
                             <h1 className="text-2xl font-headline font-bold text-primary">تقرير أداء الطالب الشهري</h1>
-                            <p className="text-muted-foreground font-semibold">المدرسة القرآنية للإمام الشافعي</p>
-                            {user?.group && <p className="text-muted-foreground">{`${user.group} — ${user.displayName}`}</p>}
-                            <p className="font-semibold mt-2">{format(new Date(selectedYear, selectedMonth), 'MMMM yyyy', { locale: ar })}</p>
+                            <p className="text-lg font-semibold text-gray-700">المدرسة القرآنية للإمام الشافعي</p>
+                            {user?.group && <p className="text-md text-gray-600">{`${user.group} — ${user.displayName}`}</p>}
+                            <p className="font-semibold mt-2 text-lg">{format(new Date(selectedYear, selectedMonth), 'MMMM yyyy', { locale: ar })}</p>
                         </header>
                         
                         <section>
@@ -200,24 +217,24 @@ export default function StudentReportPage() {
                             <Card className="bg-white shadow-none border">
                                 <CardHeader><CardTitle className="text-lg">📊 إحصائيات الشهر</CardTitle></CardHeader>
                                 <CardContent>
-                                    <table className="w-full text-sm text-center">
+                                    <table className="w-full text-sm text-center border-collapse border">
                                         <thead>
-                                            <tr className="border-b">
-                                                <th className="p-2">الحالة</th>
-                                                <th className="p-2">العدد</th>
+                                            <tr className="border-b bg-gray-50">
+                                                <th className="p-2 border">الحالة</th>
+                                                <th className="p-2 border">العدد</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr><td className="p-2 font-medium">حاضر</td><td>{reportData.stats.present}</td></tr>
-                                            <tr><td className="p-2 font-medium">غائب</td><td>{reportData.stats.absent}</td></tr>
-                                            <tr><td className="p-2 font-medium">متأخر</td><td>{reportData.stats.late}</td></tr>
-                                            <tr><td className="p-2 font-medium">تعويض</td><td>{reportData.stats.makeup}</td></tr>
-                                            <tr><td className="p-2 font-medium">عطلة</td><td>{reportData.stats.holidays}</td></tr>
+                                            <tr><td className="p-2 border font-medium">حاضر</td><td className="border">{reportData.stats.present}</td></tr>
+                                            <tr><td className="p-2 border font-medium">غائب</td><td className="border">{reportData.stats.absent}</td></tr>
+                                            <tr><td className="p-2 border font-medium">متأخر</td><td className="border">{reportData.stats.late}</td></tr>
+                                            <tr><td className="p-2 border font-medium">تعويض</td><td className="border">{reportData.stats.makeup}</td></tr>
+                                            <tr><td className="p-2 border font-medium">عطلة</td><td className="border">{reportData.stats.holidays}</td></tr>
                                         </tbody>
                                         <tfoot>
                                             <tr className="border-t font-bold bg-muted/50">
-                                                <td className="p-2">المجموع</td>
-                                                <td>{reportData.stats.totalMonthDays} يوم</td>
+                                                <td className="p-2 border">المجموع</td>
+                                                <td className="border">{reportData.stats.totalMonthDays} يوم</td>
                                             </tr>
                                         </tfoot>
                                     </table>
@@ -234,7 +251,7 @@ export default function StudentReportPage() {
                                     {reportData.memorizedSurahs.length > 0 ? (
                                         <div className="flex flex-wrap gap-2 text-sm">
                                             {reportData.memorizedSurahs.map(surah => (
-                                                <Badge key={surah.id} variant="secondary" className="bg-green-100 text-green-800">
+                                                <Badge key={surah.id} variant="secondary" className="bg-green-100 text-green-800 font-medium">
                                                     {surah.name}
                                                 </Badge>
                                             ))}
@@ -247,7 +264,7 @@ export default function StudentReportPage() {
                         </section>
                         
                         {teacherNote && (
-                            <section className="print:block">
+                            <section>
                                 <Card className="bg-white shadow-none border">
                                     <CardHeader><CardTitle className="text-lg">🖊️ ملاحظات الشيخ</CardTitle></CardHeader>
                                     <CardContent>
@@ -257,7 +274,7 @@ export default function StudentReportPage() {
                             </section>
                         )}
 
-                        <footer className="pt-12 text-center text-xs text-muted-foreground print:pt-24">
+                        <footer className="pt-12 text-center text-xs text-muted-foreground">
                             <div className="flex justify-between items-end">
                                 <div className="w-1/3"><p>.........................</p><p className="font-semibold">توقيع الشيخ</p></div>
                                 <div className="w-1/3"><p>.........................</p><p className="font-semibold">توقيع ولي الأمر</p></div>
@@ -270,9 +287,18 @@ export default function StudentReportPage() {
             </div>
 
             <style jsx global>{`
+                @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+                
+                .print-container {
+                    font-family: 'Cairo', sans-serif !important;
+                }
+
                 @media print {
                     body > *:not(#report-container) {
                         display: none;
+                    }
+                    .no-print {
+                        display: none !important;
                     }
                     #report-container, #report-content {
                         display: block;
@@ -287,6 +313,7 @@ export default function StudentReportPage() {
                         left: 0;
                         top: 0;
                         right: 0;
+                        width: 100%;
                     }
                 }
                 @page {
