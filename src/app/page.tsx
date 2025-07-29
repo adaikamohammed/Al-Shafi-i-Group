@@ -79,9 +79,16 @@ export default function StudentManagementPage() {
   };
 
   const filteredStudents = useMemo(() => {
-    return students.filter(student => 
-        student.fullName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const statusOrder: { [key in StudentStatus]: number } = {
+        "نشط": 1,
+        "غائب طويل": 2,
+        "مطرود": 3,
+        "محذوف": 4,
+    };
+
+    return students
+        .filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()))
+        .sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
   }, [students, searchTerm]);
 
   if (loading) {
@@ -446,3 +453,5 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
+    
