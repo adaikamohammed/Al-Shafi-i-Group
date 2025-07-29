@@ -44,18 +44,19 @@ export default function DataExchangePage() {
         if (dateInput.includes('/')) {
             const parts = dateInput.split('/');
             if (parts.length === 3) {
+                // Assuming DD/MM/YYYY as it's more common in the region
                 const day = parseInt(parts[0], 10);
                 const month = parseInt(parts[1], 10) - 1;
-                const year = parseInt(parts[2], 10);
-                 // Simple check for MM/DD vs DD/MM. If month > 12, it's likely DD/MM.
-                if (month > 11) {
-                     return new Date(year, parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
-                }
+                let year = parseInt(parts[2], 10);
+                if(year < 2000) year += 2000; // Handle YY format
                 return new Date(year, month, day);
             }
         }
         // Handle ISO date string
-        return parseISO(dateInput);
+        try {
+            const parsed = parseISO(dateInput);
+            if(!isNaN(parsed.getTime())) return parsed;
+        } catch(e) { /* ignore parse error */ }
     }
     if (typeof dateInput === 'number') {
          // Handle Excel serial date
@@ -74,10 +75,18 @@ export default function DataExchangePage() {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json<any>(worksheet);
+        
+        const headers: string[] = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
+        const requiredHeaders = ["الاسم الكامل", "تاريخ الميلاد", "تاريخ التسجيل"];
+        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+        if(missingHeaders.length > 0) {
+            throw new Error(`ملف غير متوافق. الأعمدة المطلوبة مفقودة: ${missingHeaders.join(', ')}. الرجاء استخدام النموذج الرسمي.`);
+        }
+
+        const json = XLSX.utils.sheet_to_json<any>(worksheet, { raw: false });
 
         const existingStudentNames = new Set(students.map(s => s.fullName.trim().toLowerCase()));
         const newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[] = [];
@@ -98,6 +107,11 @@ export default function DataExchangePage() {
            if (!birthDate || !registrationDate || isNaN(birthDate.getTime()) || isNaN(registrationDate.getTime())) {
              throw new Error(`التواريخ غير صالحة في الصف رقم ${index + 2} للطالب ${fullName}. تأكد من أنها بصيغة DD/MM/YYYY.`);
            }
+
+           const status = row['حالة الطالب'] || 'نشط';
+           if (!["نشط", "غائب طويل", "مطرود"].includes(status)) {
+             throw new Error(`حالة الطالب "${status}" في الصف ${index + 2} غير صالحة. يجب أن تكون واحدة من: نشط، غائب طويل، مطرود.`);
+           }
            
            const studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> = {
               fullName: fullName,
@@ -105,7 +119,7 @@ export default function DataExchangePage() {
               phone1: row['رقم الهاتف']?.toString() || 'N/A',
               birthDate: birthDate,
               registrationDate: registrationDate,
-              status: 'نشط',
+              status: status,
               dailyMemorizationAmount: 'صفحة',
               notes: row['ملاحظات'] || '',
            };
@@ -120,10 +134,16 @@ export default function DataExchangePage() {
               title: "نجاح ✅",
               description: `تم استيراد ${newStudents.length} طالبًا جديدًا. تم تخطي ${skippedCount} طالبًا لوجودهم مسبقًا.`,
             });
-        } else {
+        } else if (skippedCount > 0) {
              toast({
               title: "لم تتم إضافة طلاب جدد",
               description: `تم تخطي ${skippedCount} طالبًا لوجودهم مسبقًا في النظام.`,
+            });
+        } else {
+             toast({
+                title: "لم يتم العثور على طلاب",
+                description: "الملف فارغ أو لا يحتوي على بيانات طلبة جدد.",
+                variant: 'destructive',
             });
         }
 
@@ -336,13 +356,18 @@ export default function DataExchangePage() {
   }
 
   const handleDownloadStudentTemplate = () => {
-    const headers = ["الاسم الكامل", "اسم الولي", "رقم الهاتف", "تاريخ الميلاد", "تاريخ التسجيل", "ملاحظات"];
+    const headers = ["الاسم الكامل", "اسم الولي", "رقم الهاتف", "تاريخ الميلاد", "تاريخ التسجيل", "حالة الطالب", "ملاحظات"];
     const exampleRow = {
-      "الاسم الكامل": "عبدالله بن محمد", "اسم الولي": "محمد الأحمد", "رقم الهاتف": "0501234567",
-      "تاريخ الميلاد": "15/01/2012", "تاريخ التسجيل": "01/09/2023", "ملاحظات": "طالب مستجد"
+      "الاسم الكامل": "عبدالله بن محمد",
+      "اسم الولي": "محمد الأحمد",
+      "رقم الهاتف": "0501234567",
+      "تاريخ الميلاد": "15/01/2012",
+      "تاريخ التسجيل": "01/09/2023",
+      "حالة الطالب": "نشط",
+      "ملاحظات": "طالب مستجد"
     };
     const ws = XLSX.utils.json_to_sheet([exampleRow], { header: headers });
-    ws['!cols'] = [ { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 30 }];
+    ws['!cols'] = [ { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 30 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "نموذج الطلبة");
     XLSX.writeFile(wb, "نموذج_استيراد_الطلبة.xlsx");
@@ -444,7 +469,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              لن يتم إضافة طالب إذا كان اسمه الكامل موجودًا بالفعل في النظام.
+              لن يتم إضافة طالب إذا كان اسمه الكامل موجودًا بالفعل في النظام. استخدم النموذج الرسمي.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button className="flex-grow" onClick={() => fileInputRef.current?.click()} disabled={isImportingStudents}>
