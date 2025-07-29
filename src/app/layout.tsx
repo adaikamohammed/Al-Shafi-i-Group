@@ -6,7 +6,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck } from 'lucide-react';
+import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import React, { useEffect } from 'react';
 import { StudentProvider } from '@/context/StudentContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 const navItems = [
   { href: '/', label: 'إدارة الطلبة', icon: Users },
@@ -23,6 +22,7 @@ const navItems = [
   { href: '/stats', label: 'المتابعة الأسبوعية', icon: Calendar },
   { href: '/reports/monthly', label: 'الإحصائيات الشهرية', icon: BarChart3 },
   { href: '/reports/daily', label: 'التقرير اليومي', icon: Edit },
+  { href: '/reports/student', label: 'تقرير الطالب', icon: FileText },
   { href: '/ranking', label: 'ترتيب الطلبة', icon: Award },
   { href: '/surahs', label: 'متابعة الحفظ', icon: BookCheck },
   { href: '/points', label: 'نظام النقاط', icon: Gavel },
@@ -117,12 +117,6 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
                           {user?.group ? `إدارة ${user.group}` : 'مدرسة الإمام الشافعي'}
                         </h1>
                     </div>
-                     <Avatar>
-                        <AvatarImage src={user?.photoURL || 'https://storage.googleapis.com/project-os-prod/images/11182c16-5d3a-4573-9076-324d55b85a18.png'} alt={user?.displayName || ''} data-ai-hint="Quran book" />
-                        <AvatarFallback>
-                          <img src="https://storage.googleapis.com/project-os-prod/images/11182c16-5d3a-4573-9076-324d55b85a18.png" alt="Quran icon" className="w-8 h-8"/>
-                        </AvatarFallback>
-                     </Avatar>
                   </header>
                   <main className="flex-grow p-4">
                     {children}
