@@ -73,9 +73,6 @@ export default function StudentReportPage() {
         // doc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
         // doc.setFont('Amiri');
         
-        doc.setRTL(true);
-        doc.setFontSize(10);
-        
         // Use a generic font that might have some Arabic support
         doc.setFont('Helvetica');
 
@@ -105,7 +102,7 @@ export default function StudentReportPage() {
             ],
             theme: 'grid',
             headStyles: { halign: 'center', fillColor: [41, 128, 185] },
-            styles: { halign: 'right' }
+            styles: { halign: 'right', font: 'Helvetica' }
         });
         y = (doc as any).lastAutoTable.finalY + 10;
         
@@ -122,18 +119,18 @@ export default function StudentReportPage() {
             ],
             theme: 'grid',
             headStyles: { halign: 'center', fillColor: [41, 128, 185] },
-            styles: { halign: 'right' }
+            styles: { halign: 'right', font: 'Helvetica' }
         });
         y = (doc as any).lastAutoTable.finalY + 10;
         
         // Surah Progress
-        doc.text('السور المحفوظة', doc.internal.pageSize.getWidth() - 14, y);
+        doc.text('السور المحفوظة', doc.internal.pageSize.getWidth() - 14, y, { align: 'right' });
         y += 5;
         const surahChunks: string[][] = [];
         let chunk: string[] = [];
         allSurahs.forEach((surah, index) => {
             const status = studentSurahProgress.includes(surah.id) ? '✔' : '❌';
-            chunk.push(`${status} ${surah.name}`);
+            chunk.push(`${surah.name} ${status}`);
             if (chunk.length === 5 || index === allSurahs.length - 1) {
                 surahChunks.push(chunk);
                 chunk = [];
@@ -144,7 +141,7 @@ export default function StudentReportPage() {
             startY: y,
             body: surahChunks,
             theme: 'plain',
-            styles: { halign: 'right', cellPadding: 2, fontSize: 9 },
+            styles: { halign: 'right', cellPadding: 2, fontSize: 9, font: 'Helvetica' },
         });
         y = (doc as any).lastAutoTable.finalY + 15;
         
@@ -232,3 +229,4 @@ export default function StudentReportPage() {
     );
 }
 
+    
