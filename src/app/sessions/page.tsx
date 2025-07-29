@@ -9,7 +9,7 @@ import { useStudentContext } from '@/context/StudentContext';
 import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, DailySession } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, ArrowLeft, ArrowRight, Loader2, Download } from 'lucide-react';
+import { Info, ArrowLeft, ArrowRight, Loader2, Download, MoreVertical, Trash2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,8 @@ import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
 const sessionTypeDescriptions: { [key in SessionType]: string } = {
@@ -39,7 +41,7 @@ export default function DailySessionsPage() {
   const [isSessionDialogOpen, setSessionDialogOpen] = useState(false);
   const { toast } = useToast();
   
-  const { students, dailySessions, loading, getSessionForDate, addDailySession } = useStudentContext();
+  const { students, dailySessions, loading, getSessionForDate, addDailySession, deleteDailySession } = useStudentContext();
   const activeStudents = useMemo(() => 
     students.filter(s => s.status === "نشط"), 
   [students]);
@@ -56,6 +58,14 @@ export default function DailySessionsPage() {
 
   const handleYearChange = (offset: number) => {
       setCurrentDate(prev => offset > 0 ? addMonths(prev, 12) : subMonths(prev, 12));
+  }
+  
+  const handleDeleteDay = (e: React.MouseEvent, day: number) => {
+    e.stopPropagation();
+    const date = new Date(getYear(currentDate), getMonth(currentDate), day);
+    const formattedDate = format(date, 'yyyy-MM-dd');
+    deleteDailySession(formattedDate);
+    toast({ title: "✅ تم الحذف", description: `تم حذف بيانات يوم ${formattedDate} بنجاح.` });
   }
 
   const handleExportDay = (e: React.MouseEvent, day: number) => {
@@ -141,30 +151,48 @@ export default function DailySessionsPage() {
           key={day}
           onClick={() => handleDayClick(day)}
           className={cn(
-            "p-2 text-start border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col justify-between relative cursor-pointer",
+            "p-2 text-start border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col justify-between relative group cursor-pointer",
             dayStatusClass
           )}
         >
             <div className="flex justify-between w-full items-start">
                  <span className="font-bold">{day}</span>
                  {session && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-foreground/60 hover:text-foreground"
-                                onClick={(e) => handleExportDay(e, day)}
-                            >
-                                <Download className="h-4 w-4" />
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <DropdownMenu>
+                         <DropdownMenuTrigger asChild>
+                             <Button variant="ghost" size="icon" className="h-6 w-6 text-foreground/60 hover:text-foreground" onClick={(e) => e.stopPropagation()}>
+                                <MoreVertical className="h-4 w-4" />
                             </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                           <p>تحميل بيانات اليوم</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                         </DropdownMenuTrigger>
+                         <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
+                             <DropdownMenuItem onClick={(e) => handleExportDay(e, day)}>
+                                <Download className="ml-2 h-4 w-4" />
+                                <span>تحميل بيانات اليوم</span>
+                            </DropdownMenuItem>
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                        <Trash2 className="ml-2 h-4 w-4" />
+                                        <span>حذف بيانات اليوم</span>
+                                    </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                    <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        سيؤدي هذا إلى حذف جميع سجلات هذا اليوم نهائيًا. هذا الإجراء لا يمكن التراجع عنه.
+                                    </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                    <AlertDialogAction onClick={(e) => handleDeleteDay(e, day)}>نعم، قم بالحذف</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                         </DropdownMenuContent>
+                    </DropdownMenu>
+                    </div>
                  )}
             </div>
            <span className="text-xs text-muted-foreground self-end">{format(dayDate, 'EEEE', { locale: ar })}</span>
