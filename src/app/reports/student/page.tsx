@@ -65,34 +65,36 @@ export default function StudentReportPage() {
         
         const sessionDates = new Set(filteredSessions.map(s => s.date));
         
-        filteredSessions.forEach(session => {
-             if (session.sessionType === 'يوم عطلة') {
-                stats.holidays++;
-             }
-        });
-
-        for (let i = 1; i <= stats.totalMonthDays; i++) {
-            const currentDate = new Date(selectedYear, selectedMonth, i);
+         for (let day = 1; day <= stats.totalMonthDays; day++) {
+            const currentDate = new Date(selectedYear, selectedMonth, day);
             const dateString = format(currentDate, 'yyyy-MM-dd');
             const session = dailySessions[dateString];
 
             if (session) {
-                if (session.sessionType !== 'يوم عطلة') {
+                if (session.sessionType === 'يوم عطلة') {
+                    stats.holidays++;
+                } else {
                     const record = session.records.find(r => r.studentId === selectedStudentId);
-                     if (record) {
-                        switch(record.attendance) {
+                    if (record) {
+                        switch (record.attendance) {
                             case 'حاضر': stats.present++; break;
                             case 'متأخر': stats.late++; break;
                             case 'تعويض': stats.makeup++; break;
                             case 'غائب': stats.absent++; break;
                         }
                     } else {
+                        // Student record not found in a non-holiday session, count as absent
                         stats.absent++;
                     }
                 }
             } else {
-                 // If there's no session for a day (and it's not a holiday, though holidays are sessions), it's absence.
-                 // This logic might need refinement depending on school's policy for non-session days.
+                // No session found for the day, can be treated as absent or ignored based on policy
+                // Assuming it's an absence if no session is logged on a weekday
+                 const dayOfWeek = currentDate.getDay();
+                 // Assuming weekend is Friday (5)
+                 if (dayOfWeek !== 5) {
+                    stats.absent++;
+                 }
             }
         }
         
@@ -111,9 +113,12 @@ export default function StudentReportPage() {
     const handlePrint = () => {
         const reportElement = document.getElementById('report-content');
         if (reportElement && reportData) {
+            const studentName = reportData.student.fullName.replace(/\s/g, '_');
+            const monthName = format(new Date(selectedYear, selectedMonth), 'MMMM', { locale: ar });
+
             const opt = {
                 margin:       0.5,
-                filename:     `تقرير_${reportData.student.fullName}_${format(new Date(selectedYear, selectedMonth), 'MMMM-yyyy', { locale: ar })}.pdf`,
+                filename:     `تقرير_${studentName}_${monthName}_${selectedYear}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true },
                 jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
@@ -289,7 +294,7 @@ export default function StudentReportPage() {
             <style jsx global>{`
                 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
                 
-                .print-container {
+                .print-container, .print-container * {
                     font-family: 'Cairo', sans-serif !important;
                 }
 
@@ -300,12 +305,9 @@ export default function StudentReportPage() {
                     .no-print {
                         display: none !important;
                     }
-                    #report-container, #report-content {
-                        display: block;
-                        margin: 0;
+                    #report-container {
                         padding: 0;
-                        border: none;
-                        box-shadow: none;
+                        margin: 0;
                     }
                      #report-content {
                         visibility: visible;
@@ -314,6 +316,9 @@ export default function StudentReportPage() {
                         top: 0;
                         right: 0;
                         width: 100%;
+                        border: none;
+                        box-shadow: none;
+                        page-break-inside: avoid;
                     }
                 }
                 @page {
