@@ -12,6 +12,8 @@ import { Loader2, AlertTriangle, Printer } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { surahs as allSurahs } from '@/lib/surahs';
+import { Badge } from '@/components/ui/badge';
+
 
 const calculateAge = (birthDate?: Date) => {
   if (!birthDate) return 'N/A';
@@ -58,23 +60,23 @@ export default function StudentReportPage() {
         };
 
         filteredSessions.forEach(session => {
+            if (session.sessionType === 'يوم عطلة') return;
             const record = session.records.find(r => r.studentId === selectedStudentId);
-            if (record) {
-                if (record.attendance === 'حاضر') stats.present++;
-                if (record.attendance === 'غائب') stats.absent++;
-                if (record.attendance === 'متأخر') stats.late++;
-                if (record.attendance === 'تعويض') stats.makeup++;
+            if (record?.attendance) {
+                stats[record.attendance.toLowerCase() as keyof typeof stats]++;
+            } else if (!record) {
+                // If student has no record on a non-holiday, consider them absent
+                stats.absent++;
             }
         });
         
         const studentSurahs = surahProgress[selectedStudentId] || [];
-        const progressPercent = (studentSurahs.length / allSurahs.length) * 100;
+        const memorizedSurahObjects = allSurahs.filter(s => studentSurahs.includes(s.id));
 
         return {
             student,
             stats,
-            studentSurahs,
-            progressPercent,
+            memorizedSurahs: memorizedSurahObjects,
         };
 
     }, [selectedStudentId, selectedMonth, selectedYear, students, dailySessions, surahProgress]);
@@ -136,105 +138,111 @@ export default function StudentReportPage() {
                     </Button>
                 </CardContent>
             </Card>
+            
+            <Card className="print:hidden">
+                <CardHeader><CardTitle>ملاحظات الشيخ للتقرير</CardTitle></CardHeader>
+                <CardContent>
+                    <Textarea 
+                        placeholder="أضف ملاحظاتك هنا لتظهر في التقرير المطبوع..."
+                        value={teacherNote}
+                        onChange={e => setTeacherNote(e.target.value)}
+                        rows={4}
+                    />
+                </CardContent>
+            </Card>
+
 
             {reportData && (
-                <div id="report-content" className="p-8 bg-white rounded-lg shadow-lg print:shadow-none space-y-8">
-                     <header className="text-center border-b-2 pb-4 border-primary">
-                        <h1 className="text-3xl font-headline font-bold text-primary">تقرير أداء الطالب الشهري</h1>
-                        <p className="text-muted-foreground">مدرسة الإمام الشافعي القرآنية</p>
+                <div id="report-content" className="p-6 md:p-8 bg-white rounded-lg shadow-lg print:shadow-none space-y-6 border">
+                     <header className="text-center border-b-2 pb-4 border-primary/50">
+                        <h1 className="text-2xl font-headline font-bold text-primary">تقرير أداء الطالب الشهري</h1>
+                        <p className="text-muted-foreground font-semibold">المدرسة القرآنية للإمام الشافعي</p>
+                        {user?.group && <p className="text-muted-foreground">{`${user.group} — ${user.displayName}`}</p>}
                         <p className="font-semibold mt-2">{format(new Date(selectedYear, selectedMonth), 'MMMM yyyy', { locale: ar })}</p>
                     </header>
                     
                     <section>
-                        <Card>
-                            <CardHeader><CardTitle>بيانات الطالب</CardTitle></CardHeader>
-                            <CardContent className="grid grid-cols-2 gap-x-8 gap-y-4">
-                                <div><span className="font-semibold">الاسم الكامل:</span> {reportData.student.fullName}</div>
-                                <div><span className="font-semibold">اسم الولي:</span> {reportData.student.guardianName}</div>
-                                <div><span className="font-semibold">رقم الهاتف:</span> {reportData.student.phone1}</div>
-                                <div><span className="font-semibold">العمر:</span> {calculateAge(reportData.student.birthDate)} سنة</div>
-                                <div><span className="font-semibold">تاريخ التسجيل:</span> {format(reportData.student.registrationDate, 'dd/MM/yyyy')}</div>
-                                 <div><span className="font-semibold">الفوج:</span> {user?.group || 'غير محدد'}</div>
-                            </CardContent>
-                        </Card>
-                    </section>
-
-                    <section>
-                         <Card>
-                             <CardHeader><CardTitle>إحصائيات الشهر</CardTitle></CardHeader>
-                            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="p-3 bg-green-100 rounded-md text-center">
-                                    <p className="font-bold text-2xl">{reportData.stats.present}</p>
-                                    <p className="text-sm text-green-800">حاضر</p>
-                                </div>
-                                <div className="p-3 bg-red-100 rounded-md text-center">
-                                    <p className="font-bold text-2xl">{reportData.stats.absent}</p>
-                                    <p className="text-sm text-red-800">غائب</p>
-                                </div>
-                                <div className="p-3 bg-yellow-100 rounded-md text-center">
-                                    <p className="font-bold text-2xl">{reportData.stats.late}</p>
-                                    <p className="text-sm text-yellow-800">متأخر</p>
-                                </div>
-                                 <div className="p-3 bg-blue-100 rounded-md text-center">
-                                    <p className="font-bold text-2xl">{reportData.stats.makeup}</p>
-                                    <p className="text-sm text-blue-800">تعويض</p>
+                        <Card className="bg-white shadow-none border">
+                            <CardHeader><CardTitle className="text-lg">📄 بيانات الطالب</CardTitle></CardHeader>
+                            <CardContent>
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                                    <div><span className="font-semibold">الاسم الكامل:</span> {reportData.student.fullName}</div>
+                                    <div><span className="font-semibold">اسم الولي:</span> {reportData.student.guardianName}</div>
+                                    <div><span className="font-semibold">العمر:</span> {calculateAge(reportData.student.birthDate)} سنة</div>
+                                    <div><span className="font-semibold">رقم الهاتف:</span> {reportData.student.phone1}</div>
+                                    <div><span className="font-semibold">تاريخ التسجيل:</span> {format(reportData.student.registrationDate, 'yyyy/MM/dd')}</div>
+                                     <div><span className="font-semibold">الفوج:</span> {user?.group || 'غير محدد'}</div>
                                 </div>
                             </CardContent>
                         </Card>
                     </section>
 
                     <section>
-                        <Card>
+                         <Card className="bg-white shadow-none border">
+                             <CardHeader><CardTitle className="text-lg">📊 إحصائيات الشهر</CardTitle></CardHeader>
+                            <CardContent>
+                                <table className="w-full text-sm text-center">
+                                    <thead>
+                                        <tr className="border-b">
+                                            <th className="p-2">الحالة</th>
+                                            <th className="p-2">العدد</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td className="p-2 font-medium">حاضر</td><td>{reportData.stats.present}</td></tr>
+                                        <tr><td className="p-2 font-medium">غائب</td><td>{reportData.stats.absent}</td></tr>
+                                        <tr><td className="p-2 font-medium">متأخر</td><td>{reportData.stats.late}</td></tr>
+                                        <tr><td className="p-2 font-medium">تعويض</td><td>{reportData.stats.makeup}</td></tr>
+                                        <tr><td className="p-2 font-medium">عطلة</td><td>{reportData.stats.holidays}</td></tr>
+                                    </tbody>
+                                    <tfoot>
+                                        <tr className="border-t font-bold bg-muted/50">
+                                            <td className="p-2">المجموع</td>
+                                            <td>{reportData.stats.totalMonthDays} يوم</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </CardContent>
+                        </Card>
+                    </section>
+
+                    <section>
+                        <Card className="bg-white shadow-none border">
                             <CardHeader>
-                                <CardTitle>متابعة حفظ السور ({reportData.studentSurahs.length} / 114)</CardTitle>
-                                <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                                    <div className="bg-primary h-2.5 rounded-full" style={{ width: `${reportData.progressPercent}%` }}></div>
-                                </div>
+                                <CardTitle className="text-lg">📚 متابعة حفظ السور ({reportData.memorizedSurahs.length} / 114)</CardTitle>
                             </CardHeader>
-                            <CardContent className="flex flex-wrap gap-2 text-sm">
-                                {allSurahs.map(surah => (
-                                    <span key={surah.id} className={`py-1 px-2 rounded-full ${reportData.studentSurahs.includes(surah.id) ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-700'}`}>
-                                        {surah.name}
-                                    </span>
-                                ))}
+                            <CardContent>
+                                {reportData.memorizedSurahs.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2 text-sm">
+                                        {reportData.memorizedSurahs.map(surah => (
+                                            <Badge key={surah.id} variant="secondary" className="bg-green-100 text-green-800">
+                                                {surah.name}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-muted-foreground text-center">لم يحفظ الطالب أي سورة بعد.</p>
+                                )}
                             </CardContent>
                         </Card>
                     </section>
                     
-                     <section className="print:hidden">
-                        <Card>
-                             <CardHeader><CardTitle>ملاحظات الشيخ</CardTitle></CardHeader>
-                            <CardContent>
-                                <Textarea 
-                                    placeholder="أضف ملاحظاتك هنا لتظهر في التقرير المطبوع..."
-                                    value={teacherNote}
-                                    onChange={e => setTeacherNote(e.target.value)}
-                                    rows={4}
-                                />
-                            </CardContent>
-                        </Card>
-                    </section>
                      <section className="hidden print:block">
                         {teacherNote && (
-                             <Card>
-                                <CardHeader><CardTitle>ملاحظات الشيخ</CardTitle></CardHeader>
+                             <Card className="bg-white shadow-none border">
+                                <CardHeader><CardTitle className="text-lg">🖊️ ملاحظات الشيخ</CardTitle></CardHeader>
                                 <CardContent>
-                                    <p className="whitespace-pre-wrap">{teacherNote}</p>
+                                    <p className="whitespace-pre-wrap text-sm">{teacherNote}</p>
                                 </CardContent>
                             </Card>
                         )}
                     </section>
 
-                    <footer className="pt-12 text-center text-sm text-muted-foreground">
-                        <div className="flex justify-around">
-                            <div>
-                                <p>.........................</p>
-                                <p>توقيع الشيخ</p>
-                            </div>
-                            <div>
-                                <p>.........................</p>
-                                <p>توقيع ولي الأمر</p>
-                            </div>
+                    <footer className="pt-12 text-center text-xs text-muted-foreground print:pt-24">
+                        <div className="flex justify-between items-end">
+                            <div className="w-1/3"><p>.........................</p><p className="font-semibold">توقيع الشيخ</p></div>
+                            <div className="w-1/3"><p>.........................</p><p className="font-semibold">توقيع ولي الأمر</p></div>
+                            <div className="w-1/3"><p>.........................</p><p className="font-semibold">توقيع الإدارة</p></div>
                         </div>
                          <p className="mt-8">هذا التقرير تم إنشاؤه بواسطة نظام إدارة مدرسة الإمام الشافعي بتاريخ {format(new Date(), 'dd/MM/yyyy')}</p>
                     </footer>
@@ -243,8 +251,18 @@ export default function StudentReportPage() {
             
             <style jsx global>{`
                 @media print {
-                    body * {
-                        visibility: hidden;
+                    body {
+                       -webkit-print-color-adjust: exact;
+                       print-color-adjust: exact;
+                    }
+                    .print\\:hidden {
+                        display: none;
+                    }
+                     .print\\:block {
+                        display: block;
+                    }
+                     body > div:not(#report-content) {
+                        display: none;
                     }
                     #report-content, #report-content * {
                         visibility: visible;
@@ -254,13 +272,15 @@ export default function StudentReportPage() {
                         left: 0;
                         top: 0;
                         right: 0;
+                        margin: 0;
+                        padding: 0;
+                        border: none;
+                        box-shadow: none;
                     }
-                    .print\\:hidden {
-                        display: none;
-                    }
-                     .print\\:block {
-                        display: block;
-                    }
+                }
+                @page {
+                    size: A4 portrait;
+                    margin: 1cm;
                 }
             `}</style>
         </div>
