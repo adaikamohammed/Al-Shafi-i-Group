@@ -70,7 +70,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
              </Avatar>
              <div>
                 <h1 className="font-headline text-lg font-bold text-primary">
-                    إدارة فوج - الإمام الشافعي
+                    {user?.displayName || 'إدارة فوج'}
                 </h1>
                 <p className="text-xs text-muted-foreground">{user?.email}</p>
              </div>
@@ -117,7 +117,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
                           </Button>
                         </SheetTrigger>
                         <h1 className="font-headline text-lg font-semibold text-primary">
-                          مدرسة الإمام الشافعي
+                          {user?.group ? `إدارة ${user.group}` : 'مدرسة الإمام الشافعي'}
                         </h1>
                     </div>
                      <Avatar>

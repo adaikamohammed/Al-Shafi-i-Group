@@ -1,10 +1,12 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
+import { useAuth } from '@/context/AuthContext';
 import { Loader2, Users, CalendarDays, BarChart, AlertTriangle, CheckCircle, XCircle, Clock, Replace, Plane } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, getDate, getDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -25,6 +27,7 @@ interface ChartData {
 
 export default function MonthlyStatisticsPage() {
     const { students, dailySessions, loading } = useStudentContext();
+    const { user } = useAuth();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -183,7 +186,10 @@ export default function MonthlyStatisticsPage() {
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <h1 className="text-3xl font-headline font-bold">لوحة الإحصائيات الشهرية</h1>
+                <div className="w-full">
+                    <h1 className="text-3xl font-headline font-bold">لوحة الإحصائيات الشهرية</h1>
+                    <p className="text-muted-foreground">{user?.group ? `نظرة عامة على ${user.group}` : ''}</p>
+                </div>
                  <div className="flex gap-2 w-full md:w-auto">
                     <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
                         <SelectTrigger className="w-full md:w-[200px]">
@@ -363,4 +369,3 @@ export default function MonthlyStatisticsPage() {
         </div>
     );
 }
-

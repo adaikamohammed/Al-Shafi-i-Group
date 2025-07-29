@@ -86,10 +86,10 @@ export interface Surah {
 // This is no longer tied to a firestore document
 export interface AppUser {
     uid: string;
-    name: string;
+    displayName: string | null;
     email: string | null;
     photoURL?: string | null;
-    role: 'شيخ' | 'إدارة';
+    group?: string;
 }
 
 export interface StudentStat extends Partial<SessionRecord> {

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -16,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import type { Student, StudentStatus, MemorizationAmount } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
+import { useAuth } from '@/context/AuthContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
@@ -43,6 +45,7 @@ const calculateAge = (birthDate?: Date) => {
 
 export default function StudentManagementPage() {
   const { students, updateStudent, deleteStudent, loading, deleteAllStudents } = useStudentContext();
+  const { user } = useAuth();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -155,7 +158,7 @@ export default function StudentManagementPage() {
       <Card>
         <CardHeader>
           <CardTitle>قائمة الطلبة ({filteredStudents.length})</CardTitle>
-          <CardDescription>فوج الشيخ أحمد بن عمر</CardDescription>
+          <CardDescription>{user?.group ? `طلبة ${user.group}` : 'فوج غير محدد'}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -443,5 +446,3 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
-
-    
