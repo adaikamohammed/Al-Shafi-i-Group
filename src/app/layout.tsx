@@ -65,12 +65,6 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     <>
       <SidebarHeader className="p-4">
          <div className="flex items-center gap-3">
-             <Avatar>
-                <AvatarImage src={user?.photoURL || 'https://storage.googleapis.com/project-os-prod/images/11182c16-5d3a-4573-9076-324d55b85a18.png'} alt={user?.displayName || ''} data-ai-hint="Quran book" />
-                <AvatarFallback>
-                  <img src="https://storage.googleapis.com/project-os-prod/images/11182c16-5d3a-4573-9076-324d55b85a18.png" alt="Quran icon" className="w-8 h-8"/>
-                </AvatarFallback>
-             </Avatar>
              <div>
                 <h1 className="font-headline text-lg font-bold text-primary">
                     {user?.group ? `إدارة ${user.group}` : 'إدارة فوج - الإمام الشافعي'}
