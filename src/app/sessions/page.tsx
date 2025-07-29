@@ -387,7 +387,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[120px]">الطالب</TableHead>
-                <TableHead className="w-[240px]">الحضور</TableHead>
+                <TableHead className="w-[240px]">الحضُور</TableHead>
                 {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
                 {!isActivitySession && <TableHead className="w-[120px]">المراجعة</TableHead>}
                 <TableHead className="w-[150px]">السلوك</TableHead>

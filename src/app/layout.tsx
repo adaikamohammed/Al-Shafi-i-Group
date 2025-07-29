@@ -129,7 +129,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
                     {children}
                   </main>
                 </div>
-                <SheetContent side="right" className="flex flex-col p-0">
+                <SheetContent side="right" className="flex flex-col p-0 bg-card">
                   {sidebarContent}
                 </SheetContent>
               </Sheet>
@@ -159,6 +159,7 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>مدير مدرسة الشافعي</title>
         <meta name="description" content="إدارة مدرسة الإمام الشافعي القرآنية" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
