@@ -15,7 +15,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import React, { useEffect } from 'react';
 import { StudentProvider } from '@/context/StudentContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 const navItems = [
   { href: '/', label: 'إدارة الطلبة', icon: Users },
@@ -66,7 +66,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
       <SidebarHeader className="p-4">
          <div className="flex items-center gap-3">
              <Avatar>
-                <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || ''} />
+                <AvatarImage src={user?.photoURL || 'https://placehold.co/40x40.png'} alt={user?.displayName || ''} data-ai-hint="Quran book" />
                 <AvatarFallback>{user?.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
              </Avatar>
              <div>
@@ -122,7 +122,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
                         </h1>
                     </div>
                      <Avatar>
-                        <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || ''} />
+                        <AvatarImage src={user?.photoURL || 'https://placehold.co/40x40.png'} alt={user?.displayName || ''} data-ai-hint="Quran book" />
                         <AvatarFallback>{user?.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
                      </Avatar>
                   </header>
