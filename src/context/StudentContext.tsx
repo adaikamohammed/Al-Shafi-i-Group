@@ -1,8 +1,9 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import type { Student, SessionRecord, DailySession, DailyReport } from '@/lib/types';
+import type { Student, SessionRecord, DailySession, DailyReport, SurahProgress } from '@/lib/types';
 import { isWithinInterval, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -32,6 +33,7 @@ interface StudentContextType {
   students: Student[];
   dailySessions: Record<string, DailySession>;
   dailyReports: Record<string, DailyReport>;
+  surahProgress: Record<string, number[]>;
   loading: boolean;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => void;
   updateStudent: (studentId: string, updatedData: Partial<Student>) => void;
@@ -42,6 +44,7 @@ interface StudentContextType {
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[]) => void;
   saveDailyReport: (report: DailyReport) => void;
+  toggleSurahStatus: (studentId: string, surahId: number) => void;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -51,6 +54,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
   const [dailyReports, setDailyReports] = useState<Record<string, DailyReport>>({});
+  const [surahProgress, setSurahProgress] = useState<Record<string, number[]>>({});
   const [loading, setLoading] = useState(true);
 
   // Load data from localStorage when user is authenticated
@@ -65,15 +69,18 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         }));
         const storedSessions = getLocalStorage(`dailySessions_${user.uid}`, {});
         const storedReports = getLocalStorage(`dailyReports_${user.uid}`, {});
+        const storedSurahProgress = getLocalStorage(`surahProgress_${user.uid}`, {});
         
         setStudents(storedStudents);
         setDailySessions(storedSessions);
         setDailyReports(storedReports);
+        setSurahProgress(storedSurahProgress);
       } else {
         // Clear data if user logs out
         setStudents([]);
         setDailySessions({});
         setDailyReports({});
+        setSurahProgress({});
       }
       setLoading(false);
     }
@@ -99,6 +106,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setLocalStorage(`dailyReports_${user.uid}`, dailyReports);
     }
   }, [dailyReports, user, loading]);
+  
+    // Save surah progress to localStorage whenever it changes
+  useEffect(() => {
+    if (user && !loading) {
+        setLocalStorage(`surahProgress_${user.uid}`, surahProgress);
+    }
+  }, [surahProgress, user, loading]);
 
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => {
@@ -171,9 +185,24 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         [report.date]: report
     }));
   }
+  
+  const toggleSurahStatus = (studentId: string, surahId: number) => {
+    setSurahProgress(prev => {
+        const studentProgress = prev[studentId] ? [...prev[studentId]] : [];
+        const surahIndex = studentProgress.indexOf(surahId);
+        if (surahIndex > -1) {
+            // Surah is already saved, remove it (un-save)
+            studentProgress.splice(surahIndex, 1);
+        } else {
+            // Surah is not saved, add it
+            studentProgress.push(surahId);
+        }
+        return { ...prev, [studentId]: studentProgress };
+    });
+  }
 
   return (
-    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport }}>
+    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport, toggleSurahStatus }}>
       {children}
     </StudentContext.Provider>
   );
