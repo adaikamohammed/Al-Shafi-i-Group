@@ -6,7 +6,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck } from 'lucide-react';
+import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ const navItems = [
   { href: '/stats', label: 'المتابعة الأسبوعية', icon: Calendar },
   { href: '/reports/monthly', label: 'الإحصائيات الشهرية', icon: BarChart3 },
   { href: '/reports/daily', label: 'التقرير اليومي', icon: Edit },
+  { href: '/reports/student', label: 'تقرير الطالب', icon: FileText },
   { href: '/ranking', label: 'ترتيب الطلبة', icon: Award },
   { href: '/surahs', label: 'متابعة الحفظ', icon: BookCheck },
   { href: '/points', label: 'نظام النقاط', icon: Gavel },
@@ -67,11 +68,13 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
          <div className="flex items-center gap-3">
              <Avatar>
                 <AvatarImage src={user?.photoURL || 'https://placehold.co/40x40.png'} alt={user?.displayName || ''} data-ai-hint="Quran book" />
-                <AvatarFallback>{user?.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
+                <AvatarFallback>
+                  <img src="/icon-quran.png" alt="Quran icon" className="w-8 h-8"/>
+                </AvatarFallback>
              </Avatar>
              <div>
                 <h1 className="font-headline text-lg font-bold text-primary">
-                    {user?.group ? `إدارة ${user.group}` : 'إدارة فوج'}
+                    {user?.group ? `إدارة ${user.group}` : 'إدارة فوج - الإمام الشافعي'}
                 </h1>
                 <p className="text-xs text-muted-foreground">{user?.email}</p>
              </div>
@@ -83,7 +86,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
             <SidebarMenuItem key={item.href}>
                <SidebarMenuButton
                 asChild
-                isActive={pathname === item.href}
+                isActive={pathname.startsWith(item.href) && (item.href !== '/' || pathname === '/')}
                 tooltip={{ children: item.label, side: 'right', align: 'center' }}
               >
                 <Link href={item.href}>
@@ -123,7 +126,9 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
                     </div>
                      <Avatar>
                         <AvatarImage src={user?.photoURL || 'https://placehold.co/40x40.png'} alt={user?.displayName || ''} data-ai-hint="Quran book" />
-                        <AvatarFallback>{user?.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback>
+                          <img src="/icon-quran.png" alt="Quran icon" className="w-8 h-8"/>
+                        </AvatarFallback>
                      </Avatar>
                   </header>
                   <main className="flex-grow p-4">
