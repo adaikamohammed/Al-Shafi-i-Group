@@ -9,8 +9,10 @@ import { Progress } from '@/components/ui/progress';
 import { useStudentContext } from '@/context/StudentContext';
 import { surahs as allSurahs } from '@/lib/surahs';
 import { cn } from '@/lib/utils';
-import { Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
-import { Student } from '@/lib/types';
+import { Loader2, AlertTriangle, CheckCircle, Award } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+
 
 export default function SurahProgressPage() {
     const { students, surahProgress, toggleSurahStatus, loading } = useStudentContext();
@@ -31,13 +33,19 @@ export default function SurahProgressPage() {
         if (studentProgress.length === 0) return 0;
         return (studentProgress.length / allSurahs.length) * 100;
     }, [studentProgress]);
+    
+    const leaderboard = useMemo(() => {
+        return activeStudents.map(student => ({
+            ...student,
+            savedCount: surahProgress[student.id]?.length || 0
+        })).sort((a,b) => b.savedCount - a.savedCount);
+    }, [activeStudents, surahProgress]);
 
     const handleSurahClick = (surahId: number) => {
         if (!selectedStudentId) return;
         toggleSurahStatus(selectedStudentId, surahId);
     };
     
-    // Set default selected student
     React.useEffect(() => {
         if(activeStudents.length > 0 && !selectedStudentId) {
             setSelectedStudentId(activeStudents[0].id);
@@ -108,34 +116,85 @@ export default function SurahProgressPage() {
                     </CardContent>
                 </Card>
             )}
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>قائمة السور الكاملة</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                        {allSurahs.map(surah => {
-                            const isSaved = studentProgress.includes(surah.id);
-                            return (
-                                <Button
-                                    key={surah.id}
-                                    variant={isSaved ? "default" : "outline"}
-                                    onClick={() => handleSurahClick(surah.id)}
-                                    disabled={!selectedStudentId}
-                                    className="h-auto justify-between"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        {isSaved && <CheckCircle className="h-4 w-4" />}
-                                        <span>{surah.id}. {surah.name}</span>
-                                    </div>
-                                    <span className="text-xs text-muted-foreground">{surah.verses}</span>
-                                </Button>
-                            )
-                        })}
-                    </div>
-                </CardContent>
-            </Card>
+            
+            <div className="grid md:grid-cols-3 gap-6">
+                 <Card className="md:col-span-2">
+                    <CardHeader>
+                        <CardTitle>قائمة السور الكاملة</CardTitle>
+                         <CardDescription>انقر على اسم السورة لتغيير حالة حفظها للطالب المحدد.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                            {allSurahs.map(surah => {
+                                const isSaved = studentProgress.includes(surah.id);
+                                return (
+                                    <Button
+                                        key={surah.id}
+                                        variant={isSaved ? "default" : "outline"}
+                                        onClick={() => handleSurahClick(surah.id)}
+                                        disabled={!selectedStudentId}
+                                        className="h-auto justify-between"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {isSaved && <CheckCircle className="h-4 w-4" />}
+                                            <span>{surah.id}. {surah.name}</span>
+                                        </div>
+                                        <span className="text-xs text-muted-foreground">{surah.verses}</span>
+                                    </Button>
+                                )
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+                
+                <Card>
+                    <CardHeader>
+                        <CardTitle>🏆 لوحة شرف الحفظ</CardTitle>
+                        <CardDescription>ترتيب الطلبة حسب عدد السور المحفوظة.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>الترتيب</TableHead>
+                                    <TableHead>الطالب</TableHead>
+                                    <TableHead>السور</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                            {leaderboard.map((student, index) => (
+                                <TableRow key={student.id}>
+                                    <TableCell className="font-bold">{index + 1}</TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <span>{student.fullName}</span>
+                                            {student.savedCount === 114 && 
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger>
+                                                             <Award className="h-5 w-5 text-yellow-500" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>🎉 خاتم للقرآن الكريم</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            }
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-8">{student.savedCount}</span>
+                                            <Progress value={(student.savedCount / allSurahs.length) * 100} className="w-20"/>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </div>
 
         </div>
     );
