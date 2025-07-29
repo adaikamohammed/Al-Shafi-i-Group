@@ -14,7 +14,6 @@ import { ar } from 'date-fns/locale';
 import { surahs as allSurahs } from '@/lib/surahs';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { amiriFont } from '@/lib/amiri-font';
 
 
 // You might need to add a custom font to jsPDF to support Arabic characters
@@ -68,32 +67,26 @@ export default function StudentReportPage() {
 
         // PDF Generation
         const doc = new jsPDF();
-
-        // Add Arabic font
-        doc.addFileToVFS('Amiri-Regular.ttf', amiriFont);
-        doc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
-        doc.setFont('Amiri');
-        doc.setFontSize(10);
         
         // Use a generic font that might have some Arabic support
-        doc.setFont('Amiri');
+        doc.setFont('times', 'normal');
 
 
         // Header
         doc.setFontSize(18);
-        doc.text('المدرسة القرآنية للإمام الشافعي', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+        doc.text('المدرسة القرآنية للإمام الشافعي', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center', lang: 'ar' });
         doc.setFontSize(14);
-        doc.text('تقرير الطالب الشهري', doc.internal.pageSize.getWidth() / 2, 30, { align: 'center' });
+        doc.text('تقرير الطالب الشهري', doc.internal.pageSize.getWidth() / 2, 30, { align: 'center', lang: 'ar' });
         doc.setFontSize(12);
         const monthName = format(startDate, 'MMMM yyyy', {locale: ar});
-        doc.text(`شهر: ${monthName}`, doc.internal.pageSize.getWidth() / 2, 40, { align: 'center' });
+        doc.text(`شهر: ${monthName}`, doc.internal.pageSize.getWidth() / 2, 40, { align: 'center', lang: 'ar' });
         
         let y = 55;
 
         // Student Info
         (doc as any).autoTable({
             startY: y,
-            head: [['بيانات الطالب']],
+            head: [[{content: 'بيانات الطالب', styles: {halign: 'center', font: 'times'}}]],
             body: [
                 [`${student.fullName}`, 'الاسم الكامل'],
                 [`${student.guardianName}`, 'اسم الولي'],
@@ -101,27 +94,27 @@ export default function StudentReportPage() {
                 [`${new Date().getFullYear() - new Date(student.birthDate).getFullYear()} سنة`, 'العمر'],
                 [`${format(new Date(student.registrationDate), 'dd/MM/yyyy')}`, 'تاريخ التسجيل'],
                 [`${user?.group || 'غير محدد'}`, 'الفوج'],
-            ],
+            ].map(row => row.reverse()),
             theme: 'grid',
-            headStyles: { halign: 'center', fillColor: [41, 128, 185], font: 'Amiri' },
-            styles: { halign: 'right', font: 'Amiri' }
+            headStyles: { halign: 'center', fillColor: [41, 128, 185], font: 'times' },
+            styles: { halign: 'right', font: 'times' }
         });
         y = (doc as any).lastAutoTable.finalY + 10;
         
         // Attendance Stats
         (doc as any).autoTable({
             startY: y,
-            head: [['إحصائيات الشهر']],
+            head: [[{content: 'إحصائيات الشهر', styles: {halign: 'center', font: 'times'}}]],
             body: [
                 [`${stats.present} يوم`, 'حاضر'],
                 [`${stats.absent} يوم`, 'غائب'],
                 [`${stats.late} يوم`, 'متأخر'],
                 [`${stats.makeup} حصص`, 'تعويض'],
                 [`${stats.holidays} يوم`, 'عطلة'],
-            ],
+            ].map(row => row.reverse()),
             theme: 'grid',
-            headStyles: { halign: 'center', fillColor: [41, 128, 185], font: 'Amiri' },
-            styles: { halign: 'right', font: 'Amiri' }
+            headStyles: { halign: 'center', fillColor: [41, 128, 185], font: 'times' },
+            styles: { halign: 'right', font: 'times' }
         });
         y = (doc as any).lastAutoTable.finalY + 10;
         
@@ -143,7 +136,7 @@ export default function StudentReportPage() {
             startY: y,
             body: surahChunks,
             theme: 'plain',
-            styles: { halign: 'right', cellPadding: 2, fontSize: 9, font: 'Amiri' },
+            styles: { halign: 'right', cellPadding: 2, fontSize: 9, font: 'times' },
         });
         y = (doc as any).lastAutoTable.finalY + 15;
         
