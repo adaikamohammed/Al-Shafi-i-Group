@@ -186,19 +186,23 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }));
   }
   
-  const toggleSurahStatus = (studentId: string, surahId: number) => {
+ const toggleSurahStatus = (studentId: string, surahId: number) => {
+    let newProgress: number[] = [];
+    
     setSurahProgress(prev => {
         const studentProgress = prev[studentId] ? [...prev[studentId]] : [];
         const surahIndex = studentProgress.indexOf(surahId);
         if (surahIndex > -1) {
-            // Surah is already saved, remove it (un-save)
             studentProgress.splice(surahIndex, 1);
         } else {
-            // Surah is not saved, add it
             studentProgress.push(surahId);
         }
+        newProgress = studentProgress;
         return { ...prev, [studentId]: studentProgress };
     });
+    
+    // After updating progress, update the student's memorized surahs count
+    updateStudent(studentId, { memorizedSurahsCount: newProgress.length });
   }
 
   return (

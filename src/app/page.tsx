@@ -184,7 +184,7 @@ export default function StudentManagementPage() {
                     <TableCell>
                         <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">{student.memorizedSurahsCount}</TableCell>
+                    <TableCell className="hidden md:table-cell">{student.memorizedSurahsCount || 0}</TableCell>
                     <TableCell>
                         <StudentActions student={student} onStatusChange={handleStatusChange} />
                     </TableCell>
