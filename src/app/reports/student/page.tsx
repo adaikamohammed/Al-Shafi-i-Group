@@ -122,4 +122,147 @@ export default function StudentReportPage() {
                             ))}
                         </SelectContent>
                     </Select>
-                     <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelecte
+                     <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
+                        <SelectTrigger className="w-full md:w-[120px]"><SelectValue placeholder="السنة" /></SelectTrigger>
+                        <SelectContent>
+                             {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Button onClick={handlePrint} disabled={!selectedStudentId}>
+                        <Printer className="ml-2 h-4 w-4" />
+                        طباعة التقرير
+                    </Button>
+                </CardContent>
+            </Card>
+
+            {reportData && (
+                <div id="report-content" className="p-8 bg-white rounded-lg shadow-lg print:shadow-none space-y-8">
+                     <header className="text-center border-b-2 pb-4 border-primary">
+                        <h1 className="text-3xl font-headline font-bold text-primary">تقرير أداء الطالب الشهري</h1>
+                        <p className="text-muted-foreground">مدرسة الإمام الشافعي القرآنية</p>
+                        <p className="font-semibold mt-2">{format(new Date(selectedYear, selectedMonth), 'MMMM yyyy', { locale: ar })}</p>
+                    </header>
+                    
+                    <section>
+                        <Card>
+                            <CardHeader><CardTitle>بيانات الطالب</CardTitle></CardHeader>
+                            <CardContent className="grid grid-cols-2 gap-x-8 gap-y-4">
+                                <div><span className="font-semibold">الاسم الكامل:</span> {reportData.student.fullName}</div>
+                                <div><span className="font-semibold">اسم الولي:</span> {reportData.student.guardianName}</div>
+                                <div><span className="font-semibold">رقم الهاتف:</span> {reportData.student.phone1}</div>
+                                <div><span className="font-semibold">العمر:</span> {calculateAge(reportData.student.birthDate)} سنة</div>
+                                <div><span className="font-semibold">تاريخ التسجيل:</span> {format(reportData.student.registrationDate, 'dd/MM/yyyy')}</div>
+                                 <div><span className="font-semibold">الفوج:</span> {user?.group || 'غير محدد'}</div>
+                            </CardContent>
+                        </Card>
+                    </section>
+
+                    <section>
+                         <Card>
+                             <CardHeader><CardTitle>إحصائيات الشهر</CardTitle></CardHeader>
+                            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="p-3 bg-green-100 rounded-md text-center">
+                                    <p className="font-bold text-2xl">{reportData.stats.present}</p>
+                                    <p className="text-sm text-green-800">حاضر</p>
+                                </div>
+                                <div className="p-3 bg-red-100 rounded-md text-center">
+                                    <p className="font-bold text-2xl">{reportData.stats.absent}</p>
+                                    <p className="text-sm text-red-800">غائب</p>
+                                </div>
+                                <div className="p-3 bg-yellow-100 rounded-md text-center">
+                                    <p className="font-bold text-2xl">{reportData.stats.late}</p>
+                                    <p className="text-sm text-yellow-800">متأخر</p>
+                                </div>
+                                 <div className="p-3 bg-blue-100 rounded-md text-center">
+                                    <p className="font-bold text-2xl">{reportData.stats.makeup}</p>
+                                    <p className="text-sm text-blue-800">تعويض</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </section>
+
+                    <section>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>متابعة حفظ السور ({reportData.studentSurahs.length} / 114)</CardTitle>
+                                <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                                    <div className="bg-primary h-2.5 rounded-full" style={{ width: `${reportData.progressPercent}%` }}></div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="flex flex-wrap gap-2 text-sm">
+                                {allSurahs.map(surah => (
+                                    <span key={surah.id} className={`py-1 px-2 rounded-full ${reportData.studentSurahs.includes(surah.id) ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-700'}`}>
+                                        {surah.name}
+                                    </span>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    </section>
+                    
+                     <section className="print:hidden">
+                        <Card>
+                             <CardHeader><CardTitle>ملاحظات الشيخ</CardTitle></CardHeader>
+                            <CardContent>
+                                <Textarea 
+                                    placeholder="أضف ملاحظاتك هنا لتظهر في التقرير المطبوع..."
+                                    value={teacherNote}
+                                    onChange={e => setTeacherNote(e.target.value)}
+                                    rows={4}
+                                />
+                            </CardContent>
+                        </Card>
+                    </section>
+                     <section className="hidden print:block">
+                        {teacherNote && (
+                             <Card>
+                                <CardHeader><CardTitle>ملاحظات الشيخ</CardTitle></CardHeader>
+                                <CardContent>
+                                    <p className="whitespace-pre-wrap">{teacherNote}</p>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </section>
+
+                    <footer className="pt-12 text-center text-sm text-muted-foreground">
+                        <div className="flex justify-around">
+                            <div>
+                                <p>.........................</p>
+                                <p>توقيع الشيخ</p>
+                            </div>
+                            <div>
+                                <p>.........................</p>
+                                <p>توقيع ولي الأمر</p>
+                            </div>
+                        </div>
+                         <p className="mt-8">هذا التقرير تم إنشاؤه بواسطة نظام إدارة مدرسة الإمام الشافعي بتاريخ {format(new Date(), 'dd/MM/yyyy')}</p>
+                    </footer>
+                </div>
+            )}
+            
+            <style jsx global>{`
+                @media print {
+                    body * {
+                        visibility: hidden;
+                    }
+                    #report-content, #report-content * {
+                        visibility: visible;
+                    }
+                    #report-content {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        right: 0;
+                    }
+                    .print\\:hidden {
+                        display: none;
+                    }
+                     .print\\:block {
+                        display: block;
+                    }
+                }
+            `}</style>
+        </div>
+    );
+}
