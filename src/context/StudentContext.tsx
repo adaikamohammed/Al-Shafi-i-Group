@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import type { Student, SessionRecord, DailySession, DailyReport } from '@/lib/types';
+import type { Student, DailySession, DailyReport } from '@/lib/types';
 import { isWithinInterval, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -40,14 +40,24 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // onAuthStateChanged is the key to ensure we have the user object before fetching data.
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setLoading(true);
+
       if (currentUser) {
-        const dbRef = ref(db, currentUser.email === 'admin@gmail.com' ? 'users' : `users/${currentUser.uid}`);
-        
+        let dbRef;
+        // Determine the database path based on user role
+        if (currentUser.email === 'admin@gmail.com') {
+          dbRef = ref(db, 'users');
+        } else {
+          dbRef = ref(db, `users/${currentUser.uid}`);
+        }
+
         onValue(dbRef, (snapshot) => {
           const data = snapshot.val();
           
           if (currentUser.email === 'admin@gmail.com') {
+            // Admin user logic: aggregate data from all users
             let allStudents: Student[] = [];
             let allSessions: Record<string, DailySession> = {};
             let allReports: Record<string, DailyReport> = {};
@@ -56,9 +66,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             if (data) {
                 Object.entries(data).forEach(([uid, userData]: [string, any]) => {
                     if (userData.students) {
-                        const userStudents = Object.values(userData.students).map((s: any) => ({
+                        const userStudents: Student[] = Object.values(userData.students).map((s: any) => ({
                             ...s,
-                            ownerId: uid,
+                            ownerId: uid, // IMPORTANT: Store the owner's UID
                             birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
                             registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
                             updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
@@ -75,6 +85,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             setDailyReports(allReports);
             setSurahProgress(allSurahProgress);
           } else {
+             // Regular user logic: get data from their own node
              const storedStudents = data?.students ? Object.values(data.students).map((s: any) => ({
                 ...s,
                 ownerId: currentUser.uid,
@@ -93,8 +104,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           setLoading(false);
         });
 
+        // The function to detach the listener will be the return value of onAuthStateChanged
         return () => off(dbRef);
       } else {
+        // No user is logged in
         setStudents([]);
         setDailySessions({});
         setDailyReports({});
@@ -103,8 +116,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
+    // Cleanup the subscription on component unmount
     return () => unsubscribe();
-  }, []);
+  }, []); // The empty dependency array ensures this effect runs only once
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
     if (!user) return;
@@ -151,48 +165,55 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const deleteAllStudents = () => {
-      if (!user) return;
+      if (!user || user.email === 'admin@gmail.com') return; // Prevent admin from deleting all students of one user
       const studentsRef = ref(db, `users/${user.uid}/students`);
       remove(studentsRef);
   }
 
   const addDailySession = (session: DailySession) => {
     if (!user) return;
-    const ownerUid = user.email === 'admin@gmail.com' ? (students.find(s => s.id === session.records[0]?.studentId)?.ownerId || user.uid) : user.uid;
+
+    // Determine the correct owner UID
+    let ownerUid;
+    if (user.email === 'admin@gmail.com') {
+      // For admin, find the owner from the first student in the record
+      const firstStudentId = session.records[0]?.studentId;
+      if (firstStudentId) {
+          ownerUid = students.find(s => s.id === firstStudentId)?.ownerId;
+      }
+      // If no records (e.g., holiday) or student not found, we can't determine owner, so we bail.
+      if (!ownerUid) return;
+    } else {
+      // For regular users, it's their own UID
+      ownerUid = user.uid;
+    }
+    
     const sessionRef = ref(db, `users/${ownerUid}/dailySessions/${session.date}`);
     set(sessionRef, session);
   };
   
   const deleteDailySession = (date: string) => {
-    if (!user) return;
-    // For admin, this is tricky as we don't know which user's session it is without more context.
-    // This assumes the admin can only delete sessions they can see, which belong to some user.
-    // A robust implementation would need to find the session's owner.
-    // For now, we assume a non-admin user is deleting their own session.
     const sessionToDelete = dailySessions[date];
     if (!sessionToDelete) return;
 
-    let ownerUid = user.uid;
+    let ownerUid;
+    const firstStudentId = sessionToDelete.records[0]?.studentId;
 
-    if (user.email === 'admin@gmail.com') {
-      const firstStudentId = sessionToDelete.records[0]?.studentId;
-      if (firstStudentId) {
-        const studentOwner = students.find(s => s.id === firstStudentId)?.ownerId;
-        if (studentOwner) {
-          ownerUid = studentOwner;
-        } else {
-          // Cannot determine owner, bail.
-          return;
-        }
-      } else if (sessionToDelete.records.length === 0) {
-        // This is likely a holiday added by a specific user, can't reliably get owner for admin.
-        // For now, we prevent admin deletion of empty sessions.
-        return;
-      }
+    if (firstStudentId) {
+        ownerUid = students.find(s => s.id === firstStudentId)?.ownerId;
+    } else if (user) {
+        // This is likely a holiday added by the current user. Only they can delete it.
+        // Admin cannot delete holidays without a student context.
+        ownerUid = user.uid;
     }
-
-    const sessionRef = ref(db, `users/${ownerUid}/dailySessions/${date}`);
-    remove(sessionRef);
+    
+    if (!ownerUid) return; // Cannot determine owner.
+    
+    // Check if the current user has permission
+    if (user && (user.uid === ownerUid || user.email === 'admin@gmail.com')) {
+        const sessionRef = ref(db, `users/${ownerUid}/dailySessions/${date}`);
+        remove(sessionRef);
+    }
   }
 
   const getSessionForDate = (date: string): DailySession | undefined => {
@@ -200,8 +221,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const getRecordsForDateRange = (startDate: string, endDate: string): Record<string, DailySession> => {
-      const start = startOfMonth(parseISO(startDate));
-      const end = endOfMonth(parseISO(endDate));
+      const start = parseISO(startDate);
+      const end = parseISO(endDate);
       const filteredSessions: Record<string, DailySession> = {};
 
        Object.entries(dailySessions).forEach(([date, session]) => {
