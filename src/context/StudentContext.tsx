@@ -40,24 +40,23 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading) {
-      setLoading(true);
+    // We must wait for auth to be resolved and have a user.
+    if (authLoading || !user) {
+      // If auth is done and there's no user, stop loading and clear data.
+      if (!authLoading && !user) {
+        setStudents([]);
+        setDailySessions({});
+        setDailyReports({});
+        setSurahProgress({});
+        setLoading(false);
+      }
       return;
     }
 
-    if (!user) {
-      setStudents([]);
-      setDailySessions({});
-      setDailyReports({});
-      setSurahProgress({});
-      setLoading(false);
-      return;
-    }
-
-    const isUserAdmin = user.email === 'admin@gmail.com';
-    const dataRef: DatabaseReference = ref(db, isUserAdmin ? 'users' : `users/${user.uid}`);
-    
     setLoading(true);
+    const isUserAdmin = user.email === 'admin@gmail.com';
+    const dataRefPath = isUserAdmin ? 'users' : `users/${user.uid}`;
+    const dataRef: DatabaseReference = ref(db, dataRefPath);
 
     const handleValueChange = (snapshot: any) => {
       if (!snapshot.exists()) {
@@ -124,7 +123,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }, [user, authLoading]);
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
-    if (!user || (user.email === 'admin@gmail.com')) return; 
+    if (!user || user.email === 'admin@gmail.com') return; 
 
     const studentId = uuidv4();
     const newStudent: Student = {
@@ -144,7 +143,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
-     if (!user || (user.email === 'admin@gmail.com')) return;
+     if (!user || user.email === 'admin@gmail.com') return;
      newStudents.forEach(s => addStudent(s));
   }
 
@@ -180,19 +179,19 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const deleteAllStudents = () => {
-      if (!user || (user.email === 'admin@gmail.com')) return;
+      if (!user || user.email === 'admin@gmail.com') return;
       const studentsRef = ref(db, `users/${user.uid}/students`);
       remove(studentsRef);
   }
 
   const addDailySession = (session: DailySession) => {
-    if (!user || (user.email === 'admin@gmail.com')) return;
+    if (!user || user.email === 'admin@gmail.com') return;
     const sessionRef = ref(db, `users/${user.uid}/dailySessions/${session.date}`);
     set(sessionRef, session);
   };
   
   const deleteDailySession = (date: string) => {
-    if (!user || (user.email === 'admin@gmail.com')) return;
+    if (!user || user.email === 'admin@gmail.com') return;
     const sessionRef = ref(db, `users/${user.uid}/dailySessions/${date}`);
     remove(sessionRef);
   }
@@ -219,7 +218,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const saveDailyReport = (report: DailyReport) => {
-    if (!user || (user.email === 'admin@gmail.com')) return;
+    if (!user || user.email === 'admin@gmail.com') return;
     const reportRef = ref(db, `users/${user.uid}/dailyReports/${report.date}`);
     set(reportRef, report);
   }
@@ -258,4 +257,3 @@ export const useStudentContext = () => {
   }
   return context;
 };
-
