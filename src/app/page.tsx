@@ -51,9 +51,9 @@ export default function StudentManagementPage() {
 
   const handleStatusChange = (student: Student, status: StudentStatus, reason?: string) => {
     if (status === 'محذوف') {
-        deleteStudent(student.id);
+        deleteStudent(student.id, student.ownerId);
     } else {
-        updateStudent(student.id, { status, actionReason: reason });
+        updateStudent(student.id, { status, actionReason: reason }, student.ownerId);
     }
   };
   
@@ -347,7 +347,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 
     if (student) {
         // Update existing student
-        updateStudent(student.id, studentData);
+        updateStudent(student.id, studentData, student.ownerId);
     } else {
         // Add new student
         addStudent(studentData as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>);
@@ -371,14 +371,14 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
             <Input name="fullName" id="fullName" defaultValue={student?.fullName} required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="guardianName">اسم الولي</Label>
-            <Input name="guardianName" id="guardianName" defaultValue={student?.guardianName} required />
+            <Label htmlFor="guardianName">اسم الولي (اختياري)</Label>
+            <Input name="guardianName" id="guardianName" defaultValue={student?.guardianName} />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="phone1">رقم الهاتف 1</Label>
-            <Input name="phone1" id="phone1" type="tel" defaultValue={student?.phone1} required />
+            <Label htmlFor="phone1">رقم الهاتف 1 (اختياري)</Label>
+            <Input name="phone1" id="phone1" type="tel" defaultValue={student?.phone1} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone2">رقم الهاتف 2 (اختياري)</Label>
@@ -405,8 +405,8 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
                         onSelect={setBirthDate}
                         initialFocus
                         captionLayout="dropdown-buttons"
-                        fromYear={new Date().getFullYear() - 20}
-                        toYear={new Date().getFullYear() - 5}
+                        fromYear={1990}
+                        toYear={new Date().getFullYear()}
                     />
                     </PopoverContent>
                 </Popover>
@@ -455,10 +455,10 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
                         <SelectValue placeholder="اختر المقدار" />
                     </SelectTrigger>
                     <SelectContent>
+                        <SelectItem value="نصف صفحة">نصف صفحة</SelectItem>
+                        <SelectItem value="صفحة">صفحة</SelectItem>
                         <SelectItem value="ثمن">ثمن</SelectItem>
                         <SelectItem value="ربع">ربع</SelectItem>
-                        <SelectItem value="نصف">نصف</SelectItem>
-                        <SelectItem value="صفحة">صفحة</SelectItem>
                         <SelectItem value="أكثر">أكثر</SelectItem>
                     </SelectContent>
                 </Select>
