@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, AlertTriangle, Printer, FileDown, FileText as FileTextIcon, Image as ImageIcon } from 'lucide-react';
-import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth } from 'date-fns';
+import { Loader2, AlertTriangle, FileDown, FileText as FileTextIcon } from 'lucide-react';
+import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, startOfYear, endOfYear, setMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { surahs as allSurahs } from '@/lib/surahs';
 import { Badge } from '@/components/ui/badge';
@@ -27,7 +27,9 @@ export default function StudentReportPage() {
     const { user } = useAuth();
     
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+    const [reportPeriod, setReportPeriod] = useState<'month' | 'season' | 'year'>('month');
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+    const [selectedSeason, setSelectedSeason] = useState<number>(1);
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [teacherNote, setTeacherNote] = useState('');
 
@@ -44,70 +46,79 @@ export default function StudentReportPage() {
         
         const student = students.find(s => s.id === selectedStudentId);
         if (!student) return null;
-
-        const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
-        const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
         
+        let startDate: Date;
+        let endDate: Date;
+        let reportTitle = '';
+        let statsPeriod = '';
+
+        switch (reportPeriod) {
+            case 'season':
+                const seasonStartMonth = (selectedSeason - 1) * 3;
+                startDate = startOfMonth(setMonth(new Date(selectedYear, 0), seasonStartMonth));
+                endDate = endOfMonth(setMonth(new Date(selectedYear, 0), seasonStartMonth + 2));
+                reportTitle = 'الموسمي';
+                statsPeriod = `موسم ${selectedSeason} - ${selectedYear}`;
+                break;
+            case 'year':
+                startDate = startOfYear(new Date(selectedYear, 0));
+                endDate = endOfYear(new Date(selectedYear, 0));
+                reportTitle = 'السنوي';
+                statsPeriod = `سنة ${selectedYear}`;
+                break;
+            case 'month':
+            default:
+                startDate = startOfMonth(new Date(selectedYear, selectedMonth));
+                endDate = endOfMonth(new Date(selectedYear, selectedMonth));
+                reportTitle = 'الشهري';
+                statsPeriod = format(startDate, 'MMMM yyyy', { locale: ar });
+                break;
+        }
+
         const stats = {
-            present: 0,
-            absent: 0,
-            late: 0,
-            makeup: 0,
-            holidays: 0,
+            present: 0, absent: 0, late: 0, makeup: 0, holidays: 0,
         };
 
-        const totalDaysInMonth = getDaysInMonth(startDate);
+        const totalDaysInRange = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24) + 1;
         
-        for (let day = 1; day <= totalDaysInMonth; day++) {
-            const currentDate = new Date(selectedYear, selectedMonth, day);
-            const dateString = format(currentDate, 'yyyy-MM-dd');
-            const session = dailySessions[dateString];
+        const sessionsInRange = Object.values(dailySessions).filter(session => {
+            const sessionDate = parseISO(session.date);
+            return sessionDate >= startDate && sessionDate <= endDate;
+        });
 
-            if (session) {
-                if (session.sessionType === 'يوم عطلة') {
-                    stats.holidays++;
-                } else {
-                    const record = session.records.find(r => r.studentId === selectedStudentId);
-                    if (record) {
-                        switch (record.attendance) {
-                            case 'حاضر': stats.present++; break;
-                            case 'متأخر': stats.late++; break;
-                            case 'تعويض': stats.makeup++; break;
-                            case 'غائب': stats.absent++; break;
-                        }
-                    } else {
-                        // Student record not found in a non-holiday session, count as absent
-                         stats.absent++;
+        sessionsInRange.forEach(session => {
+            if (session.sessionType === 'يوم عطلة') {
+                stats.holidays++;
+            } else {
+                 const record = session.records.find(r => r.studentId === selectedStudentId);
+                 if (record) {
+                    switch (record.attendance) {
+                        case 'حاضر': stats.present++; break;
+                        case 'متأخر': stats.late++; break;
+                        case 'تعويض': stats.makeup++; break;
+                        case 'غائب': stats.absent++; break;
                     }
                 }
-            } else {
-                 const dayOfWeek = currentDate.getDay();
-                 // Assuming weekend is Friday (5)
-                 if (dayOfWeek !== 5) {
-                    // stats.absent++;
-                 }
             }
-        }
-        
+        });
+
         const studentSurahs = surahProgress[selectedStudentId] || [];
         const memorizedSurahObjects = allSurahs.filter(s => studentSurahs.includes(s.id));
 
         return {
             student,
-            stats: {
-                ...stats,
-                totalMonthDays: totalDaysInMonth
-            },
+            stats: { ...stats, totalPeriodDays: Math.round(totalDaysInRange) },
             memorizedSurahs: memorizedSurahObjects,
+            reportTitle,
+            statsPeriod
         };
 
-    }, [selectedStudentId, selectedMonth, selectedYear, students, dailySessions, surahProgress]);
+    }, [selectedStudentId, reportPeriod, selectedMonth, selectedSeason, selectedYear, students, dailySessions, surahProgress]);
     
     const getReportFilename = (extension: string) => {
         if (!reportData) return `report.${extension}`;
         const studentName = reportData.student.fullName.replace(/\s/g, '_');
-        const monthName = format(new Date(selectedYear, selectedMonth), 'MMMM', { locale: ar });
-        return `تقرير_${studentName}_${monthName}_${selectedYear}.${extension}`;
+        return `تقرير_${studentName}_${reportData.statsPeriod.replace(/\s/g, '_')}.${extension}`;
     }
 
     const handleDownloadAsPDF = async () => {
@@ -123,19 +134,6 @@ export default function StudentReportPage() {
                 pagebreak: { avoid: ['.avoid-break'] }
             };
             html2pdf().set(opt).from(reportElement).save();
-        }
-    };
-    
-    const handleDownloadAsImage = async () => {
-        const reportElement = document.getElementById('report-content');
-        if (reportElement) {
-            const html2canvas = (await import('html2canvas')).default;
-            html2canvas(reportElement, { scale: 2, useCORS: true }).then(canvas => {
-                const link = document.createElement("a");
-                link.download = getReportFilename('png');
-                link.href = canvas.toDataURL("image/png");
-                link.click();
-            });
         }
     };
 
@@ -178,8 +176,8 @@ export default function StudentReportPage() {
         <div className="space-y-6">
              <Card className="print:hidden">
                 <CardHeader>
-                    <CardTitle>إنشاء تقرير طالب شهري</CardTitle>
-                    <CardDescription>اختر الطالب والشهر المطلوب ثم قم بحفظ التقرير بالصيغة التي تفضلها.</CardDescription>
+                    <CardTitle>إنشاء تقرير أداء الطالب</CardTitle>
+                    <CardDescription>اختر الطالب والفترة الزمنية المطلوبة، ثم قم بحفظ التقرير بالصيغة التي تفضلها.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                      <div className="flex flex-col md:flex-row gap-2">
@@ -191,14 +189,38 @@ export default function StudentReportPage() {
                                 ))}
                             </SelectContent>
                         </Select>
-                         <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
-                            <SelectTrigger className="w-full md:w-[150px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
+                        
+                         <Select dir="rtl" value={reportPeriod} onValueChange={(value: 'month' | 'season' | 'year') => setReportPeriod(value)}>
+                            <SelectTrigger className="w-full md:w-[150px]"><SelectValue placeholder="نوع التقرير" /></SelectTrigger>
                             <SelectContent>
-                                {Array.from({length: 12}, (_, i) => (
-                                    <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
-                                ))}
+                                <SelectItem value="month">تقرير شهري</SelectItem>
+                                <SelectItem value="season">تقرير موسمي</SelectItem>
+                                <SelectItem value="year">تقرير سنوي</SelectItem>
                             </SelectContent>
                         </Select>
+
+                        {reportPeriod === 'month' && (
+                           <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
+                                <SelectTrigger className="w-full md:w-[150px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
+                                <SelectContent>
+                                    {Array.from({length: 12}, (_, i) => (
+                                        <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                        {reportPeriod === 'season' && (
+                             <Select dir="rtl" value={selectedSeason.toString()} onValueChange={(val) => setSelectedSeason(parseInt(val))}>
+                                <SelectTrigger className="w-full md:w-[220px]"><SelectValue placeholder="الموسم" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="1">الموسم 1 (جانفي - مارس)</SelectItem>
+                                    <SelectItem value="2">الموسم 2 (أفريل - جوان)</SelectItem>
+                                    <SelectItem value="3">الموسم 3 (جويلية - سبتمبر)</SelectItem>
+                                    <SelectItem value="4">الموسم 4 (أكتوبر - ديسمبر)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
+
                          <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
                             <SelectTrigger className="w-full md:w-[120px]"><SelectValue placeholder="السنة" /></SelectTrigger>
                             <SelectContent>
@@ -212,10 +234,6 @@ export default function StudentReportPage() {
                         <Button onClick={handleDownloadAsPDF} disabled={!selectedStudentId} variant="destructive">
                             <FileDown className="ml-2 h-4 w-4" />
                             حفظ كـ PDF
-                        </Button>
-                        <Button onClick={handleDownloadAsImage} disabled={!selectedStudentId} variant="secondary">
-                            <ImageIcon className="ml-2 h-4 w-4" />
-                            حفظ كصورة (PNG)
                         </Button>
                         <Button onClick={handleDownloadAsWord} disabled={!selectedStudentId}>
                             <FileTextIcon className="ml-2 h-4 w-4" />
@@ -237,15 +255,14 @@ export default function StudentReportPage() {
                 </CardContent>
             </Card>
 
-            {/* This container is for display on screen, not for printing */}
             {reportData && (
                 <Card id="report-display" className="p-6 md:p-8 bg-white text-black rounded-lg shadow-lg font-body">
                    <div id="report-content" className="space-y-6">
                         <header className="text-center border-b-2 pb-4 border-gray-300">
-                            <h1 className="text-2xl font-headline font-bold text-gray-800">تقرير أداء الطالب الشهري</h1>
+                            <h1 className="text-2xl font-headline font-bold text-gray-800">{`تقرير أداء الطالب ${reportData.reportTitle}`}</h1>
                             <p className="text-lg font-semibold text-gray-700">المدرسة القرآنية للإمام الشافعي</p>
                             {user?.group && <p className="text-md text-gray-600">{`فوج ${user.group} — ${user.displayName}`}</p>}
-                            <p className="font-semibold mt-2 text-lg">{format(new Date(selectedYear, selectedMonth), 'MMMM yyyy', { locale: ar })}</p>
+                            <p className="font-semibold mt-2 text-lg">{reportData.statsPeriod}</p>
                         </header>
                         
                         <section className="avoid-break">
@@ -266,13 +283,13 @@ export default function StudentReportPage() {
 
                         <section className="avoid-break">
                             <Card className="bg-white shadow-none border border-gray-300">
-                                <CardHeader><CardTitle className="text-lg text-gray-800">📊 إحصائيات الشهر</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-lg text-gray-800">{`📊 إحصائيات ${reportData.reportTitle}`}</CardTitle></CardHeader>
                                 <CardContent>
                                     <table className="w-full text-sm text-center border-collapse border border-gray-300">
                                         <thead>
                                             <tr className="border-b border-gray-300 bg-gray-50">
                                                 <th className="p-2 border border-gray-300">الحالة</th>
-                                                <th className="p-2 border border-gray-300">العدد</th>
+                                                <th className="p-2 border border-gray-300">العدد (أيام)</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -284,8 +301,8 @@ export default function StudentReportPage() {
                                         </tbody>
                                         <tfoot>
                                             <tr className="border-t border-gray-300 font-bold bg-gray-100">
-                                                <td className="p-2 border border-gray-300">المجموع</td>
-                                                <td className="border border-gray-300">{reportData.stats.totalMonthDays} يوم</td>
+                                                <td className="p-2 border border-gray-300">إجمالي أيام الفترة</td>
+                                                <td className="border border-gray-300">{reportData.stats.totalPeriodDays} يوم</td>
                                             </tr>
                                         </tfoot>
                                     </table>
@@ -379,4 +396,3 @@ export default function StudentReportPage() {
         </div>
     );
 }
-
