@@ -172,7 +172,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const getSessionForDate = (date: string): DailySession | undefined => {
-      return dailySessions ? dailySessions[date] : undefined;
+      return (dailySessions ?? {})[date];
   }
 
   const getRecordsForDateRange = (startDate: string, endDate: string): Record<string, DailySession> => {
@@ -196,23 +196,36 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     if (!authContextUser) throw new Error("User not authenticated");
     
     const reportId = reportIdToUpdate || Date.now().toString();
-    const finalReport: DailyReport = { ...reportData, id: reportId };
+    const finalReport: Omit<DailyReport, 'id'> & { id?: string; imageUrl?: string } = { ...reportData };
 
     if (imageFile) {
       const imageStorageRef = storageRef(storage, `dailyReports/${finalReport.date}/${reportId}.jpg`);
       const uploadResult = await uploadBytes(imageStorageRef, imageFile);
       finalReport.imageUrl = await getDownloadURL(uploadResult.ref);
     }
+    
+    // Ensure the ID is part of the object being saved
+    const reportToSave: DailyReport = {
+        ...finalReport,
+        id: reportId,
+        // Keep existing image URL if not uploading a new one and it's an update
+        imageUrl: finalReport.imageUrl || (reportIdToUpdate ? (dailyReports?.[reportData.date]?.[reportIdToUpdate]?.imageUrl) : undefined)
+    };
+    
+    // Remove imageUrl if it is undefined, to prevent Firebase error
+    if (reportToSave.imageUrl === undefined) {
+        delete reportToSave.imageUrl;
+    }
 
     const reportRef = ref(db, `users/${authContextUser.uid}/dailyReports/${finalReport.date}/${reportId}`);
-    await set(reportRef, finalReport);
+    await set(reportRef, reportToSave);
   }
 
   const deleteDailyReport = async (reportId: string, date: string) => {
       if (!authContextUser) throw new Error("User not authenticated");
 
       // First, get the report to see if it has an image
-      const report = dailyReports?.[date]?.[reportId];
+      const report = (dailyReports ?? {})?.[date]?.[reportId];
       if (report?.imageUrl) {
           try {
              // Create a reference to the file to delete
@@ -265,4 +278,3 @@ export const useStudentContext = () => {
   }
   return context;
 };
-
