@@ -25,12 +25,14 @@ const sheikhInitialData: { [email: string]: { name: string; group: string } } = 
   "admin7@gmail.com": { name: "الشيخ سفيان نصيرة", group: "فوج 7" },
   "admin8@gmail.com": { name: "الشيخ عبد الحق نصيرة", group: "فوج 8" },
   "admin9@gmail.com": { name: "الشيخ عبد القادر", group: "فوج 9" },
-  "admin10@gmail.com": { name: "الشيخ محمد منصور", group: "فوج 10" }
+  "admin10@gmail.com": { name: "الشيخ محمد منصور", group: "فوج 10" },
+  "admin@gmail.com": { name: "الإدارة العامة", group: "كل الأفواج" }
 };
 
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
+  isAdmin: boolean;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -41,29 +43,37 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setLoading(true);
       if (currentUser) {
-        // Fetch user data from Realtime Database
         const userRef = ref(db, `users/${currentUser.uid}/profile`);
         const snapshot = await get(userRef);
+        
+        let appUser: AppUser;
         if (snapshot.exists()) {
-            setUser({ uid: currentUser.uid, ...snapshot.val() });
+            appUser = { uid: currentUser.uid, ...snapshot.val() };
         } else {
-             // Fallback for users who signed up before profile was stored in DB
-             const sheikhInfo = sheikhInitialData[currentUser.email || ''];
-             const appUser: AppUser = {
+             const sheikhInfo = sheikhInitialData[currentUser.email || ''] || { name: currentUser.displayName || 'مستخدم جديد', group: 'فوج غير محدد' };
+             appUser = {
                 uid: currentUser.uid,
                 email: currentUser.email,
-                displayName: sheikhInfo?.name || currentUser.displayName,
+                displayName: sheikhInfo.name,
                 photoURL: currentUser.photoURL,
-                group: sheikhInfo?.group
+                group: sheikhInfo.group
             };
-            setUser(appUser);
+            if(currentUser.email && !snapshot.exists()) {
+                 const newProfileRef = ref(db, `users/${currentUser.uid}/profile`);
+                 await set(newProfileRef, appUser);
+            }
         }
+        setUser(appUser);
+        setIsAdmin(appUser.email === 'admin@gmail.com');
       } else {
         setUser(null);
+        setIsAdmin(false);
       }
       setLoading(false);
     });
@@ -76,45 +86,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const sheikhInfo = sheikhInitialData[email] || { name: displayName, group: 'فوج غير محدد' };
     
-    // Update profile in Firebase Auth
     await updateProfile(newUser, { displayName: sheikhInfo.name });
 
-    // Store user profile in Realtime Database
-    const userRef = ref(db, `users/${newUser.uid}/profile`);
-    const profileData = {
+    const profileData: AppUser = {
         uid: newUser.uid,
         email: newUser.email,
         displayName: sheikhInfo.name,
         group: sheikhInfo.group,
     };
+    const userRef = ref(db, `users/${newUser.uid}/profile`);
     await set(userRef, profileData);
-    
-    setUser(profileData);
   };
   
   const signInWithEmail = async (email: string, password: string) => {
     if (!email || !password) {
       throw new FirebaseError("auth/invalid-argument", "Email and password must not be empty.");
     }
-    try {
-       await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-        if (error instanceof FirebaseError) {
-             console.error("Firebase Login Error:", error.code, error.message);
-        } else {
-            console.error("An unexpected error occurred during login:", error);
-        }
-        throw error;
-    }
+    await signInWithEmailAndPassword(auth, email, password);
   }
 
   const logout = async () => {
     await signOut(auth);
-    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUpWithEmail, signInWithEmail, logout }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, signUpWithEmail, signInWithEmail, logout }}>
       {children}
     </AuthContext.Provider>
   );

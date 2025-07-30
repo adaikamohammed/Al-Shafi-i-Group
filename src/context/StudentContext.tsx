@@ -20,7 +20,7 @@ interface StudentContextType {
   deleteStudent: (studentId: string) => void;
   deleteAllStudents: () => void;
   addDailySession: (session: DailySession) => void;
-  deleteDailySession: (date: string) => void;
+  deleteDailySession: (date: string, ownerId: string) => void;
   getSessionForDate: (date: string) => DailySession | undefined;
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
@@ -31,7 +31,8 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, isAdmin, loading: authLoading } = useAuth();
+  
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
   const [dailyReports, setDailyReports] = useState<Record<string, DailyReport>>({});
@@ -39,11 +40,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
+    setLoading(true);
 
+    if (authLoading) {
+      return; 
+    }
+    
     if (!user) {
       setStudents([]);
       setDailySessions({});
@@ -52,46 +54,85 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       return;
     }
-    
-    setLoading(true);
-    const userRef = ref(db, `users/${user.uid}`);
+
+    let dataRef;
+    if (isAdmin) {
+      dataRef = ref(db, 'users');
+    } else {
+      dataRef = ref(db, `users/${user.uid}`);
+    }
 
     const handleValueChange = (snapshot: any) => {
-        const userData = snapshot.val();
-        
-        const loadedStudents = userData?.students ? Object.values(userData.students).map((s: any) => ({
-            ...s,
-            id: s.id || uuidv4(),
-            ownerId: user.uid,
-            birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-            registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-            updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-        })) : [];
-
-        setStudents(loadedStudents);
-        setDailySessions(userData?.dailySessions || {});
-        setDailyReports(userData?.dailyReports || {});
-        setSurahProgress(userData?.surahProgress || {});
+      if (!snapshot.exists()) {
+        setStudents([]);
+        setDailySessions({});
+        setDailyReports({});
+        setSurahProgress({});
         setLoading(false);
+        return;
+      }
+        
+      const data = snapshot.val();
+      let combinedStudents: Student[] = [];
+      let combinedSessions: Record<string, DailySession> = {};
+      let combinedReports: Record<string, DailyReport> = {};
+      let combinedSurahProgress: Record<string, number[]> = {};
+
+      if (isAdmin) {
+        Object.keys(data).forEach(uid => {
+          const userData = data[uid];
+          if (userData.students) {
+            const userStudents = Object.values(userData.students).map((s: any) => ({
+              ...s,
+              ownerId: uid, // Attach ownerId for admin actions
+              birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+              registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+              updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+            }));
+            combinedStudents.push(...userStudents);
+          }
+          if(userData.dailySessions) Object.assign(combinedSessions, userData.dailySessions);
+          if(userData.dailyReports) Object.assign(combinedReports, userData.dailyReports);
+          if(userData.surahProgress) Object.assign(combinedSurahProgress, userData.surahProgress);
+        });
+      } else {
+        combinedStudents = data.students ? Object.values(data.students).map((s: any) => ({
+          ...s,
+          ownerId: user.uid,
+          birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+          registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+          updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+        })) : [];
+        combinedSessions = data.dailySessions || {};
+        combinedReports = data.dailyReports || {};
+        combinedSurahProgress = data.surahProgress || {};
+      }
+
+      setStudents(combinedStudents);
+      setDailySessions(combinedSessions);
+      setDailyReports(combinedReports);
+      setSurahProgress(combinedSurahProgress);
+      setLoading(false);
     };
 
-    onValue(userRef, handleValueChange, (error) => {
+    onValue(dataRef, handleValueChange, (error) => {
       console.error("Firebase read failed: " + error.message);
       setLoading(false);
     });
 
     return () => {
-      off(userRef, 'value', handleValueChange);
+      off(dataRef, 'value', handleValueChange);
     };
-  }, [user, authLoading]);
+  }, [user, isAdmin, authLoading]);
 
   const getOwnerUid = useCallback(() => {
+    if (isAdmin) return null; // Admin should not perform write operations
     if (!user) {
       console.error("Action requires a logged-in user.");
       return null;
     }
     return user.uid;
-  }, [user]);
+  }, [user, isAdmin]);
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
     const ownerUid = getOwnerUid();
@@ -115,18 +156,19 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
-     if (!user) return;
+     const ownerUid = getOwnerUid();
+     if (!ownerUid) return;
      newStudents.forEach(s => addStudent(s));
   }
 
   const updateStudent = (studentId: string, updatedData: Partial<Student>) => {
+    const studentToUpdate = students.find(s => s.id === studentId);
+    if (!studentToUpdate || !studentToUpdate.ownerId) return;
+
     const ownerUid = getOwnerUid();
     if (!ownerUid) return;
     
-    const studentToUpdate = students.find(s => s.id === studentId);
-    if (!studentToUpdate) return;
-    
-    const studentRef = ref(db, `users/${ownerUid}/students/${studentId}`);
+    const studentRef = ref(db, `users/${studentToUpdate.ownerId}/students/${studentId}`);
     const finalData = { ...studentToUpdate, ...updatedData, updatedAt: new Date() };
 
     set(studentRef, {
@@ -138,9 +180,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deleteStudent = (studentId: string) => {
+      const studentToDelete = students.find(s => s.id === studentId);
+      if (!studentToDelete || !studentToDelete.ownerId) return;
       const ownerUid = getOwnerUid();
       if (!ownerUid) return;
-      const studentRef = ref(db, `users/${ownerUid}/students/${studentId}`);
+
+      const studentRef = ref(db, `users/${studentToDelete.ownerId}/students/${studentId}`);
       remove(studentRef);
   }
   
@@ -194,6 +239,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number) => {
+    const studentToUpdate = students.find(s => s.id === studentId);
+    if (!studentToUpdate || !studentToUpdate.ownerId) return;
+
     const ownerUid = getOwnerUid();
     if (!ownerUid) return;
 
@@ -206,7 +254,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         studentProgress.push(surahId);
     }
     
-    const surahProgressRef = ref(db, `users/${ownerUid}/surahProgress/${studentId}`);
+    const surahProgressRef = ref(db, `users/${studentToUpdate.ownerId}/surahProgress/${studentId}`);
     set(surahProgressRef, studentProgress);
     
     updateStudent(studentId, { memorizedSurahsCount: studentProgress.length });

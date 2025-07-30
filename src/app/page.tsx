@@ -45,7 +45,7 @@ const calculateAge = (birthDate?: Date) => {
 
 export default function StudentManagementPage() {
   const { students, updateStudent, deleteStudent, loading, deleteAllStudents } = useStudentContext();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -99,7 +99,7 @@ export default function StudentManagementPage() {
     );
   }
   
-   if (!students || students.length === 0) {
+   if (!isAdmin && students.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
             <h1 className="text-2xl font-bold mb-4">لا يوجد طلاب بعد</h1>
@@ -129,7 +129,7 @@ export default function StudentManagementPage() {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
         <h1 className="text-3xl font-headline font-bold">إدارة الطلبة</h1>
         <div className="flex w-full sm:w-auto items-center gap-2">
-           <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
+           {!isAdmin && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
             <DialogTrigger asChild>
                 <Button className="w-full sm:w-auto">
                 <PlusCircle className="ml-2 h-4 w-4" />
@@ -142,7 +142,7 @@ export default function StudentManagementPage() {
                 onCancel={() => setAddStudentDialogOpen(false)}
                 />
             </DialogContent>
-            </Dialog>
+            </Dialog>}
         </div>
       </div>
 
@@ -161,7 +161,7 @@ export default function StudentManagementPage() {
                 <Download className="ml-2 h-4 w-4" />
                 تصدير الطلبة (Excel)
             </Button>
-             <AlertDialog>
+             {!isAdmin && <AlertDialog>
                 <AlertDialogTrigger asChild>
                     <Button variant="destructive" disabled={students.length === 0}>
                         <Trash2 className="ml-2 h-4 w-4" />
@@ -181,7 +181,7 @@ export default function StudentManagementPage() {
                         <AlertDialogAction onClick={deleteAllStudents}>نعم، قم بحذف الكل</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
-             </AlertDialog>
+             </AlertDialog>}
          </div>
        </div>
 
@@ -216,7 +216,7 @@ export default function StudentManagementPage() {
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{student.memorizedSurahsCount || 0}</TableCell>
                     <TableCell>
-                        <StudentActions student={student} onStatusChange={handleStatusChange} />
+                        {!isAdmin && <StudentActions student={student} onStatusChange={handleStatusChange} />}
                     </TableCell>
                     </TableRow>
                 ))
