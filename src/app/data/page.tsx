@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useRef, useState } from 'react';
@@ -10,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import type { Student, SessionRecord, SessionType } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
+import { useAuth } from '@/context/AuthContext';
 import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -20,6 +22,7 @@ export default function DataExchangePage() {
   const monthlySessionFileInputRef = useRef<HTMLInputElement>(null);
 
   const { students, addDailySession, getRecordsForDateRange, importStudents } = useStudentContext();
+  const { isAdmin } = useAuth();
   const activeStudents = students.filter(s => s.status === 'نشط');
 
   // State for monthly export
@@ -449,6 +452,17 @@ export default function DataExchangePage() {
         });
 
         XLSX.writeFile(workbook, `تقرير_حصص_شهر_${format(startDate, 'yyyy-MM')}.xlsx`);
+  }
+  
+  if (isAdmin) {
+    return (
+        <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+            <h1 className="text-3xl font-headline font-bold text-center">صفحة المدير</h1>
+            <p className="text-muted-foreground text-center">
+                لا يمكن للمدير استيراد أو تصدير البيانات. هذه الصفحة مخصصة للمعلمين فقط.
+            </p>
+        </div>
+    );
   }
 
   return (

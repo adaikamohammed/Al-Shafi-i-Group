@@ -124,7 +124,7 @@ export default function StudentManagementPage() {
 
   return (
     <div className="space-y-6">
-       <DailyInspiration />
+       {!isAdmin && <DailyInspiration />}
        
       <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
         <h1 className="text-3xl font-headline font-bold">إدارة الطلبة</h1>
@@ -199,9 +199,9 @@ export default function StudentManagementPage() {
                 <TableHead className="hidden lg:table-cell">العمر</TableHead>
                 <TableHead>الحالة</TableHead>
                 <TableHead className="hidden md:table-cell">السور المحفوظة</TableHead>
-                <TableHead>
+                {!isAdmin && <TableHead>
                   <span className="sr-only">إجراءات</span>
-                </TableHead>
+                </TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -215,14 +215,14 @@ export default function StudentManagementPage() {
                         <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{student.memorizedSurahsCount || 0}</TableCell>
-                    <TableCell>
-                        {!isAdmin && <StudentActions student={student} onStatusChange={handleStatusChange} />}
-                    </TableCell>
+                    {!isAdmin && <TableCell>
+                        <StudentActions student={student} onStatusChange={handleStatusChange} />
+                    </TableCell>}
                     </TableRow>
                 ))
              ) : (
                 <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={isAdmin ? 5 : 6} className="h-24 text-center">
                        {searchTerm ? "لم يتم العثور على طلاب مطابقين للبحث." : "لا يوجد طلبة حاليًا. قم بإضافة طالب جديد."}
                     </TableCell>
                 </TableRow>
@@ -321,7 +321,7 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
 function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSuccess: () => void, onCancel: () => void }) {
   const { addStudent, updateStudent } = useStudentContext();
   const [birthDate, setBirthDate] = useState<Date | undefined>(student?.birthDate ? new Date(student.birthDate) : undefined);
-  const [registrationDate, setRegistrationDate] = useState<Date | undefined>(student?.registrationDate ? new Date(student.registrationDate) : undefined);
+  const [registrationDate, setRegistrationDate] = useState<Date | undefined>(student?.registrationDate ? new Date(student.registrationDate) : new Date());
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

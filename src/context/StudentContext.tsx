@@ -20,7 +20,7 @@ interface StudentContextType {
   deleteStudent: (studentId: string) => void;
   deleteAllStudents: () => void;
   addDailySession: (session: DailySession) => void;
-  deleteDailySession: (date: string, ownerId: string) => void;
+  deleteDailySession: (date: string) => void;
   getSessionForDate: (date: string) => DailySession | undefined;
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
@@ -40,12 +40,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
-
     if (authLoading) {
-      return; 
+      setLoading(true);
+      return;
     }
-    
+
     if (!user) {
       setStudents([]);
       setDailySessions({});
@@ -55,12 +54,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    let dataRef;
-    if (isAdmin) {
-      dataRef = ref(db, 'users');
-    } else {
-      dataRef = ref(db, `users/${user.uid}`);
-    }
+    const dataRef = ref(db, 'users');
 
     const handleValueChange = (snapshot: any) => {
       if (!snapshot.exists()) {
@@ -84,7 +78,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           if (userData.students) {
             const userStudents = Object.values(userData.students).map((s: any) => ({
               ...s,
-              ownerId: uid, // Attach ownerId for admin actions
+              ownerId: uid, 
               birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
               registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
               updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
@@ -96,16 +90,19 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           if(userData.surahProgress) Object.assign(combinedSurahProgress, userData.surahProgress);
         });
       } else {
-        combinedStudents = data.students ? Object.values(data.students).map((s: any) => ({
-          ...s,
-          ownerId: user.uid,
-          birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-          registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-          updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-        })) : [];
-        combinedSessions = data.dailySessions || {};
-        combinedReports = data.dailyReports || {};
-        combinedSurahProgress = data.surahProgress || {};
+        const userData = data[user.uid];
+        if(userData) {
+            combinedStudents = userData.students ? Object.values(userData.students).map((s: any) => ({
+            ...s,
+            ownerId: user.uid,
+            birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+            registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+            updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+            })) : [];
+            combinedSessions = userData.dailySessions || {};
+            combinedReports = userData.dailyReports || {};
+            combinedSurahProgress = userData.surahProgress || {};
+        }
       }
 
       setStudents(combinedStudents);
@@ -125,28 +122,18 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [user, isAdmin, authLoading]);
 
-  const getOwnerUid = useCallback(() => {
-    if (isAdmin) return null; // Admin should not perform write operations
-    if (!user) {
-      console.error("Action requires a logged-in user.");
-      return null;
-    }
-    return user.uid;
-  }, [user, isAdmin]);
-
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
-    const ownerUid = getOwnerUid();
-    if (!ownerUid) return;
+    if (!user || isAdmin) return; 
 
     const studentId = uuidv4();
     const newStudent: Student = {
       ...studentData,
       id: studentId,
-      ownerId: ownerUid,
+      ownerId: user.uid,
       memorizedSurahsCount: 0,
       updatedAt: new Date(),
     };
-    const studentRef = ref(db, `users/${ownerUid}/students/${studentId}`);
+    const studentRef = ref(db, `users/${user.uid}/students/${studentId}`);
     set(studentRef, {
         ...newStudent, 
         birthDate: newStudent.birthDate.toISOString(), 
@@ -156,17 +143,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
-     const ownerUid = getOwnerUid();
-     if (!ownerUid) return;
+     if (!user || isAdmin) return;
      newStudents.forEach(s => addStudent(s));
   }
 
   const updateStudent = (studentId: string, updatedData: Partial<Student>) => {
+    if (!user || isAdmin) return;
     const studentToUpdate = students.find(s => s.id === studentId);
     if (!studentToUpdate || !studentToUpdate.ownerId) return;
-
-    const ownerUid = getOwnerUid();
-    if (!ownerUid) return;
     
     const studentRef = ref(db, `users/${studentToUpdate.ownerId}/students/${studentId}`);
     const finalData = { ...studentToUpdate, ...updatedData, updatedAt: new Date() };
@@ -180,33 +164,29 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deleteStudent = (studentId: string) => {
+      if (!user || isAdmin) return;
       const studentToDelete = students.find(s => s.id === studentId);
       if (!studentToDelete || !studentToDelete.ownerId) return;
-      const ownerUid = getOwnerUid();
-      if (!ownerUid) return;
-
+      
       const studentRef = ref(db, `users/${studentToDelete.ownerId}/students/${studentId}`);
       remove(studentRef);
   }
   
   const deleteAllStudents = () => {
-      const ownerUid = getOwnerUid();
-      if (!ownerUid) return;
-      const studentsRef = ref(db, `users/${ownerUid}/students`);
+      if (!user || isAdmin) return;
+      const studentsRef = ref(db, `users/${user.uid}/students`);
       remove(studentsRef);
   }
 
   const addDailySession = (session: DailySession) => {
-    const ownerUid = getOwnerUid();
-    if (!ownerUid) return;
-    const sessionRef = ref(db, `users/${ownerUid}/dailySessions/${session.date}`);
+    if (!user || isAdmin) return;
+    const sessionRef = ref(db, `users/${user.uid}/dailySessions/${session.date}`);
     set(sessionRef, session);
   };
   
   const deleteDailySession = (date: string) => {
-    const ownerUid = getOwnerUid();
-    if (!ownerUid) return;
-    const sessionRef = ref(db, `users/${ownerUid}/dailySessions/${date}`);
+    if (!user || isAdmin) return;
+    const sessionRef = ref(db, `users/${user.uid}/dailySessions/${date}`);
     remove(sessionRef);
   }
 
@@ -232,18 +212,15 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const saveDailyReport = (report: DailyReport) => {
-    const ownerUid = getOwnerUid();
-    if (!ownerUid) return;
-    const reportRef = ref(db, `users/${ownerUid}/dailyReports/${report.date}`);
+    if (!user || isAdmin) return;
+    const reportRef = ref(db, `users/${user.uid}/dailyReports/${report.date}`);
     set(reportRef, report);
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number) => {
+    if (!user || isAdmin) return;
     const studentToUpdate = students.find(s => s.id === studentId);
     if (!studentToUpdate || !studentToUpdate.ownerId) return;
-
-    const ownerUid = getOwnerUid();
-    if (!ownerUid) return;
 
     const studentProgress = surahProgress[studentId] ? [...surahProgress[studentId]] : [];
     const surahIndex = studentProgress.indexOf(surahId);

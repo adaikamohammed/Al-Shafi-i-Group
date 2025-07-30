@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useStudentContext } from '@/context/StudentContext';
+import { useAuth } from '@/context/AuthContext';
 import { surahs as allSurahs } from '@/lib/surahs';
 import { cn } from '@/lib/utils';
 import { Loader2, AlertTriangle, CheckCircle, Award } from 'lucide-react';
@@ -16,6 +18,7 @@ import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/comp
 
 export default function SurahProgressPage() {
     const { students, surahProgress, toggleSurahStatus, loading } = useStudentContext();
+    const { isAdmin } = useAuth();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
 
     const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
@@ -42,7 +45,7 @@ export default function SurahProgressPage() {
     }, [activeStudents, surahProgress]);
 
     const handleSurahClick = (surahId: number) => {
-        if (!selectedStudentId) return;
+        if (!selectedStudentId || isAdmin) return;
         toggleSurahStatus(selectedStudentId, surahId);
     };
     
@@ -80,7 +83,9 @@ export default function SurahProgressPage() {
                 <CardHeader>
                     <CardTitle className="text-3xl font-headline font-bold">📖 متابعة حفظ السور</CardTitle>
                     <CardDescription>
-                        حدد طالبًا لعرض وتحديث السور التي حفظها. اضغط على السورة لتبديل حالتها بين "محفوظة" و "غير محفوظة".
+                        {isAdmin
+                          ? "استعرض تقدم حفظ السور لجميع الطلبة."
+                          : "حدد طالبًا لعرض وتحديث السور التي حفظها. اضغط على السورة لتبديل حالتها بين 'محفوظة' و 'غير محفوظة'."}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -174,7 +179,9 @@ export default function SurahProgressPage() {
                  <Card>
                     <CardHeader>
                         <CardTitle>قائمة السور الكاملة</CardTitle>
-                         <CardDescription>انقر على اسم السورة لتغيير حالة حفظها للطالب المحدد.</CardDescription>
+                         <CardDescription>
+                            {isAdmin ? "عرض حالة الحفظ للطالب المحدد." : "انقر على اسم السورة لتغيير حالة حفظها للطالب المحدد."}
+                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3">
@@ -185,8 +192,8 @@ export default function SurahProgressPage() {
                                         key={surah.id}
                                         variant={isSaved ? "default" : "outline"}
                                         onClick={() => handleSurahClick(surah.id)}
-                                        disabled={!selectedStudentId}
-                                        className="h-auto justify-between"
+                                        disabled={!selectedStudentId || isAdmin}
+                                        className={cn("h-auto justify-between", isAdmin && "cursor-default")}
                                     >
                                         <div className="flex items-center gap-2">
                                             {isSaved && <CheckCircle className="h-4 w-4" />}

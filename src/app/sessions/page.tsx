@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -6,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useStudentContext } from '@/context/StudentContext';
+import { useAuth } from '@/context/AuthContext';
 import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, DailySession } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -42,11 +44,13 @@ export default function DailySessionsPage() {
   const { toast } = useToast();
   
   const { students, dailySessions, loading, getSessionForDate, addDailySession, deleteDailySession } = useStudentContext();
+  const { isAdmin } = useAuth();
   const activeStudents = useMemo(() => 
     students.filter(s => s.status === "نشط"), 
   [students]);
 
   const handleDayClick = (day: number) => {
+    if (isAdmin) return; // Prevent admin from opening the dialog
     const newSelectedDay = new Date(getYear(currentDate), getMonth(currentDate), day);
     setSelectedDay(newSelectedDay);
     setSessionDialogOpen(true);
@@ -151,13 +155,14 @@ export default function DailySessionsPage() {
           key={day}
           onClick={() => handleDayClick(day)}
           className={cn(
-            "p-2 text-start border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col justify-between relative group cursor-pointer",
-            dayStatusClass
+            "p-2 text-start border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col justify-between relative group",
+            dayStatusClass,
+            isAdmin ? "cursor-default" : "cursor-pointer"
           )}
         >
             <div className="flex justify-between w-full items-start">
                  <span className="font-bold">{day}</span>
-                 {session && (
+                 {session && !isAdmin && (
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <DropdownMenu>
                          <DropdownMenuTrigger asChild>
@@ -231,7 +236,7 @@ export default function DailySessionsPage() {
                 </Button>
             </div>
             <CardDescription className="text-center">
-              اختر الشهر لعرض أيامه، ثم اضغط على اليوم المطلوب لتسجيل الحصة.
+              {isAdmin ? "عرض بيانات الحصص المسجلة من قبل المعلمين." : "اختر الشهر لعرض أيامه، ثم اضغط على اليوم المطلوب لتسجيل الحصة."}
             </CardDescription>
         </CardHeader>
         <CardContent>

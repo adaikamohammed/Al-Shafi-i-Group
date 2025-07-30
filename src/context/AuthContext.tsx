@@ -64,9 +64,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 photoURL: currentUser.photoURL,
                 group: sheikhInfo.group
             };
+            // Only write profile if it doesn't exist.
             if(currentUser.email && !snapshot.exists()) {
                  const newProfileRef = ref(db, `users/${currentUser.uid}/profile`);
-                 await set(newProfileRef, appUser);
+                 await set(newProfileRef, { 
+                    email: appUser.email, 
+                    displayName: appUser.displayName,
+                    group: appUser.group
+                 });
             }
         }
         setUser(appUser);
@@ -88,8 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     await updateProfile(newUser, { displayName: sheikhInfo.name });
 
-    const profileData: AppUser = {
-        uid: newUser.uid,
+    const profileData: Omit<AppUser, 'uid' | 'photoURL'> = {
         email: newUser.email,
         displayName: sheikhInfo.name,
         group: sheikhInfo.group,
