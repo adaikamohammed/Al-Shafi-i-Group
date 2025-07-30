@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, AlertTriangle, Printer } from 'lucide-react';
+import { Loader2, AlertTriangle, Printer, FileDown, FileText as FileTextIcon, Image as ImageIcon } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { surahs as allSurahs } from '@/lib/surahs';
@@ -102,24 +102,60 @@ export default function StudentReportPage() {
         };
 
     }, [selectedStudentId, selectedMonth, selectedYear, students, dailySessions, surahProgress]);
+    
+    const getReportFilename = (extension: string) => {
+        if (!reportData) return `report.${extension}`;
+        const studentName = reportData.student.fullName.replace(/\s/g, '_');
+        const monthName = format(new Date(selectedYear, selectedMonth), 'MMMM', { locale: ar });
+        return `تقرير_${studentName}_${monthName}_${selectedYear}.${extension}`;
+    }
 
-    const handlePrint = async () => {
+    const handleDownloadAsPDF = async () => {
         const reportElement = document.getElementById('report-content');
-        if (reportElement && reportData) {
-            const studentName = reportData.student.fullName.replace(/\s/g, '_');
-            const monthName = format(new Date(selectedYear, selectedMonth), 'MMMM', { locale: ar });
-            
+        if (reportElement) {
             const html2pdf = (await import('html2pdf.js')).default;
-
             const opt = {
                 margin:       [5, 5, 5, 5],
-                filename:     `تقرير_${studentName}_${monthName}_${selectedYear}.pdf`,
+                filename:     getReportFilename('pdf'),
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true, allowTaint: false },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
                 pagebreak: { avoid: ['.avoid-break'] }
             };
             html2pdf().set(opt).from(reportElement).save();
+        }
+    };
+    
+    const handleDownloadAsImage = async () => {
+        const reportElement = document.getElementById('report-content');
+        if (reportElement) {
+            const html2canvas = (await import('html2canvas')).default;
+            html2canvas(reportElement, { scale: 2, useCORS: true }).then(canvas => {
+                const link = document.createElement("a");
+                link.download = getReportFilename('png');
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            });
+        }
+    };
+
+    const handleDownloadAsWord = () => {
+        const reportElement = document.getElementById('report-content');
+        if(reportElement) {
+            const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' "+
+                           "xmlns:w='urn:schemas-microsoft-com:office:word' "+
+                           "xmlns='http://www.w3.org/TR/REC-html40'>"+
+                           "<head><meta charset='utf-8'><title>Export HTML to Word Document</title></head><body dir='rtl'>";
+            const footer = "</body></html>";
+            const sourceHTML = header + reportElement.innerHTML + footer;
+            
+            const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+            const fileDownload = document.createElement("a");
+            document.body.appendChild(fileDownload);
+            fileDownload.href = source;
+            fileDownload.download = getReportFilename('doc');
+            fileDownload.click();
+            document.body.removeChild(fileDownload);
         }
     };
 
@@ -143,37 +179,49 @@ export default function StudentReportPage() {
              <Card className="print:hidden">
                 <CardHeader>
                     <CardTitle>إنشاء تقرير طالب شهري</CardTitle>
-                    <CardDescription>اختر الطالب والشهر المطلوب ثم اضغط على زر الطباعة لإنشاء التقرير.</CardDescription>
+                    <CardDescription>اختر الطالب والشهر المطلوب ثم قم بحفظ التقرير بالصيغة التي تفضلها.</CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-col md:flex-row gap-4">
-                     <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                        <SelectTrigger className="w-full md:w-[200px]"><SelectValue placeholder="اختر طالبًا" /></SelectTrigger>
-                        <SelectContent>
-                            {activeStudents.map(student => (
-                                <SelectItem key={student.id} value={student.id}>{student.fullName}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                     <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
-                        <SelectTrigger className="w-full md:w-[150px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
-                        <SelectContent>
-                            {Array.from({length: 12}, (_, i) => (
-                                <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                     <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
-                        <SelectTrigger className="w-full md:w-[120px]"><SelectValue placeholder="السنة" /></SelectTrigger>
-                        <SelectContent>
-                             {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
-                                <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Button onClick={handlePrint} disabled={!selectedStudentId}>
-                        <Printer className="ml-2 h-4 w-4" />
-                        طباعة التقرير
-                    </Button>
+                <CardContent className="space-y-4">
+                     <div className="flex flex-col md:flex-row gap-2">
+                         <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                            <SelectTrigger className="w-full md:w-[200px]"><SelectValue placeholder="اختر طالبًا" /></SelectTrigger>
+                            <SelectContent>
+                                {activeStudents.map(student => (
+                                    <SelectItem key={student.id} value={student.id}>{student.fullName}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                         <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
+                            <SelectTrigger className="w-full md:w-[150px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
+                            <SelectContent>
+                                {Array.from({length: 12}, (_, i) => (
+                                    <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                         <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
+                            <SelectTrigger className="w-full md:w-[120px]"><SelectValue placeholder="السنة" /></SelectTrigger>
+                            <SelectContent>
+                                 {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div className="flex flex-wrap gap-2">
+                        <Button onClick={handleDownloadAsPDF} disabled={!selectedStudentId} variant="destructive">
+                            <FileDown className="ml-2 h-4 w-4" />
+                            حفظ كـ PDF
+                        </Button>
+                        <Button onClick={handleDownloadAsImage} disabled={!selectedStudentId} variant="secondary">
+                            <ImageIcon className="ml-2 h-4 w-4" />
+                            حفظ كصورة (PNG)
+                        </Button>
+                        <Button onClick={handleDownloadAsWord} disabled={!selectedStudentId}>
+                            <FileTextIcon className="ml-2 h-4 w-4" />
+                            حفظ بصيغة Word
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
             
