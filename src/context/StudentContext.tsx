@@ -31,7 +31,7 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, authLoading } = useAuth();
   
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
@@ -40,11 +40,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Keep loading if auth is still resolving
     if (authLoading) {
       setLoading(true);
       return;
     }
-    
+
+    // If auth is resolved and there is no user, stop loading and clear data
     if (!user) {
       setStudents([]);
       setDailySessions({});
@@ -54,10 +56,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    setLoading(true);
+    // At this point, auth is loaded and we have a user.
+    // Now we can safely check the user's email and define the data path.
     const isAdmin = user.email === 'admin@gmail.com';
     const dataRef: DatabaseReference = isAdmin ? ref(db, 'users') : ref(db, `users/${user.uid}`);
     
+    setLoading(true);
+
     const handleValueChange = (snapshot: any) => {
       if (!snapshot.exists()) {
         setStudents([]); 
