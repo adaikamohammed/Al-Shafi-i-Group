@@ -84,7 +84,7 @@ export interface Surah {
     verses: number;
 }
 
-// This is no longer tied to a firestore document
+
 export interface AppUser {
     uid: string;
     displayName: string | null;

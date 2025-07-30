@@ -11,10 +11,11 @@ import {
   onAuthStateChanged,
   FirebaseError
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import type { AppUser } from '@/lib/types';
+import { ref, set, get } from 'firebase/database';
 
-const sheikhData: { [email: string]: { name: string; group: string } } = {
+const sheikhInitialData: { [email: string]: { name: string; group: string } } = {
   "admin1@gmail.com": { name: "الشيخ صهيب نصيب", group: "فوج 1" },
   "admin2@gmail.com": { name: "الشيخ زياد درويش", group: "فوج 2" },
   "admin3@gmail.com": { name: "الشيخ فؤاد بن عمر", group: "فوج 3" },
@@ -42,17 +43,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        const sheikhInfo = sheikhData[currentUser.email || ''];
-        const appUser: AppUser = {
-          uid: currentUser.uid,
-          email: currentUser.email,
-          displayName: sheikhInfo?.name || currentUser.displayName,
-          photoURL: currentUser.photoURL,
-          group: sheikhInfo?.group
-        };
-        setUser(appUser);
+        // Fetch user data from Realtime Database
+        const userRef = ref(db, `users/${currentUser.uid}/profile`);
+        const snapshot = await get(userRef);
+        if (snapshot.exists()) {
+            setUser({ uid: currentUser.uid, ...snapshot.val() });
+        } else {
+             // Fallback for users who signed up before profile was stored in DB
+             const sheikhInfo = sheikhInitialData[currentUser.email || ''];
+             const appUser: AppUser = {
+                uid: currentUser.uid,
+                email: currentUser.email,
+                displayName: sheikhInfo?.name || currentUser.displayName,
+                photoURL: currentUser.photoURL,
+                group: sheikhInfo?.group
+            };
+            setUser(appUser);
+        }
       } else {
         setUser(null);
       }
@@ -64,17 +73,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUpWithEmail = async (email: string, password: string, displayName: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const newUser = userCredential.user;
-    await updateProfile(newUser, { displayName });
     
-    const sheikhInfo = sheikhData[newUser.email || ''];
-    // Set user in state to trigger updates
-    setUser({
+    const sheikhInfo = sheikhInitialData[email] || { name: displayName, group: 'فوج غير محدد' };
+    
+    // Update profile in Firebase Auth
+    await updateProfile(newUser, { displayName: sheikhInfo.name });
+
+    // Store user profile in Realtime Database
+    const userRef = ref(db, `users/${newUser.uid}/profile`);
+    const profileData = {
         uid: newUser.uid,
         email: newUser.email,
-        displayName: sheikhInfo?.name || displayName,
-        photoURL: newUser.photoURL,
-        group: sheikhInfo?.group
-    });
+        displayName: sheikhInfo.name,
+        group: sheikhInfo.group,
+    };
+    await set(userRef, profileData);
+    
+    setUser(profileData);
   };
   
   const signInWithEmail = async (email: string, password: string) => {
@@ -89,7 +104,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
             console.error("An unexpected error occurred during login:", error);
         }
-        // Re-throw the error to be caught by the UI component
         throw error;
     }
   }
