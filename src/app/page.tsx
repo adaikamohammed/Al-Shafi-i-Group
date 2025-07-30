@@ -93,10 +93,33 @@ export default function StudentManagementPage() {
 
   if (loading) {
     return (
-        <div className="flex items-center justify-center h-full">
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
     );
+  }
+  
+   if (!students || students.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+            <h1 className="text-2xl font-bold mb-4">لا يوجد طلاب بعد</h1>
+            <p className="text-muted-foreground mb-6">ابدأ بإضافة طالب جديد أو استيراد قائمة الطلاب.</p>
+            <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
+            <DialogTrigger asChild>
+                <Button>
+                <PlusCircle className="ml-2 h-4 w-4" />
+                إضافة طالب جديد
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+                <StudentForm 
+                onSuccess={() => setAddStudentDialogOpen(false)} 
+                onCancel={() => setAddStudentDialogOpen(false)}
+                />
+            </DialogContent>
+            </Dialog>
+        </div>
+      )
   }
 
   return (
@@ -327,7 +350,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         updateStudent(student.id, studentData);
     } else {
         // Add new student
-        addStudent(studentData as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>);
+        addStudent(studentData as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>);
     }
     
     onSuccess();
@@ -453,5 +476,3 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
-
-    

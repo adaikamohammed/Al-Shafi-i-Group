@@ -5,6 +5,7 @@ export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "
 
 export interface Student {
   id: string;
+  ownerId: string; // UID of the user who owns this student record
   fullName: string;
   guardianName: string;
   phone1: string;

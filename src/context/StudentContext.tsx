@@ -15,7 +15,7 @@ interface StudentContextType {
   dailyReports: Record<string, DailyReport>;
   surahProgress: Record<string, number[]>;
   loading: boolean;
-  addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => void;
+  addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => void;
   updateStudent: (studentId: string, updatedData: Partial<Student>) => void;
   deleteStudent: (studentId: string) => void;
   deleteAllStudents: () => void;
@@ -23,7 +23,7 @@ interface StudentContextType {
   deleteDailySession: (date: string) => void;
   getSessionForDate: (date: string) => DailySession | undefined;
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession>;
-  importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[]) => void;
+  importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
   saveDailyReport: (report: DailyReport) => void;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
 }
@@ -62,6 +62,15 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const onData = onValue(dataRef, (snapshot) => {
       const data = snapshot.val();
       
+      if (!data) {
+          setStudents([]);
+          setDailySessions({});
+          setDailyReports({});
+          setSurahProgress({});
+          setLoading(false);
+          return;
+      }
+      
       if (isAdmin) {
         // Aggregate data from all users for the admin
         let allStudents: Student[] = [];
@@ -69,42 +78,39 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         let allReports: Record<string, DailyReport> = {};
         let allSurahProgress: Record<string, number[]> = {};
 
-        if (data) {
-           Object.values(data).forEach((userData: any) => {
-                if (userData.students) {
-                    allStudents.push(...Object.values(userData.students).map((s: any) => ({
-                        ...s,
-                        birthDate: new Date(s.birthDate),
-                        registrationDate: new Date(s.registrationDate),
-                        updatedAt: new Date(s.updatedAt)
-                    })));
-                }
-                if(userData.dailySessions) Object.assign(allSessions, userData.dailySessions);
-                if(userData.dailyReports) Object.assign(allReports, userData.dailyReports);
-                if(userData.surahProgress) Object.assign(allSurahProgress, userData.surahProgress);
-           });
-        }
+        Object.entries(data).forEach(([uid, userData]: [string, any]) => {
+            if (userData.students) {
+                const userStudents = Object.values(userData.students).map((s: any) => ({
+                    ...s,
+                    ownerId: uid, // Attach owner's UID to each student
+                    birthDate: new Date(s.birthDate),
+                    registrationDate: new Date(s.registrationDate),
+                    updatedAt: new Date(s.updatedAt)
+                }));
+                allStudents.push(...userStudents);
+            }
+            if(userData.dailySessions) Object.assign(allSessions, userData.dailySessions);
+            if(userData.dailyReports) Object.assign(allReports, userData.dailyReports);
+            if(userData.surahProgress) Object.assign(allSurahProgress, userData.surahProgress);
+        });
+        
         setStudents(allStudents);
         setDailySessions(allSessions);
         setDailyReports(allReports);
         setSurahProgress(allSurahProgress);
       } else {
         // Regular user, just set their own data
-        if (data) {
-          const storedStudents = data.students ? Object.values(data.students).map((s: any) => ({
-              ...s,
-              birthDate: new Date(s.birthDate),
-              registrationDate: new Date(s.registrationDate),
-              updatedAt: new Date(s.updatedAt)
-          })) : [];
-          setStudents(storedStudents);
-          setDailySessions(data.dailySessions || {});
-          setDailyReports(data.dailyReports || {});
-          setSurahProgress(data.surahProgress || {});
-        } else {
-            setStudents([]); setDailySessions({});
-            setDailyReports({}); setSurahProgress({});
-        }
+        const storedStudents = data.students ? Object.values(data.students).map((s: any) => ({
+            ...s,
+            ownerId: user.uid, // Attach owner's UID
+            birthDate: new Date(s.birthDate),
+            registrationDate: new Date(s.registrationDate),
+            updatedAt: new Date(s.updatedAt)
+        })) : [];
+        setStudents(storedStudents);
+        setDailySessions(data.dailySessions || {});
+        setDailyReports(data.dailyReports || {});
+        setSurahProgress(data.surahProgress || {});
       }
       setLoading(false);
     }, (error) => {
@@ -117,19 +123,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     return () => off(dataRef, 'value', onData);
     
   }, [user, authLoading]);
-  
-  const saveDataToDb = useCallback((path: string, data: any) => {
-      if (!user) return;
-      const dataRef = ref(db, `users/${user.uid}/${path}`);
-      set(dataRef, data);
-  }, [user]);
 
-  const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => {
+  const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
     if (!user) return;
     const studentId = uuidv4();
     const newStudent: Student = {
       ...studentData,
       id: studentId,
+      ownerId: user.uid,
       memorizedSurahsCount: 0,
       updatedAt: new Date(),
     };
@@ -137,35 +138,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     set(studentRef, {...newStudent, birthDate: newStudent.birthDate.toISOString(), registrationDate: newStudent.registrationDate.toISOString(), updatedAt: newStudent.updatedAt.toISOString() });
   };
   
-  const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[]) => {
+  const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
      if (!user) return;
-     const updates: { [key: string]: any } = {};
-     newStudents.forEach(s => {
-       const studentId = uuidv4();
-       const studentToSave: Student = {
-         ...s,
-         id: studentId,
-         memorizedSurahsCount: 0,
-         updatedAt: new Date(),
-       };
-       updates[`users/${user.uid}/students/${studentId}`] = {...studentToSave, birthDate: studentToSave.birthDate.toISOString(), registrationDate: studentToSave.registrationDate.toISOString(), updatedAt: studentToSave.updatedAt.toISOString()};
-     });
-     // This needs a multi-path update which is more complex.
-     // For simplicity, we'll update one by one for now.
-     // This is less efficient but works.
      newStudents.forEach(s => addStudent(s));
   }
 
   const updateStudent = (studentId: string, updatedData: Partial<Student>) => {
-    if (!user) return;
     const studentToUpdate = students.find(s => s.id === studentId);
-    if (!studentToUpdate) return;
+    if (!studentToUpdate || !studentToUpdate.ownerId) return;
     
-    // Find the owner of the student to update in the correct path for admin
-    // This is a simplification. A real multi-tenant app would need to store the owner's UID with the student.
-    // For now, we assume admin edits will happen on their own data or this needs a more complex structure.
-    // Let's assume for now, updates only happen for the current user's students.
-    const studentRef = ref(db, `users/${user.uid}/students/${studentId}`);
+    const ownerUid = studentToUpdate.ownerId;
+    const studentRef = ref(db, `users/${ownerUid}/students/${studentId}`);
     const finalData = { ...studentToUpdate, ...updatedData, updatedAt: new Date() };
 
     set(studentRef, {
@@ -177,19 +160,25 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deleteStudent = (studentId: string) => {
-      if (!user) return;
-      const studentRef = ref(db, `users/${user.uid}/students/${studentId}`);
+      const studentToDelete = students.find(s => s.id === studentId);
+      if (!studentToDelete || !studentToDelete.ownerId) return;
+      
+      const ownerUid = studentToDelete.ownerId;
+      const studentRef = ref(db, `users/${ownerUid}/students/${studentId}`);
       remove(studentRef);
   }
   
   const deleteAllStudents = () => {
       if (!user) return;
+      // This action should only be performed by a user on their own data.
+      // Admin should delete users one by one or via a dedicated admin function.
       const studentsRef = ref(db, `users/${user.uid}/students`);
       remove(studentsRef);
   }
 
   const addDailySession = (session: DailySession) => {
     if (!user) return;
+    // We assume sessions are owned by the current user. Admin can see all, but only writes for their own group if they have one.
     const sessionRef = ref(db, `users/${user.uid}/dailySessions/${session.date}`);
     set(sessionRef, session);
   };
@@ -228,7 +217,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number) => {
-    if (!user) return;
+    const student = students.find(s => s.id === studentId);
+    if (!student || !student.ownerId) return;
+    const ownerUid = student.ownerId;
     
     let newProgress: number[] = [];
     const studentProgress = surahProgress[studentId] ? [...surahProgress[studentId]] : [];
@@ -241,10 +232,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
     newProgress = studentProgress;
     
-    const surahProgressRef = ref(db, `users/${user.uid}/surahProgress/${studentId}`);
+    const surahProgressRef = ref(db, `users/${ownerUid}/surahProgress/${studentId}`);
     set(surahProgressRef, newProgress);
     
-    // After updating progress, update the student's memorized surahs count
     updateStudent(studentId, { memorizedSurahsCount: newProgress.length });
   }
 
