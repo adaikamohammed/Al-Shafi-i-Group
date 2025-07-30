@@ -232,7 +232,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   return (
     <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus }}>
       {children}
-    </Student.Provider>
+    </StudentContext.Provider>
   );
 };
 
