@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -9,11 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, AlertTriangle, FileDown, FileText as FileTextIcon } from 'lucide-react';
+import { Loader2, AlertTriangle, FileDown, FileText as FileTextIcon, MessageCircle } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, startOfYear, endOfYear, setMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { surahs as allSurahs } from '@/lib/surahs';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 
 const calculateAge = (birthDate?: Date) => {
@@ -26,6 +26,7 @@ const calculateAge = (birthDate?: Date) => {
 export default function StudentReportPage() {
     const { students, dailySessions, surahProgress, loading } = useStudentContext();
     const { user } = useAuth();
+    const { toast } = useToast();
     
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
     const [reportPeriod, setReportPeriod] = useState<'month' | 'season' | 'year'>('month');
@@ -157,6 +158,49 @@ export default function StudentReportPage() {
             document.body.removeChild(fileDownload);
         }
     };
+    
+    const handleCopyWhatsAppReport = () => {
+        if (!reportData) return;
+
+        const { student, stats, memorizedSurahs, reportTitle, statsPeriod } = reportData;
+        const surahsText = memorizedSurahs.length > 0 
+            ? memorizedSurahs.map(s => s.name).join('، ') 
+            : "لا توجد سور محفوظة مسجلة.";
+        const totalSessionDays = stats.present + stats.absent + stats.late + stats.makeup;
+        const attendanceRate = totalSessionDays > 0 
+            ? Math.round((stats.present / totalSessionDays) * 100) + "%" 
+            : "غير متاح";
+        const notes = teacherNote.trim() || "لا توجد ملاحظات إضافية.";
+        const sheikhName = user?.displayName || "الشيخ";
+
+        const message = `📢 *تقرير ${reportTitle} شامل لأداء الطالب: ${student.fullName}*
+
+📆 *الفترة*: ${statsPeriod}
+👨‍🏫 *الشيخ المسؤول*: ${sheikhName}
+👨‍👦 *اسم الولي*: ${student.guardianName || 'غير محدد'}
+
+📖 *السور المحفوظة (${memorizedSurahs.length})*: ${surahsText}
+📊 *معدل الحضور*: ${attendanceRate} (حضر ${stats.present} من ${totalSessionDays} حصة)
+
+📝 *ملاحظات الشيخ*:
+${notes}
+
+📤 هذا التقرير تم إعداده تلقائيًا من قبل نظام إدارة مدرسة الإمام الشافعي.`;
+
+        navigator.clipboard.writeText(message).then(() => {
+            toast({
+                title: "✅ تم النسخ بنجاح!",
+                description: "الرسالة جاهزة للصق في واتساب.",
+            });
+        }).catch(err => {
+            console.error('Failed to copy: ', err);
+            toast({
+                title: "❌ فشل النسخ",
+                description: "لم نتمكن من نسخ الرسالة. حاول مرة أخرى.",
+                variant: "destructive",
+            });
+        });
+    };
 
 
     if (loading) {
@@ -240,6 +284,10 @@ export default function StudentReportPage() {
                             <FileTextIcon className="ml-2 h-4 w-4" />
                             حفظ بصيغة Word
                         </Button>
+                        <Button onClick={handleCopyWhatsAppReport} disabled={!selectedStudentId} variant="secondary">
+                            <MessageCircle className="ml-2 h-4 w-4" />
+                            نسخ رسالة واتساب
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -248,7 +296,7 @@ export default function StudentReportPage() {
                 <CardHeader><CardTitle>ملاحظات الشيخ للتقرير</CardTitle></CardHeader>
                 <CardContent>
                     <Textarea 
-                        placeholder="أضف ملاحظاتك هنا لتظهر في التقرير المطبوع..."
+                        placeholder="أضف ملاحظاتك هنا لتظهر في التقرير المطبوع ورسالة واتساب..."
                         value={teacherNote}
                         onChange={e => setTeacherNote(e.target.value)}
                         rows={4}
@@ -397,3 +445,5 @@ export default function StudentReportPage() {
         </div>
     );
 }
+
+    
