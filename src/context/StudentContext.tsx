@@ -41,46 +41,58 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
   // Load data from Firebase when user is authenticated
   useEffect(() => {
-    if (authLoading) return;
-    setLoading(true);
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
 
-    if (user) {
-      const userRef = ref(db, `users/${user.uid}`);
-
-      const onData = onValue(userRef, (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          const storedStudents = (data.students || []).map((s: any) => ({
-              ...s,
-              birthDate: new Date(s.birthDate),
-              registrationDate: new Date(s.registrationDate),
-              updatedAt: new Date(s.updatedAt)
-          }));
-          setStudents(storedStudents);
-          setDailySessions(data.dailySessions || {});
-          setDailyReports(data.dailyReports || {});
-          setSurahProgress(data.surahProgress || {});
-        } else {
-            // No data in DB, initialize with empty state
-            setStudents([]);
-            setDailySessions({});
-            setDailyReports({});
-            setSurahProgress({});
-        }
-        setLoading(false);
-      });
-      
-      // Detach listener on cleanup
-      return () => off(userRef, 'value', onData);
-      
-    } else {
-      // Clear data if user logs out
+    if (!user) {
       setStudents([]);
       setDailySessions({});
       setDailyReports({});
       setSurahProgress({});
       setLoading(false);
+      return;
     }
+    
+    setLoading(true);
+    const userRef = ref(db, `users/${user.uid}`);
+
+    const onData = onValue(userRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const storedStudents = (data.students || []).map((s: any) => ({
+            ...s,
+            birthDate: new Date(s.birthDate),
+            registrationDate: new Date(s.registrationDate),
+            updatedAt: new Date(s.updatedAt)
+        }));
+        setStudents(storedStudents);
+        setDailySessions(data.dailySessions || {});
+        setDailyReports(data.dailyReports || {});
+        setSurahProgress(data.surahProgress || {});
+      } else {
+          // Data is null, which means no data exists for this user yet.
+          // This is a valid state, not an error.
+          setStudents([]);
+          setDailySessions({});
+          setDailyReports({});
+          setSurahProgress({});
+      }
+      setLoading(false);
+    }, (error) => {
+        // Handle potential errors during data fetching
+        console.error("Firebase data fetching failed:", error);
+        setStudents([]);
+        setDailySessions({});
+        setDailyReports({});
+        setSurahProgress({});
+        setLoading(false); // Ensure loading stops even on error
+    });
+    
+    // Detach listener on cleanup
+    return () => off(userRef, 'value', onData);
+    
   }, [user, authLoading]);
   
   const saveDataToDb = useCallback((path: string, data: any) => {
