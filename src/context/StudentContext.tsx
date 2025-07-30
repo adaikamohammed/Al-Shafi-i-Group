@@ -6,9 +6,8 @@ import type { Student, DailySession, DailyReport } from '@/lib/types';
 import { isWithinInterval, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { ref, set, onValue, off, remove } from 'firebase/database';
-import { onAuthStateChanged, User } from 'firebase/auth';
 
 interface StudentContextType {
   students: Student[];
@@ -32,7 +31,7 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
   const [dailyReports, setDailyReports] = useState<Record<string, DailyReport>>({});
@@ -40,55 +39,69 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // onAuthStateChanged is the key to ensure we have the user object before fetching data.
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    // If auth is still loading, we should also be in a loading state.
+    if (authLoading) {
       setLoading(true);
+      return;
+    }
 
-      if (currentUser) {
-        let dbRef;
-        // Determine the database path based on user role
-        if (currentUser.email === 'admin@gmail.com') {
-          dbRef = ref(db, 'users');
+    // If there is no user, reset all data and stop loading.
+    if (!user) {
+      setStudents([]);
+      setDailySessions({});
+      setDailyReports({});
+      setSurahProgress({});
+      setLoading(false);
+      return;
+    }
+
+    // At this point, we have a user. Let's fetch data based on their role.
+    setLoading(true);
+    let dbRef;
+
+    if (user.email === 'admin@gmail.com') {
+      // Admin user logic: fetch all data
+      dbRef = ref(db, 'users');
+    } else {
+      // Regular user logic: fetch their own data
+      dbRef = ref(db, `users/${user.uid}`);
+    }
+
+    const handleValueChange = (snapshot: any) => {
+        const data = snapshot.val();
+        if (user.email === 'admin@gmail.com') {
+             let allStudents: Student[] = [];
+             let allSessions: Record<string, DailySession> = {};
+             let allReports: Record<string, DailyReport> = {};
+             let allSurahProgress: Record<string, number[]> = {};
+
+             if (data) {
+                 Object.entries(data).forEach(([uid, userData]: [string, any]) => {
+                     if (userData.students) {
+                         const userStudents: Student[] = Object.values(userData.students).map((s: any) => ({
+                             ...s,
+                             id: s.id || uuidv4(),
+                             ownerId: uid,
+                             birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+                             registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+                             updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+                         }));
+                         allStudents.push(...userStudents);
+                     }
+                     if (userData.dailySessions) Object.assign(allSessions, userData.dailySessions);
+                     if (userData.dailyReports) Object.assign(allReports, userData.dailyReports);
+                     if (userData.surahProgress) Object.assign(allSurahProgress, userData.surahProgress);
+                 });
+             }
+             setStudents(allStudents);
+             setDailySessions(allSessions);
+             setDailyReports(allReports);
+             setSurahProgress(allSurahProgress);
         } else {
-          dbRef = ref(db, `users/${currentUser.uid}`);
-        }
-
-        onValue(dbRef, (snapshot) => {
-          const data = snapshot.val();
-          
-          if (currentUser.email === 'admin@gmail.com') {
-            // Admin user logic: aggregate data from all users
-            let allStudents: Student[] = [];
-            let allSessions: Record<string, DailySession> = {};
-            let allReports: Record<string, DailyReport> = {};
-            let allSurahProgress: Record<string, number[]> = {};
-
-            if (data) {
-                Object.entries(data).forEach(([uid, userData]: [string, any]) => {
-                    if (userData.students) {
-                        const userStudents: Student[] = Object.values(userData.students).map((s: any) => ({
-                            ...s,
-                            ownerId: uid, // IMPORTANT: Store the owner's UID
-                            birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-                            registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-                            updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-                        }));
-                        allStudents.push(...userStudents);
-                    }
-                    if (userData.dailySessions) Object.assign(allSessions, userData.dailySessions);
-                    if (userData.dailyReports) Object.assign(allReports, userData.dailyReports);
-                    if (userData.surahProgress) Object.assign(allSurahProgress, userData.surahProgress);
-                });
-            }
-            setStudents(allStudents);
-            setDailySessions(allSessions);
-            setDailyReports(allReports);
-            setSurahProgress(allSurahProgress);
-          } else {
-             // Regular user logic: get data from their own node
-             const storedStudents = data?.students ? Object.values(data.students).map((s: any) => ({
+            const storedStudents = data?.students ? Object.values(data.students).map((s: any) => ({
                 ...s,
-                ownerId: currentUser.uid,
+                id: s.id || uuidv4(),
+                ownerId: user.uid,
                 birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
                 registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
                 updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
@@ -97,28 +110,22 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             setDailySessions(data?.dailySessions || {});
             setDailyReports(data?.dailyReports || {});
             setSurahProgress(data?.surahProgress || {});
-          }
-          setLoading(false);
-        }, (error) => {
-          console.error("Firebase data fetching failed:", error);
-          setLoading(false);
-        });
-
-        // The function to detach the listener will be the return value of onAuthStateChanged
-        return () => off(dbRef);
-      } else {
-        // No user is logged in
-        setStudents([]);
-        setDailySessions({});
-        setDailyReports({});
-        setSurahProgress({});
+        }
         setLoading(false);
-      }
-    });
+    };
 
-    // Cleanup the subscription on component unmount
-    return () => unsubscribe();
-  }, []); // The empty dependency array ensures this effect runs only once
+    const handleError = (error: Error) => {
+        console.error("Firebase data fetching failed:", error);
+        setLoading(false);
+    };
+
+    onValue(dbRef, handleValueChange, handleError);
+
+    // Cleanup function to detach the listener when the component unmounts or user changes
+    return () => {
+      off(dbRef, 'value', handleValueChange);
+    };
+  }, [user, authLoading]); // Rerun effect when user or authLoading changes
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
     if (!user) return;
@@ -165,7 +172,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const deleteAllStudents = () => {
-      if (!user || user.email === 'admin@gmail.com') return; // Prevent admin from deleting all students of one user
+      if (!user || user.email === 'admin@gmail.com') return;
       const studentsRef = ref(db, `users/${user.uid}/students`);
       remove(studentsRef);
   }
@@ -173,18 +180,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const addDailySession = (session: DailySession) => {
     if (!user) return;
 
-    // Determine the correct owner UID
     let ownerUid;
     if (user.email === 'admin@gmail.com') {
-      // For admin, find the owner from the first student in the record
       const firstStudentId = session.records[0]?.studentId;
       if (firstStudentId) {
           ownerUid = students.find(s => s.id === firstStudentId)?.ownerId;
       }
-      // If no records (e.g., holiday) or student not found, we can't determine owner, so we bail.
-      if (!ownerUid) return;
+      if (!ownerUid) {
+        console.error("Admin tried to save a session, but owner could not be determined.");
+        return;
+      }
     } else {
-      // For regular users, it's their own UID
       ownerUid = user.uid;
     }
     
@@ -193,6 +199,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deleteDailySession = (date: string) => {
+    if (!user) return;
     const sessionToDelete = dailySessions[date];
     if (!sessionToDelete) return;
 
@@ -201,16 +208,18 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     if (firstStudentId) {
         ownerUid = students.find(s => s.id === firstStudentId)?.ownerId;
-    } else if (user) {
-        // This is likely a holiday added by the current user. Only they can delete it.
-        // Admin cannot delete holidays without a student context.
+    } else {
+        // This is likely a holiday added by a user.
+        // We can't determine the owner if we are admin, but a user can delete their own.
         ownerUid = user.uid;
     }
     
-    if (!ownerUid) return; // Cannot determine owner.
+    if (!ownerUid) {
+      console.error("Could not delete session: owner UID not found.");
+      return;
+    }
     
-    // Check if the current user has permission
-    if (user && (user.uid === ownerUid || user.email === 'admin@gmail.com')) {
+    if (user.uid === ownerUid || user.email === 'admin@gmail.com') {
         const sessionRef = ref(db, `users/${ownerUid}/dailySessions/${date}`);
         remove(sessionRef);
     }
@@ -248,7 +257,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     if (!student || !student.ownerId) return;
     const ownerUid = student.ownerId;
     
-    let newProgress: number[] = [];
     const studentProgress = surahProgress[studentId] ? [...surahProgress[studentId]] : [];
     const surahIndex = studentProgress.indexOf(surahId);
 
@@ -257,12 +265,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     } else {
         studentProgress.push(surahId);
     }
-    newProgress = studentProgress;
     
     const surahProgressRef = ref(db, `users/${ownerUid}/surahProgress/${studentId}`);
-    set(surahProgressRef, newProgress);
+    set(surahProgressRef, studentProgress);
     
-    updateStudent(studentId, { memorizedSurahsCount: newProgress.length });
+    updateStudent(studentId, { memorizedSurahsCount: studentProgress.length });
   }
 
   return (
