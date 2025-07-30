@@ -21,7 +21,7 @@ export default function DataExchangePage() {
   const monthlySessionFileInputRef = useRef<HTMLInputElement>(null);
 
   const { students, addDailySession, getRecordsForDateRange, importStudents } = useStudentContext();
-  const activeStudents = students.filter(s => s.status === 'نشط');
+  const activeStudents = (students ?? []).filter(s => s.status === 'نشط');
 
   // State for monthly export
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
@@ -89,7 +89,7 @@ export default function DataExchangePage() {
 
         const json = XLSX.utils.sheet_to_json<any>(worksheet, { raw: false });
 
-        const existingStudentNames = new Set(students.map(s => s.fullName.trim().toLowerCase()));
+        const existingStudentNames = new Set((students ?? []).map(s => s.fullName.trim().toLowerCase()));
         const newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[] = [];
         let skippedCount = 0;
 
@@ -218,7 +218,7 @@ export default function DataExchangePage() {
                 return;
             }
             
-            const student = students.find(s => s.fullName === currentStudentName);
+            const student = (students ?? []).find(s => s.fullName === currentStudentName);
             if (!student) {
                 errors.push(`⚠️ الصف رقم ${index + 2}: لم يتم العثور على الطالب "${currentStudentName}".`);
                 return;
@@ -311,7 +311,7 @@ export default function DataExchangePage() {
                        const studentName = row['اسم الطالب']?.trim();
                        if (!studentName) return; // Skip if no student name
 
-                       const student = students.find(s => s.fullName === studentName);
+                       const student = (students ?? []).find(s => s.fullName === studentName);
                        if (!student) {
                            errors.push(`لم يتم العثور على الطالب "${studentName}" في ورقة ${sheetName}`);
                            return;
@@ -425,8 +425,8 @@ export default function DataExchangePage() {
                     'نوع الحصة': 'يوم عطلة',
                 }];
             } else {
-                 dataForSheet = session.records.map(record => {
-                    const student = students.find(s => s.id === record.studentId);
+                 dataForSheet = (session.records ?? []).map(record => {
+                    const student = (students ?? []).find(s => s.id === record.studentId);
                     return {
                         'التاريخ': format(parseISO(date), 'dd/MM/yyyy'),
                         'اليوم': format(parseISO(date), 'EEEE', { locale: ar }),

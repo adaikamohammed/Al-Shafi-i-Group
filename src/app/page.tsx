@@ -58,7 +58,7 @@ export default function StudentManagementPage() {
   };
   
   const handleExportStudents = () => {
-    const dataToExport = students.map(s => ({
+    const dataToExport = (students ?? []).map(s => ({
         "الاسم الكامل": s.fullName,
         "اسم الولي": s.guardianName,
         "رقم الهاتف 1": s.phone1,
@@ -86,7 +86,7 @@ export default function StudentManagementPage() {
         "محذوف": 4,
     };
 
-    return students
+    return (students ?? [])
         .filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()))
         .sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
   }, [students, searchTerm]);
@@ -99,7 +99,7 @@ export default function StudentManagementPage() {
     );
   }
   
-   if (students.length === 0 && !loading) {
+   if ((students ?? []).length === 0 && !loading) {
       return (
         <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
             <h1 className="text-2xl font-bold mb-4">لا يوجد طلاب بعد</h1>
@@ -157,13 +157,13 @@ export default function StudentManagementPage() {
             />
          </div>
          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleExportStudents} disabled={students.length === 0}>
+            <Button variant="outline" onClick={handleExportStudents} disabled={(students ?? []).length === 0}>
                 <Download className="ml-2 h-4 w-4" />
                 تصدير الطلبة (Excel)
             </Button>
             <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button variant="destructive" disabled={students.length === 0}>
+                    <Button variant="destructive" disabled={(students ?? []).length === 0}>
                         <Trash2 className="ml-2 h-4 w-4" />
                         حذف كل الطلبة
                     </Button>

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -94,7 +95,7 @@ export default function WeeklyFollowUpPage() {
     const [currentDate, setCurrentDate] = useState(new Date());
 
     const activeStudents = useMemo(() => {
-        const filtered = students.filter(s => s.status === 'نشط');
+        const filtered = (students ?? []).filter(s => s.status === 'نشط');
         if (selectedStudentId !== 'all') {
             return filtered.filter(s => s.id === selectedStudentId);
         }
@@ -122,7 +123,7 @@ export default function WeeklyFollowUpPage() {
         );
     }
     
-     if (students.filter(s => s.status === 'نشط').length === 0 && !loading) {
+     if ((students ?? []).filter(s => s.status === 'نشط').length === 0 && !loading) {
         return (
             <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
                 <AlertTriangle className="h-16 w-16 text-yellow-400" />
@@ -153,7 +154,7 @@ export default function WeeklyFollowUpPage() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">كل الطلبة النشطين</SelectItem>
-                                {students.filter(s => s.status === 'نشط').map(student => (
+                                {(students ?? []).filter(s => s.status === 'نشط').map(student => (
                                     <SelectItem key={student.id} value={student.id}>
                                         {student.fullName}
                                     </SelectItem>
@@ -179,8 +180,8 @@ export default function WeeklyFollowUpPage() {
                                     <div className="font-semibold self-center text-center p-2 bg-muted rounded-md">{student.fullName}</div>
                                     {weekDates.map(date => {
                                          const dateString = format(date, 'yyyy-MM-dd');
-                                         const session = dailySessions[dateString];
-                                         const record = session?.records.find(r => r.studentId === student.id);
+                                         const session = dailySessions ? dailySessions[dateString] : undefined;
+                                         const record = session?.records?.find(r => r.studentId === student.id);
                                          return (
                                             <DayCell key={date.toISOString()} session={session} record={record} date={date}/>
                                          )

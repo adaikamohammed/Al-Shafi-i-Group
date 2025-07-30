@@ -28,7 +28,7 @@ export default function DailyReportPage() {
 
     useEffect(() => {
         if (user) {
-            const todaysReport = Object.values(dailyReports).find(r => r.date === todayStr && r.authorId === user.uid);
+            const todaysReport = Object.values(dailyReports ?? {}).find(r => r.date === todayStr && r.authorId === user.uid);
             if (todaysReport) {
                 setNote(todaysReport.note);
             }
@@ -65,7 +65,7 @@ export default function DailyReportPage() {
     };
     
     const sortedReports = useMemo(() => {
-        return Object.values(dailyReports)
+        return Object.values(dailyReports ?? {})
             .filter(report => report.note.toLowerCase().includes(searchTerm.toLowerCase()) || report.authorName.toLowerCase().includes(searchTerm.toLowerCase()))
             .sort((a, b) => b.date.localeCompare(a.date));
     }, [dailyReports, searchTerm]);
@@ -92,7 +92,7 @@ export default function DailyReportPage() {
                     />
                     <Button onClick={handleSaveReport} disabled={isSaving} className="mt-4">
                         {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                        {Object.values(dailyReports).some(r => r.date === todayStr && r.authorId === user?.uid) ? 'تحديث تقرير اليوم' : 'حفظ تقرير اليوم'}
+                        {Object.values(dailyReports ?? {}).some(r => r.date === todayStr && r.authorId === user?.uid) ? 'تحديث تقرير اليوم' : 'حفظ تقرير اليوم'}
                     </Button>
                 </CardContent>
             </Card>

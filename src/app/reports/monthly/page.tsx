@@ -32,20 +32,20 @@ export default function MonthlyStatisticsPage() {
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     
-    const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
+    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
 
     const monthlyData = useMemo(() => {
         const startDate = new Date(selectedYear, selectedMonth, 1);
         const endDate = new Date(selectedYear, selectedMonth, getDaysInMonth(startDate));
         
-        const filteredSessions = Object.values(dailySessions).filter(session => {
+        const filteredSessions = Object.values(dailySessions ?? {}).filter(session => {
             const sessionDate = parseISO(session.date);
             return sessionDate >= startDate && sessionDate <= endDate;
         });
 
         let recordsSource = selectedStudentId === 'all' 
-            ? filteredSessions.flatMap(s => s.records)
-            : filteredSessions.flatMap(s => s.records.filter(r => r.studentId === selectedStudentId));
+            ? filteredSessions.flatMap(s => s.records ?? [])
+            : filteredSessions.flatMap(s => (s.records ?? []).filter(r => r.studentId === selectedStudentId));
 
         const stats = {
             totalRecords: recordsSource.length,
@@ -74,7 +74,7 @@ export default function MonthlyStatisticsPage() {
         const studentSpecificRecords: { [key: string]: SessionRecord & {sessionType: string} } = {};
         if (selectedStudentId !== 'all') {
             filteredSessions.forEach(session => {
-                 const record = session.records.find(r => r.studentId === selectedStudentId);
+                 const record = (session.records ?? []).find(r => r.studentId === selectedStudentId);
                  if (record) {
                      studentSpecificRecords[session.date] = {...record, sessionType: session.sessionType};
                  } else if (session.sessionType === 'يوم عطلة') {
@@ -279,7 +279,7 @@ export default function MonthlyStatisticsPage() {
              {selectedStudentId !== 'all' && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>تقويم الطالب: {activeStudents.find(s => s.id === selectedStudentId)?.fullName}</CardTitle>
+                        <CardTitle>تقويم الطالب: {(activeStudents ?? []).find(s => s.id === selectedStudentId)?.fullName}</CardTitle>
                         <CardDescription>نظرة سريعة على حضور الطالب خلال الشهر المحدد.</CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -337,7 +337,7 @@ export default function MonthlyStatisticsPage() {
                              <CardDescription>
                                 {selectedStudentId === 'all' 
                                 ? 'متوسط تقييم جميع الطلاب خلال الشهر المحدد' 
-                                : `تقييمات الطالب ${students.find(s=>s.id === selectedStudentId)?.fullName} خلال الشهر`}
+                                : `تقييمات الطالب ${(students ?? []).find(s=>s.id === selectedStudentId)?.fullName} خلال الشهر`}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>

@@ -43,13 +43,13 @@ export default function RankingPage() {
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
-    const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
+    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
 
     const rankingData: StudentScore[] = useMemo(() => {
         const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
         const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
 
-        const filteredSessions = Object.values(dailySessions).filter(session => {
+        const filteredSessions = Object.values(dailySessions ?? {}).filter(session => {
             const sessionDate = parseISO(session.date);
             return sessionDate >= startDate && sessionDate <= endDate;
         });
@@ -66,7 +66,7 @@ export default function RankingPage() {
         });
 
         filteredSessions.forEach(session => {
-            session.records.forEach(record => {
+            (session.records ?? []).forEach(record => {
                 if (studentScores[record.studentId]) {
                     let points = 0;
                     if (record.attendance) {

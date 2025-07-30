@@ -131,7 +131,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const updateStudent = (studentId: string, updatedData: Partial<Student>) => {
     if (!authContextUser) return;
     
-    const originalStudent = students.find(s => s.id === studentId);
+    const originalStudent = (students ?? []).find(s => s.id === studentId);
     if (!originalStudent) return;
     
     const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
@@ -170,7 +170,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const getSessionForDate = (date: string): DailySession | undefined => {
-      return dailySessions[date];
+      return dailySessions ? dailySessions[date] : undefined;
   }
 
   const getRecordsForDateRange = (startDate: string, endDate: string): Record<string, DailySession> => {
@@ -178,7 +178,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const end = parseISO(endDate);
       const filteredSessions: Record<string, DailySession> = {};
 
-       Object.entries(dailySessions).forEach(([date, session]) => {
+       Object.entries(dailySessions ?? {}).forEach(([date, session]) => {
            try {
                 if(isWithinInterval(parseISO(date), { start, end })) {
                     filteredSessions[date] = session;
@@ -199,7 +199,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
  const toggleSurahStatus = (studentId: string, surahId: number) => {
     if (!authContextUser) return;
 
-    const studentProgressList = surahProgress[studentId] ? [...surahProgress[studentId]] : [];
+    const studentProgressList = (surahProgress ? surahProgress[studentId] : []) || [];
     const surahIndex = studentProgressList.indexOf(surahId);
 
     if (surahIndex > -1) {

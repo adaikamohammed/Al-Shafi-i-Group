@@ -19,14 +19,14 @@ export default function SurahProgressPage() {
     const { students, surahProgress, toggleSurahStatus, loading } = useStudentContext();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
 
-    const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
+    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
 
     const selectedStudent = useMemo(() => {
         return activeStudents.find(s => s.id === selectedStudentId);
     }, [activeStudents, selectedStudentId]);
 
     const studentProgress = useMemo(() => {
-        if (!selectedStudentId) return [];
+        if (!selectedStudentId || !surahProgress) return [];
         return surahProgress[selectedStudentId] || [];
     }, [surahProgress, selectedStudentId]);
 
@@ -38,7 +38,7 @@ export default function SurahProgressPage() {
     const leaderboard = useMemo(() => {
         return activeStudents.map(student => ({
             ...student,
-            savedCount: surahProgress[student.id]?.length || 0
+            savedCount: (surahProgress && surahProgress[student.id]?.length) || 0
         })).sort((a,b) => b.savedCount - a.savedCount);
     }, [activeStudents, surahProgress]);
 

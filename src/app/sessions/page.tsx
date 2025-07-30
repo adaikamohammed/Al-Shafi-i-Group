@@ -45,7 +45,7 @@ export default function DailySessionsPage() {
   
   const { students, dailySessions, loading, getSessionForDate, addDailySession, deleteDailySession } = useStudentContext();
   const activeStudents = useMemo(() => 
-    students.filter(s => s.status === "نشط"), 
+    (students ?? []).filter(s => s.status === "نشط"), 
   [students]);
 
   const handleDayClick = (day: number) => {
@@ -93,8 +93,8 @@ export default function DailySessionsPage() {
             'نوع الحصة': 'يوم عطلة',
         }];
     } else {
-        dataForSheet = session.records.map(record => {
-            const student = students.find(s => s.id === record.studentId);
+        dataForSheet = (session.records ?? []).map(record => {
+            const student = (students ?? []).find(s => s.id === record.studentId);
             return {
                 'التاريخ': readableDate,
                 'اليوم': dayName,
@@ -135,7 +135,7 @@ export default function DailySessionsPage() {
     for (let day = 1; day <= daysInMonth; day++) {
         const dayDate = new Date(year, month, day);
         const formattedDayDate = format(dayDate, 'yyyy-MM-dd');
-        const session = dailySessions[formattedDayDate];
+        const session = dailySessions ? dailySessions[formattedDayDate] : undefined;
         const isHoliday = session?.sessionType === 'يوم عطلة';
         
         let dayStatusClass = '';
@@ -315,8 +315,8 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
         if (existingSession.sessionType === 'يوم عطلة') {
             setRecords([]);
         } else {
-             const updatedRecords = students.map(s => {
-                const existingRec = existingSession.records.find(r => r.studentId === s.id);
+             const updatedRecords = (students ?? []).map(s => {
+                const existingRec = (existingSession.records ?? []).find(r => r.studentId === s.id);
                 return existingRec || {
                     studentId: s.id,
                     attendance: 'حاضر',
@@ -327,7 +327,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
             setRecords(updatedRecords);
         }
     } else {
-        const initialRecords = students.map(s => ({
+        const initialRecords = (students ?? []).map(s => ({
             studentId: s.id,
             attendance: 'حاضر',
             memorization: null, review: false, behavior: 'هادئ',
@@ -417,8 +417,8 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
               </TableRow>
             </TableHeader>
             <TableBody>
-              {students.map(student => {
-                const record = records.find(r => r.studentId === student.id);
+              {(students ?? []).map(student => {
+                const record = (records ?? []).find(r => r.studentId === student.id);
                 if (!record) return null;
                 const isAbsent = record.attendance === 'غائب';
                 const isRowDisabled = isAbsent || (isActivitySession && !isMakeupSession);

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -33,7 +34,7 @@ export default function StudentReportPage() {
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [teacherNote, setTeacherNote] = useState('');
 
-    const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
+    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
 
      useEffect(() => {
         if(activeStudents.length > 0 && !selectedStudentId) {
@@ -44,7 +45,7 @@ export default function StudentReportPage() {
     const reportData = useMemo(() => {
         if (!selectedStudentId) return null;
         
-        const student = students.find(s => s.id === selectedStudentId);
+        const student = (students ?? []).find(s => s.id === selectedStudentId);
         if (!student) return null;
         
         let startDate: Date;
@@ -81,7 +82,7 @@ export default function StudentReportPage() {
 
         const totalDaysInRange = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24) + 1;
         
-        const sessionsInRange = Object.values(dailySessions).filter(session => {
+        const sessionsInRange = Object.values(dailySessions ?? {}).filter(session => {
             const sessionDate = parseISO(session.date);
             return sessionDate >= startDate && sessionDate <= endDate;
         });
@@ -90,7 +91,7 @@ export default function StudentReportPage() {
             if (session.sessionType === 'يوم عطلة') {
                 stats.holidays++;
             } else {
-                 const record = session.records.find(r => r.studentId === selectedStudentId);
+                 const record = (session.records ?? []).find(r => r.studentId === selectedStudentId);
                  if (record) {
                     switch (record.attendance) {
                         case 'حاضر': stats.present++; break;
@@ -102,7 +103,7 @@ export default function StudentReportPage() {
             }
         });
 
-        const studentSurahs = surahProgress[selectedStudentId] || [];
+        const studentSurahs = (surahProgress ?? {})[selectedStudentId] || [];
         const memorizedSurahObjects = allSurahs.filter(s => studentSurahs.includes(s.id));
 
         return {
