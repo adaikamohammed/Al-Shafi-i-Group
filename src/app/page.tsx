@@ -45,16 +45,15 @@ const calculateAge = (birthDate?: Date) => {
 
 export default function StudentManagementPage() {
   const { students, updateStudent, deleteStudent, loading, deleteAllStudents } = useStudentContext();
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleStatusChange = (student: Student, status: StudentStatus, reason?: string) => {
-    if (isAdmin) return; // Prevent admin from making changes
     if (status === 'محذوف') {
-        deleteStudent(student.id, student.ownerId);
+        deleteStudent(student.id);
     } else {
-        updateStudent(student.id, { status, actionReason: reason }, student.ownerId);
+        updateStudent(student.id, { status, actionReason: reason });
     }
   };
   
@@ -105,37 +104,9 @@ export default function StudentManagementPage() {
         <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
             <h1 className="text-2xl font-bold mb-4">لا يوجد طلاب بعد</h1>
             <p className="text-muted-foreground mb-6">ابدأ بإضافة طالب جديد أو استيراد قائمة الطلاب.</p>
-            {!isAdmin && (
-              <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
-              <DialogTrigger asChild>
-                  <Button>
-                  <PlusCircle className="ml-2 h-4 w-4" />
-                  إضافة طالب جديد
-                  </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
-                  <StudentForm 
-                  onSuccess={() => setAddStudentDialogOpen(false)} 
-                  onCancel={() => setAddStudentDialogOpen(false)}
-                  />
-              </DialogContent>
-              </Dialog>
-            )}
-        </div>
-      )
-  }
-
-  return (
-    <div className="space-y-6">
-       {!isAdmin && <DailyInspiration />}
-       
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-        <h1 className="text-3xl font-headline font-bold">إدارة الطلبة</h1>
-        <div className="flex w-full sm:w-auto items-center gap-2">
-          {!isAdmin && (
             <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
             <DialogTrigger asChild>
-                <Button className="w-full sm:w-auto">
+                <Button>
                 <PlusCircle className="ml-2 h-4 w-4" />
                 إضافة طالب جديد
                 </Button>
@@ -147,7 +118,31 @@ export default function StudentManagementPage() {
                 />
             </DialogContent>
             </Dialog>
-          )}
+        </div>
+      )
+  }
+
+  return (
+    <div className="space-y-6">
+       <DailyInspiration />
+       
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+        <h1 className="text-3xl font-headline font-bold">إدارة الطلبة</h1>
+        <div className="flex w-full sm:w-auto items-center gap-2">
+          <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
+          <DialogTrigger asChild>
+              <Button className="w-full sm:w-auto">
+              <PlusCircle className="ml-2 h-4 w-4" />
+              إضافة طالب جديد
+              </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px]">
+              <StudentForm 
+              onSuccess={() => setAddStudentDialogOpen(false)} 
+              onCancel={() => setAddStudentDialogOpen(false)}
+              />
+          </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -166,30 +161,27 @@ export default function StudentManagementPage() {
                 <Download className="ml-2 h-4 w-4" />
                 تصدير الطلبة (Excel)
             </Button>
-            {!isAdmin && (
-              <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                      <Button variant="destructive" disabled={students.length === 0}>
-                          <Trash2 className="ml-2 h-4 w-4" />
-                          حذف كل الطلبة
-                      </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                      <AlertDialogHeader>
-                          <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
-                          <AlertDialogDescription>
-                              سيؤدي هذا إلى حذف جميع بيانات الطلبة نهائيًا.
-                              {isAdmin ? ' سيتم حذف جميع الطلبة من جميع الأفواج.' : 'سيتم حذف جميع الطلبة من هذا الفوج.'}
-                              هذا الإجراء لا يمكن التراجع عنه.
-                          </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                          <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                          <AlertDialogAction onClick={deleteAllStudents}>نعم، قم بحذف الكل</AlertDialogAction>
-                      </AlertDialogFooter>
-                  </AlertDialogContent>
-              </AlertDialog>
-            )}
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={students.length === 0}>
+                        <Trash2 className="ml-2 h-4 w-4" />
+                        حذف كل الطلبة
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            سيؤدي هذا إلى حذف جميع بيانات الطلبة نهائيًا من هذا الفوج.
+                            هذا الإجراء لا يمكن التراجع عنه.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={deleteAllStudents}>نعم، قم بحذف الكل</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
          </div>
        </div>
 
@@ -207,11 +199,9 @@ export default function StudentManagementPage() {
                 <TableHead className="hidden lg:table-cell">العمر</TableHead>
                 <TableHead>الحالة</TableHead>
                 <TableHead className="hidden md:table-cell">السور المحفوظة</TableHead>
-                {!isAdmin && (
-                  <TableHead>
-                    <span className="sr-only">إجراءات</span>
-                  </TableHead>
-                )}
+                <TableHead>
+                  <span className="sr-only">إجراءات</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -225,16 +215,14 @@ export default function StudentManagementPage() {
                         <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{student.memorizedSurahsCount || 0}</TableCell>
-                    {!isAdmin && (
-                      <TableCell>
-                          <StudentActions student={student} onStatusChange={handleStatusChange} />
-                      </TableCell>
-                    )}
+                    <TableCell>
+                        <StudentActions student={student} onStatusChange={handleStatusChange} />
+                    </TableCell>
                     </TableRow>
                 ))
              ) : (
                 <TableRow>
-                    <TableCell colSpan={isAdmin ? 5 : 6} className="h-24 text-center">
+                    <TableCell colSpan={6} className="h-24 text-center">
                        {searchTerm ? "لم يتم العثور على طلاب مطابقين للبحث." : "لا يوجد طلبة حاليًا. قم بإضافة طالب جديد."}
                     </TableCell>
                 </TableRow>
@@ -250,9 +238,6 @@ export default function StudentManagementPage() {
 function StudentActions({ student, onStatusChange }: { student: Student, onStatusChange: (student: Student, status: StudentStatus, reason?: string) => void }) {
     const [isEditOpen, setEditOpen] = useState(false);
     const [actionReason, setActionReason] = useState('');
-    const { isAdmin } = useAuth();
-    
-    if (isAdmin) return null;
 
     return (
         <DropdownMenu>
@@ -362,7 +347,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 
     if (student) {
         // Update existing student
-        updateStudent(student.id, studentData, student.ownerId);
+        updateStudent(student.id, studentData);
     } else {
         // Add new student
         addStudent(studentData as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>);

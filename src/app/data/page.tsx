@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import type { Student, SessionRecord, SessionType } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
-import { useAuth } from '@/context/AuthContext';
 import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -22,7 +21,6 @@ export default function DataExchangePage() {
   const monthlySessionFileInputRef = useRef<HTMLInputElement>(null);
 
   const { students, addDailySession, getRecordsForDateRange, importStudents } = useStudentContext();
-  const { user, isAdmin } = useAuth();
   const activeStudents = students.filter(s => s.status === 'نشط');
 
   // State for monthly export
@@ -456,9 +454,9 @@ export default function DataExchangePage() {
 
   return (
     <div className="space-y-6">
-      <input type="file" ref={fileInputRef} onChange={handleStudentFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingStudents || isAdmin}/>
-      <input type="file" ref={sessionFileInputRef} onChange={handleSessionFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingSessions || isAdmin}/>
-      <input type="file" ref={monthlySessionFileInputRef} onChange={handleMonthlySessionUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingMonthly || isAdmin}/>
+      <input type="file" ref={fileInputRef} onChange={handleStudentFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingStudents}/>
+      <input type="file" ref={sessionFileInputRef} onChange={handleSessionFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingSessions}/>
+      <input type="file" ref={monthlySessionFileInputRef} onChange={handleMonthlySessionUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingMonthly}/>
       
       <h1 className="text-3xl font-headline font-bold">استيراد وتصدير البيانات</h1>
       
@@ -475,7 +473,7 @@ export default function DataExchangePage() {
               لن يتم إضافة طالب إذا كان اسمه الكامل موجودًا بالفعل في النظام. استخدم النموذج الرسمي.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
-              <Button className="flex-grow" onClick={() => fileInputRef.current?.click()} disabled={isImportingStudents || isAdmin}>
+              <Button className="flex-grow" onClick={() => fileInputRef.current?.click()} disabled={isImportingStudents}>
                 {isImportingStudents ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Upload className="ml-2 h-4 w-4" />}
                 {isImportingStudents ? 'جاري الاستيراد...' : 'رفع ملف الطلبة'}
               </Button>
@@ -483,7 +481,6 @@ export default function DataExchangePage() {
                 <Download className="ml-2 h-4 w-4" /> تحميل نموذج الطلبة
               </Button>
             </div>
-             {isAdmin && <p className="text-xs text-destructive text-center mt-2">المدير لا يمكنه استيراد الطلبة.</p>}
           </CardContent>
         </Card>
 
@@ -499,7 +496,7 @@ export default function DataExchangePage() {
               لتسجيل البيانات بشكل غير متصل. سيتم حفظ البيانات عند الرفع.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
-               <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()} disabled={isImportingSessions || isAdmin}>
+               <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()} disabled={isImportingSessions}>
                 {isImportingSessions ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
                 {isImportingSessions ? 'جاري الاستيراد...' : 'رفع سجل حصة اليوم'}
               </Button>
@@ -508,7 +505,6 @@ export default function DataExchangePage() {
               </Button>
             </div>
              {activeStudents.length === 0 && <p className="text-xs text-destructive text-center mt-2">يجب إضافة طلبة نشطين أولاً.</p>}
-             {isAdmin && <p className="text-xs text-destructive text-center mt-2">المدير لا يمكنه استيراد سجلات الحصص.</p>}
           </CardContent>
         </Card>
       </div>
@@ -541,11 +537,10 @@ export default function DataExchangePage() {
                         </SelectContent>
                     </Select>
                  </div>
-                 <Button className="w-full" onClick={() => monthlySessionFileInputRef.current?.click()} disabled={isImportingMonthly || isAdmin}>
+                 <Button className="w-full" onClick={() => monthlySessionFileInputRef.current?.click()} disabled={isImportingMonthly}>
                     {isImportingMonthly ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CalendarClock className="ml-2 h-4 w-4" />}
                     {isImportingMonthly ? 'جاري الاستيراد...' : 'رفع ملف الشهر'}
                  </Button>
-                 {isAdmin && <p className="text-xs text-destructive text-center mt-2">المدير لا يمكنه استيراد السجلات الشهرية.</p>}
             </div>
              <div className="space-y-4">
                 <h4 className="font-semibold">تصدير بيانات شهر كامل</h4>

@@ -7,10 +7,8 @@ import type { Student, DailySession, DailyReport } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { ref, set, onValue, off, remove, DatabaseReference } from 'firebase/database';
-import { onAuthStateChanged, User } from 'firebase/auth';
-
 
 interface StudentContextType {
   students: Student[];
@@ -19,22 +17,22 @@ interface StudentContextType {
   surahProgress: Record<string, number[]>;
   loading: boolean;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => void;
-  updateStudent: (studentId: string, updatedData: Partial<Student>, ownerId?: string) => void;
-  deleteStudent: (studentId: string, ownerId?: string) => void;
+  updateStudent: (studentId: string, updatedData: Partial<Student>) => void;
+  deleteStudent: (studentId: string) => void;
   deleteAllStudents: () => void;
-  addDailySession: (session: DailySession, ownerId?: string) => void;
-  deleteDailySession: (date: string, ownerId?: string) => void;
+  addDailySession: (session: DailySession) => void;
+  deleteDailySession: (date: string) => void;
   getSessionForDate: (date: string) => DailySession | undefined;
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
   saveDailyReport: (report: DailyReport) => void;
-  toggleSurahStatus: (studentId: string, surahId: number, ownerId?: string) => void;
+  toggleSurahStatus: (studentId: string, surahId: number) => void;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user: authContextUser, authLoading, isAdmin } = useAuth();
+  const { user: authContextUser, authLoading } = useAuth();
   
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
@@ -53,7 +51,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   
     if (authContextUser) {
       setLoading(true);
-      const dataPath = isAdmin ? 'users' : `users/${authContextUser.uid}`;
+      const dataPath = `users/${authContextUser.uid}`;
       dataRef = ref(db, dataPath);
       
       const handleValueChange = (snapshot: any) => {
@@ -64,47 +62,23 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           }
 
           const data = snapshot.val();
-          let combinedStudents: Student[] = [];
-          let combinedSessions: Record<string, DailySession> = {};
-          let combinedReports: Record<string, DailyReport> = {};
-          let combinedSurahProgress: Record<string, number[]> = {};
-
-          const processUserData = (userData: any, uid: string) => {
-               if (userData.students) {
-                  const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) => ({
-                      ...s,
-                      id,
-                      ownerId: uid,
-                      birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-                      registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-                      updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-                  }));
-                  combinedStudents.push(...userStudents);
-              }
-              if (userData.dailySessions) {
-                  Object.entries(userData.dailySessions).forEach(([date, session]) => {
-                       if (!combinedSessions[date]) combinedSessions[date] = { date, sessionType: (session as any).sessionType, records: [] };
-                       if((session as any).records) {
-                          (session as any).records.forEach((r: any) => combinedSessions[date].records.push(r));
-                       }
-                  });
-              }
-              if(userData.dailyReports) Object.assign(combinedReports, userData.dailyReports);
-              if(userData.surahProgress) Object.assign(combinedSurahProgress, userData.surahProgress);
+          
+          let userStudents: Student[] = [];
+          if (data.students) {
+              userStudents = Object.entries(data.students).map(([id, s]: [string, any]) => ({
+                  ...s,
+                  id,
+                  ownerId: authContextUser.uid,
+                  birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+                  registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+                  updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+              }));
           }
 
-          if (isAdmin) {
-              Object.keys(data).forEach(uid => {
-                  processUserData(data[uid], uid);
-              });
-          } else {
-              processUserData(data, authContextUser.uid);
-          }
-
-          setStudents(combinedStudents);
-          setDailySessions(combinedSessions);
-          setDailyReports(combinedReports);
-          setSurahProgress(combinedSurahProgress);
+          setStudents(userStudents);
+          setDailySessions(data.dailySessions || {});
+          setDailyReports(data.dailyReports || {});
+          setSurahProgress(data.surahProgress || {});
           setLoading(false);
       };
 
@@ -126,11 +100,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         off(dataRef, 'value', valueCallback);
       }
     };
-  }, [authContextUser, authLoading, isAdmin]);
+  }, [authContextUser, authLoading]);
 
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
-    if (!authContextUser || isAdmin) return;
+    if (!authContextUser) return;
 
     const studentId = uuidv4();
     const newStudent: Student = {
@@ -150,18 +124,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
-     if (!authContextUser || isAdmin) return;
+     if (!authContextUser) return;
      newStudents.forEach(s => addStudent(s));
   }
 
-  const updateStudent = (studentId: string, updatedData: Partial<Student>, ownerId?: string) => {
-    if (!authContextUser || isAdmin) return;
-    const studentOwnerId = ownerId || authContextUser.uid;
+  const updateStudent = (studentId: string, updatedData: Partial<Student>) => {
+    if (!authContextUser) return;
     
     const originalStudent = students.find(s => s.id === studentId);
     if (!originalStudent) return;
     
-    const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
+    const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
     const finalData = { ...originalStudent, ...updatedData, updatedAt: new Date() };
 
     set(studentRef, {
@@ -172,30 +145,27 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     });
   };
   
-  const deleteStudent = (studentId: string, ownerId?: string) => {
-      if (!authContextUser || isAdmin) return;
-      const studentOwnerId = ownerId || authContextUser.uid;
-      const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
+  const deleteStudent = (studentId: string) => {
+      if (!authContextUser) return;
+      const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
       remove(studentRef);
   }
   
   const deleteAllStudents = () => {
-      if (!authContextUser || isAdmin) return;
+      if (!authContextUser) return;
       const userStudentsRef = ref(db, `users/${authContextUser.uid}/students`);
       remove(userStudentsRef);
   }
 
-  const addDailySession = (session: DailySession, ownerId?: string) => {
-    if (!authContextUser || isAdmin) return;
-    const targetOwnerId = ownerId || authContextUser.uid;
-    const sessionRef = ref(db, `users/${targetOwnerId}/dailySessions/${session.date}`);
+  const addDailySession = (session: DailySession) => {
+    if (!authContextUser) return;
+    const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${session.date}`);
     set(sessionRef, session);
   };
   
-  const deleteDailySession = (date: string, ownerId?: string) => {
-    if (!authContextUser || isAdmin) return;
-    const targetOwnerId = ownerId || authContextUser.uid;
-    const sessionRef = ref(db, `users/${targetOwnerId}/dailySessions/${date}`);
+  const deleteDailySession = (date: string) => {
+    if (!authContextUser) return;
+    const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${date}`);
     remove(sessionRef);
   }
 
@@ -221,14 +191,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const saveDailyReport = (report: DailyReport) => {
-    if (!authContextUser || isAdmin) return;
+    if (!authContextUser) return;
     const reportRef = ref(db, `users/${report.authorId}/dailyReports/${report.date}`);
     set(reportRef, report);
   }
   
- const toggleSurahStatus = (studentId: string, surahId: number, ownerId?: string) => {
-    if (!authContextUser || isAdmin) return;
-    const studentOwnerId = ownerId || authContextUser.uid;
+ const toggleSurahStatus = (studentId: string, surahId: number) => {
+    if (!authContextUser) return;
 
     const studentProgressList = surahProgress[studentId] ? [...surahProgress[studentId]] : [];
     const surahIndex = studentProgressList.indexOf(surahId);
@@ -239,10 +208,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         studentProgressList.push(surahId);
     }
     
-    const surahProgressRef = ref(db, `users/${studentOwnerId}/surahProgress/${studentId}`);
+    const surahProgressRef = ref(db, `users/${authContextUser.uid}/surahProgress/${studentId}`);
     set(surahProgressRef, studentProgressList);
     
-    updateStudent(studentId, { memorizedSurahsCount: studentProgressList.length }, studentOwnerId);
+    updateStudent(studentId, { memorizedSurahsCount: studentProgressList.length });
   }
 
   return (

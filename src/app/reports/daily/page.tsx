@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 
 export default function DailyReportPage() {
     const { dailyReports, saveDailyReport, loading } = useStudentContext();
-    const { user, isAdmin } = useAuth();
+    const { user } = useAuth();
     const { toast } = useToast();
 
     const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -27,19 +27,15 @@ export default function DailyReportPage() {
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        if (user && !isAdmin) {
+        if (user) {
             const todaysReport = Object.values(dailyReports).find(r => r.date === todayStr && r.authorId === user.uid);
             if (todaysReport) {
                 setNote(todaysReport.note);
             }
         }
-    }, [dailyReports, todayStr, user, isAdmin]);
+    }, [dailyReports, todayStr, user]);
 
     const handleSaveReport = () => {
-        if (isAdmin) {
-            toast({ title: "خطأ", description: "المدير لا يمكنه حفظ التقارير.", variant: "destructive" });
-            return;
-        }
         if (!user) {
             toast({ title: "خطأ", description: "يجب تسجيل الدخول لحفظ التقارير.", variant: "destructive" });
             return;
@@ -82,35 +78,33 @@ export default function DailyReportPage() {
         <div className="space-y-6">
             <h1 className="text-3xl font-headline font-bold">التقرير اليومي للشيخ</h1>
             
-            {!isAdmin && (
-              <Card>
-                  <CardHeader>
-                      <CardTitle>📝 تقرير اليوم: {format(new Date(), 'EEEE, d MMMM yyyy', { locale: ar })}</CardTitle>
-                      <CardDescription>اكتب هنا ملاحظاتك العامة عن هذا اليوم، مثل السلوك العام للفوج، مستوى الحفظ، اقتراحات، أو أي حالات خاصة تستدعي انتباه الإدارة.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                      <Textarea 
-                          placeholder="مثال: كان الحفظ ممتازًا اليوم، ولكن لوحظ تأخر بعض الطلبة. أقترح..."
-                          rows={6}
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                      />
-                      <Button onClick={handleSaveReport} disabled={isSaving} className="mt-4">
-                          {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                          {Object.values(dailyReports).some(r => r.date === todayStr && r.authorId === user?.uid) ? 'تحديث تقرير اليوم' : 'حفظ تقرير اليوم'}
-                      </Button>
-                  </CardContent>
-              </Card>
-            )}
+            <Card>
+                <CardHeader>
+                    <CardTitle>📝 تقرير اليوم: {format(new Date(), 'EEEE, d MMMM yyyy', { locale: ar })}</CardTitle>
+                    <CardDescription>اكتب هنا ملاحظاتك العامة عن هذا اليوم، مثل السلوك العام للفوج، مستوى الحفظ، اقتراحات، أو أي حالات خاصة تستدعي انتباه الإدارة.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Textarea 
+                        placeholder="مثال: كان الحفظ ممتازًا اليوم، ولكن لوحظ تأخر بعض الطلبة. أقترح..."
+                        rows={6}
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                    />
+                    <Button onClick={handleSaveReport} disabled={isSaving} className="mt-4">
+                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+                        {Object.values(dailyReports).some(r => r.date === todayStr && r.authorId === user?.uid) ? 'تحديث تقرير اليوم' : 'حفظ تقرير اليوم'}
+                    </Button>
+                </CardContent>
+            </Card>
             
             <Card>
                 <CardHeader>
                     <CardTitle>📂 سجل التقارير السابقة</CardTitle>
-                    <CardDescription>هنا يمكنك تصفح جميع التقارير التي تم حفظها من قبل الشيوخ.</CardDescription>
+                    <CardDescription>هنا يمكنك تصفح جميع التقارير التي تم حفظها من قبلك.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Input 
-                        placeholder="🔍 ابحث في الملاحظات أو باسم الشيخ..."
+                        placeholder="🔍 ابحث في الملاحظات..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="mb-4"

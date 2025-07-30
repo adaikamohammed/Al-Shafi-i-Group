@@ -26,13 +26,12 @@ const sheikhInitialData: { [email: string]: { name: string; group: string } } = 
   "admin8@gmail.com": { name: "الشيخ عبد الحق نصيرة", group: "فوج 8" },
   "admin9@gmail.com": { name: "الشيخ عبد القادر", group: "فوج 9" },
   "admin10@gmail.com": { name: "الشيخ محمد منصور", group: "فوج 10" },
-  "admin11@gmail.com": { name: "الإدارة العامة", group: "كل الأفواج" }
 };
 
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
-  isAdmin: boolean;
+  isAdmin: boolean; // This will always be false now but kept for compatibility
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -43,7 +42,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const isAdmin = false; // Admin role is removed.
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -74,10 +73,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
         setUser(appUser);
-        setIsAdmin(appUser.email === 'admin11@gmail.com');
       } else {
         setUser(null);
-        setIsAdmin(false);
       }
       setLoading(false);
     });

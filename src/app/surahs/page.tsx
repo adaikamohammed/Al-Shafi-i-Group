@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useStudentContext } from '@/context/StudentContext';
-import { useAuth } from '@/context/AuthContext';
 import { surahs as allSurahs } from '@/lib/surahs';
 import { cn } from '@/lib/utils';
 import { Loader2, AlertTriangle, CheckCircle, Award } from 'lucide-react';
@@ -18,7 +17,6 @@ import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/comp
 
 export default function SurahProgressPage() {
     const { students, surahProgress, toggleSurahStatus, loading } = useStudentContext();
-    const { isAdmin } = useAuth();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
 
     const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
@@ -46,7 +44,7 @@ export default function SurahProgressPage() {
 
     const handleSurahClick = (surahId: number) => {
         if (!selectedStudent) return;
-        toggleSurahStatus(selectedStudent.id, surahId, selectedStudent.ownerId);
+        toggleSurahStatus(selectedStudent.id, surahId);
     };
     
     React.useEffect(() => {

@@ -44,13 +44,11 @@ export default function DailySessionsPage() {
   const { toast } = useToast();
   
   const { students, dailySessions, loading, getSessionForDate, addDailySession, deleteDailySession } = useStudentContext();
-  const { isAdmin } = useAuth();
   const activeStudents = useMemo(() => 
     students.filter(s => s.status === "نشط"), 
   [students]);
 
   const handleDayClick = (day: number) => {
-    if (isAdmin) return;
     const newSelectedDay = new Date(getYear(currentDate), getMonth(currentDate), day);
     setSelectedDay(newSelectedDay);
     setSessionDialogOpen(true);
@@ -66,13 +64,9 @@ export default function DailySessionsPage() {
   
   const handleDeleteDay = (e: React.MouseEvent, day: number) => {
     e.stopPropagation();
-    if (isAdmin) return;
     const date = new Date(getYear(currentDate), getMonth(currentDate), day);
     const formattedDate = format(date, 'yyyy-MM-dd');
-    const session = getSessionForDate(formattedDate);
-    // For admin, we might need to find the correct ownerId to delete from
-    const ownerId = session?.records[0]?.studentId ? students.find(s => s.id === session.records[0].studentId)?.ownerId : undefined;
-    deleteDailySession(formattedDate, ownerId);
+    deleteDailySession(formattedDate);
     toast({ title: "✅ تم الحذف", description: `تم حذف بيانات يوم ${formattedDate} بنجاح.` });
   }
 
@@ -159,7 +153,7 @@ export default function DailySessionsPage() {
           onClick={() => handleDayClick(day)}
           className={cn(
             "p-2 text-start border rounded-md transition-colors h-24 flex flex-col justify-between relative group",
-            !isAdmin && "hover:bg-accent hover:text-accent-foreground cursor-pointer",
+            "hover:bg-accent hover:text-accent-foreground cursor-pointer",
             dayStatusClass
           )}
         >
@@ -178,7 +172,6 @@ export default function DailySessionsPage() {
                                 <Download className="ml-2 h-4 w-4" />
                                 <span>تحميل بيانات اليوم</span>
                             </DropdownMenuItem>
-                            {!isAdmin && (
                              <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                     <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
@@ -199,7 +192,6 @@ export default function DailySessionsPage() {
                                     </AlertDialogFooter>
                                 </AlertDialogContent>
                             </AlertDialog>
-                            )}
                          </DropdownMenuContent>
                     </DropdownMenu>
                     </div>
@@ -241,7 +233,7 @@ export default function DailySessionsPage() {
                 </Button>
             </div>
             <CardDescription className="text-center">
-              {isAdmin ? 'عرض تقويم الحصص المسجلة من قبل الشيوخ.' : 'اختر الشهر لعرض أيامه، ثم اضغط على اليوم المطلوب لتسجيل أو تعديل الحصة.'}
+              {'اختر الشهر لعرض أيامه، ثم اضغط على اليوم المطلوب لتسجيل أو تعديل الحصة.'}
             </CardDescription>
         </CardHeader>
         <CardContent>
@@ -304,7 +296,7 @@ interface DailySessionFormProps {
     day: Date;
     students: Student[];
     onClose: () => void;
-    addDailySession: (session: DailySession, ownerId?: string) => void;
+    addDailySession: (session: DailySession) => void;
     getSessionForDate: (date: string) => DailySession | undefined;
 }
 
@@ -313,7 +305,6 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
   const [sessionType, setSessionType] = useState<SessionType>('حصة أساسية');
   const [records, setRecords] = useState<DailyRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const { user, isAdmin } = useAuth();
 
   useEffect(() => {
     const formattedDate = format(day, 'yyyy-MM-dd');
@@ -364,7 +355,6 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
   };
 
   const handleSave = () => {
-    if (!user || isAdmin) return;
     setIsLoading(true);
     const formattedDate = format(day, 'yyyy-MM-dd');
     
