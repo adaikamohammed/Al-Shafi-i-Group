@@ -45,8 +45,8 @@ export default function SurahProgressPage() {
     }, [activeStudents, surahProgress]);
 
     const handleSurahClick = (surahId: number) => {
-        if (!selectedStudentId) return;
-        toggleSurahStatus(selectedStudentId, surahId);
+        if (!selectedStudent) return;
+        toggleSurahStatus(selectedStudent.id, surahId, selectedStudent.ownerId);
     };
     
     React.useEffect(() => {

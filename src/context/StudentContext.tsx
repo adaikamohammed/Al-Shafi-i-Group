@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
@@ -16,8 +17,8 @@ interface StudentContextType {
   surahProgress: Record<string, number[]>;
   loading: boolean;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => void;
-  updateStudent: (studentId: string, updatedData: Partial<Student>) => void;
-  deleteStudent: (studentId: string) => void;
+  updateStudent: (studentId: string, updatedData: Partial<Student>, ownerId?: string) => void;
+  deleteStudent: (studentId: string, ownerId?: string) => void;
   deleteAllStudents: () => void;
   addDailySession: (session: DailySession, ownerId?: string) => void;
   deleteDailySession: (date: string, ownerId?: string) => void;
@@ -25,7 +26,7 @@ interface StudentContextType {
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
   saveDailyReport: (report: DailyReport) => void;
-  toggleSurahStatus: (studentId: string, surahId: number) => void;
+  toggleSurahStatus: (studentId: string, surahId: number, ownerId?: string) => void;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -96,13 +97,15 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             });
         } else {
             const userData = data;
-            combinedStudents = userData.students ? Object.values(userData.students).map((s: any) => ({
-                ...s,
-                ownerId: user!.uid,
-                birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-                registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-                updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-            })) : [];
+            if (userData.students) {
+              combinedStudents = Object.values(userData.students).map((s: any) => ({
+                  ...s,
+                  ownerId: user.uid,
+                  birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+                  registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+                  updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+              }));
+            }
             combinedSessions = userData.dailySessions || {};
             combinedReports = userData.dailyReports || {};
             combinedSurahProgress = userData.surahProgress || {};
@@ -150,16 +153,15 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
      newStudents.forEach(s => addStudent(s));
   }
 
-  const updateStudent = (studentId: string, updatedData: Partial<Student>) => {
+  const updateStudent = (studentId: string, updatedData: Partial<Student>, ownerId?: string) => {
     if (!user) return;
-    const studentToUpdate = students.find(s => s.id === studentId);
-    if (!studentToUpdate || !studentToUpdate.ownerId) return;
+    const studentOwnerId = ownerId || user.uid;
     
-    const isAdmin = user.email === 'admin@gmail.com';
-    const ownerId = isAdmin ? studentToUpdate.ownerId : user.uid;
+    const originalStudent = students.find(s => s.id === studentId);
+    if (!originalStudent) return;
     
-    const studentRef = ref(db, `users/${ownerId}/students/${studentId}`);
-    const finalData = { ...studentToUpdate, ...updatedData, updatedAt: new Date() };
+    const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
+    const finalData = { ...originalStudent, ...updatedData, updatedAt: new Date() };
 
     set(studentRef, {
         ...finalData,
@@ -169,41 +171,34 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     });
   };
   
-  const deleteStudent = (studentId: string) => {
+  const deleteStudent = (studentId: string, ownerId?: string) => {
       if (!user) return;
-      const studentToDelete = students.find(s => s.id === studentId);
-      if (!studentToDelete || !studentToDelete.ownerId) return;
-
-      const isAdmin = user.email === 'admin@gmail.com';
-      const ownerId = isAdmin ? studentToDelete.ownerId : user.uid;
-      
-      const studentRef = ref(db, `users/${ownerId}/students/${studentId}`);
+      const studentOwnerId = ownerId || user.uid;
+      const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
       remove(studentRef);
   }
   
   const deleteAllStudents = () => {
       if (!user) return;
-      const isAdmin = user.email === 'admin@gmail.com';
-      if(isAdmin) return; // Prevent admin from deleting all students from one teacher's node
-      
-      const studentsRef = ref(db, `users/${user.uid}/students`);
-      remove(studentsRef);
+      if (user.email === 'admin@gmail.com') {
+          const allUsersRef = ref(db, 'users');
+          remove(allUsersRef);
+      } else {
+          const userStudentsRef = ref(db, `users/${user.uid}/students`);
+          remove(userStudentsRef);
+      }
   }
 
   const addDailySession = (session: DailySession, ownerId?: string) => {
     if (!user) return;
-    const isAdmin = user.email === 'admin@gmail.com';
-    const targetOwnerId = isAdmin ? ownerId : user.uid;
-    if (!targetOwnerId) return;
+    const targetOwnerId = ownerId || user.uid;
     const sessionRef = ref(db, `users/${targetOwnerId}/dailySessions/${session.date}`);
     set(sessionRef, session);
   };
   
   const deleteDailySession = (date: string, ownerId?: string) => {
     if (!user) return;
-    const isAdmin = user.email === 'admin@gmail.com';
-    const targetOwnerId = isAdmin ? ownerId : user.uid;
-    if (!targetOwnerId) return;
+    const targetOwnerId = ownerId || user.uid;
     const sessionRef = ref(db, `users/${targetOwnerId}/dailySessions/${date}`);
     remove(sessionRef);
   }
@@ -235,27 +230,23 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     set(reportRef, report);
   }
   
- const toggleSurahStatus = (studentId: string, surahId: number) => {
+ const toggleSurahStatus = (studentId: string, surahId: number, ownerId?: string) => {
     if (!user) return;
-    const studentToUpdate = students.find(s => s.id === studentId);
-    if (!studentToUpdate || !studentToUpdate.ownerId) return;
+    const studentOwnerId = ownerId || user.uid;
 
-    const isAdmin = user.email === 'admin@gmail.com';
-    const ownerId = isAdmin ? studentToUpdate.ownerId : user.uid;
-
-    const studentProgress = surahProgress[studentId] ? [...surahProgress[studentId]] : [];
-    const surahIndex = studentProgress.indexOf(surahId);
+    const studentProgressList = surahProgress[studentId] ? [...surahProgress[studentId]] : [];
+    const surahIndex = studentProgressList.indexOf(surahId);
 
     if (surahIndex > -1) {
-        studentProgress.splice(surahIndex, 1);
+        studentProgressList.splice(surahIndex, 1);
     } else {
-        studentProgress.push(surahId);
+        studentProgressList.push(surahId);
     }
     
-    const surahProgressRef = ref(db, `users/${ownerId}/surahProgress/${studentId}`);
-    set(surahProgressRef, studentProgress);
+    const surahProgressRef = ref(db, `users/${studentOwnerId}/surahProgress/${studentId}`);
+    set(surahProgressRef, studentProgressList);
     
-    updateStudent(studentId, { memorizedSurahsCount: studentProgress.length });
+    updateStudent(studentId, { memorizedSurahsCount: studentProgressList.length }, studentOwnerId);
   }
 
   return (

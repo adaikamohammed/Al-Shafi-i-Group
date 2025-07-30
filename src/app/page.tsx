@@ -49,11 +49,11 @@ export default function StudentManagementPage() {
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const handleStatusChange = (studentId: string, status: StudentStatus, reason?: string) => {
+  const handleStatusChange = (student: Student, status: StudentStatus, reason?: string) => {
     if (status === 'محذوف') {
-        deleteStudent(studentId);
+        deleteStudent(student.id, student.ownerId);
     } else {
-        updateStudent(studentId, { status, actionReason: reason });
+        updateStudent(student.id, { status, actionReason: reason }, student.ownerId);
     }
   };
   
@@ -99,7 +99,7 @@ export default function StudentManagementPage() {
     );
   }
   
-   if (students.length === 0 && !loading && !isAdmin) {
+   if (students.length === 0 && !loading) {
       return (
         <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
             <h1 className="text-2xl font-bold mb-4">لا يوجد طلاب بعد</h1>
@@ -129,7 +129,7 @@ export default function StudentManagementPage() {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
         <h1 className="text-3xl font-headline font-bold">إدارة الطلبة</h1>
         <div className="flex w-full sm:w-auto items-center gap-2">
-           {!isAdmin && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
+           <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
             <DialogTrigger asChild>
                 <Button className="w-full sm:w-auto">
                 <PlusCircle className="ml-2 h-4 w-4" />
@@ -142,7 +142,7 @@ export default function StudentManagementPage() {
                 onCancel={() => setAddStudentDialogOpen(false)}
                 />
             </DialogContent>
-            </Dialog>}
+            </Dialog>
         </div>
       </div>
 
@@ -161,7 +161,7 @@ export default function StudentManagementPage() {
                 <Download className="ml-2 h-4 w-4" />
                 تصدير الطلبة (Excel)
             </Button>
-             {!isAdmin && <AlertDialog>
+            <AlertDialog>
                 <AlertDialogTrigger asChild>
                     <Button variant="destructive" disabled={students.length === 0}>
                         <Trash2 className="ml-2 h-4 w-4" />
@@ -172,7 +172,8 @@ export default function StudentManagementPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                            سيؤدي هذا إلى حذف جميع بيانات الطلبة نهائيًا من هذا المتصفح.
+                            سيؤدي هذا إلى حذف جميع بيانات الطلبة نهائيًا.
+                            {isAdmin ? ' سيتم حذف جميع الطلبة من جميع الأفواج.' : 'سيتم حذف جميع الطلبة من هذا الفوج.'}
                             هذا الإجراء لا يمكن التراجع عنه.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -181,7 +182,7 @@ export default function StudentManagementPage() {
                         <AlertDialogAction onClick={deleteAllStudents}>نعم، قم بحذف الكل</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
-             </AlertDialog>}
+             </AlertDialog>
          </div>
        </div>
 
@@ -235,7 +236,7 @@ export default function StudentManagementPage() {
   );
 }
 
-function StudentActions({ student, onStatusChange }: { student: Student, onStatusChange: (studentId: string, status: StudentStatus, reason?: string) => void }) {
+function StudentActions({ student, onStatusChange }: { student: Student, onStatusChange: (student: Student, status: StudentStatus, reason?: string) => void }) {
     const [isEditOpen, setEditOpen] = useState(false);
     const [actionReason, setActionReason] = useState('');
     
@@ -280,7 +281,7 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => onStatusChange(student.id, 'محذوف')}>تأكيد الحذف</AlertDialogAction>
+                            <AlertDialogAction onClick={() => onStatusChange(student, 'محذوف')}>تأكيد الحذف</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
@@ -309,7 +310,7 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
                         </div>
                         <AlertDialogFooter>
                             <AlertDialogCancel onClick={() => setActionReason('')}>إلغاء</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => onStatusChange(student.id, 'مطرود', actionReason)}>تأكيد الطرد</AlertDialogAction>
+                            <AlertDialogAction onClick={() => onStatusChange(student, 'مطرود', actionReason)}>تأكيد الطرد</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
@@ -347,7 +348,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 
     if (student) {
         // Update existing student
-        updateStudent(student.id, studentData);
+        updateStudent(student.id, studentData, student.ownerId);
     } else {
         // Add new student
         addStudent(studentData as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>);
