@@ -40,7 +40,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
   // Load data from Firebase when user is authenticated
   useEffect(() => {
-    // Wait until authentication is complete and we have a user object
+    // Wait until authentication is complete
     if (authLoading) {
       setLoading(true);
       return;
