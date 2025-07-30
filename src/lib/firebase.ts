@@ -1,6 +1,7 @@
 
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { getDatabase } from 'firebase/database';
 import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
@@ -15,7 +16,7 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = null; 
+const db = getDatabase(app); 
 
 // Initialize Analytics only in the browser
 let analytics;

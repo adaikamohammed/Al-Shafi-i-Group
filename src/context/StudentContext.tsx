@@ -7,27 +7,8 @@ import type { Student, SessionRecord, DailySession, DailyReport, SurahProgress }
 import { isWithinInterval, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
-
-// Helper functions to interact with localStorage
-const getLocalStorage = (key: string, defaultValue: any) => {
-  if (typeof window === 'undefined') {
-    return defaultValue;
-  }
-  const storedValue = localStorage.getItem(key);
-  try {
-     return storedValue ? JSON.parse(storedValue) : defaultValue;
-  } catch (error) {
-    console.error("Error parsing JSON from localStorage", key, error);
-    return defaultValue;
-  }
-};
-
-const setLocalStorage = (key: string, value: any) => {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(key, JSON.stringify(value));
-  }
-};
-
+import { db } from '@/lib/firebase';
+import { ref, set, onValue, off, remove } from 'firebase/database';
 
 interface StudentContextType {
   students: Student[];
@@ -58,64 +39,56 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [surahProgress, setSurahProgress] = useState<Record<string, number[]>>({});
   const [loading, setLoading] = useState(true);
 
-  // Load data from localStorage when user is authenticated
+  // Load data from Firebase when user is authenticated
   useEffect(() => {
-    if (!authLoading) {
-      if (user) {
-        const storedStudents = getLocalStorage(`students_${user.uid}`, []).map((s: any) => ({
-            ...s,
-            birthDate: new Date(s.birthDate),
-            registrationDate: new Date(s.registrationDate),
-            updatedAt: new Date(s.updatedAt)
-        }));
-        const storedSessions = getLocalStorage(`dailySessions_${user.uid}`, {});
-        const storedReports = getLocalStorage(`dailyReports_${user.uid}`, {});
-        const storedSurahProgress = getLocalStorage(`surahProgress_${user.uid}`, {});
-        
-        setStudents(storedStudents);
-        setDailySessions(storedSessions);
-        setDailyReports(storedReports);
-        setSurahProgress(storedSurahProgress);
-      } else {
-        // Clear data if user logs out
-        setStudents([]);
-        setDailySessions({});
-        setDailyReports({});
-        setSurahProgress({});
-      }
+    if (authLoading) return;
+    setLoading(true);
+
+    if (user) {
+      const userRef = ref(db, `users/${user.uid}`);
+
+      const onData = onValue(userRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          const storedStudents = (data.students || []).map((s: any) => ({
+              ...s,
+              birthDate: new Date(s.birthDate),
+              registrationDate: new Date(s.registrationDate),
+              updatedAt: new Date(s.updatedAt)
+          }));
+          setStudents(storedStudents);
+          setDailySessions(data.dailySessions || {});
+          setDailyReports(data.dailyReports || {});
+          setSurahProgress(data.surahProgress || {});
+        } else {
+            // No data in DB, initialize with empty state
+            setStudents([]);
+            setDailySessions({});
+            setDailyReports({});
+            setSurahProgress({});
+        }
+        setLoading(false);
+      });
+      
+      // Detach listener on cleanup
+      return () => off(userRef, 'value', onData);
+      
+    } else {
+      // Clear data if user logs out
+      setStudents([]);
+      setDailySessions({});
+      setDailyReports({});
+      setSurahProgress({});
       setLoading(false);
     }
   }, [user, authLoading]);
   
-  // Save students to localStorage whenever they change
-  useEffect(() => {
-    if (user && !loading) {
-      setLocalStorage(`students_${user.uid}`, students);
-    }
-  }, [students, user, loading]);
-
-  // Save sessions to localStorage whenever they change
-  useEffect(() => {
-    if (user && !loading) {
-      setLocalStorage(`dailySessions_${user.uid}`, dailySessions);
-    }
-  }, [dailySessions, user, loading]);
-
-  // Save reports to localStorage whenever they change
-  useEffect(() => {
-    if (user && !loading) {
-        setLocalStorage(`dailyReports_${user.uid}`, dailyReports);
-    }
-  }, [dailyReports, user, loading]);
+  const saveDataToDb = useCallback((path: string, data: any) => {
+      if (!user) return;
+      const dataRef = ref(db, `users/${user.uid}/${path}`);
+      set(dataRef, data);
+  }, [user]);
   
-    // Save surah progress to localStorage whenever it changes
-  useEffect(() => {
-    if (user && !loading) {
-        setLocalStorage(`surahProgress_${user.uid}`, surahProgress);
-    }
-  }, [surahProgress, user, loading]);
-
-
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>) => {
     const newStudent: Student = {
       ...studentData,
@@ -123,7 +96,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       memorizedSurahsCount: 0,
       updatedAt: new Date(),
     };
-    setStudents(prev => [...prev, newStudent]);
+    const updatedStudents = [...students, newStudent];
+    setStudents(updatedStudents);
+    saveDataToDb('students', updatedStudents.map(s => ({...s, birthDate: s.birthDate.toISOString(), registrationDate: s.registrationDate.toISOString(), updatedAt: s.updatedAt.toISOString() })));
   };
   
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[]) => {
@@ -133,38 +108,46 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
          memorizedSurahsCount: 0,
          updatedAt: new Date(),
      }));
-     setStudents(prev => [...prev, ...studentsToSave]);
+     const updatedStudents = [...students, ...studentsToSave];
+     setStudents(updatedStudents);
+     saveDataToDb('students', updatedStudents.map(s => ({...s, birthDate: s.birthDate.toISOString(), registrationDate: s.registrationDate.toISOString(), updatedAt: s.updatedAt.toISOString() })));
   }
 
   const updateStudent = (studentId: string, updatedData: Partial<Student>) => {
-    setStudents(prev =>
-      prev.map(s =>
+    const updatedStudents = students.map(s =>
         s.id === studentId ? { ...s, ...updatedData, updatedAt: new Date() } : s
-      )
-    );
+      );
+    setStudents(updatedStudents);
+    saveDataToDb('students', updatedStudents.map(s => ({...s, birthDate: s.birthDate.toISOString(), registrationDate: s.registrationDate.toISOString(), updatedAt: s.updatedAt.toISOString() })));
   };
   
   const deleteStudent = (studentId: string) => {
-      setStudents(prev => prev.filter(s => s.id !== studentId));
+      const updatedStudents = students.filter(s => s.id !== studentId);
+      setStudents(updatedStudents);
+      saveDataToDb('students', updatedStudents.map(s => ({...s, birthDate: s.birthDate.toISOString(), registrationDate: s.registrationDate.toISOString(), updatedAt: s.updatedAt.toISOString() })));
   }
   
   const deleteAllStudents = () => {
       setStudents([]);
+      if (user) {
+        remove(ref(db, `users/${user.uid}/students`));
+      }
   }
 
   const addDailySession = (session: DailySession) => {
-    setDailySessions(prev => ({
-        ...prev,
+    const updatedSessions = {
+        ...dailySessions,
         [session.date]: session
-    }));
+    };
+    setDailySessions(updatedSessions);
+    saveDataToDb('dailySessions', updatedSessions);
   };
   
   const deleteDailySession = (date: string) => {
-    setDailySessions(prev => {
-        const newSessions = { ...prev };
-        delete newSessions[date];
-        return newSessions;
-    });
+    const newSessions = { ...dailySessions };
+    delete newSessions[date];
+    setDailySessions(newSessions);
+    saveDataToDb('dailySessions', newSessions);
   }
 
   const getSessionForDate = (date: string): DailySession | undefined => {
@@ -189,26 +172,28 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const saveDailyReport = (report: DailyReport) => {
-    setDailyReports(prev => ({
-        ...prev,
+    const updatedReports = {
+        ...dailyReports,
         [report.date]: report
-    }));
+    };
+    setDailyReports(updatedReports);
+    saveDataToDb('dailyReports', updatedReports);
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number) => {
     let newProgress: number[] = [];
+    const studentProgress = surahProgress[studentId] ? [...surahProgress[studentId]] : [];
+    const surahIndex = studentProgress.indexOf(surahId);
+    if (surahIndex > -1) {
+        studentProgress.splice(surahIndex, 1);
+    } else {
+        studentProgress.push(surahId);
+    }
+    newProgress = studentProgress;
     
-    setSurahProgress(prev => {
-        const studentProgress = prev[studentId] ? [...prev[studentId]] : [];
-        const surahIndex = studentProgress.indexOf(surahId);
-        if (surahIndex > -1) {
-            studentProgress.splice(surahIndex, 1);
-        } else {
-            studentProgress.push(surahId);
-        }
-        newProgress = studentProgress;
-        return { ...prev, [studentId]: studentProgress };
-    });
+    const updatedSurahProgress = { ...surahProgress, [studentId]: newProgress };
+    setSurahProgress(updatedSurahProgress);
+    saveDataToDb('surahProgress', updatedSurahProgress);
     
     // After updating progress, update the student's memorized surahs count
     updateStudent(studentId, { memorizedSurahsCount: newProgress.length });
