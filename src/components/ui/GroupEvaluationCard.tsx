@@ -45,7 +45,7 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
     }, [students, sessions, reports]);
 
     if (!evaluationData) {
-        return null; // Or a placeholder card
+        return null;
     }
 
     const evaluateGroupPerformance = (data: typeof evaluationData) => {

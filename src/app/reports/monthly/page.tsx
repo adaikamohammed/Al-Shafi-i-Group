@@ -47,6 +47,7 @@ export default function MonthlyStatisticsPage() {
         const filteredReports = Object.values(dailyReports ?? {})
             .flatMap(dayReports => Object.values(dayReports))
             .filter(report => {
+                 if(!report?.date) return false;
                  const reportDate = parseISO(report.date);
                  return reportDate >= startDate && reportDate <= endDate;
             });
@@ -66,7 +67,7 @@ export default function MonthlyStatisticsPage() {
             sessionTypes: { 'حصة أساسية': 0, 'حصة أنشطة': 0, 'حصة تعويضية': 0 }
         };
 
-        recordsSource.forEach(record => {
+        (recordsSource ?? []).forEach(record => {
             if (record.attendance) stats.attendance[record.attendance]++;
             if (record.behavior) stats.behavior[record.behavior]++;
             if (record.memorization) stats.evaluation[record.memorization]++;
@@ -221,7 +222,7 @@ export default function MonthlyStatisticsPage() {
                             ))}
                         </SelectContent>
                     </Select>
-                    <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
+                    <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelecteYear(parseInt(val))}>
                         <SelectTrigger className="w-full md:w-[100px]"><SelectValue placeholder="السنة" /></SelectTrigger>
                         <SelectContent>
                             {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
