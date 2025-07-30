@@ -40,12 +40,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
   // Load data from Firebase when user is authenticated
   useEffect(() => {
+    // Wait until authentication is complete and we have a user object
     if (authLoading) {
       setLoading(true);
       return;
     }
-
-    if (!user) {
+    
+    // If no user, clear all data and stop loading
+    if (!user || !user.email) {
       setStudents([]);
       setDailySessions({});
       setDailyReports({});
@@ -55,7 +57,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
     
     setLoading(true);
-
+    
     const isAdmin = user.email === 'admin@gmail.com';
     const dataRef = isAdmin ? ref(db, 'users') : ref(db, `users/${user.uid}`);
 
@@ -120,6 +122,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
     });
     
+    // Cleanup function to remove the listener when the component unmounts or user changes
     return () => off(dataRef, 'value', onData);
     
   }, [user, authLoading]);
