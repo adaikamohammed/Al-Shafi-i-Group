@@ -31,7 +31,7 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user, isAdmin, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
@@ -44,7 +44,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       return;
     }
-
+    
     if (!user) {
       setStudents([]);
       setDailySessions({});
@@ -55,9 +55,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
 
     setLoading(true);
-
-    const isUserAdmin = user.email === 'admin@gmail.com';
-    const dataRef: DatabaseReference = isUserAdmin ? ref(db, 'users') : ref(db, `users/${user.uid}`);
+    const isAdmin = user.email === 'admin@gmail.com';
+    const dataRef: DatabaseReference = isAdmin ? ref(db, 'users') : ref(db, `users/${user.uid}`);
     
     const handleValueChange = (snapshot: any) => {
       if (!snapshot.exists()) {
@@ -75,7 +74,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       let combinedReports: Record<string, DailyReport> = {};
       let combinedSurahProgress: Record<string, number[]> = {};
 
-      if (isUserAdmin) {
+      if (isAdmin) {
         Object.keys(data).forEach(uid => {
           const userData = data[uid];
           if (userData.students) {
@@ -113,18 +112,18 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     };
 
-    onValue(dataRef, handleValueChange, (error) => {
+    const valueCallback = onValue(dataRef, handleValueChange, (error) => {
       console.error("Firebase read failed: " + error.message);
       setLoading(false);
     });
 
     return () => {
-      off(dataRef, 'value', handleValueChange);
+      off(dataRef, 'value', valueCallback);
     };
   }, [user, authLoading]);
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
-    if (!user || isAdmin) return; 
+    if (!user || user.email === 'admin@gmail.com') return; 
 
     const studentId = uuidv4();
     const newStudent: Student = {
@@ -144,7 +143,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
-     if (!user || isAdmin) return;
+     if (!user || user.email === 'admin@gmail.com') return;
      newStudents.forEach(s => addStudent(s));
   }
 
@@ -182,19 +181,19 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const deleteAllStudents = () => {
-      if (!user || isAdmin) return;
+      if (!user || user.email === 'admin@gmail.com') return;
       const studentsRef = ref(db, `users/${user.uid}/students`);
       remove(studentsRef);
   }
 
   const addDailySession = (session: DailySession) => {
-    if (!user || isAdmin) return;
+    if (!user || user.email === 'admin@gmail.com') return;
     const sessionRef = ref(db, `users/${user.uid}/dailySessions/${session.date}`);
     set(sessionRef, session);
   };
   
   const deleteDailySession = (date: string) => {
-    if (!user || isAdmin) return;
+    if (!user || user.email === 'admin@gmail.com') return;
     const sessionRef = ref(db, `users/${user.uid}/dailySessions/${date}`);
     remove(sessionRef);
   }
@@ -221,13 +220,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const saveDailyReport = (report: DailyReport) => {
-    if (!user || isAdmin) return;
+    if (!user || user.email === 'admin@gmail.com') return;
     const reportRef = ref(db, `users/${user.uid}/dailyReports/${report.date}`);
     set(reportRef, report);
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number) => {
-    if (isAdmin) return;
+    if (user?.email === 'admin@gmail.com') return;
     const studentToUpdate = students.find(s => s.id === studentId);
     if (!studentToUpdate || !studentToUpdate.ownerId) return;
 
