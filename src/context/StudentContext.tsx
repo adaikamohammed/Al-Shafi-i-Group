@@ -31,7 +31,7 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user, authLoading, isAdmin } = useAuth();
+  const { user, authLoading } = useAuth();
   
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
@@ -40,13 +40,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Keep loading if auth is still resolving
     if (authLoading) {
       setLoading(true);
       return;
     }
 
-    // If auth is resolved and there is no user, stop loading and clear data
     if (!user) {
       setStudents([]);
       setDailySessions({});
@@ -56,10 +54,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // At this point, auth is loaded and we have a user.
-    // Now we can safely check the user's role and define the data path.
     const isUserAdmin = user.email === 'admin@gmail.com';
-    const dataRef: DatabaseReference = isUserAdmin ? ref(db, 'users') : ref(db, `users/${user.uid}`);
+    const dataRef: DatabaseReference = ref(db, isUserAdmin ? 'users' : `users/${user.uid}`);
     
     setLoading(true);
 
@@ -128,7 +124,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }, [user, authLoading]);
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
-    if (!user || isAdmin) return; 
+    if (!user || (user.email === 'admin@gmail.com')) return; 
 
     const studentId = uuidv4();
     const newStudent: Student = {
@@ -148,12 +144,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
-     if (!user || isAdmin) return;
+     if (!user || (user.email === 'admin@gmail.com')) return;
      newStudents.forEach(s => addStudent(s));
   }
 
   const updateStudent = (studentId: string, updatedData: Partial<Student>) => {
-    if (isAdmin) {
+    if (user?.email === 'admin@gmail.com') {
         console.warn("Admin cannot update student data.");
         return;
     }
@@ -172,7 +168,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deleteStudent = (studentId: string) => {
-      if (isAdmin) {
+      if (user?.email === 'admin@gmail.com') {
         console.warn("Admin cannot delete student data.");
         return;
       }
@@ -184,19 +180,19 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const deleteAllStudents = () => {
-      if (!user || isAdmin) return;
+      if (!user || (user.email === 'admin@gmail.com')) return;
       const studentsRef = ref(db, `users/${user.uid}/students`);
       remove(studentsRef);
   }
 
   const addDailySession = (session: DailySession) => {
-    if (!user || isAdmin) return;
+    if (!user || (user.email === 'admin@gmail.com')) return;
     const sessionRef = ref(db, `users/${user.uid}/dailySessions/${session.date}`);
     set(sessionRef, session);
   };
   
   const deleteDailySession = (date: string) => {
-    if (!user || isAdmin) return;
+    if (!user || (user.email === 'admin@gmail.com')) return;
     const sessionRef = ref(db, `users/${user.uid}/dailySessions/${date}`);
     remove(sessionRef);
   }
@@ -223,13 +219,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const saveDailyReport = (report: DailyReport) => {
-    if (!user || isAdmin) return;
+    if (!user || (user.email === 'admin@gmail.com')) return;
     const reportRef = ref(db, `users/${user.uid}/dailyReports/${report.date}`);
     set(reportRef, report);
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number) => {
-    if (isAdmin) return;
+    if (user?.email === 'admin@gmail.com') return;
     const studentToUpdate = students.find(s => s.id === studentId);
     if (!studentToUpdate || !studentToUpdate.ownerId) return;
 
@@ -263,4 +259,3 @@ export const useStudentContext = () => {
   return context;
 };
 
-    
