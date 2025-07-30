@@ -11,9 +11,10 @@ import { Loader2, Users, CalendarDays, BarChart, AlertTriangle, CheckCircle, XCi
 import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, getDate, getDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Bar, XAxis, YAxis, CartesianGrid, Legend, BarChart as RechartsBarChart } from 'recharts';
-import type { Student, DailySession, SessionRecord } from '@/lib/types';
+import type { Student, DailySession, SessionRecord, DailyReport } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip as ShadTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
 
 
 const ATTENDANCE_COLORS: { [key: string]: string } = { 'حاضر': '#10B981', 'غائب': '#EF4444', 'متأخر': '#F59E0B', 'تعويض': '#3B82F6' };
@@ -26,7 +27,7 @@ interface ChartData {
 }
 
 export default function MonthlyStatisticsPage() {
-    const { students, dailySessions, loading } = useStudentContext();
+    const { students, dailySessions, dailyReports, loading } = useStudentContext();
     const { user } = useAuth();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
@@ -42,6 +43,13 @@ export default function MonthlyStatisticsPage() {
             const sessionDate = parseISO(session.date);
             return sessionDate >= startDate && sessionDate <= endDate;
         });
+        
+        const filteredReports = Object.values(dailyReports ?? {})
+            .flatMap(dayReports => Object.values(dayReports))
+            .filter(report => {
+                 const reportDate = parseISO(report.date);
+                 return reportDate >= startDate && reportDate <= endDate;
+            });
 
         let recordsSource = selectedStudentId === 'all' 
             ? filteredSessions.flatMap(s => s.records ?? [])
@@ -52,7 +60,8 @@ export default function MonthlyStatisticsPage() {
             attendance: { 'حاضر': 0, 'غائب': 0, 'متأخر': 0, 'تعويض': 0 },
             behavior: { 'هادئ': 0, 'متوسط': 0, 'غير منضبط': 0 },
             evaluation: { 'ممتاز': 0, 'جيد': 0, 'متوسط': 0, 'ضعيف': 0, 'لا يوجد': 0 },
-            sessions: filteredSessions.length,
+            sessions: filteredSessions,
+            reports: filteredReports,
             holidays: filteredSessions.filter(s => s.sessionType === 'يوم عطلة').length,
             sessionTypes: { 'حصة أساسية': 0, 'حصة أنشطة': 0, 'حصة تعويضية': 0 }
         };
@@ -86,7 +95,7 @@ export default function MonthlyStatisticsPage() {
 
         return { ...stats, studentSpecificRecords };
 
-    }, [dailySessions, selectedMonth, selectedYear, selectedStudentId]);
+    }, [dailySessions, dailyReports, selectedMonth, selectedYear, selectedStudentId]);
     
     
      const renderStudentCalendar = () => {
@@ -171,7 +180,7 @@ export default function MonthlyStatisticsPage() {
         );
     }
     
-     if (activeStudents.length === 0 && !loading) {
+     if ((students ?? []).filter(s => s.status === 'نشط').length === 0 && !loading) {
         return (
             <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
                 <AlertTriangle className="h-16 w-16 text-yellow-400" />
@@ -276,10 +285,19 @@ export default function MonthlyStatisticsPage() {
                 </Card>
             </div>
             
+             {selectedStudentId === 'all' && (
+                <GroupEvaluationCard
+                    students={students ?? []}
+                    sessions={monthlyData.sessions}
+                    reports={monthlyData.reports}
+                    groupName={user?.group}
+                />
+            )}
+
              {selectedStudentId !== 'all' && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>تقويم الطالب: {(activeStudents ?? []).find(s => s.id === selectedStudentId)?.fullName}</CardTitle>
+                        <CardTitle>تقويم الطالب: {(students ?? []).find(s => s.id === selectedStudentId)?.fullName}</CardTitle>
                         <CardDescription>نظرة سريعة على حضور الطالب خلال الشهر المحدد.</CardDescription>
                     </CardHeader>
                     <CardContent>
