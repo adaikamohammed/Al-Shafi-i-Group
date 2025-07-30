@@ -64,7 +64,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 photoURL: currentUser.photoURL,
                 group: sheikhInfo.group
             };
-            // Only write profile if it doesn't exist.
             if(currentUser.email && !snapshot.exists()) {
                  const newProfileRef = ref(db, `users/${currentUser.uid}/profile`);
                  await set(newProfileRef, { 
