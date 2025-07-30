@@ -49,7 +49,6 @@ export interface DailyReport {
   authorName: string;
   authorId: string;
   category: string;
-  imageUrl?: string;
 }
 
 

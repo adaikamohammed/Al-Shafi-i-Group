@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,9 +14,8 @@ import { useAuth } from '@/context/AuthContext';
 import { format, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, ExternalLink, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { Loader2, Save, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import type { DailyReport } from '@/lib/types';
-import Image from 'next/image';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
@@ -31,12 +30,9 @@ export default function DailyReportPage() {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const [note, setNote] = useState('');
     const [category, setCategory] = useState(defaultCategories[0]);
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [editingReport, setEditingReport] = useState<DailyReport | null>(null);
     
-    const imageInputRef = useRef<HTMLInputElement>(null);
 
     const todaysReports = useMemo(() => {
         const reportsForToday = dailyReports?.[todayStr];
@@ -46,27 +42,10 @@ export default function DailyReportPage() {
             .sort((a, b) => b.id.localeCompare(a.id));
     }, [dailyReports, todayStr]);
 
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setImageFile(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-    
     const resetForm = () => {
         setNote('');
         setCategory(defaultCategories[0]);
-        setImageFile(null);
-        setImagePreview(null);
         setEditingReport(null);
-        if (imageInputRef.current) {
-            imageInputRef.current.value = '';
-        }
     }
 
     const handleSaveReport = async () => {
@@ -88,10 +67,9 @@ export default function DailyReportPage() {
                 authorId: user.uid,
                 authorName: user.displayName || "شيخ غير مسمى",
                 category: category,
-                imageUrl: editingReport?.imageUrl // Keep old image if not changed
             };
 
-            await saveDailyReport(reportData, imageFile, editingReport?.id);
+            await saveDailyReport(reportData, editingReport?.id);
             
             toast({ title: "نجاح ✅", description: editingReport ? "تم تحديث التقرير بنجاح." : "تم حفظ التقرير بنجاح." });
             resetForm();
@@ -108,8 +86,6 @@ export default function DailyReportPage() {
         setEditingReport(report);
         setNote(report.note);
         setCategory(report.category);
-        setImagePreview(report.imageUrl || null);
-        setImageFile(null);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     
@@ -137,24 +113,18 @@ export default function DailyReportPage() {
                     <CardDescription>اكتب هنا ملاحظاتك العامة عن هذا اليوم، مثل السلوك العام للفوج، مستوى الحفظ، اقتراحات، أو أي حالات خاصة تستدعي انتباه الإدارة.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="category">🏷️ التصنيف</Label>
-                            <Select dir="rtl" value={category} onValueChange={setCategory}>
-                                <SelectTrigger id="category">
-                                    <SelectValue placeholder="اختر تصنيفًا" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {defaultCategories.map(cat => (
-                                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                         <div className="space-y-2">
-                            <Label htmlFor="image-upload">📷 {editingReport?.imageUrl ? 'تغيير الصورة' : 'إضافة صورة (اختياري)'}</Label>
-                            <Input id="image-upload" type="file" accept="image/*" onChange={handleImageChange} ref={imageInputRef} />
-                        </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="category">🏷️ التصنيف</Label>
+                        <Select dir="rtl" value={category} onValueChange={setCategory}>
+                            <SelectTrigger id="category">
+                                <SelectValue placeholder="اختر تصنيفًا" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {defaultCategories.map(cat => (
+                                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     <div className="space-y-2">
@@ -167,13 +137,6 @@ export default function DailyReportPage() {
                             onChange={(e) => setNote(e.target.value)}
                         />
                     </div>
-                    
-                    {imagePreview && (
-                        <div className="mt-4">
-                            <p className="text-sm font-medium mb-2">معاينة الصورة:</p>
-                            <Image src={imagePreview} alt="معاينة الصورة" width={200} height={200} className="rounded-md border" />
-                        </div>
-                    )}
 
                     <div className="flex items-center gap-2">
                         <Button onClick={handleSaveReport} disabled={isSaving}>
@@ -206,14 +169,6 @@ export default function DailyReportPage() {
                                     </p>
                                  </div>
                                  <div className="flex items-center gap-2">
-                                  {report.imageUrl && (
-                                     <a href={report.imageUrl} target="_blank" rel="noopener noreferrer">
-                                        <Button variant="ghost" size="sm">
-                                            <ExternalLink className="ml-2 h-4 w-4"/>
-                                            فتح الصورة
-                                        </Button>
-                                     </a>
-                                  )}
                                   <AlertDialog>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
@@ -236,7 +191,7 @@ export default function DailyReportPage() {
                                         <AlertDialogHeader>
                                             <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
                                             <AlertDialogDescription>
-                                                سيؤدي هذا إلى حذف التقرير نهائيًا، بما في ذلك الصورة المرفقة. لا يمكن التراجع عن هذا الإجراء.
+                                                سيؤدي هذا إلى حذف التقرير نهائيًا. لا يمكن التراجع عن هذا الإجراء.
                                             </AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
@@ -258,4 +213,3 @@ export default function DailyReportPage() {
         </div>
     );
 }
-

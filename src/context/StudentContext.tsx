@@ -7,9 +7,8 @@ import type { Student, DailySession, DailyReport } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { ref, set, onValue, off, remove, DatabaseReference } from 'firebase/database';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 interface StudentContextType {
   students: Student[];
@@ -26,7 +25,7 @@ interface StudentContextType {
   getSessionForDate: (date: string) => DailySession | undefined;
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
-  saveDailyReport: (report: Omit<DailyReport, 'id'>, imageFile: File | null, reportIdToUpdate?: string) => Promise<void>;
+  saveDailyReport: (report: Omit<DailyReport, 'id'>, reportIdToUpdate?: string) => Promise<void>;
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
 }
@@ -192,56 +191,22 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
        return filteredSessions;
   }
   
-  const saveDailyReport = async (reportData: Omit<DailyReport, 'id'>, imageFile: File | null, reportIdToUpdate?: string) => {
+  const saveDailyReport = async (reportData: Omit<DailyReport, 'id'>, reportIdToUpdate?: string) => {
     if (!authContextUser) throw new Error("User not authenticated");
     
     const reportId = reportIdToUpdate || Date.now().toString();
-    const finalReport: Omit<DailyReport, 'id'> & { id?: string; imageUrl?: string } = { ...reportData };
-
-    if (imageFile) {
-      const imageStorageRef = storageRef(storage, `dailyReports/${finalReport.date}/${reportId}.jpg`);
-      const uploadResult = await uploadBytes(imageStorageRef, imageFile);
-      finalReport.imageUrl = await getDownloadURL(uploadResult.ref);
-    }
     
-    // Ensure the ID is part of the object being saved
     const reportToSave: DailyReport = {
-        ...finalReport,
+        ...reportData,
         id: reportId,
-        // Keep existing image URL if not uploading a new one and it's an update
-        imageUrl: finalReport.imageUrl || (reportIdToUpdate ? (dailyReports?.[reportData.date]?.[reportIdToUpdate]?.imageUrl) : undefined)
     };
-    
-    // Remove imageUrl if it is undefined, to prevent Firebase error
-    if (reportToSave.imageUrl === undefined) {
-        delete reportToSave.imageUrl;
-    }
 
-    const reportRef = ref(db, `users/${authContextUser.uid}/dailyReports/${finalReport.date}/${reportId}`);
+    const reportRef = ref(db, `users/${authContextUser.uid}/dailyReports/${reportToSave.date}/${reportId}`);
     await set(reportRef, reportToSave);
   }
 
   const deleteDailyReport = async (reportId: string, date: string) => {
       if (!authContextUser) throw new Error("User not authenticated");
-
-      // First, get the report to see if it has an image
-      const report = (dailyReports ?? {})?.[date]?.[reportId];
-      if (report?.imageUrl) {
-          try {
-             // Create a reference to the file to delete
-            const imageStorageRef = storageRef(storage, `dailyReports/${date}/${reportId}.jpg`);
-            // Delete the file
-            await deleteObject(imageStorageRef);
-          } catch (error: any) {
-              // We can ignore "object not found" errors, but log others
-              if (error.code !== 'storage/object-not-found') {
-                console.error("Error deleting image from storage:", error);
-                throw new Error("فشل حذف الصورة المرتبطة بالتقرير.");
-              }
-          }
-      }
-      
-      // Now delete the database entry
       const reportDbRef = ref(db, `users/${authContextUser.uid}/dailyReports/${date}/${reportId}`);
       await remove(reportDbRef);
   }
@@ -267,7 +232,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   return (
     <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus }}>
       {children}
-    </StudentContext.Provider>
+    </Student.Provider>
   );
 };
 
