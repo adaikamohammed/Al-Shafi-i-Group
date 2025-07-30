@@ -9,7 +9,7 @@ import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { db, storage } from '@/lib/firebase';
 import { ref, set, onValue, off, remove, DatabaseReference } from 'firebase/database';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 interface StudentContextType {
   students: Student[];
@@ -26,14 +26,15 @@ interface StudentContextType {
   getSessionForDate: (date: string) => DailySession | undefined;
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
-  saveDailyReport: (report: Omit<DailyReport, 'id'>, imageFile?: File | null) => Promise<void>;
+  saveDailyReport: (report: Omit<DailyReport, 'id'>, imageFile: File | null, reportIdToUpdate?: string) => Promise<void>;
+  deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user: authContextUser, authLoading } = useAuth();
+  const { user: authContextUser, loading: authLoading } = useAuth();
   
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
@@ -191,21 +192,45 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
        return filteredSessions;
   }
   
-  const saveDailyReport = async (reportData: Omit<DailyReport, 'id'>, imageFile?: File | null) => {
+  const saveDailyReport = async (reportData: Omit<DailyReport, 'id'>, imageFile: File | null, reportIdToUpdate?: string) => {
     if (!authContextUser) throw new Error("User not authenticated");
     
-    const reportId = Date.now().toString();
+    const reportId = reportIdToUpdate || Date.now().toString();
     const finalReport: DailyReport = { ...reportData, id: reportId };
 
     if (imageFile) {
       const imageStorageRef = storageRef(storage, `dailyReports/${finalReport.date}/${reportId}.jpg`);
       const uploadResult = await uploadBytes(imageStorageRef, imageFile);
-      const downloadURL = await getDownloadURL(uploadResult.ref);
-      finalReport.imageUrl = downloadURL;
+      finalReport.imageUrl = await getDownloadURL(uploadResult.ref);
     }
 
     const reportRef = ref(db, `users/${authContextUser.uid}/dailyReports/${finalReport.date}/${reportId}`);
     await set(reportRef, finalReport);
+  }
+
+  const deleteDailyReport = async (reportId: string, date: string) => {
+      if (!authContextUser) throw new Error("User not authenticated");
+
+      // First, get the report to see if it has an image
+      const report = dailyReports?.[date]?.[reportId];
+      if (report?.imageUrl) {
+          try {
+             // Create a reference to the file to delete
+            const imageStorageRef = storageRef(storage, `dailyReports/${date}/${reportId}.jpg`);
+            // Delete the file
+            await deleteObject(imageStorageRef);
+          } catch (error: any) {
+              // We can ignore "object not found" errors, but log others
+              if (error.code !== 'storage/object-not-found') {
+                console.error("Error deleting image from storage:", error);
+                throw new Error("فشل حذف الصورة المرتبطة بالتقرير.");
+              }
+          }
+      }
+      
+      // Now delete the database entry
+      const reportDbRef = ref(db, `users/${authContextUser.uid}/dailyReports/${date}/${reportId}`);
+      await remove(reportDbRef);
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number) => {
@@ -227,7 +252,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport, toggleSurahStatus }}>
+    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus }}>
       {children}
     </StudentContext.Provider>
   );
@@ -240,3 +265,4 @@ export const useStudentContext = () => {
   }
   return context;
 };
+

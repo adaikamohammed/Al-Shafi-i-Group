@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,14 +14,17 @@ import { useAuth } from '@/context/AuthContext';
 import { format, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Upload, PlusCircle, Image as ImageIcon, ExternalLink } from 'lucide-react';
+import { Loader2, Save, ExternalLink, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import type { DailyReport } from '@/lib/types';
 import Image from 'next/image';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+
 
 const defaultCategories = ["اقتراح", "شكوى", "ملاحظة عامة", "شكر", "طلب"];
 
 export default function DailyReportPage() {
-    const { dailyReports, saveDailyReport, loading } = useStudentContext();
+    const { dailyReports, saveDailyReport, deleteDailyReport, loading } = useStudentContext();
     const { user } = useAuth();
     const { toast } = useToast();
 
@@ -31,6 +34,7 @@ export default function DailyReportPage() {
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [editingReport, setEditingReport] = useState<DailyReport | null>(null);
     
     const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -38,13 +42,8 @@ export default function DailyReportPage() {
         const reportsForToday = dailyReports?.[todayStr];
         if (!reportsForToday) return [];
         return Object.values(reportsForToday)
-            .filter(report => report && typeof report === 'object') // Defensive filter
-            .sort((a, b) => {
-                if (a?.id && b?.id) {
-                    return b.id.localeCompare(a.id);
-                }
-                return 0;
-            });
+            .filter(report => report && typeof report === 'object' && report.id) 
+            .sort((a, b) => b.id.localeCompare(a.id));
     }, [dailyReports, todayStr]);
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,6 +57,17 @@ export default function DailyReportPage() {
             reader.readAsDataURL(file);
         }
     };
+    
+    const resetForm = () => {
+        setNote('');
+        setCategory(defaultCategories[0]);
+        setImageFile(null);
+        setImagePreview(null);
+        setEditingReport(null);
+        if (imageInputRef.current) {
+            imageInputRef.current.value = '';
+        }
+    }
 
     const handleSaveReport = async () => {
         if (!user) {
@@ -70,32 +80,48 @@ export default function DailyReportPage() {
         }
         setIsSaving(true);
         
-        const reportData: Omit<DailyReport, 'id'> = {
-            date: todayStr,
-            note: note,
-            timestamp: new Date().toISOString(),
-            authorId: user.uid,
-            authorName: user.displayName || "شيخ غير مسمى",
-            category: category,
-        };
-        
         try {
-            await saveDailyReport(reportData, imageFile);
-            toast({ title: "نجاح ✅", description: "تم حفظ التقرير بنجاح." });
-            // Reset form
-            setNote('');
-            setCategory(defaultCategories[0]);
-            setImageFile(null);
-            setImagePreview(null);
-            if (imageInputRef.current) {
-                imageInputRef.current.value = '';
-            }
+            const reportData: Omit<DailyReport, 'id'> = {
+                date: todayStr,
+                note: note,
+                timestamp: editingReport?.timestamp || new Date().toISOString(),
+                authorId: user.uid,
+                authorName: user.displayName || "شيخ غير مسمى",
+                category: category,
+                imageUrl: editingReport?.imageUrl // Keep old image if not changed
+            };
+
+            await saveDailyReport(reportData, imageFile, editingReport?.id);
+            
+            toast({ title: "نجاح ✅", description: editingReport ? "تم تحديث التقرير بنجاح." : "تم حفظ التقرير بنجاح." });
+            resetForm();
+
         } catch(error) {
-             toast({ title: "خطأ ❌", description: "فشل حفظ التقرير.", variant: "destructive" });
+             const errorMessage = error instanceof Error ? error.message : "فشل حفظ التقرير.";
+             toast({ title: "خطأ ❌", description: errorMessage, variant: "destructive" });
         } finally {
             setIsSaving(false);
         }
     };
+    
+    const handleEditClick = (report: DailyReport) => {
+        setEditingReport(report);
+        setNote(report.note);
+        setCategory(report.category);
+        setImagePreview(report.imageUrl || null);
+        setImageFile(null);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    const handleDeleteClick = async (reportId: string, date: string) => {
+        try {
+            await deleteDailyReport(reportId, date);
+            toast({ title: "✅ تم الحذف", description: "تم حذف التقرير بنجاح." });
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "فشل حذف التقرير.";
+            toast({ title: "خطأ ❌", description: errorMessage, variant: "destructive" });
+        }
+    }
     
     if(loading) {
         return <div className="flex items-center justify-center h-full"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
@@ -107,7 +133,7 @@ export default function DailyReportPage() {
             
             <Card>
                 <CardHeader>
-                    <CardTitle>➕ إضافة تقرير جديد ليوم: {format(new Date(), 'EEEE, d MMMM yyyy', { locale: ar })}</CardTitle>
+                    <CardTitle>➕ {editingReport ? 'تعديل التقرير' : `إضافة تقرير جديد ليوم: ${format(new Date(), 'EEEE, d MMMM yyyy', { locale: ar })}`}</CardTitle>
                     <CardDescription>اكتب هنا ملاحظاتك العامة عن هذا اليوم، مثل السلوك العام للفوج، مستوى الحفظ، اقتراحات، أو أي حالات خاصة تستدعي انتباه الإدارة.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -126,7 +152,7 @@ export default function DailyReportPage() {
                             </Select>
                         </div>
                          <div className="space-y-2">
-                            <Label htmlFor="image-upload">📷 صورة (اختياري)</Label>
+                            <Label htmlFor="image-upload">📷 {editingReport?.imageUrl ? 'تغيير الصورة' : 'إضافة صورة (اختياري)'}</Label>
                             <Input id="image-upload" type="file" accept="image/*" onChange={handleImageChange} ref={imageInputRef} />
                         </div>
                     </div>
@@ -149,17 +175,24 @@ export default function DailyReportPage() {
                         </div>
                     )}
 
-                    <Button onClick={handleSaveReport} disabled={isSaving}>
-                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                        حفظ التقرير
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button onClick={handleSaveReport} disabled={isSaving}>
+                            {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+                            {editingReport ? 'حفظ التعديلات' : 'حفظ التقرير'}
+                        </Button>
+                         {editingReport && (
+                            <Button variant="outline" onClick={resetForm}>
+                                إلغاء التعديل
+                            </Button>
+                        )}
+                    </div>
                 </CardContent>
             </Card>
             
             <Card>
                 <CardHeader>
                     <CardTitle>📂 التقارير المسجلة لهذا اليوم ({todaysReports.length})</CardTitle>
-                    <CardDescription>هنا يمكنك تصفح جميع التقارير التي تم حفظها لهذا اليوم.</CardDescription>
+                    <CardDescription>هنا يمكنك تصفح جميع التقارير التي تم حفظها لهذا اليوم وتعديلها أو حذفها.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {todaysReports.length > 0 ? (
@@ -172,6 +205,7 @@ export default function DailyReportPage() {
                                         {report.authorName} - {format(parseISO(report.timestamp), 'h:mm a', { locale: ar })}
                                     </p>
                                  </div>
+                                 <div className="flex items-center gap-2">
                                   {report.imageUrl && (
                                      <a href={report.imageUrl} target="_blank" rel="noopener noreferrer">
                                         <Button variant="ghost" size="sm">
@@ -179,7 +213,39 @@ export default function DailyReportPage() {
                                             فتح الصورة
                                         </Button>
                                      </a>
-                                 )}
+                                  )}
+                                  <AlertDialog>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent>
+                                            <DropdownMenuItem onClick={() => handleEditClick(report)}>
+                                                <Edit className="ml-2 h-4 w-4" />
+                                                <span>تعديل</span>
+                                            </DropdownMenuItem>
+                                            <AlertDialogTrigger asChild>
+                                                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                                                    <Trash2 className="ml-2 h-4 w-4" />
+                                                    <span>حذف</span>
+                                                </DropdownMenuItem>
+                                            </AlertDialogTrigger>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                     <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                سيؤدي هذا إلى حذف التقرير نهائيًا، بما في ذلك الصورة المرفقة. لا يمكن التراجع عن هذا الإجراء.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteClick(report.id, report.date)}>تأكيد الحذف</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                 </div>
                                </div>
                                 <p className="mt-2 whitespace-pre-wrap border-t pt-2">{report.note}</p>
                             </Card>
@@ -192,3 +258,4 @@ export default function DailyReportPage() {
         </div>
     );
 }
+
