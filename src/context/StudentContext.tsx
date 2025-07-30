@@ -7,8 +7,10 @@ import type { Student, DailySession, DailyReport } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { ref, set, onValue, off, remove, DatabaseReference } from 'firebase/database';
+import { onAuthStateChanged, User } from 'firebase/auth';
+
 
 interface StudentContextType {
   students: Student[];
@@ -32,7 +34,7 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user, authLoading } = useAuth();
+  const { user: authContextUser, authLoading } = useAuth();
   
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
@@ -41,105 +43,96 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
-    
-    if (!user) {
-      setStudents([]);
-      setDailySessions({});
-      setDailyReports({});
-      setSurahProgress({});
-      setLoading(false);
-      return;
-    }
+    setLoading(true);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+            const isAdmin = user.email === 'admin@gmail.com';
+            const dataRef = ref(db, isAdmin ? 'users' : `users/${user.uid}`);
 
-    const isAdmin = user.email === 'admin@gmail.com';
-    const dataRef: DatabaseReference = isAdmin ? ref(db, 'users') : ref(db, `users/${user.uid}`);
-    
-    const handleValueChange = (snapshot: any) => {
-        if (!snapshot.exists()) {
-            setStudents([]); setDailySessions({}); setDailyReports({}); setSurahProgress({});
-            setLoading(false);
-            return;
-        }
-
-        const data = snapshot.val();
-        let combinedStudents: Student[] = [];
-        let combinedSessions: Record<string, DailySession> = {};
-        let combinedReports: Record<string, DailyReport> = {};
-        let combinedSurahProgress: Record<string, number[]> = {};
-
-        if (isAdmin) {
-            Object.keys(data).forEach(uid => {
-                const userData = data[uid];
-                if (userData.students) {
-                    const userStudents = Object.values(userData.students).map((s: any) => ({
-                        ...s,
-                        ownerId: uid, 
-                        birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-                        registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-                        updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-                    }));
-                    combinedStudents.push(...userStudents);
+            const handleValueChange = (snapshot: any) => {
+                if (!snapshot.exists()) {
+                    setStudents([]); setDailySessions({}); setDailyReports({}); setSurahProgress({});
+                    setLoading(false);
+                    return;
                 }
-                if(userData.dailySessions) {
-                    Object.entries(userData.dailySessions).forEach(([date, session]) => {
-                         if (!combinedSessions[date]) combinedSessions[date] = { date, sessionType: (session as any).sessionType, records: [] };
-                         if((session as any).records) {
-                            (session as any).records.forEach((r: any) => combinedSessions[date].records.push(r));
-                         }
+
+                const data = snapshot.val();
+                let combinedStudents: Student[] = [];
+                let combinedSessions: Record<string, DailySession> = {};
+                let combinedReports: Record<string, DailyReport> = {};
+                let combinedSurahProgress: Record<string, number[]> = {};
+
+                const processUserData = (userData: any, uid: string) => {
+                     if (userData.students) {
+                        const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) => ({
+                            ...s,
+                            id,
+                            ownerId: uid,
+                            birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+                            registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+                            updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+                        }));
+                        combinedStudents.push(...userStudents);
+                    }
+                    if (userData.dailySessions) {
+                        Object.entries(userData.dailySessions).forEach(([date, session]) => {
+                             if (!combinedSessions[date]) combinedSessions[date] = { date, sessionType: (session as any).sessionType, records: [] };
+                             if((session as any).records) {
+                                (session as any).records.forEach((r: any) => combinedSessions[date].records.push(r));
+                             }
+                        });
+                    }
+                    if(userData.dailyReports) Object.assign(combinedReports, userData.dailyReports);
+                    if(userData.surahProgress) Object.assign(combinedSurahProgress, userData.surahProgress);
+                }
+
+                if (isAdmin) {
+                    Object.keys(data).forEach(uid => {
+                        processUserData(data[uid], uid);
                     });
+                } else {
+                    processUserData(data, user.uid);
                 }
-                if(userData.dailyReports) Object.assign(combinedReports, userData.dailyReports);
-                if(userData.surahProgress) Object.assign(combinedSurahProgress, userData.surahProgress);
+
+                setStudents(combinedStudents);
+                setDailySessions(combinedSessions);
+                setDailyReports(combinedReports);
+                setSurahProgress(combinedSurahProgress);
+                setLoading(false);
+            };
+
+            const valueCallback = onValue(dataRef, handleValueChange, (error) => {
+                console.error("Firebase read failed: " + error.message);
+                setLoading(false);
             });
+
+            return () => {
+              off(dataRef, 'value', valueCallback);
+            };
         } else {
-            const userData = data;
-            if (userData.students) {
-              combinedStudents = Object.values(userData.students).map((s: any) => ({
-                  ...s,
-                  ownerId: user.uid,
-                  birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-                  registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-                  updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-              }));
-            }
-            combinedSessions = userData.dailySessions || {};
-            combinedReports = userData.dailyReports || {};
-            combinedSurahProgress = userData.surahProgress || {};
+            setStudents([]);
+            setDailySessions({});
+            setDailyReports({});
+            setSurahProgress({});
+            setLoading(false);
         }
-
-        setStudents(combinedStudents);
-        setDailySessions(combinedSessions);
-        setDailyReports(combinedReports);
-        setSurahProgress(combinedSurahProgress);
-        setLoading(false);
-    };
-
-    const valueCallback = onValue(dataRef, handleValueChange, (error) => {
-        console.error("Firebase read failed: " + error.message);
-        setLoading(false);
     });
 
-    return () => {
-      off(dataRef, 'value', valueCallback);
-    };
-  }, [user, authLoading]);
+    return () => unsubscribe();
+  }, []);
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
-    if (!user) return; 
+    if (!authContextUser) return;
 
     const studentId = uuidv4();
     const newStudent: Student = {
       ...studentData,
       id: studentId,
-      ownerId: user.uid,
+      ownerId: authContextUser.uid,
       memorizedSurahsCount: 0,
       updatedAt: new Date(),
     };
-    const studentRef = ref(db, `users/${user.uid}/students/${studentId}`);
+    const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
     set(studentRef, {
         ...newStudent, 
         birthDate: newStudent.birthDate.toISOString(), 
@@ -149,13 +142,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
-     if (!user) return;
+     if (!authContextUser) return;
      newStudents.forEach(s => addStudent(s));
   }
 
   const updateStudent = (studentId: string, updatedData: Partial<Student>, ownerId?: string) => {
-    if (!user) return;
-    const studentOwnerId = ownerId || user.uid;
+    if (!authContextUser) return;
+    const studentOwnerId = ownerId || authContextUser.uid;
     
     const originalStudent = students.find(s => s.id === studentId);
     if (!originalStudent) return;
@@ -172,33 +165,33 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deleteStudent = (studentId: string, ownerId?: string) => {
-      if (!user) return;
-      const studentOwnerId = ownerId || user.uid;
+      if (!authContextUser) return;
+      const studentOwnerId = ownerId || authContextUser.uid;
       const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
       remove(studentRef);
   }
   
   const deleteAllStudents = () => {
-      if (!user) return;
-      if (user.email === 'admin@gmail.com') {
+      if (!authContextUser) return;
+      if (authContextUser.email === 'admin@gmail.com') {
           const allUsersRef = ref(db, 'users');
           remove(allUsersRef);
       } else {
-          const userStudentsRef = ref(db, `users/${user.uid}/students`);
+          const userStudentsRef = ref(db, `users/${authContextUser.uid}/students`);
           remove(userStudentsRef);
       }
   }
 
   const addDailySession = (session: DailySession, ownerId?: string) => {
-    if (!user) return;
-    const targetOwnerId = ownerId || user.uid;
+    if (!authContextUser) return;
+    const targetOwnerId = ownerId || authContextUser.uid;
     const sessionRef = ref(db, `users/${targetOwnerId}/dailySessions/${session.date}`);
     set(sessionRef, session);
   };
   
   const deleteDailySession = (date: string, ownerId?: string) => {
-    if (!user) return;
-    const targetOwnerId = ownerId || user.uid;
+    if (!authContextUser) return;
+    const targetOwnerId = ownerId || authContextUser.uid;
     const sessionRef = ref(db, `users/${targetOwnerId}/dailySessions/${date}`);
     remove(sessionRef);
   }
@@ -225,14 +218,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const saveDailyReport = (report: DailyReport) => {
-    if (!user) return;
+    if (!authContextUser) return;
     const reportRef = ref(db, `users/${report.authorId}/dailyReports/${report.date}`);
     set(reportRef, report);
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number, ownerId?: string) => {
-    if (!user) return;
-    const studentOwnerId = ownerId || user.uid;
+    if (!authContextUser) return;
+    const studentOwnerId = ownerId || authContextUser.uid;
 
     const studentProgressList = surahProgress[studentId] ? [...surahProgress[studentId]] : [];
     const surahIndex = studentProgressList.indexOf(surahId);
