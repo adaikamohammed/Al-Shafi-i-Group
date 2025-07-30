@@ -50,6 +50,7 @@ export default function DailySessionsPage() {
   [students]);
 
   const handleDayClick = (day: number) => {
+    if (isAdmin) return;
     const newSelectedDay = new Date(getYear(currentDate), getMonth(currentDate), day);
     setSelectedDay(newSelectedDay);
     setSessionDialogOpen(true);
@@ -65,6 +66,7 @@ export default function DailySessionsPage() {
   
   const handleDeleteDay = (e: React.MouseEvent, day: number) => {
     e.stopPropagation();
+    if (isAdmin) return;
     const date = new Date(getYear(currentDate), getMonth(currentDate), day);
     const formattedDate = format(date, 'yyyy-MM-dd');
     const session = getSessionForDate(formattedDate);
@@ -156,7 +158,8 @@ export default function DailySessionsPage() {
           key={day}
           onClick={() => handleDayClick(day)}
           className={cn(
-            "p-2 text-start border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col justify-between relative group cursor-pointer",
+            "p-2 text-start border rounded-md transition-colors h-24 flex flex-col justify-between relative group",
+            !isAdmin && "hover:bg-accent hover:text-accent-foreground cursor-pointer",
             dayStatusClass
           )}
         >
@@ -175,6 +178,7 @@ export default function DailySessionsPage() {
                                 <Download className="ml-2 h-4 w-4" />
                                 <span>تحميل بيانات اليوم</span>
                             </DropdownMenuItem>
+                            {!isAdmin && (
                              <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                     <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
@@ -195,6 +199,7 @@ export default function DailySessionsPage() {
                                     </AlertDialogFooter>
                                 </AlertDialogContent>
                             </AlertDialog>
+                            )}
                          </DropdownMenuContent>
                     </DropdownMenu>
                     </div>
@@ -236,7 +241,7 @@ export default function DailySessionsPage() {
                 </Button>
             </div>
             <CardDescription className="text-center">
-              اختر الشهر لعرض أيامه، ثم اضغط على اليوم المطلوب لتسجيل أو تعديل الحصة.
+              {isAdmin ? 'عرض تقويم الحصص المسجلة من قبل الشيوخ.' : 'اختر الشهر لعرض أيامه، ثم اضغط على اليوم المطلوب لتسجيل أو تعديل الحصة.'}
             </CardDescription>
         </CardHeader>
         <CardContent>
@@ -359,37 +364,16 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
   };
 
   const handleSave = () => {
-    if (!user) return;
+    if (!user || isAdmin) return;
     setIsLoading(true);
     const formattedDate = format(day, 'yyyy-MM-dd');
     
-    if (isAdmin) {
-        const recordsByOwner: Record<string, DailyRecord[]> = {};
-        records.forEach(record => {
-            const ownerId = students.find(s => s.id === record.studentId)?.ownerId;
-            if (ownerId) {
-                if (!recordsByOwner[ownerId]) recordsByOwner[ownerId] = [];
-                recordsByOwner[ownerId].push(record);
-            }
-        });
-
-        Object.entries(recordsByOwner).forEach(([ownerId, ownerRecords]) => {
-            const sessionToSave: DailySession = {
-                date: formattedDate,
-                sessionType: sessionType,
-                records: ownerRecords,
-            };
-            addDailySession(sessionToSave, ownerId);
-        });
-
-    } else {
-        const sessionToSave: DailySession = {
-            date: formattedDate,
-            sessionType: sessionType,
-            records: sessionType === 'يوم عطلة' ? [] : records,
-        };
-        addDailySession(sessionToSave);
-    }
+    const sessionToSave: DailySession = {
+        date: formattedDate,
+        sessionType: sessionType,
+        records: sessionType === 'يوم عطلة' ? [] : records,
+    };
+    addDailySession(sessionToSave);
     
     setIsLoading(false);
     onClose();
