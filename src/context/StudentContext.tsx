@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import type { Student, DailySession, DailyReport, AppUser } from '@/lib/types';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import type { Student, DailySession, DailyReport } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -54,14 +54,15 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const dataRef = ref(db, 'users');
+    setLoading(true);
+    
+    // Determine the correct data path based on user role.
+    const isUserAdmin = user.email === 'admin@gmail.com';
+    const dataRef = isUserAdmin ? ref(db, 'users') : ref(db, `users/${user.uid}`);
 
     const handleValueChange = (snapshot: any) => {
       if (!snapshot.exists()) {
-        setStudents([]);
-        setDailySessions({});
-        setDailyReports({});
-        setSurahProgress({});
+        setStudents([]); setDailySessions({}); setDailyReports({}); setSurahProgress({});
         setLoading(false);
         return;
       }
@@ -72,7 +73,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       let combinedReports: Record<string, DailyReport> = {};
       let combinedSurahProgress: Record<string, number[]> = {};
 
-      if (isAdmin) {
+      if (isUserAdmin) {
         Object.keys(data).forEach(uid => {
           const userData = data[uid];
           if (userData.students) {
@@ -90,19 +91,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           if(userData.surahProgress) Object.assign(combinedSurahProgress, userData.surahProgress);
         });
       } else {
-        const userData = data[user.uid];
-        if(userData) {
-            combinedStudents = userData.students ? Object.values(userData.students).map((s: any) => ({
-            ...s,
-            ownerId: user.uid,
-            birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-            registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-            updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-            })) : [];
-            combinedSessions = userData.dailySessions || {};
-            combinedReports = userData.dailyReports || {};
-            combinedSurahProgress = userData.surahProgress || {};
-        }
+        const userData = data;
+        combinedStudents = userData.students ? Object.values(userData.students).map((s: any) => ({
+        ...s,
+        ownerId: user.uid,
+        birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+        registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+        updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+        })) : [];
+        combinedSessions = userData.dailySessions || {};
+        combinedReports = userData.dailyReports || {};
+        combinedSurahProgress = userData.surahProgress || {};
       }
 
       setStudents(combinedStudents);
@@ -120,7 +119,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       off(dataRef, 'value', handleValueChange);
     };
-  }, [user, isAdmin, authLoading]);
+  }, [user, authLoading]);
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
     if (!user || isAdmin) return; 
