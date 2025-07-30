@@ -40,8 +40,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(authLoading);
     if (authLoading) {
+      setLoading(true);
       return;
     }
 
@@ -55,12 +55,16 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
 
     setLoading(true);
-    
-    const dataRef: DatabaseReference = isAdmin ? ref(db, 'users') : ref(db, `users/${user.uid}`);
 
+    const isUserAdmin = user.email === 'admin@gmail.com';
+    const dataRef: DatabaseReference = isUserAdmin ? ref(db, 'users') : ref(db, `users/${user.uid}`);
+    
     const handleValueChange = (snapshot: any) => {
       if (!snapshot.exists()) {
-        setStudents([]); setDailySessions({}); setDailyReports({}); setSurahProgress({});
+        setStudents([]); 
+        setDailySessions({}); 
+        setDailyReports({}); 
+        setSurahProgress({});
         setLoading(false);
         return;
       }
@@ -71,7 +75,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       let combinedReports: Record<string, DailyReport> = {};
       let combinedSurahProgress: Record<string, number[]> = {};
 
-      if (isAdmin) {
+      if (isUserAdmin) {
         Object.keys(data).forEach(uid => {
           const userData = data[uid];
           if (userData.students) {
@@ -117,7 +121,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       off(dataRef, 'value', handleValueChange);
     };
-  }, [user, isAdmin, authLoading]);
+  }, [user, authLoading]);
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
     if (!user || isAdmin) return; 
@@ -145,10 +149,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const updateStudent = (studentId: string, updatedData: Partial<Student>) => {
-    if (!user || isAdmin) return;
     const studentToUpdate = students.find(s => s.id === studentId);
     if (!studentToUpdate || !studentToUpdate.ownerId) return;
     
+    if (user?.email === 'admin@gmail.com') {
+        console.warn("Admin cannot update student data.");
+        return;
+    }
+
     const studentRef = ref(db, `users/${studentToUpdate.ownerId}/students/${studentId}`);
     const finalData = { ...studentToUpdate, ...updatedData, updatedAt: new Date() };
 
@@ -161,9 +169,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deleteStudent = (studentId: string) => {
-      if (!user || isAdmin) return;
       const studentToDelete = students.find(s => s.id === studentId);
       if (!studentToDelete || !studentToDelete.ownerId) return;
+
+       if (user?.email === 'admin@gmail.com') {
+        console.warn("Admin cannot delete student data.");
+        return;
+    }
       
       const studentRef = ref(db, `users/${studentToDelete.ownerId}/students/${studentId}`);
       remove(studentRef);
@@ -215,7 +227,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number) => {
-    if (!user || isAdmin) return;
+    if (isAdmin) return;
     const studentToUpdate = students.find(s => s.id === studentId);
     if (!studentToUpdate || !studentToUpdate.ownerId) return;
 
