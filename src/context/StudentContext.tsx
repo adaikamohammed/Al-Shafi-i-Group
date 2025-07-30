@@ -40,16 +40,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // We must wait for auth to be resolved and have a user.
-    if (authLoading || !user) {
-      // If auth is done and there's no user, stop loading and clear data.
-      if (!authLoading && !user) {
-        setStudents([]);
-        setDailySessions({});
-        setDailyReports({});
-        setSurahProgress({});
-        setLoading(false);
-      }
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
+    if (!user) {
+      setStudents([]);
+      setDailySessions({});
+      setDailyReports({});
+      setSurahProgress({});
+      setLoading(false);
       return;
     }
 
@@ -148,12 +149,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const updateStudent = (studentId: string, updatedData: Partial<Student>) => {
+    const studentToUpdate = students.find(s => s.id === studentId);
+    if (!studentToUpdate || !studentToUpdate.ownerId) return;
+    
+    // Prevent admin from writing data
     if (user?.email === 'admin@gmail.com') {
         console.warn("Admin cannot update student data.");
         return;
     }
-    const studentToUpdate = students.find(s => s.id === studentId);
-    if (!studentToUpdate || !studentToUpdate.ownerId) return;
 
     const studentRef = ref(db, `users/${studentToUpdate.ownerId}/students/${studentId}`);
     const finalData = { ...studentToUpdate, ...updatedData, updatedAt: new Date() };
@@ -167,12 +170,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deleteStudent = (studentId: string) => {
+      const studentToDelete = students.find(s => s.id === studentId);
+      if (!studentToDelete || !studentToDelete.ownerId) return;
+
       if (user?.email === 'admin@gmail.com') {
         console.warn("Admin cannot delete student data.");
         return;
       }
-      const studentToDelete = students.find(s => s.id === studentId);
-      if (!studentToDelete || !studentToDelete.ownerId) return;
       
       const studentRef = ref(db, `users/${studentToDelete.ownerId}/students/${studentId}`);
       remove(studentRef);
@@ -224,9 +228,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number) => {
-    if (user?.email === 'admin@gmail.com') return;
     const studentToUpdate = students.find(s => s.id === studentId);
     if (!studentToUpdate || !studentToUpdate.ownerId) return;
+
+    if (user?.email === 'admin@gmail.com') return;
 
     const studentProgress = surahProgress[studentId] ? [...surahProgress[studentId]] : [];
     const surahIndex = studentProgress.indexOf(surahId);
