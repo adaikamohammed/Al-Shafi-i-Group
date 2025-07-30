@@ -42,11 +42,14 @@ export interface DailySession {
 }
 
 export interface DailyReport {
+  id: string; // Unique ID for the report (timestamp or uuid)
   date: string; // YYYY-MM-DD
   note: string;
   timestamp: string; // ISO string
   authorName: string;
   authorId: string;
+  category: string;
+  imageUrl?: string;
 }
 
 

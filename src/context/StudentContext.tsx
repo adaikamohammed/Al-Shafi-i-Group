@@ -7,13 +7,14 @@ import type { Student, DailySession, DailyReport } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { ref, set, onValue, off, remove, DatabaseReference } from 'firebase/database';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface StudentContextType {
   students: Student[];
   dailySessions: Record<string, DailySession>;
-  dailyReports: Record<string, DailyReport>;
+  dailyReports: { [date: string]: { [reportId: string]: DailyReport } };
   surahProgress: Record<string, number[]>;
   loading: boolean;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => void;
@@ -25,7 +26,7 @@ interface StudentContextType {
   getSessionForDate: (date: string) => DailySession | undefined;
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
-  saveDailyReport: (report: DailyReport) => void;
+  saveDailyReport: (report: Omit<DailyReport, 'id'>, imageFile?: File | null) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
 }
 
@@ -36,7 +37,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
-  const [dailyReports, setDailyReports] = useState<Record<string, DailyReport>>({});
+  const [dailyReports, setDailyReports] = useState<{ [date: string]: { [reportId: string]: DailyReport } }>({});
   const [surahProgress, setSurahProgress] = useState<Record<string, number[]>>({});
   const [loading, setLoading] = useState(true);
   
@@ -190,10 +191,21 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
        return filteredSessions;
   }
   
-  const saveDailyReport = (report: DailyReport) => {
-    if (!authContextUser) return;
-    const reportRef = ref(db, `users/${report.authorId}/dailyReports/${report.date}`);
-    set(reportRef, report);
+  const saveDailyReport = async (reportData: Omit<DailyReport, 'id'>, imageFile?: File | null) => {
+    if (!authContextUser) throw new Error("User not authenticated");
+    
+    const reportId = Date.now().toString();
+    const finalReport: DailyReport = { ...reportData, id: reportId };
+
+    if (imageFile) {
+      const imageStorageRef = storageRef(storage, `dailyReports/${finalReport.date}/${reportId}.jpg`);
+      const uploadResult = await uploadBytes(imageStorageRef, imageFile);
+      const downloadURL = await getDownloadURL(uploadResult.ref);
+      finalReport.imageUrl = downloadURL;
+    }
+
+    const reportRef = ref(db, `users/${authContextUser.uid}/dailyReports/${finalReport.date}/${reportId}`);
+    await set(reportRef, finalReport);
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number) => {
