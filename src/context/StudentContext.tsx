@@ -31,7 +31,7 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user, authLoading } = useAuth();
+  const { user, authLoading, isAdmin } = useAuth();
   
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
@@ -40,11 +40,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Wait until authentication is fully resolved
     if (authLoading) {
       setLoading(true);
       return;
     }
 
+    // If no user, clear all data and stop loading
     if (!user) {
       setStudents([]);
       setDailySessions({});
@@ -54,9 +56,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    // Now that we have a user, determine the correct data path
     setLoading(true);
-    const isUserAdmin = user.email === 'admin@gmail.com';
-    const dataRefPath = isUserAdmin ? 'users' : `users/${user.uid}`;
+    const dataRefPath = isAdmin ? 'users' : `users/${user.uid}`;
     const dataRef: DatabaseReference = ref(db, dataRefPath);
 
     const handleValueChange = (snapshot: any) => {
@@ -75,7 +77,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       let combinedReports: Record<string, DailyReport> = {};
       let combinedSurahProgress: Record<string, number[]> = {};
 
-      if (isUserAdmin) {
+      if (isAdmin) {
         Object.keys(data).forEach(uid => {
           const userData = data[uid];
           if (userData.students) {
@@ -118,13 +120,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     });
 
+    // Cleanup function to remove the listener when the component unmounts or dependencies change
     return () => {
       off(dataRef, 'value', valueCallback);
     };
-  }, [user, authLoading]);
+  }, [user, authLoading, isAdmin]); // Depend on authLoading and isAdmin to re-run when auth state is resolved.
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
-    if (!user || user.email === 'admin@gmail.com') return; 
+    if (!user || isAdmin) return; 
 
     const studentId = uuidv4();
     const newStudent: Student = {
@@ -144,17 +147,21 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
-     if (!user || user.email === 'admin@gmail.com') return;
+     if (!user || isAdmin) return;
      newStudents.forEach(s => addStudent(s));
   }
 
   const updateStudent = (studentId: string, updatedData: Partial<Student>) => {
+    if (!user || isAdmin) {
+        console.warn("Admin cannot update student data.");
+        return;
+    }
     const studentToUpdate = students.find(s => s.id === studentId);
     if (!studentToUpdate || !studentToUpdate.ownerId) return;
     
-    // Prevent admin from writing data
-    if (user?.email === 'admin@gmail.com') {
-        console.warn("Admin cannot update student data.");
+    // Ensure the current user owns the record they are trying to update
+    if(user.uid !== studentToUpdate.ownerId) {
+        console.warn("User does not have permission to update this student record.");
         return;
     }
 
@@ -170,11 +177,15 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deleteStudent = (studentId: string) => {
+      if (!user || isAdmin) {
+        console.warn("Admin cannot delete student data.");
+        return;
+      }
       const studentToDelete = students.find(s => s.id === studentId);
       if (!studentToDelete || !studentToDelete.ownerId) return;
 
-      if (user?.email === 'admin@gmail.com') {
-        console.warn("Admin cannot delete student data.");
+      if(user.uid !== studentToDelete.ownerId) {
+        console.warn("User does not have permission to delete this student record.");
         return;
       }
       
@@ -183,19 +194,19 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const deleteAllStudents = () => {
-      if (!user || user.email === 'admin@gmail.com') return;
+      if (!user || isAdmin) return;
       const studentsRef = ref(db, `users/${user.uid}/students`);
       remove(studentsRef);
   }
 
   const addDailySession = (session: DailySession) => {
-    if (!user || user.email === 'admin@gmail.com') return;
+    if (!user || isAdmin) return;
     const sessionRef = ref(db, `users/${user.uid}/dailySessions/${session.date}`);
     set(sessionRef, session);
   };
   
   const deleteDailySession = (date: string) => {
-    if (!user || user.email === 'admin@gmail.com') return;
+    if (!user || isAdmin) return;
     const sessionRef = ref(db, `users/${user.uid}/dailySessions/${date}`);
     remove(sessionRef);
   }
@@ -222,16 +233,20 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const saveDailyReport = (report: DailyReport) => {
-    if (!user || user.email === 'admin@gmail.com') return;
+    if (!user || isAdmin) return;
     const reportRef = ref(db, `users/${user.uid}/dailyReports/${report.date}`);
     set(reportRef, report);
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number) => {
+    if (!user || isAdmin) return;
     const studentToUpdate = students.find(s => s.id === studentId);
     if (!studentToUpdate || !studentToUpdate.ownerId) return;
 
-    if (user?.email === 'admin@gmail.com') return;
+    if(user.uid !== studentToUpdate.ownerId) {
+        console.warn("User does not have permission to update this student's surah progress.");
+        return;
+    }
 
     const studentProgress = surahProgress[studentId] ? [...surahProgress[studentId]] : [];
     const surahIndex = studentProgress.indexOf(surahId);
