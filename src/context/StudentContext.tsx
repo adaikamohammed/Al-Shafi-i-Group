@@ -31,7 +31,7 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user, authLoading, isAdmin } = useAuth();
+  const { user, authLoading } = useAuth();
   
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
@@ -40,17 +40,24 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading) return;
-    setLoading(true);
-
-    const dataRef: DatabaseReference = isAdmin ? ref(db, 'users') : user ? ref(db, `users/${user.uid}`) : null;
-
-    if (!dataRef) {
-      setLoading(false);
+    if (authLoading) {
+      setLoading(true);
       return;
     }
     
-    const valueCallback = onValue(dataRef, (snapshot) => {
+    if (!user) {
+      setStudents([]);
+      setDailySessions({});
+      setDailyReports({});
+      setSurahProgress({});
+      setLoading(false);
+      return;
+    }
+
+    const isAdmin = user.email === 'admin@gmail.com';
+    const dataRef: DatabaseReference = isAdmin ? ref(db, 'users') : ref(db, `users/${user.uid}`);
+    
+    const handleValueChange = (snapshot: any) => {
         if (!snapshot.exists()) {
             setStudents([]); setDailySessions({}); setDailyReports({}); setSurahProgress({});
             setLoading(false);
@@ -79,7 +86,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
                 if(userData.dailySessions) {
                     Object.entries(userData.dailySessions).forEach(([date, session]) => {
                          if (!combinedSessions[date]) combinedSessions[date] = { date, sessionType: (session as any).sessionType, records: [] };
-                         (session as any).records.forEach((r: any) => combinedSessions[date].records.push(r));
+                         if((session as any).records) {
+                            (session as any).records.forEach((r: any) => combinedSessions[date].records.push(r));
+                         }
                     });
                 }
                 if(userData.dailyReports) Object.assign(combinedReports, userData.dailyReports);
@@ -104,7 +113,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setDailyReports(combinedReports);
         setSurahProgress(combinedSurahProgress);
         setLoading(false);
-    }, (error) => {
+    };
+
+    const valueCallback = onValue(dataRef, handleValueChange, (error) => {
         console.error("Firebase read failed: " + error.message);
         setLoading(false);
     });
@@ -112,7 +123,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       off(dataRef, 'value', valueCallback);
     };
-  }, [user, authLoading, isAdmin]);
+  }, [user, authLoading]);
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
     if (!user) return; 
@@ -144,12 +155,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const studentToUpdate = students.find(s => s.id === studentId);
     if (!studentToUpdate || !studentToUpdate.ownerId) return;
     
+    const isAdmin = user.email === 'admin@gmail.com';
     const ownerId = isAdmin ? studentToUpdate.ownerId : user.uid;
-    if (ownerId !== studentToUpdate.ownerId && !isAdmin) {
-      console.warn("User does not have permission to update this student record.");
-      return;
-    }
-
+    
     const studentRef = ref(db, `users/${ownerId}/students/${studentId}`);
     const finalData = { ...studentToUpdate, ...updatedData, updatedAt: new Date() };
 
@@ -166,24 +174,25 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const studentToDelete = students.find(s => s.id === studentId);
       if (!studentToDelete || !studentToDelete.ownerId) return;
 
+      const isAdmin = user.email === 'admin@gmail.com';
       const ownerId = isAdmin ? studentToDelete.ownerId : user.uid;
-       if (ownerId !== studentToDelete.ownerId && !isAdmin) {
-          console.warn("User does not have permission to delete this student record.");
-          return;
-      }
       
       const studentRef = ref(db, `users/${ownerId}/students/${studentId}`);
       remove(studentRef);
   }
   
   const deleteAllStudents = () => {
-      if (!user || isAdmin) return; // For now, only teachers can delete their own data
+      if (!user) return;
+      const isAdmin = user.email === 'admin@gmail.com';
+      if(isAdmin) return; // Prevent admin from deleting all students from one teacher's node
+      
       const studentsRef = ref(db, `users/${user.uid}/students`);
       remove(studentsRef);
   }
 
   const addDailySession = (session: DailySession, ownerId?: string) => {
     if (!user) return;
+    const isAdmin = user.email === 'admin@gmail.com';
     const targetOwnerId = isAdmin ? ownerId : user.uid;
     if (!targetOwnerId) return;
     const sessionRef = ref(db, `users/${targetOwnerId}/dailySessions/${session.date}`);
@@ -192,6 +201,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   
   const deleteDailySession = (date: string, ownerId?: string) => {
     if (!user) return;
+    const isAdmin = user.email === 'admin@gmail.com';
     const targetOwnerId = isAdmin ? ownerId : user.uid;
     if (!targetOwnerId) return;
     const sessionRef = ref(db, `users/${targetOwnerId}/dailySessions/${date}`);
@@ -230,11 +240,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const studentToUpdate = students.find(s => s.id === studentId);
     if (!studentToUpdate || !studentToUpdate.ownerId) return;
 
+    const isAdmin = user.email === 'admin@gmail.com';
     const ownerId = isAdmin ? studentToUpdate.ownerId : user.uid;
-    if (ownerId !== studentToUpdate.ownerId && !isAdmin) {
-      console.warn("User does not have permission to update this student's surah progress.");
-      return;
-    }
 
     const studentProgress = surahProgress[studentId] ? [...surahProgress[studentId]] : [];
     const surahIndex = studentProgress.indexOf(surahId);
