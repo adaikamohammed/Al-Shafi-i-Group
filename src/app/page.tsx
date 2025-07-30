@@ -194,12 +194,12 @@ export default function StudentManagementPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>الاسم الكامل</TableHead>
-                <TableHead className="hidden md:table-cell">اسم الولي</TableHead>
-                <TableHead className="hidden lg:table-cell">العمر</TableHead>
-                <TableHead>الحالة</TableHead>
-                <TableHead className="hidden md:table-cell">السور المحفوظة</TableHead>
-                <TableHead>
+                <TableHead className="w-[25%] text-center">الاسم الكامل</TableHead>
+                <TableHead className="hidden md:table-cell w-[25%] text-center">اسم الولي</TableHead>
+                <TableHead className="hidden lg:table-cell w-[10%] text-center">العمر</TableHead>
+                <TableHead className="w-[15%] text-center">الحالة</TableHead>
+                <TableHead className="hidden md:table-cell w-[15%] text-center">السور المحفوظة</TableHead>
+                <TableHead className="w-[10%] text-center">
                   <span className="sr-only">إجراءات</span>
                 </TableHead>
               </TableRow>
@@ -208,14 +208,14 @@ export default function StudentManagementPage() {
              {filteredStudents.length > 0 ? (
                 filteredStudents.map((student) => (
                     <TableRow key={student.id}>
-                    <TableCell className="font-medium">{student.fullName}</TableCell>
-                    <TableCell className="hidden md:table-cell">{student.guardianName}</TableCell>
-                    <TableCell className="hidden lg:table-cell">{calculateAge(student.birthDate)}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium text-center">{student.fullName}</TableCell>
+                    <TableCell className="hidden md:table-cell text-center">{student.guardianName}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-center">{calculateAge(student.birthDate)}</TableCell>
+                    <TableCell className="text-center">
                         <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">{student.memorizedSurahsCount || 0}</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell text-center">{student.memorizedSurahsCount || 0}</TableCell>
+                    <TableCell className="text-center">
                         <StudentActions student={student} onStatusChange={handleStatusChange} />
                     </TableCell>
                     </TableRow>
