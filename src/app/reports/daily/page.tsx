@@ -37,7 +37,14 @@ export default function DailyReportPage() {
     const todaysReports = useMemo(() => {
         const reportsForToday = dailyReports?.[todayStr];
         if (!reportsForToday) return [];
-        return Object.values(reportsForToday).sort((a, b) => b.id.localeCompare(a.id));
+        return Object.values(reportsForToday)
+            .filter(report => report && typeof report === 'object') // Defensive filter
+            .sort((a, b) => {
+                if (a?.id && b?.id) {
+                    return b.id.localeCompare(a.id);
+                }
+                return 0;
+            });
     }, [dailyReports, todayStr]);
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
