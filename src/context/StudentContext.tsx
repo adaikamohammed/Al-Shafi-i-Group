@@ -7,7 +7,7 @@ import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/lib/firebase';
-import { ref, set, onValue, off, remove } from 'firebase/database';
+import { ref, set, onValue, off, remove, DatabaseReference } from 'firebase/database';
 
 interface StudentContextType {
   students: Student[];
@@ -40,8 +40,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(authLoading);
     if (authLoading) {
-      setLoading(true);
       return;
     }
 
@@ -56,9 +56,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     setLoading(true);
     
-    // Determine the correct data path based on user role.
-    const isUserAdmin = user.email === 'admin@gmail.com';
-    const dataRef = isUserAdmin ? ref(db, 'users') : ref(db, `users/${user.uid}`);
+    const dataRef: DatabaseReference = isAdmin ? ref(db, 'users') : ref(db, `users/${user.uid}`);
 
     const handleValueChange = (snapshot: any) => {
       if (!snapshot.exists()) {
@@ -73,7 +71,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       let combinedReports: Record<string, DailyReport> = {};
       let combinedSurahProgress: Record<string, number[]> = {};
 
-      if (isUserAdmin) {
+      if (isAdmin) {
         Object.keys(data).forEach(uid => {
           const userData = data[uid];
           if (userData.students) {
@@ -119,7 +117,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       off(dataRef, 'value', handleValueChange);
     };
-  }, [user, authLoading]);
+  }, [user, isAdmin, authLoading]);
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
     if (!user || isAdmin) return; 
