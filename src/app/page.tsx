@@ -99,7 +99,7 @@ export default function StudentManagementPage() {
     );
   }
   
-   if (!isAdmin && students.length === 0) {
+   if (students.length === 0 && !loading && !isAdmin) {
       return (
         <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
             <h1 className="text-2xl font-bold mb-4">لا يوجد طلاب بعد</h1>
@@ -199,9 +199,9 @@ export default function StudentManagementPage() {
                 <TableHead className="hidden lg:table-cell">العمر</TableHead>
                 <TableHead>الحالة</TableHead>
                 <TableHead className="hidden md:table-cell">السور المحفوظة</TableHead>
-                {!isAdmin && <TableHead>
+                <TableHead>
                   <span className="sr-only">إجراءات</span>
-                </TableHead>}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -215,14 +215,14 @@ export default function StudentManagementPage() {
                         <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{student.memorizedSurahsCount || 0}</TableCell>
-                    {!isAdmin && <TableCell>
+                    <TableCell>
                         <StudentActions student={student} onStatusChange={handleStatusChange} />
-                    </TableCell>}
+                    </TableCell>
                     </TableRow>
                 ))
              ) : (
                 <TableRow>
-                    <TableCell colSpan={isAdmin ? 5 : 6} className="h-24 text-center">
+                    <TableCell colSpan={6} className="h-24 text-center">
                        {searchTerm ? "لم يتم العثور على طلاب مطابقين للبحث." : "لا يوجد طلبة حاليًا. قم بإضافة طالب جديد."}
                     </TableCell>
                 </TableRow>

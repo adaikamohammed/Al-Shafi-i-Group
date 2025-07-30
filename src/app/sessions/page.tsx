@@ -50,7 +50,6 @@ export default function DailySessionsPage() {
   [students]);
 
   const handleDayClick = (day: number) => {
-    if (isAdmin) return; // Prevent admin from opening the dialog
     const newSelectedDay = new Date(getYear(currentDate), getMonth(currentDate), day);
     setSelectedDay(newSelectedDay);
     setSessionDialogOpen(true);
@@ -68,7 +67,10 @@ export default function DailySessionsPage() {
     e.stopPropagation();
     const date = new Date(getYear(currentDate), getMonth(currentDate), day);
     const formattedDate = format(date, 'yyyy-MM-dd');
-    deleteDailySession(formattedDate);
+    const session = getSessionForDate(formattedDate);
+    // For admin, we might need to find the correct ownerId to delete from
+    const ownerId = session?.records[0]?.studentId ? students.find(s => s.id === session.records[0].studentId)?.ownerId : undefined;
+    deleteDailySession(formattedDate, ownerId);
     toast({ title: "✅ تم الحذف", description: `تم حذف بيانات يوم ${formattedDate} بنجاح.` });
   }
 
@@ -128,7 +130,6 @@ export default function DailySessionsPage() {
     const firstDayOfMonth = getDay(startOfMonth(currentDate));
     
     const dayCells = [];
-    // Adjust startDayIndex for Arabic calendar (Saturday is the first day)
     const startDayIndex = (firstDayOfMonth + 1) % 7; 
 
     for (let i = 0; i < startDayIndex; i++) {
@@ -144,7 +145,7 @@ export default function DailySessionsPage() {
         let dayStatusClass = '';
         if (isHoliday) {
             dayStatusClass = 'bg-yellow-200 dark:bg-yellow-800';
-        } else if (session) { // Covers both records and activities sessions
+        } else if (session) {
             dayStatusClass = 'bg-green-200 dark:bg-green-800';
         } else if (isPast(dayDate) && !isToday(dayDate)) {
              dayStatusClass = 'bg-red-200 dark:bg-red-900';
@@ -155,14 +156,13 @@ export default function DailySessionsPage() {
           key={day}
           onClick={() => handleDayClick(day)}
           className={cn(
-            "p-2 text-start border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col justify-between relative group",
-            dayStatusClass,
-            isAdmin ? "cursor-default" : "cursor-pointer"
+            "p-2 text-start border rounded-md hover:bg-accent hover:text-accent-foreground transition-colors h-24 flex flex-col justify-between relative group cursor-pointer",
+            dayStatusClass
           )}
         >
             <div className="flex justify-between w-full items-start">
                  <span className="font-bold">{day}</span>
-                 {session && !isAdmin && (
+                 {session && (
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <DropdownMenu>
                          <DropdownMenuTrigger asChild>
@@ -236,7 +236,7 @@ export default function DailySessionsPage() {
                 </Button>
             </div>
             <CardDescription className="text-center">
-              {isAdmin ? "عرض بيانات الحصص المسجلة من قبل المعلمين." : "اختر الشهر لعرض أيامه، ثم اضغط على اليوم المطلوب لتسجيل الحصة."}
+              اختر الشهر لعرض أيامه، ثم اضغط على اليوم المطلوب لتسجيل أو تعديل الحصة.
             </CardDescription>
         </CardHeader>
         <CardContent>
@@ -299,7 +299,7 @@ interface DailySessionFormProps {
     day: Date;
     students: Student[];
     onClose: () => void;
-    addDailySession: (session: DailySession) => void;
+    addDailySession: (session: DailySession, ownerId?: string) => void;
     getSessionForDate: (date: string) => DailySession | undefined;
 }
 
@@ -308,6 +308,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
   const [sessionType, setSessionType] = useState<SessionType>('حصة أساسية');
   const [records, setRecords] = useState<DailyRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const { user, isAdmin } = useAuth();
 
   useEffect(() => {
     const formattedDate = format(day, 'yyyy-MM-dd');
@@ -318,7 +319,6 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
         if (existingSession.sessionType === 'يوم عطلة') {
             setRecords([]);
         } else {
-            // Re-map to ensure all active students are present
              const updatedRecords = students.map(s => {
                 const existingRec = existingSession.records.find(r => r.studentId === s.id);
                 return existingRec || {
@@ -331,7 +331,6 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
             setRecords(updatedRecords);
         }
     } else {
-        // No existing session, create fresh records for all active students
         const initialRecords = students.map(s => ({
             studentId: s.id,
             attendance: 'حاضر',
@@ -351,7 +350,6 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
           if (field === 'attendance' && value === 'غائب') {
             updatedRec.memorization = null; updatedRec.review = false;
             updatedRec.behavior = 'هادئ';
-            // Do not clear notes for absent students
           }
           return updatedRec;
         }
@@ -361,23 +359,40 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
   };
 
   const handleSave = () => {
+    if (!user) return;
     setIsLoading(true);
     const formattedDate = format(day, 'yyyy-MM-dd');
     
-    const sessionToSave: DailySession = {
-        date: formattedDate,
-        sessionType: sessionType,
-        records: sessionType === 'يوم عطلة' ? [] : records,
-    };
-    
-    try {
+    if (isAdmin) {
+        const recordsByOwner: Record<string, DailyRecord[]> = {};
+        records.forEach(record => {
+            const ownerId = students.find(s => s.id === record.studentId)?.ownerId;
+            if (ownerId) {
+                if (!recordsByOwner[ownerId]) recordsByOwner[ownerId] = [];
+                recordsByOwner[ownerId].push(record);
+            }
+        });
+
+        Object.entries(recordsByOwner).forEach(([ownerId, ownerRecords]) => {
+            const sessionToSave: DailySession = {
+                date: formattedDate,
+                sessionType: sessionType,
+                records: ownerRecords,
+            };
+            addDailySession(sessionToSave, ownerId);
+        });
+
+    } else {
+        const sessionToSave: DailySession = {
+            date: formattedDate,
+            sessionType: sessionType,
+            records: sessionType === 'يوم عطلة' ? [] : records,
+        };
         addDailySession(sessionToSave);
-        onClose();
-    } catch (error) {
-        console.error("Failed to save session records:", error);
-    } finally {
-        setIsLoading(false);
     }
+    
+    setIsLoading(false);
+    onClose();
   }
 
   const isActivitySession = sessionType === 'حصة أنشطة';

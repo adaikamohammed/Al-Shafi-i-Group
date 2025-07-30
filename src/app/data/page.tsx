@@ -459,7 +459,7 @@ export default function DataExchangePage() {
         <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
             <h1 className="text-3xl font-headline font-bold text-center">صفحة المدير</h1>
             <p className="text-muted-foreground text-center">
-                لا يمكن للمدير استيراد أو تصدير البيانات. هذه الصفحة مخصصة للمعلمين فقط.
+                صلاحيات المدير الكاملة تتيح له استعراض البيانات من الصفحات الأخرى.
             </p>
         </div>
     );

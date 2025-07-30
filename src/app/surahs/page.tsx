@@ -45,7 +45,7 @@ export default function SurahProgressPage() {
     }, [activeStudents, surahProgress]);
 
     const handleSurahClick = (surahId: number) => {
-        if (!selectedStudentId || isAdmin) return;
+        if (!selectedStudentId) return;
         toggleSurahStatus(selectedStudentId, surahId);
     };
     
@@ -83,9 +83,7 @@ export default function SurahProgressPage() {
                 <CardHeader>
                     <CardTitle className="text-3xl font-headline font-bold">📖 متابعة حفظ السور</CardTitle>
                     <CardDescription>
-                        {isAdmin
-                          ? "استعرض تقدم حفظ السور لجميع الطلبة."
-                          : "حدد طالبًا لعرض وتحديث السور التي حفظها. اضغط على السورة لتبديل حالتها بين 'محفوظة' و 'غير محفوظة'."}
+                        حدد طالبًا لعرض وتحديث السور التي حفظها. اضغط على السورة لتبديل حالتها بين 'محفوظة' و 'غير محفوظة'.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -180,7 +178,7 @@ export default function SurahProgressPage() {
                     <CardHeader>
                         <CardTitle>قائمة السور الكاملة</CardTitle>
                          <CardDescription>
-                            {isAdmin ? "عرض حالة الحفظ للطالب المحدد." : "انقر على اسم السورة لتغيير حالة حفظها للطالب المحدد."}
+                            انقر على اسم السورة لتغيير حالة حفظها للطالب المحدد.
                          </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -192,8 +190,8 @@ export default function SurahProgressPage() {
                                         key={surah.id}
                                         variant={isSaved ? "default" : "outline"}
                                         onClick={() => handleSurahClick(surah.id)}
-                                        disabled={!selectedStudentId || isAdmin}
-                                        className={cn("h-auto justify-between", isAdmin && "cursor-default")}
+                                        disabled={!selectedStudentId}
+                                        className="h-auto justify-between"
                                     >
                                         <div className="flex items-center gap-2">
                                             {isSaved && <CheckCircle className="h-4 w-4" />}

@@ -27,15 +27,17 @@ export default function DailyReportPage() {
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        const todaysReport = dailyReports[todayStr];
-        if (todaysReport) {
-            setNote(todaysReport.note);
+        if (user) {
+            const todaysReport = Object.values(dailyReports).find(r => r.date === todayStr && r.authorId === user.uid);
+            if (todaysReport) {
+                setNote(todaysReport.note);
+            }
         }
-    }, [dailyReports, todayStr]);
+    }, [dailyReports, todayStr, user]);
 
     const handleSaveReport = () => {
-        if (!user || isAdmin) {
-            toast({ title: "خطأ", description: "فقط المعلمون يمكنهم حفظ التقارير.", variant: "destructive" });
+        if (!user) {
+            toast({ title: "خطأ", description: "يجب تسجيل الدخول لحفظ التقارير.", variant: "destructive" });
             return;
         }
         if (!note.trim()) {
@@ -76,26 +78,24 @@ export default function DailyReportPage() {
         <div className="space-y-6">
             <h1 className="text-3xl font-headline font-bold">التقرير اليومي للشيخ</h1>
             
-            {!isAdmin && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>📝 تقرير اليوم: {format(new Date(), 'EEEE, d MMMM yyyy', { locale: ar })}</CardTitle>
-                        <CardDescription>اكتب هنا ملاحظاتك العامة عن هذا اليوم، مثل السلوك العام للفوج، مستوى الحفظ، اقتراحات، أو أي حالات خاصة تستدعي انتباه الإدارة.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Textarea 
-                            placeholder="مثال: كان الحفظ ممتازًا اليوم، ولكن لوحظ تأخر بعض الطلبة. أقترح..."
-                            rows={6}
-                            value={note}
-                            onChange={(e) => setNote(e.target.value)}
-                        />
-                        <Button onClick={handleSaveReport} disabled={isSaving} className="mt-4">
-                            {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                            {dailyReports[todayStr] ? 'تحديث تقرير اليوم' : 'حفظ تقرير اليوم'}
-                        </Button>
-                    </CardContent>
-                </Card>
-            )}
+            <Card>
+                <CardHeader>
+                    <CardTitle>📝 تقرير اليوم: {format(new Date(), 'EEEE, d MMMM yyyy', { locale: ar })}</CardTitle>
+                    <CardDescription>اكتب هنا ملاحظاتك العامة عن هذا اليوم، مثل السلوك العام للفوج، مستوى الحفظ، اقتراحات، أو أي حالات خاصة تستدعي انتباه الإدارة.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Textarea 
+                        placeholder="مثال: كان الحفظ ممتازًا اليوم، ولكن لوحظ تأخر بعض الطلبة. أقترح..."
+                        rows={6}
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                    />
+                    <Button onClick={handleSaveReport} disabled={isSaving} className="mt-4">
+                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+                        {Object.values(dailyReports).some(r => r.date === todayStr && r.authorId === user?.uid) ? 'تحديث تقرير اليوم' : 'حفظ تقرير اليوم'}
+                    </Button>
+                </CardContent>
+            </Card>
             
             <Card>
                 <CardHeader>
@@ -121,7 +121,7 @@ export default function DailyReportPage() {
                             <TableBody>
                                 {sortedReports.length > 0 ? (
                                     sortedReports.map(report => (
-                                        <TableRow key={report.date}>
+                                        <TableRow key={`${report.date}-${report.authorId}`}>
                                             <TableCell className="font-medium">{format(parseISO(report.date), 'dd/MM/yyyy')}</TableCell>
                                             <TableCell>{report.authorName}</TableCell>
                                             <TableCell className="whitespace-pre-wrap">{report.note}</TableCell>
