@@ -14,8 +14,8 @@ import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 
 const TIER_PRICES = {
-    initial: { 'فئة أ': 2500, 'فئة ب': 2000 },
-    subsequent: { 'فئة أ': 2000, 'فئة ب': 1500 },
+    firstPayment: { 'فئة الأكابر': 2500, 'فئة الأصاغر': 2000 },
+    renewal: { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 },
 };
 
 export default function DuesPage() {
@@ -33,11 +33,10 @@ export default function DuesPage() {
                 const studentPayments = (payments ?? []).filter(p => p.studentId === student.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                 const lastPayment = studentPayments[0];
                 
-                const monthsSinceRegistration = differenceInMonths(new Date(), student.registrationDate);
-                const isInitialPeriod = !lastPayment && monthsSinceRegistration < 3;
+                const isFirstPayment = !lastPayment;
 
-                const tier = student.subscriptionTier || 'فئة ب';
-                const dueAmount = isInitialPeriod ? prices.initial[tier] : prices.subsequent[tier];
+                const tier = student.subscriptionTier || 'فئة الأصاغر';
+                const dueAmount = isFirstPayment ? prices.firstPayment[tier] : prices.renewal[tier];
                 
                 let status: 'paid' | 'overdue' = 'overdue';
                 let nextDueDate: Date | null = null;
@@ -51,7 +50,7 @@ export default function DuesPage() {
                 } else {
                      nextDueDate = addMonths(student.registrationDate, 3);
                      if (new Date() < nextDueDate) {
-                        status = 'paid';
+                        status = 'paid'; // Still within the first 3 months, considered paid until due date passes
                      }
                 }
 
@@ -139,8 +138,8 @@ export default function DuesPage() {
                     <CardTitle>قائمة مستحقات الطلبة</CardTitle>
                     <CardDescription>
                         عرض حالة الدفع للطلبة النشطين وتسجيل الدفعات الجديدة.
-                        الأسعار: الفترة الأولى ({prices.initial['فئة أ']} د.ج / {prices.initial['فئة ب']} د.ج),
-                        الفترات اللاحقة ({prices.subsequent['فئة أ']} د.ج / {prices.subsequent['فئة ب']} د.ج).
+                        الأسعار: دفعة أولى ({prices.firstPayment['فئة الأكابر']} / {prices.firstPayment['فئة الأصاغر']} د.ج),
+                        تجديد ({prices.renewal['فئة الأكابر']} / {prices.renewal['فئة الأصاغر']} د.ج).
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -161,7 +160,7 @@ export default function DuesPage() {
                                 <TableRow key={student.id} className={student.status === 'overdue' ? 'bg-red-50 dark:bg-red-900/20' : ''}>
                                     <TableCell className="font-medium">{student.fullName}</TableCell>
                                     <TableCell>
-                                        <Badge variant="secondary">{student.subscriptionTier || 'فئة ب'}</Badge>
+                                        <Badge variant="secondary">{student.subscriptionTier || 'فئة الأصاغر'}</Badge>
                                     </TableCell>
                                     <TableCell>
                                         {student.lastPaymentDate ? format(student.lastPaymentDate, 'd MMMM yyyy', { locale: ar }) : 'لا يوجد'}

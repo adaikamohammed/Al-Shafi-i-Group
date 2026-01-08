@@ -2,7 +2,7 @@
 
 export type StudentStatus = "نشط" | "مطرود" | "غائب طويل" | "محذوف";
 export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "أكثر";
-export type SubscriptionTier = "فئة أ" | "فئة ب";
+export type SubscriptionTier = "فئة الأكابر" | "فئة الأصاغر";
 
 export interface Student {
   id: string;
@@ -111,7 +111,7 @@ export interface Payment {
 
 export interface AppSettings {
     prices: {
-        initial: { 'فئة أ': number; 'فئة ب': number; };
-        subsequent: { 'فئة أ': number; 'فئة ب': number; };
+        firstPayment: { 'فئة الأكابر': number; 'فئة الأصاغر': number; };
+        renewal: { 'فئة الأكابر': number; 'فئة الأصاغر': number; };
     };
 }

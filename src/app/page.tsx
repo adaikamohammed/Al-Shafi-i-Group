@@ -456,13 +456,13 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
             </div>
              <div className="space-y-2">
                 <Label htmlFor="subscriptionTier">فئة الاشتراك</Label>
-                <Select dir="rtl" name="subscriptionTier" defaultValue={student?.subscriptionTier ?? 'فئة ب'}>
+                <Select dir="rtl" name="subscriptionTier" defaultValue={student?.subscriptionTier ?? 'فئة الأصاغر'}>
                     <SelectTrigger id="subscriptionTier">
                         <SelectValue placeholder="اختر الفئة" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="فئة أ">فئة أ</SelectItem>
-                        <SelectItem value="فئة ب">فئة ب</SelectItem>
+                        <SelectItem value="فئة الأكابر">فئة الأكابر</SelectItem>
+                        <SelectItem value="فئة الأصاغر">فئة الأصاغر</SelectItem>
                     </SelectContent>
                 </Select>
             </div>

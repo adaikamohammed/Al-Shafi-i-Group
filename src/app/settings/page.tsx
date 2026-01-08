@@ -11,12 +11,12 @@ import { Loader2, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const TIER_PRICES = {
-    initial: { 'فئة أ': 2500, 'فئة ب': 2000 },
-    subsequent: { 'فئة أ': 2000, 'فئة ب': 1500 },
+    firstPayment: { 'فئة الأكابر': 2500, 'فئة الأصاغر': 2000 },
+    renewal: { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 },
 };
 
 export default function SettingsPage() {
-    const { settings, setSettings, loading: contextLoading } = useStudentContext();
+    const { settings, saveSettings, loading: contextLoading } = useStudentContext();
     const { toast } = useToast();
     
     const [prices, setPrices] = useState(settings?.prices || TIER_PRICES);
@@ -28,7 +28,7 @@ export default function SettingsPage() {
         }
     }, [settings]);
 
-    const handlePriceChange = (period: 'initial' | 'subsequent', tier: 'فئة أ' | 'فئة ب', value: string) => {
+    const handlePriceChange = (period: 'firstPayment' | 'renewal', tier: 'فئة الأكابر' | 'فئة الأصاغر', value: string) => {
         const numericValue = Number(value);
         if (!isNaN(numericValue)) {
             setPrices(prev => ({
@@ -44,7 +44,7 @@ export default function SettingsPage() {
     const handleSaveChanges = async () => {
         setIsLoading(true);
         try {
-            await setSettings({ prices });
+            await saveSettings({ prices });
             toast({
                 title: "✅ تم الحفظ",
                 description: "تم حفظ إعدادات الأسعار بنجاح."
@@ -77,48 +77,48 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-6">
             <div className="space-y-4 p-4 border rounded-lg">
-                 <h4 className="font-semibold text-lg">الفترة الأولى (أول 3 أشهر)</h4>
+                 <h4 className="font-semibold text-lg">سعر الدفعة الأولى</h4>
                  <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                        <Label htmlFor="initial-tier-a">سعر الفئة أ (د.ج)</Label>
+                        <Label htmlFor="first-payment-seniors">سعر فئة الأكابر (د.ج)</Label>
                         <Input 
-                            id="initial-tier-a"
+                            id="first-payment-seniors"
                             type="number"
-                            value={prices.initial['فئة أ']}
-                            onChange={(e) => handlePriceChange('initial', 'فئة أ', e.target.value)}
+                            value={prices.firstPayment['فئة الأكابر']}
+                            onChange={(e) => handlePriceChange('firstPayment', 'فئة الأكابر', e.target.value)}
                         />
                     </div>
                      <div className="space-y-2">
-                        <Label htmlFor="initial-tier-b">سعر الفئة ب (د.ج)</Label>
+                        <Label htmlFor="first-payment-juniors">سعر فئة الأصاغر (د.ج)</Label>
                         <Input 
-                            id="initial-tier-b"
+                            id="first-payment-juniors"
                             type="number"
-                            value={prices.initial['فئة ب']}
-                            onChange={(e) => handlePriceChange('initial', 'فئة ب', e.target.value)}
+                            value={prices.firstPayment['فئة الأصاغر']}
+                            onChange={(e) => handlePriceChange('firstPayment', 'فئة الأصاغر', e.target.value)}
                         />
                     </div>
                  </div>
             </div>
 
             <div className="space-y-4 p-4 border rounded-lg">
-                 <h4 className="font-semibold text-lg">الفترات اللاحقة</h4>
+                 <h4 className="font-semibold text-lg">سعر التجديد</h4>
                  <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                        <Label htmlFor="subsequent-tier-a">سعر الفئة أ (د.ج)</Label>
+                        <Label htmlFor="renewal-seniors">سعر فئة الأكابر (د.ج)</Label>
                         <Input 
-                            id="subsequent-tier-a"
+                            id="renewal-seniors"
                             type="number"
-                            value={prices.subsequent['فئة أ']}
-                            onChange={(e) => handlePriceChange('subsequent', 'فئة أ', e.target.value)}
+                            value={prices.renewal['فئة الأكابر']}
+                            onChange={(e) => handlePriceChange('renewal', 'فئة الأكابر', e.target.value)}
                         />
                     </div>
                      <div className="space-y-2">
-                        <Label htmlFor="subsequent-tier-b">سعر الفئة ب (د.ج)</Label>
+                        <Label htmlFor="renewal-juniors">سعر فئة الأصاغر (د.ج)</Label>
                         <Input 
-                            id="subsequent-tier-b"
+                            id="renewal-juniors"
                             type="number"
-                            value={prices.subsequent['فئة ب']}
-                            onChange={(e) => handlePriceChange('subsequent', 'فئة ب', e.target.value)}
+                            value={prices.renewal['فئة الأصاغر']}
+                            onChange={(e) => handlePriceChange('renewal', 'فئة الأصاغر', e.target.value)}
                         />
                     </div>
                  </div>

@@ -31,7 +31,7 @@ interface StudentContextType {
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
   addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
-  setSettings: (newSettings: AppSettings) => Promise<void>;
+  saveSettings: (newSettings: AppSettings) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -123,7 +123,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       id: studentId,
       ownerId: authContextUser.uid,
       memorizedSurahsCount: 0,
-      subscriptionTier: studentData.subscriptionTier || 'فئة ب',
+      subscriptionTier: studentData.subscriptionTier || 'فئة الأصاغر',
       updatedAt: new Date(),
     };
     const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
@@ -252,14 +252,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     await set(paymentRef, newPayment);
   };
   
-  const setSettings = async (newSettings: AppSettings) => {
+  const saveSettings = async (newSettings: AppSettings) => {
      if (!authContextUser) throw new Error("User not authenticated");
      const settingsRef = ref(db, `users/${authContextUser.uid}/settings`);
      await set(settingsRef, newSettings);
   };
 
   return (
-    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, setSettings }}>
+    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, saveSettings }}>
       {children}
     </StudentContext.Provider>
   );
