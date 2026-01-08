@@ -229,7 +229,7 @@ export default function StudentManagementPage() {
                 ))
              ) : (
                 <TableRow>
-                    <TableCell colSpan={isSuperAdmin ? 7 : 8} className="h-24 text-center">
+                    <TableCell colSpan={isSuperAdmin ? 8 : 7} className="h-24 text-center">
                        {searchTerm ? "لم يتم العثور على طلاب مطابقين للبحث." : "لا يوجد طلبة حاليًا. قم بإضافة طالب جديد."}
                     </TableCell>
                 </TableRow>

@@ -61,8 +61,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
 
     setLoading(true);
+    
+    let dataRef: DatabaseReference;
+    let valueCallback: (snapshot: any) => void;
 
-    const handleSuperAdminData = (snapshot: any) => {
+    if (isSuperAdmin) {
+      dataRef = ref(db, 'users');
+      valueCallback = (snapshot: any) => {
         if (!snapshot.exists()) {
             setLoading(false); return;
         }
@@ -108,9 +113,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setPayments(allPayments);
         setSettingsState(adminSettings);
         setLoading(false);
-    };
-
-    const handleSheikhData = (snapshot: any) => {
+      };
+    } else {
+      dataRef = ref(db, `users/${authContextUser.uid}`);
+      valueCallback = (snapshot: any) => {
         if (!snapshot.exists()) {
              setLoading(false); return;
         }
@@ -132,18 +138,16 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setPayments(paymentsArray);
         setSettingsState(data.settings || null);
         setLoading(false);
-    };
-
-    const dataRef = ref(db, isSuperAdmin ? 'users' : `users/${authContextUser.uid}`);
-    const callback = isSuperAdmin ? handleSuperAdminData : handleSheikhData;
+      };
+    }
     
-    const valueCallback = onValue(dataRef, callback, (error) => {
+    const listener = onValue(dataRef, valueCallback, (error) => {
         console.error(`Firebase read failed: ${error.message}`);
         setLoading(false);
     });
   
     return () => {
-        off(dataRef, 'value', valueCallback);
+        off(dataRef, 'value', listener);
     };
   }, [authContextUser, authLoading, isSuperAdmin]);
 
@@ -177,6 +181,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const updateStudent = (studentId: string, updatedData: Partial<Student>, ownerId: string) => {
     if (!authContextUser) return;
     
+    // Super admin cannot edit student data directly.
     if (isSuperAdmin || authContextUser.uid !== ownerId) return;
 
     const originalStudent = (students ?? []).find(s => s.id === studentId);
@@ -275,7 +280,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
     
     const surahProgressRef = ref(db, `users/${authContextUser.uid}/surahProgress/${studentId}`);
-    set(surahProgressRef, studentProgressList);
+    set(surahProgressRef, surahProgressList);
     
     updateStudent(studentId, { memorizedSurahsCount: studentProgressList.length }, authContextUser.uid);
   }
@@ -326,12 +331,3 @@ export const useStudentContext = () => {
   }
   return context;
 };
-
-    
-    
-
-
-
-
-    
-

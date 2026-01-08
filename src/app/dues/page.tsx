@@ -127,6 +127,7 @@ export default function DuesPage() {
 
 
     const handleRecordPayment = async (studentId: string, amount: number, quarter: number) => {
+        if (isSuperAdmin) return;
         setIsProcessing(studentId);
         try {
             const monthOfQuarter = (quarter - 1) * 3;
@@ -153,7 +154,7 @@ export default function DuesPage() {
     };
     
     const handleUndoPayment = async (paymentId: string | undefined) => {
-        if (!paymentId) return;
+        if (!paymentId || isSuperAdmin) return;
         try {
             await deletePayment(paymentId);
             toast({
@@ -363,7 +364,7 @@ export default function DuesPage() {
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={isSuperAdmin ? 9 : 8} className="h-24 text-center">
+                                    <TableCell colSpan={isSuperAdmin ? 8 : 7} className="h-24 text-center">
                                         لا يوجد طلبة مطابقون لخيارات البحث الحالية.
                                     </TableCell>
                                 </TableRow>
