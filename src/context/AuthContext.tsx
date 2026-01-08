@@ -15,23 +15,25 @@ import { auth, db } from '@/lib/firebase';
 import type { AppUser } from '@/lib/types';
 import { ref, set, get } from 'firebase/database';
 
-const sheikhInitialData: { [email: string]: { name: string; group: string } } = {
-  "admin1@gmail.com": { name: "الشيخ صهيب نصيب", group: "فوج 1" },
-  "admin2@gmail.com": { name: "الشيخ زياد درويش", group: "فوج 2" },
-  "admin3@gmail.com": { name: "الشيخ فؤاد بن عمر", group: "فوج 3" },
-  "admin4@gmail.com": { name: "الشيخ أحمد بن عمر", group: "فوج 4" },
-  "admin5@gmail.com": { name: "الشيخ إبراهيم مراد", group: "فوج 5" },
-  "admin6@gmail.com": { name: "الشيخ عبد الحميد", group: "فوج 6" },
-  "admin7@gmail.com": { name: "الشيخ سفيان نصيرة", group: "فوج 7" },
-  "admin8@gmail.com": { name: "الشيخ عبد الحق نصيرة", group: "فوج 8" },
-  "admin9@gmail.com": { name: "الشيخ عبد القادر", group: "فوج 9" },
-  "admin10@gmail.com": { name: "الشيخ محمد منصور", group: "فوج 10" },
+const sheikhInitialData: { [email: string]: { name: string; group: string; role: 'sheikh' | 'super_admin' } } = {
+  "admin0@gmail.com": { name: "المدير العام", group: "كل الأفواج", role: "super_admin" },
+  "admin1@gmail.com": { name: "الشيخ صهيب نصيب", group: "فوج 1", role: "sheikh" },
+  "admin2@gmail.com": { name: "الشيخ زياد درويش", group: "فوج 2", role: "sheikh" },
+  "admin3@gmail.com": { name: "الشيخ فؤاد بن عمر", group: "فوج 3", role: "sheikh" },
+  "admin4@gmail.com": { name: "الشيخ أحمد بن عمر", group: "فوج 4", role: "sheikh" },
+  "admin5@gmail.com": { name: "الشيخ إبراهيم مراد", group: "فوج 5", role: "sheikh" },
+  "admin6@gmail.com": { name: "الشيخ عبد الحميد", group: "فوج 6", role: "sheikh" },
+  "admin7@gmail.com": { name: "الشيخ سفيان نصيرة", group: "فوج 7", role: "sheikh" },
+  "admin8@gmail.com": { name: "الشيخ عبد الحق نصيرة", group: "فوج 8", role: "sheikh" },
+  "admin9@gmail.com": { name: "الشيخ عبد القادر", group: "فوج 9", role: "sheikh" },
+  "admin10@gmail.com": { name: "الشيخ محمد منصور", group: "فوج 10", role: "sheikh" },
 };
 
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
-  isAdmin: boolean; // This will always be false now but kept for compatibility
+  isSuperAdmin: boolean;
+  role: 'sheikh' | 'super_admin' | null;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -42,7 +44,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const isAdmin = false; // Admin role is removed.
+  const [role, setRole] = useState<'sheikh' | 'super_admin' | null>(null);
+  const isSuperAdmin = role === 'super_admin';
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -55,26 +58,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (snapshot.exists()) {
             appUser = { uid: currentUser.uid, ...snapshot.val() };
         } else {
-             const sheikhInfo = sheikhInitialData[currentUser.email || ''] || { name: currentUser.displayName || 'مستخدم جديد', group: 'فوج غير محدد' };
+             const sheikhInfo = sheikhInitialData[currentUser.email || ''] || { name: currentUser.displayName || 'مستخدم جديد', group: 'فوج غير محدد', role: 'sheikh' };
              appUser = {
                 uid: currentUser.uid,
                 email: currentUser.email,
                 displayName: sheikhInfo.name,
                 photoURL: currentUser.photoURL,
-                group: sheikhInfo.group
+                group: sheikhInfo.group,
+                role: sheikhInfo.role,
             };
             if(currentUser.email && !snapshot.exists()) {
                  const newProfileRef = ref(db, `users/${currentUser.uid}/profile`);
                  await set(newProfileRef, { 
                     email: appUser.email, 
                     displayName: appUser.displayName,
-                    group: appUser.group
+                    group: appUser.group,
+                    role: appUser.role,
                  });
             }
         }
         setUser(appUser);
+        setRole(appUser.role || 'sheikh');
       } else {
         setUser(null);
+        setRole(null);
       }
       setLoading(false);
     });
@@ -85,7 +92,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const newUser = userCredential.user;
     
-    const sheikhInfo = sheikhInitialData[email] || { name: displayName, group: 'فوج غير محدد' };
+    const sheikhInfo = sheikhInitialData[email] || { name: displayName, group: 'فوج غير محدد', role: 'sheikh' };
     
     await updateProfile(newUser, { displayName: sheikhInfo.name });
 
@@ -93,6 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email: newUser.email,
         displayName: sheikhInfo.name,
         group: sheikhInfo.group,
+        role: sheikhInfo.role,
     };
     const userRef = ref(db, `users/${newUser.uid}/profile`);
     await set(userRef, profileData);
@@ -110,7 +118,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, signUpWithEmail, signInWithEmail, logout }}>
+    <AuthContext.Provider value={{ user, loading, isSuperAdmin, role, signUpWithEmail, signInWithEmail, logout }}>
       {children}
     </AuthContext.Provider>
   );

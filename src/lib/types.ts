@@ -95,6 +95,7 @@ export interface AppUser {
     email: string | null;
     photoURL?: string | null;
     group?: string;
+    role?: 'sheikh' | 'super_admin';
 }
 
 export interface StudentStat extends Partial<SessionRecord> {
