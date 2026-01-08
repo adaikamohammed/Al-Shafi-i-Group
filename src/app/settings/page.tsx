@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useStudentContext } from '@/context/StudentContext';
 import { Loader2, Save, WandSparkles, ShieldCheck, Info, Trash2, PlusCircle, History } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { AppSettings, PointsConfig, Reward } from '@/lib/types';
+import type { AppSettings, PointsConfig, Reward, BadgeConfig } from '@/lib/types';
 import { produce } from 'immer';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -318,3 +318,5 @@ const PointInput = ({ label, value, onChange, tooltip }: { label: string, value:
         <Input type="number" value={value} onChange={onChange} />
     </div>
 );
+
+    
