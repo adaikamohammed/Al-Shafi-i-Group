@@ -167,7 +167,7 @@ export default function RankingPage() {
                                     <div className="flex flex-col items-center w-1/3">
                                         <div className="text-4xl">🥈</div>
                                         <div className="font-bold text-lg text-center">{topStudents[1].name}</div>
-                                        <div className="h-24 w-full bg-blue-100 rounded-t-lg flex items-center justify-center font-bold text-xl text-blue-800 p-2">
+                                        <div className="h-24 w-full bg-blue-100 dark:bg-blue-900/30 rounded-t-lg flex items-center justify-center font-bold text-xl text-blue-800 dark:text-blue-200 p-2">
                                             {topStudents[1].points.toFixed(1)} نقطة
                                         </div>
                                     </div>
@@ -176,7 +176,7 @@ export default function RankingPage() {
                                     <div className="flex flex-col items-center w-1/3">
                                          <div className="text-4xl">🥇</div>
                                         <div className="font-bold text-lg text-center">{topStudents[0].name}</div>
-                                        <div className="h-36 w-full bg-yellow-100 rounded-t-lg flex items-center justify-center font-bold text-2xl text-yellow-800 p-2">
+                                        <div className="h-36 w-full bg-yellow-100 dark:bg-yellow-900/30 rounded-t-lg flex items-center justify-center font-bold text-2xl text-yellow-800 dark:text-yellow-200 p-2">
                                            {topStudents[0].points.toFixed(1)} نقطة
                                         </div>
                                     </div>
@@ -185,7 +185,7 @@ export default function RankingPage() {
                                     <div className="flex flex-col items-center w-1/3">
                                         <div className="text-4xl">🥉</div>
                                         <div className="font-bold text-lg text-center">{topStudents[2].name}</div>
-                                        <div className="h-20 w-full bg-orange-100 rounded-t-lg flex items-center justify-center font-bold text-lg text-orange-800 p-2">
+                                        <div className="h-20 w-full bg-orange-100 dark:bg-orange-900/30 rounded-t-lg flex items-center justify-center font-bold text-lg text-orange-800 dark:text-orange-200 p-2">
                                            {topStudents[2].points.toFixed(1)} نقطة
                                         </div>
                                     </div>
@@ -200,28 +200,28 @@ export default function RankingPage() {
                         </CardHeader>
                         <CardContent className="grid md:grid-cols-3 gap-4">
                             {specialBadges.mostExcellent && specialBadges.mostExcellent.stats.excellent > 0 && (
-                                <div className="p-4 bg-green-50 rounded-lg flex items-center gap-3">
+                                <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg flex items-center gap-3">
                                     <BookOpenCheck className="h-8 w-8 text-green-600"/>
                                     <div>
-                                        <p className="font-bold text-green-800">الأكثر تميزًا في الحفظ</p>
+                                        <p className="font-bold text-green-800 dark:text-green-200">الأكثر تميزًا في الحفظ</p>
                                         <p>{specialBadges.mostExcellent.name} ({specialBadges.mostExcellent.stats.excellent} مرات)</p>
                                     </div>
                                 </div>
                             )}
                             {specialBadges.mostCalm && specialBadges.mostCalm.stats.calm > 0 && (
-                                <div className="p-4 bg-blue-50 rounded-lg flex items-center gap-3">
+                                <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex items-center gap-3">
                                     <ShieldCheck className="h-8 w-8 text-blue-600"/>
                                     <div>
-                                        <p className="font-bold text-blue-800">الأكثر انضباطًا وهدوءًا</p>
+                                        <p className="font-bold text-blue-800 dark:text-blue-200">الأكثر انضباطًا وهدوءًا</p>
                                         <p>{specialBadges.mostCalm.name} ({specialBadges.mostCalm.stats.calm} مرات)</p>
                                     </div>
                                 </div>
                             )}
                              {specialBadges.mostReviewed && specialBadges.mostReviewed.stats.reviewed > 0 && (
-                                <div className="p-4 bg-purple-50 rounded-lg flex items-center gap-3">
+                                <div className="p-4 bg-purple-50 dark:bg-purple-900/30 rounded-lg flex items-center gap-3">
                                     <UserCheck className="h-8 w-8 text-purple-600"/>
                                     <div>
-                                        <p className="font-bold text-purple-800">الأكثر مراجعة</p>
+                                        <p className="font-bold text-purple-800 dark:text-purple-200">الأكثر مراجعة</p>
                                         <p>{specialBadges.mostReviewed.name} ({specialBadges.mostReviewed.stats.reviewed} مرات)</p>
                                     </div>
                                 </div>
@@ -232,6 +232,7 @@ export default function RankingPage() {
                     <Card>
                         <CardHeader>
                             <CardTitle>جدول الترتيب التفصيلي</CardTitle>
+                            <CardDescription>عرض تفصيلي لنقاط كل طالب ومصادرها خلال الشهر المحدد.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Table>
@@ -239,25 +240,25 @@ export default function RankingPage() {
                                     <TableRow>
                                         <TableHead>الترتيب</TableHead>
                                         <TableHead>الاسم</TableHead>
-                                        <TableHead>الحضور</TableHead>
-                                        <TableHead>الغياب</TableHead>
-                                        <TableHead>تقييم ممتاز</TableHead>
-                                        <TableHead>سلوك هادئ</TableHead>
-                                        <TableHead>المراجعات</TableHead>
-                                        <TableHead>إجمالي النقاط</TableHead>
+                                        <TableHead className="text-center">حضور</TableHead>
+                                        <TableHead className="text-center">غياب</TableHead>
+                                        <TableHead className="text-center">تقييم ممتاز</TableHead>
+                                        <TableHead className="text-center">سلوك هادئ</TableHead>
+                                        <TableHead className="text-center">مراجعات</TableHead>
+                                        <TableHead className="text-center font-bold">إجمالي النقاط</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {rankingData.map((student, index) => (
                                         <TableRow key={student.id}>
-                                            <TableCell className="font-bold">{index + 1}</TableCell>
-                                            <TableCell>{student.name}</TableCell>
-                                            <TableCell>{student.stats.present}</TableCell>
-                                            <TableCell>{student.stats.absent}</TableCell>
-                                            <TableCell>{student.stats.excellent}</TableCell>
-                                            <TableCell>{student.stats.calm}</TableCell>
-                                            <TableCell>{student.stats.reviewed}</TableCell>
-                                            <TableCell><Badge>{student.points.toFixed(1)}</Badge></TableCell>
+                                            <TableCell className="font-bold text-lg">{index + 1}</TableCell>
+                                            <TableCell className="font-medium">{student.name}</TableCell>
+                                            <TableCell className="text-center">{student.stats.present}</TableCell>
+                                            <TableCell className="text-center">{student.stats.absent}</TableCell>
+                                            <TableCell className="text-center">{student.stats.excellent}</TableCell>
+                                            <TableCell className="text-center">{student.stats.calm}</TableCell>
+                                            <TableCell className="text-center">{student.stats.reviewed}</TableCell>
+                                            <TableCell className="text-center"><Badge variant="default" className="text-base">{student.points.toFixed(1)}</Badge></TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
