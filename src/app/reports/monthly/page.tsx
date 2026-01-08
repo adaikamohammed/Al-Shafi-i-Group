@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Loader2, Users, CalendarDays, BarChart, AlertTriangle, CheckCircle, XCircle, Clock, Replace, Plane, DollarSign, UserX, UserCheck } from 'lucide-react';
-import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, getDate, getDay, getQuarter } from 'date-fns';
+import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, getDate, getDay, getQuarter, startOfQuarter, endOfQuarter } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Bar, XAxis, YAxis, CartesianGrid, Legend, BarChart as RechartsBarChart } from 'recharts';
 import type { Student, DailySession, SessionRecord, DailyReport, Payment } from '@/lib/types';
@@ -48,13 +48,16 @@ export default function MonthlyStatisticsPage() {
     const prices = settings?.prices || TIER_PRICES;
 
     const monthlyData = useMemo(() => {
-        const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
-        const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
-        const currentQuarter = getQuarter(startDate);
+        const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
+        const monthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
+        
+        const quarterStartDate = startOfQuarter(monthStartDate);
+        const quarterEndDate = endOfQuarter(monthStartDate);
+        const currentQuarter = getQuarter(monthStartDate);
         
         const filteredSessions = Object.values(dailySessions ?? {}).filter(session => {
             const sessionDate = parseISO(session.date);
-            return sessionDate >= startDate && sessionDate <= endDate;
+            return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
         });
         
         const filteredReports = Object.values(dailyReports ?? {})
@@ -62,12 +65,12 @@ export default function MonthlyStatisticsPage() {
             .filter(report => {
                  if(!report?.date) return false;
                  const reportDate = parseISO(report.date);
-                 return reportDate >= startDate && reportDate <= endDate;
+                 return reportDate >= monthStartDate && reportDate <= monthEndDate;
             });
             
-        const paymentsInMonth = (payments ?? []).filter(p => {
+        const paymentsInQuarter = (payments ?? []).filter(p => {
              const paymentDate = parseISO(p.date);
-             return paymentDate >= startDate && paymentDate <= endDate;
+             return paymentDate >= quarterStartDate && paymentDate <= quarterEndDate;
         });
         
         let recordsSource = selectedStudentId === 'all' 
@@ -101,7 +104,11 @@ export default function MonthlyStatisticsPage() {
         
         const studentSpecificRecords: { [key: string]: SessionRecord & {sessionType: string} } = {};
         if (selectedStudentId !== 'all') {
-            filteredSessions.forEach(session => {
+            const studentSessions = Object.values(dailySessions ?? {}).filter(session => {
+                const sessionDate = parseISO(session.date);
+                return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
+            });
+            studentSessions.forEach(session => {
                  const record = (session.records ?? []).find(r => r.studentId === selectedStudentId);
                  if (record) {
                      studentSpecificRecords[session.date] = {...record, sessionType: session.sessionType};
@@ -112,26 +119,39 @@ export default function MonthlyStatisticsPage() {
         }
         
         const financialStats = {
-            totalRevenue: paymentsInMonth.reduce((sum, p) => sum + p.amount, 0),
+            totalRevenue: paymentsInQuarter.reduce((sum, p) => sum + p.amount, 0),
             expectedRevenue: 0,
-            paidStudentsCount: new Set(paymentsInMonth.map(p => p.studentId)).size,
+            paidStudentsCount: new Set(paymentsInQuarter.map(p => p.studentId)).size,
             unpaidStudentsCount: 0,
         };
         
-        const quarterStudents = activeStudents.filter(s => getYear(s.registrationDate) < selectedYear || (getYear(s.registrationDate) === selectedYear && getQuarter(s.registrationDate) <= currentQuarter));
-        const studentsWhoPaidThisYear = new Set((payments ?? []).filter(p => getYear(parseISO(p.date)) === selectedYear).map(p => p.studentId));
+        const studentsDueForQuarter = activeStudents.filter(s => {
+            const registrationYear = getYear(s.registrationDate);
+            const registrationQuarter = getQuarter(s.registrationDate);
+            return registrationYear < selectedYear || (registrationYear === selectedYear && registrationQuarter <= currentQuarter);
+        });
         
-        financialStats.expectedRevenue = quarterStudents.reduce((total, student) => {
-            const hasPaidForQuarter = (payments ?? []).some(p => p.studentId === student.id && getQuarter(parseISO(p.date)) === currentQuarter && getYear(parseISO(p.date)) === selectedYear);
-            if (hasPaidForQuarter) return total;
+        const studentsWhoPaidInQuarter = new Set(paymentsInQuarter.map(p => p.studentId));
 
+        financialStats.expectedRevenue = studentsDueForQuarter.reduce((total, student) => {
+            if (studentsWhoPaidInQuarter.has(student.id)) {
+                return total; // Already paid this quarter
+            }
+            
+            const registrationYear = getYear(student.registrationDate);
+            const registrationQuarter = getQuarter(student.registrationDate);
+            const isFirstEverPayment = (payments ?? []).filter(p => p.studentId === student.id).length === 0;
+
+            const isFirstPaymentForThisStudent = registrationYear === selectedYear && registrationQuarter === currentQuarter && isFirstEverPayment;
+            
             const tier = student.subscriptionTier || 'فئة الأصاغر';
-            const isFirstEverPayment = !studentsWhoPaidThisYear.has(student.id);
-            return total + (isFirstEverPayment ? prices.firstPayment[tier] : prices.renewal[tier]);
+            const amountDue = isFirstPaymentForThisStudent ? prices.firstPayment[tier] : prices.renewal[tier];
+
+            return total + amountDue;
         }, 0);
         
-        financialStats.unpaidStudentsCount = quarterStudents.length - financialStats.paidStudentsCount;
-
+        const unpaidStudents = studentsDueForQuarter.filter(s => !studentsWhoPaidInQuarter.has(s.id));
+        financialStats.unpaidStudentsCount = unpaidStudents.length;
 
         return { ...stats, studentSpecificRecords, financialStats };
 
@@ -213,9 +233,9 @@ export default function MonthlyStatisticsPage() {
         .map(([name, value]) => ({ name, value }));
         
     const revenueData: RevenueChartData[] = [{
-        name: 'الإيرادات',
+        name: `موسم ${getQuarter(new Date(selectedYear, selectedMonth))}`,
         'الإيرادات الفعلية': monthlyData.financialStats.totalRevenue,
-        'الإيرادات المتوقعة': monthlyData.financialStats.expectedRevenue + monthlyData.financialStats.totalRevenue
+        'الإيرادات المتوقعة': monthlyData.financialStats.expectedRevenue
     }];
 
     if (loading) {
@@ -242,7 +262,7 @@ export default function MonthlyStatisticsPage() {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="w-full">
-                    <h1 className="text-3xl font-headline font-bold">لوحة الإحصائيات الشهرية</h1>
+                    <h1 className="text-3xl font-headline font-bold">لوحة الإحصائيات</h1>
                     <p className="text-muted-foreground">{user?.group ? `نظرة عامة على ${user.group}` : ''}</p>
                 </div>
                  <div className="flex gap-2 w-full md:w-auto">
@@ -278,30 +298,30 @@ export default function MonthlyStatisticsPage() {
                 </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">الإيرادات المحققة</CardTitle>
+                        <CardTitle className="text-sm font-medium">الإيرادات المحققة (الموسم)</CardTitle>
                         <DollarSign className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{monthlyData.financialStats.totalRevenue.toLocaleString()} د.ج</div>
-                        <p className="text-xs text-muted-foreground">في الشهر المحدد</p>
+                        <p className="text-xs text-muted-foreground">للموسم الحالي</p>
                     </CardContent>
                 </Card>
                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">مبالغ مستحقة</CardTitle>
+                        <CardTitle className="text-sm font-medium">مبالغ مستحقة (الموسم)</CardTitle>
                         <DollarSign className="h-4 w-4 text-red-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{monthlyData.financialStats.expectedRevenue.toLocaleString()} د.ج</div>
-                        <p className="text-xs text-muted-foreground">متبقية لهذا الشهر</p>
+                        <p className="text-xs text-muted-foreground">المتبقية لهذا الموسم</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">الطلاب الذين دفعوا</CardTitle>
+                        <CardTitle className="text-sm font-medium">الطلاب الذين دفعوا (الموسم)</CardTitle>
                         <UserCheck className="h-4 w-4 text-blue-500" />
                     </CardHeader>
                     <CardContent>
@@ -311,7 +331,7 @@ export default function MonthlyStatisticsPage() {
                 </Card>
                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">الطلاب المتأخرون</CardTitle>
+                        <CardTitle className="text-sm font-medium">الطلاب المتأخرون (الموسم)</CardTitle>
                         <UserX className="h-4 w-4 text-yellow-500" />
                     </CardHeader>
                     <CardContent>
@@ -351,9 +371,9 @@ export default function MonthlyStatisticsPage() {
                 <div className="grid gap-6 md:grid-cols-2">
                      <Card className="md:col-span-2">
                          <CardHeader>
-                            <CardTitle>📊 ملخص الإيرادات</CardTitle>
+                            <CardTitle>📊 ملخص الإيرادات للموسم الحالي</CardTitle>
                              <CardDescription>
-                                مقارنة بين الإيرادات الفعلية (المبالغ المدفوعة) والمتوقعة (إجمالي المستحقات) للشهر المحدد.
+                                مقارنة بين الإيرادات الفعلية (المدفوعة) والمتوقعة (المستحقة) للموسم المحدد.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -372,7 +392,7 @@ export default function MonthlyStatisticsPage() {
                     </Card>
                     <Card>
                         <CardHeader>
-                            <CardTitle>📊 توزيع الحضور</CardTitle>
+                            <CardTitle>📊 توزيع الحضور (شهري)</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <ResponsiveContainer width="100%" height={300}>
@@ -390,7 +410,7 @@ export default function MonthlyStatisticsPage() {
                     </Card>
                     <Card>
                         <CardHeader>
-                            <CardTitle>😊 توزيع السلوك</CardTitle>
+                            <CardTitle>😊 توزيع السلوك (شهري)</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <ResponsiveContainer width="100%" height={300}>
@@ -408,7 +428,7 @@ export default function MonthlyStatisticsPage() {
                     </Card>
                     <Card className="md:col-span-2">
                          <CardHeader>
-                            <CardTitle>📚 توزيع التقييم</CardTitle>
+                            <CardTitle>📚 توزيع التقييم (شهري)</CardTitle>
                              <CardDescription>
                                 {selectedStudentId === 'all' 
                                 ? 'متوسط تقييم جميع الطلاب خلال الشهر المحدد' 
@@ -444,3 +464,5 @@ export default function MonthlyStatisticsPage() {
         </div>
     );
 }
+
+    
