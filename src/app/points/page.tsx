@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
 import { Loader2, AlertTriangle, Medal, Star, Gift, ShoppingCart, History, Coins } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -46,12 +46,21 @@ export default function PointsSystemPage() {
 
     const studentTotalPoints = useMemo(() => {
         const studentScores: Record<string, number> = {};
+         const selectedMonth = new Date().getMonth();
+        const selectedYear = new Date().getFullYear();
+        const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
+        const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
+
+        const filteredSessions = Object.values(dailySessions ?? {}).filter(session => {
+            const sessionDate = parseISO(session.date);
+            return sessionDate >= startDate && sessionDate <= endDate;
+        });
 
         activeStudents.forEach(student => {
-            studentScores[student.id] = 0;
+            let totalPoints = 0;
             
             // Points from sessions
-            Object.values(dailySessions ?? {}).forEach(session => {
+            filteredSessions.forEach(session => {
                 (session.records ?? []).forEach(record => {
                     if (record.studentId === student.id) {
                         let points = 0;
@@ -59,7 +68,7 @@ export default function PointsSystemPage() {
                         if (record.memorization) points += pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] ?? 0;
                         if (record.behavior) points += pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] ?? 0;
                         if (record.review) points += pointsConfig.review.completed;
-                        studentScores[student.id] += points;
+                        totalPoints += points;
                     }
                 });
             });
@@ -67,9 +76,10 @@ export default function PointsSystemPage() {
             // Points from Surah mastery
             const progress = surahProgress ? (surahProgress[student.id] || {}) : {};
             Object.values(progress).forEach(status => {
-                if (status === 1) studentScores[student.id] += 20; // Memorized
-                if (status === 2) studentScores[student.id] += (20 + 50); // Memorized + Mastered
+                if (status === 1) totalPoints += 20; // Memorized
+                if (status === 2) totalPoints += 50; // Mastered
             });
+            studentScores[student.id] = totalPoints;
         });
         
         return studentScores;
@@ -240,5 +250,3 @@ export default function PointsSystemPage() {
         </div>
     );
 }
-
-    

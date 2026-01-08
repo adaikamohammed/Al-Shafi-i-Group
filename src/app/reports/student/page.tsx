@@ -132,14 +132,20 @@ export default function StudentReportPage() {
         ];
         
         let autoNote = '';
-        const minScoreItem = radarData.reduce((min, item) => item.score < min.score ? item : min, radarData[0]);
-        if (minScoreItem.score < 5) {
-            switch(minScoreItem.subject) {
-                case 'الحضور': autoNote = 'نوصي بالتركيز على تحسين جانب الحضور والالتزام بمواعيد الحصص.'; break;
-                case 'الحفظ': autoNote = 'نوصي بتكثيف المراجعة والتركيز على تثبيت السور المحفوظة للوصول لمرحلة الإتقان.'; break;
-                case 'الانضباط': autoNote = 'نوصي بالعمل على تحسين السلوك والانضباط داخل الحلقة.'; break;
-                case 'التجويد': autoNote = 'نوصي بالتركيز على مخارج الحروف وأحكام التجويد.'; break;
-                case 'الأخلاق': autoNote = 'نوصي بتعزيز جانب الأخلاق والآداب الإسلامية العامة.'; break;
+        const studentProgressData = surahProgress[selectedStudentId] || {};
+        const memorizedCount = Object.values(studentProgressData).filter(s => s === 1).length;
+        if(masteredCount > 0 && memorizedCount > masteredCount) {
+             autoNote = 'الطالب يحفظ جيداً ولكن يحتاج لتركيز أكبر على مراجعة وتثبيت المحفوظ القديم.';
+        } else {
+            const minScoreItem = radarData.reduce((min, item) => item.score < min.score ? item : min, radarData[0]);
+            if (minScoreItem.score < 5) {
+                switch(minScoreItem.subject) {
+                    case 'الحفظ': autoNote = 'نوصي بتكثيف المراجعة والتركيز على تثبيت السور المحفوظة للوصول لمرحلة الإتقان.'; break;
+                    case 'الحضور': autoNote = 'نوصي بالتركيز على تحسين جانب الحضور والالتزام بمواعيد الحصص.'; break;
+                    case 'الانضباط': autoNote = 'نوصي بالعمل على تحسين السلوك والانضباط داخل الحلقة.'; break;
+                    case 'التجويد': autoNote = 'نوصي بالتركيز على مخارج الحروف وأحكام التجويد.'; break;
+                    case 'الأخلاق': autoNote = 'نوصي بتعزيز جانب الأخلاق والآداب الإسلامية العامة.'; break;
+                }
             }
         }
 
