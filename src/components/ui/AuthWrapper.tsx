@@ -39,9 +39,9 @@ function AppContent({ children }: { children: React.ReactNode }) {
     
     const navItems = useMemo(() => {
         if (isSuperAdmin) {
-            return allNavItems.filter(item => !['/', '/reports/daily'].includes(item.href));
+            return allNavItems.filter(item => !['/', '/reports/daily', '/points'].includes(item.href));
         }
-        return allNavItems.filter(item => item.href !== '/settings' || isSuperAdmin);
+        return allNavItems;
     }, [isSuperAdmin]);
     
     useEffect(() => {
