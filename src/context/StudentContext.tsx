@@ -36,6 +36,7 @@ const TIER_PRICES = {
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
+    seasonStartDate: new Date(new Date().getFullYear(), 8, 1).toISOString(), // Default to Sep 1st of current year
     prices: TIER_PRICES,
     points: DEFAULT_POINTS_CONFIG,
     rewards: DEFAULT_REWARDS,
@@ -65,7 +66,7 @@ interface StudentContextType {
   toggleSurahStatus: (studentId: string, surahId: number) => void;
   addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
   deletePayment: (paymentId: string) => Promise<void>;
-  saveSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
+  saveSettings: (newSettings: AppSettings) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -406,6 +407,3 @@ export const useStudentContext = () => {
   }
   return context;
 };
-
-
-    

@@ -4,15 +4,16 @@
 import '../../app/globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
-import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard } from 'lucide-react';
+import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { StudentProvider } from '@/context/StudentContext';
+import { StudentProvider, useStudentContext } from '@/context/StudentContext';
+import { CommandBar } from '@/components/ui/CommandBar';
 
 const allNavItems = [
   { href: '/overview', label: 'نظرة عامة', icon: LayoutDashboard },
@@ -33,15 +34,17 @@ const allNavItems = [
 
 function AppContent({ children }: { children: React.ReactNode }) {
     const { user, loading: authLoading, logout, isSuperAdmin } = useAuth();
+    const { students } = useStudentContext();
     const router = useRouter();
     const pathname = usePathname();
     const isMobile = useIsMobile();
+    const [isCommandBarOpen, setCommandBarOpen] = useState(false);
     
     const navItems = useMemo(() => {
         if (isSuperAdmin) {
-            return allNavItems.filter(item => !['/', '/reports/daily', '/points'].includes(item.href));
+            return allNavItems.filter(item => !['/reports/daily', '/points'].includes(item.href));
         }
-        return allNavItems;
+        return allNavItems.filter(item => isSuperAdmin ? item.href !== '/settings' : true);
     }, [isSuperAdmin]);
     
     useEffect(() => {
@@ -64,6 +67,17 @@ function AppContent({ children }: { children: React.ReactNode }) {
              router.push('/overview');
         }
     }, [user, authLoading, router, pathname, isSuperAdmin]);
+
+    useEffect(() => {
+        const down = (e: KeyboardEvent) => {
+            if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault()
+                setCommandBarOpen((open) => !open)
+            }
+        }
+        document.addEventListener("keydown", down)
+        return () => document.removeEventListener("keydown", down)
+    }, [])
 
     if (authLoading) {
         return (
@@ -122,6 +136,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
     return (
         <SidebarProvider>
+            <CommandBar students={students} isOpen={isCommandBarOpen} onOpenChange={setCommandBarOpen} />
             {isMobile ? (
               <Sheet>
                 <div className="flex flex-col min-h-screen">
@@ -156,6 +171,14 @@ function AppContent({ children }: { children: React.ReactNode }) {
                 </main>
               </>
             )}
+             <Button
+                onClick={() => setCommandBarOpen(true)}
+                className="fixed bottom-4 left-4 h-12 w-12 rounded-full shadow-lg z-50 flex items-center justify-center md:hidden"
+                size="icon"
+                >
+                <Search className="h-6 w-6" />
+                <span className="sr-only">بحث</span>
+            </Button>
             <Toaster />
           </SidebarProvider>
     )
