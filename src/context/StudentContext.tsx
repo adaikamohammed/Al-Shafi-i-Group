@@ -48,7 +48,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [settings, setSettingsState] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   
-  useEffect(() => {
+ useEffect(() => {
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
     let dataRef: DatabaseReference | null = null;
     let valueCallback: any = null;
 
@@ -60,104 +65,94 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setPayments([]);
         setSettingsState(null);
         setLoading(false);
-    }
+    };
 
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
-  
+    const handleValueChange = (snapshot: any) => {
+        if (!snapshot.exists()) {
+            resetState();
+            return;
+        }
+
+        const data = snapshot.val();
+        
+        if (isSuperAdmin) {
+            let allStudents: Student[] = [];
+            let allSessions: Record<string, DailySession> = {};
+            let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
+            let allProgress: Record<string, number[]> = {};
+            let allPayments: Payment[] = [];
+            let adminSettings: AppSettings | null = null;
+
+            for(const uid in data) {
+                const userData = data[uid];
+                if(userData.profile?.role === 'super_admin' && userData.settings) {
+                    adminSettings = userData.settings;
+                }
+
+                if(userData.students) {
+                     const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) => ({
+                        ...s, id, ownerId: uid, groupName: userData.profile?.group || 'غير محدد',
+                        birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+                        registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+                        updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+                    }));
+                    allStudents.push(...userStudents);
+                }
+                if(userData.dailySessions) {
+                    Object.assign(allSessions, userData.dailySessions);
+                }
+                 if(userData.dailyReports) {
+                    for(const date in userData.dailyReports) {
+                        if(!allReports[date]) allReports[date] = {};
+                        Object.assign(allReports[date], userData.dailyReports[date]);
+                    }
+                }
+                if(userData.surahProgress) {
+                     Object.assign(allProgress, userData.surahProgress);
+                }
+                if(userData.payments) {
+                    const userPayments = Object.entries(userData.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) }));
+                    allPayments.push(...userPayments);
+                }
+            }
+            setStudents(allStudents);
+            setDailySessions(allSessions);
+            setDailyReports(allReports);
+            setSurahProgress(allProgress);
+            setPayments(allPayments);
+            setSettingsState(adminSettings);
+
+        } else if (authContextUser) {
+            let userStudents: Student[] = [];
+            if (data.students) {
+                userStudents = Object.entries(data.students).map(([id, s]: [string, any]) => ({
+                    ...s, id, ownerId: authContextUser.uid,
+                    birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+                    registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+                    updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+                }));
+            }
+            const paymentsArray = data.payments ? Object.entries(data.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : [];
+            setStudents(userStudents);
+            setDailySessions(data.dailySessions || {});
+            setDailyReports(data.dailyReports || {});
+            setSurahProgress(data.surahProgress || {});
+            setPayments(paymentsArray);
+            setSettingsState(data.settings || null);
+        }
+        setLoading(false);
+    };
+
     if (authContextUser) {
-      setLoading(true);
-      
-      const dataPath = isSuperAdmin ? 'users' : `users/${authContextUser.uid}`;
-      dataRef = ref(db, dataPath);
-      
-      const handleValueChange = (snapshot: any) => {
-          if (!snapshot.exists()) {
-              resetState();
-              return;
-          }
-
-          const data = snapshot.val();
-          
-          if(isSuperAdmin) {
-              // Aggregate data from all users
-              let allStudents: Student[] = [];
-              let allSessions: Record<string, DailySession> = {};
-              let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
-              let allProgress: Record<string, number[]> = {};
-              let allPayments: Payment[] = [];
-              let adminSettings: AppSettings | null = null; // Assuming super admin settings are primary
-
-              for(const uid in data) {
-                  const userData = data[uid];
-                  if(userData.profile?.role === 'super_admin' && userData.settings) {
-                      adminSettings = userData.settings;
-                  }
-
-                  if(userData.students) {
-                       const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) => ({
-                          ...s, id, ownerId: uid, groupName: userData.profile?.group || 'غير محدد',
-                          birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-                          registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-                          updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-                      }));
-                      allStudents.push(...userStudents);
-                  }
-                  if(userData.dailySessions) {
-                      Object.assign(allSessions, userData.dailySessions);
-                  }
-                   if(userData.dailyReports) {
-                      for(const date in userData.dailyReports) {
-                          if(!allReports[date]) allReports[date] = {};
-                          Object.assign(allReports[date], userData.dailyReports[date]);
-                      }
-                  }
-                  if(userData.surahProgress) {
-                       Object.assign(allProgress, userData.surahProgress);
-                  }
-                  if(userData.payments) {
-                      const userPayments = Object.entries(userData.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) }));
-                      allPayments.push(...userPayments);
-                  }
-              }
-              setStudents(allStudents);
-              setDailySessions(allSessions);
-              setDailyReports(allReports);
-              setSurahProgress(allProgress);
-              setPayments(allPayments);
-              setSettingsState(adminSettings);
-
-          } else {
-              // Regular sheikh data
-              let userStudents: Student[] = [];
-              if (data.students) {
-                  userStudents = Object.entries(data.students).map(([id, s]: [string, any]) => ({
-                      ...s, id, ownerId: authContextUser.uid,
-                      birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-                      registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-                      updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-                  }));
-              }
-              const paymentsArray = data.payments ? Object.entries(data.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : [];
-              setStudents(userStudents);
-              setDailySessions(data.dailySessions || {});
-              setDailyReports(data.dailyReports || {});
-              setSurahProgress(data.surahProgress || {});
-              setPayments(paymentsArray);
-              setSettingsState(data.settings || null);
-          }
-          setLoading(false);
-      };
-
-      valueCallback = onValue(dataRef, handleValueChange, (error) => {
-          console.error(`Firebase read failed: ${error.message}`);
-          setLoading(false);
-      });
-
+        setLoading(true);
+        const dataPath = isSuperAdmin ? 'users' : `users/${authContextUser.uid}`;
+        dataRef = ref(db, dataPath);
+        valueCallback = onValue(dataRef, handleValueChange, (error) => {
+            console.error(`Firebase read failed: ${error.message}`);
+            setLoading(false);
+        });
     } else {
-      resetState();
+        resetState();
     }
   
     return () => {
@@ -350,4 +345,5 @@ export const useStudentContext = () => {
 
     
     
+
 
