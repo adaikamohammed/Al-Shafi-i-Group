@@ -4,7 +4,7 @@
 import '../../app/globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
-import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign } from 'lucide-react';
+import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { StudentProvider } from '@/context/StudentContext';
 
 const allNavItems = [
+  { href: '/overview', label: 'نظرة عامة', icon: LayoutDashboard },
   { href: '/', label: 'إدارة الطلبة', icon: Users },
   { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList },
   { href: '/stats', label: 'المتابعة الأسبوعية', icon: Calendar },
@@ -38,9 +39,9 @@ function AppContent({ children }: { children: React.ReactNode }) {
     
     const navItems = useMemo(() => {
         if (isSuperAdmin) {
-            return allNavItems.filter(item => item.href !== '/');
+            return allNavItems.filter(item => !['/', '/reports/daily'].includes(item.href));
         }
-        return allNavItems;
+        return allNavItems.filter(item => item.href !== '/settings' || isSuperAdmin);
     }, [isSuperAdmin]);
     
     useEffect(() => {
@@ -60,11 +61,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
             router.push('/login');
         }
          if (!authLoading && user && pathname === '/login') {
-             if (isSuperAdmin) {
-                 router.push('/dues'); // Redirect super admin to dues page
-             } else {
-                router.push('/');
-             }
+             router.push('/overview');
         }
     }, [user, authLoading, router, pathname, isSuperAdmin]);
 
