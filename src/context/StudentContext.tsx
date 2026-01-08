@@ -281,7 +281,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const studentOwnerId = students.find(s => s.id === studentId)?.ownerId;
     if(authContextUser.uid !== studentOwnerId) return;
 
-    const studentProgressList = (surahProgress ? surahProgress[studentId] : []) || [];
+    const studentProgressList = [...(surahProgress[studentId] || [])];
     const surahIndex = studentProgressList.indexOf(surahId);
 
     if (surahIndex > -1) {
@@ -291,7 +291,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
     
     const surahProgressRef = ref(db, `users/${authContextUser.uid}/surahProgress/${studentId}`);
-    set(surahProgressRef, surahProgressList);
+    set(surahProgressRef, studentProgressList);
     
     updateStudent(studentId, { memorizedSurahsCount: studentProgressList.length }, authContextUser.uid);
   }
