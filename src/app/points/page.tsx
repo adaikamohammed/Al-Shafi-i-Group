@@ -13,20 +13,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 
-const pointsConfig = {
-    attendance: { 'حاضر': 3, 'متأخر': 1, 'تعويض': 1.5, 'غائب': -2 },
-    evaluation: { 'ممتاز': 3, 'جيد': 2, 'متوسط': 1, 'ضعيف': 0 },
-    behavior: { 'هادئ': 2, 'متوسط': 1, 'غير منضبط': -1 },
-    review: { 'completed': 1, 'not_completed': 0 }
-};
-
-const rewards = [
-    { id: 'weekly_reader', name: 'لقب قارئ الأسبوع', cost: 500, icon: Star, description: 'تعزيز الثقة بالنفس أمام الزملاء.' },
-    { id: 'review_exempt', name: 'إعفاء من تسميع مراجعة', cost: 1000, icon: Medal, description: 'مكافأة على الحفظ المتقن السابق.' },
-    { id: 'leader_for_day', name: 'قائد الفوج لليوم', cost: 800, icon: Medal, description: 'تنمية المهارات القيادية لدى الطالب.' },
-    { id: 'physical_gift', name: 'هدية عينية (مصحف/قلم)', cost: 3000, icon: Gift, description: 'تشجيع مادي ملموس.' },
-];
-
 interface Redemption {
     id: string;
     studentName: string;
@@ -36,13 +22,16 @@ interface Redemption {
 }
 
 export default function PointsSystemPage() {
-    const { students, dailySessions, surahProgress, loading } = useStudentContext();
+    const { students, dailySessions, surahProgress, loading, settings } = useStudentContext();
     const { toast } = useToast();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
     const [spentPoints, setSpentPoints] = useState<Record<string, number>>({});
     const [redemptionHistory, setRedemptionHistory] = useState<Redemption[]>([]);
 
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
+    
+    const pointsConfig = settings.points;
+    const rewards = settings.rewards;
 
     const studentTotalPoints = useMemo(() => {
         const studentScores: Record<string, number> = {};
@@ -76,14 +65,14 @@ export default function PointsSystemPage() {
             // Points from Surah mastery
             const progress = surahProgress ? (surahProgress[student.id] || {}) : {};
             Object.values(progress).forEach(status => {
-                if (status === 1) totalPoints += 20; // Memorized
-                if (status === 2) totalPoints += 50; // Mastered
+                if (status === 1) totalPoints += pointsConfig.surah.memorized;
+                if (status === 2) totalPoints += pointsConfig.surah.mastered;
             });
             studentScores[student.id] = totalPoints;
         });
         
         return studentScores;
-    }, [activeStudents, dailySessions, surahProgress]);
+    }, [activeStudents, dailySessions, surahProgress, pointsConfig]);
 
     const studentCurrentBalance = useMemo(() => {
         if (!selectedStudentId) return 0;
@@ -123,6 +112,16 @@ export default function PointsSystemPage() {
             description: `تم خصم ${prize.cost} نقطة من رصيد الطالب ${student?.fullName}.`
         });
     };
+
+    const getIcon = (iconName: string) => {
+        switch(iconName) {
+            case 'Star': return <Star className="h-6 w-6 text-primary" />;
+            case 'Medal': return <Medal className="h-6 w-6 text-primary" />;
+            case 'Gift': return <Gift className="h-6 w-6 text-primary" />;
+            case 'UserCheck': return <Medal className="h-6 w-6 text-primary" />;
+            default: return <Star className="h-6 w-6 text-primary" />;
+        }
+    }
 
     if (loading) {
         return (
@@ -186,7 +185,7 @@ export default function PointsSystemPage() {
                             <Card key={prize.id} className="flex flex-col">
                                 <CardHeader className="flex-row items-center gap-4 space-y-0">
                                     <div className="bg-primary/10 p-3 rounded-full">
-                                        <prize.icon className="h-6 w-6 text-primary" />
+                                        {getIcon(prize.icon)}
                                     </div>
                                     <CardTitle>{prize.name}</CardTitle>
                                 </CardHeader>

@@ -386,7 +386,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     await remove(paymentRef);
   }
 
-  const saveSettings = async (newSettings: Partial<AppSettings>) => {
+  const saveSettings = async (newSettings: AppSettings) => {
      if (!authContextUser) throw new Error("User not authenticated");
      const settingsRef = ref(db, `users/${authContextUser.uid}/settings`);
      await set(settingsRef, newSettings);

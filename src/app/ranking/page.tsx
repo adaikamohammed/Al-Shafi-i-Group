@@ -31,17 +31,12 @@ interface StudentScore {
     }
 }
 
-const pointsConfig = {
-    attendance: { 'حاضر': 3, 'متأخر': 1, 'تعويض': 1.5, 'غائب': -2 },
-    evaluation: { 'ممتاز': 3, 'جيد': 2, 'متوسط': 1, 'ضعيف': 0 },
-    behavior: { 'هادئ': 2, 'متوسط': 1, 'غير منضبط': -1 },
-    review: { 'completed': 1, 'not_completed': 0 }
-};
-
 export default function RankingPage() {
-    const { students, dailySessions, loading } = useStudentContext();
+    const { students, dailySessions, loading, settings } = useStudentContext();
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+    
+    const pointsConfig = settings.points;
 
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
 
@@ -98,7 +93,7 @@ export default function RankingPage() {
         });
 
         return Object.values(studentScores).sort((a, b) => b.points - a.points);
-    }, [activeStudents, dailySessions, selectedMonth, selectedYear]);
+    }, [activeStudents, dailySessions, selectedMonth, selectedYear, pointsConfig]);
 
     const topStudents = rankingData.slice(0, 3);
     
