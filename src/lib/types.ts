@@ -7,6 +7,7 @@ export type SubscriptionTier = "فئة الأكابر" | "فئة الأصاغر"
 export interface Student {
   id: string;
   ownerId: string; // UID of the user who owns this student record
+  groupName?: string; // Name of the group/sheikh
   fullName: string;
   guardianName: string;
   phone1: string;

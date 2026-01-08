@@ -38,7 +38,7 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user: authContextUser, loading: authLoading } = useAuth();
+  const { user: authContextUser, loading: authLoading, isSuperAdmin } = useAuth();
   
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
@@ -52,6 +52,16 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     let dataRef: DatabaseReference | null = null;
     let valueCallback: any = null;
 
+    const resetState = () => {
+        setStudents([]);
+        setDailySessions({});
+        setDailyReports({});
+        setSurahProgress({});
+        setPayments([]);
+        setSettingsState(null);
+        setLoading(false);
+    }
+
     if (authLoading) {
       setLoading(true);
       return;
@@ -59,54 +69,95 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   
     if (authContextUser) {
       setLoading(true);
-      const dataPath = `users/${authContextUser.uid}`;
+      
+      const dataPath = isSuperAdmin ? 'users' : `users/${authContextUser.uid}`;
       dataRef = ref(db, dataPath);
       
       const handleValueChange = (snapshot: any) => {
           if (!snapshot.exists()) {
-              setStudents([]); setDailySessions({}); setDailyReports({}); setSurahProgress({}); setPayments([]); setSettingsState(null);
-              setLoading(false);
+              resetState();
               return;
           }
 
           const data = snapshot.val();
           
-          let userStudents: Student[] = [];
-          if (data.students) {
-              userStudents = Object.entries(data.students).map(([id, s]: [string, any]) => ({
-                  ...s,
-                  id,
-                  ownerId: authContextUser.uid,
-                  birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-                  registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-                  updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-              }));
+          if(isSuperAdmin) {
+              // Aggregate data from all users
+              let allStudents: Student[] = [];
+              let allSessions: Record<string, DailySession> = {};
+              let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
+              let allProgress: Record<string, number[]> = {};
+              let allPayments: Payment[] = [];
+              let adminSettings: AppSettings | null = null; // Assuming super admin settings are primary
+
+              for(const uid in data) {
+                  const userData = data[uid];
+                  if(userData.profile?.role === 'super_admin' && userData.settings) {
+                      adminSettings = userData.settings;
+                  }
+
+                  if(userData.students) {
+                       const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) => ({
+                          ...s, id, ownerId: uid, groupName: userData.profile?.group || 'غير محدد',
+                          birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+                          registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+                          updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+                      }));
+                      allStudents.push(...userStudents);
+                  }
+                  if(userData.dailySessions) {
+                      Object.assign(allSessions, userData.dailySessions);
+                  }
+                   if(userData.dailyReports) {
+                      for(const date in userData.dailyReports) {
+                          if(!allReports[date]) allReports[date] = {};
+                          Object.assign(allReports[date], userData.dailyReports[date]);
+                      }
+                  }
+                  if(userData.surahProgress) {
+                       Object.assign(allProgress, userData.surahProgress);
+                  }
+                  if(userData.payments) {
+                      const userPayments = Object.entries(userData.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) }));
+                      allPayments.push(...userPayments);
+                  }
+              }
+              setStudents(allStudents);
+              setDailySessions(allSessions);
+              setDailyReports(allReports);
+              setSurahProgress(allProgress);
+              setPayments(allPayments);
+              setSettingsState(adminSettings);
+
+          } else {
+              // Regular sheikh data
+              let userStudents: Student[] = [];
+              if (data.students) {
+                  userStudents = Object.entries(data.students).map(([id, s]: [string, any]) => ({
+                      ...s, id, ownerId: authContextUser.uid,
+                      birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+                      registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+                      updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+                  }));
+              }
+              const paymentsArray = data.payments ? Object.entries(data.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : [];
+              setStudents(userStudents);
+              setDailySessions(data.dailySessions || {});
+              setDailyReports(data.dailyReports || {});
+              setSurahProgress(data.surahProgress || {});
+              setPayments(paymentsArray);
+              setSettingsState(data.settings || null);
           }
-
-          const paymentsArray = data.payments ? Object.entries(data.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : [];
-
-          setStudents(userStudents);
-          setDailySessions(data.dailySessions || {});
-          setDailyReports(data.dailyReports || {});
-          setSurahProgress(data.surahProgress || {});
-          setPayments(paymentsArray);
-          setSettingsState(data.settings || null);
           setLoading(false);
       };
 
       valueCallback = onValue(dataRef, handleValueChange, (error) => {
-          console.error("Firebase read failed: " + error.message);
+          console.error(`Firebase read failed: ${error.message}`);
           setLoading(false);
       });
 
     } else {
-      setStudents([]);
-      setDailySessions({});
-      setDailyReports({});
-      setSurahProgress({});
-      setPayments([]);
-      setSettingsState(null);
-      setLoading(false);
+      resetState();
     }
   
     return () => {
@@ -114,7 +165,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         off(dataRef, 'value', valueCallback);
       }
     };
-  }, [authContextUser, authLoading]);
+  }, [authContextUser, authLoading, isSuperAdmin]);
 
 
   const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
@@ -144,8 +195,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const updateStudent = (studentId: string, updatedData: Partial<Student>, ownerId: string) => {
-    if (!authContextUser || authContextUser.uid !== ownerId) return;
+    if (!authContextUser) return;
     
+    // Super admin can't edit, only sheikh can edit his own students
+    if (isSuperAdmin || authContextUser.uid !== ownerId) return;
+
     const originalStudent = (students ?? []).find(s => s.id === studentId);
     if (!originalStudent) return;
     
@@ -161,25 +215,26 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deleteStudent = (studentId: string, ownerId: string) => {
-      if (!authContextUser || authContextUser.uid !== ownerId) return;
+      if (!authContextUser) return;
+      if (isSuperAdmin || authContextUser.uid !== ownerId) return;
       const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
       remove(studentRef);
   }
   
   const deleteAllStudents = () => {
-      if (!authContextUser) return;
+      if (!authContextUser || isSuperAdmin) return;
       const userStudentsRef = ref(db, `users/${authContextUser.uid}/students`);
       remove(userStudentsRef);
   }
 
   const addDailySession = (session: DailySession) => {
-    if (!authContextUser) return;
+    if (!authContextUser || isSuperAdmin) return;
     const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${session.date}`);
     set(sessionRef, session);
   };
   
   const deleteDailySession = (date: string) => {
-    if (!authContextUser) return;
+    if (!authContextUser || isSuperAdmin) return;
     const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${date}`);
     remove(sessionRef);
   }
@@ -206,7 +261,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
   
   const saveDailyReport = async (reportData: Omit<DailyReport, 'id'>, reportIdToUpdate?: string) => {
-    if (!authContextUser) throw new Error("User not authenticated");
+    if (!authContextUser || isSuperAdmin) throw new Error("User cannot save reports");
     
     const reportId = reportIdToUpdate || Date.now().toString();
     
@@ -220,13 +275,16 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const deleteDailyReport = async (reportId: string, date: string) => {
-      if (!authContextUser) throw new Error("User not authenticated");
+      if (!authContextUser || isSuperAdmin) throw new Error("User cannot delete reports");
       const reportDbRef = ref(db, `users/${authContextUser.uid}/dailyReports/${date}/${reportId}`);
       await remove(reportDbRef);
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number) => {
-    if (!authContextUser) return;
+    if (!authContextUser || isSuperAdmin) return;
+
+    const studentOwnerId = students.find(s => s.id === studentId)?.ownerId;
+    if(authContextUser.uid !== studentOwnerId) return;
 
     const studentProgressList = (surahProgress ? surahProgress[studentId] : []) || [];
     const surahIndex = studentProgressList.indexOf(surahId);
@@ -244,7 +302,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const addPayment = async (paymentData: Omit<Payment, 'id'>) => {
-    if (!authContextUser) throw new Error("User not authenticated");
+    if (!authContextUser || isSuperAdmin) throw new Error("User cannot add payments");
+    const studentOwnerId = students.find(s => s.id === paymentData.studentId)?.ownerId;
+    if(authContextUser.uid !== studentOwnerId) return;
+
     const paymentId = uuidv4();
     const newPayment: Payment = {
         ...paymentData,
@@ -255,13 +316,19 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deletePayment = async (paymentId: string) => {
-    if (!authContextUser) throw new Error("User not authenticated");
+    if (!authContextUser || isSuperAdmin) throw new Error("User cannot delete payments");
+
+    const payment = payments.find(p => p.id === paymentId);
+    if(!payment) return;
+    const studentOwnerId = students.find(s => s.id === payment.studentId)?.ownerId;
+    if(authContextUser.uid !== studentOwnerId) return;
+
     const paymentRef = ref(db, `users/${authContextUser.uid}/payments/${paymentId}`);
     await remove(paymentRef);
   }
 
   const saveSettings = async (newSettings: AppSettings) => {
-     if (!authContextUser) throw new Error("User not authenticated");
+     if (!authContextUser || !isSuperAdmin) throw new Error("Only Super Admin can save settings");
      const settingsRef = ref(db, `users/${authContextUser.uid}/settings`);
      await set(settingsRef, newSettings);
   };
@@ -283,3 +350,4 @@ export const useStudentContext = () => {
 
     
     
+

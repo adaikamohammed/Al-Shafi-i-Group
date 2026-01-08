@@ -175,6 +175,7 @@ export default function DuesPage() {
             return {
                 "اسم الطالب": s.fullName,
                 "الفئة": s.subscriptionTier,
+                "الفوج": (s as any).groupName || 'غير محدد',
                 "تاريخ التسجيل": format(s.registrationDate, 'yyyy-MM-dd'),
                 "فصل 1": s.paymentStatus[1].status,
                 "فصل 2": s.paymentStatus[2].status,
@@ -288,6 +289,7 @@ export default function DuesPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>اسم الطالب</TableHead>
+                                {isSuperAdmin && <TableHead>الفوج</TableHead>}
                                 <TableHead>الفئة</TableHead>
                                 <TableHead className="text-center">فصل 1</TableHead>
                                 <TableHead className="text-center">فصل 2</TableHead>
@@ -301,6 +303,7 @@ export default function DuesPage() {
                             {filteredStudents.length > 0 ? filteredStudents.map(student => (
                                 <TableRow key={student.id} className={(student.totalPaid < student.totalDue && student.totalDue > 0) ? 'bg-red-50 dark:bg-red-900/20' : ''}>
                                     <TableCell className="font-medium">{student.fullName}</TableCell>
+                                    {isSuperAdmin && <TableCell><Badge variant="outline">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
                                     <TableCell>
                                         <Badge variant="secondary">{student.subscriptionTier || 'فئة الأصاغر'}</Badge>
                                     </TableCell>
@@ -360,7 +363,7 @@ export default function DuesPage() {
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center">
+                                    <TableCell colSpan={isSuperAdmin ? 9 : 8} className="h-24 text-center">
                                         لا يوجد طلبة مطابقون لخيارات البحث الحالية.
                                     </TableCell>
                                 </TableRow>
@@ -372,3 +375,4 @@ export default function DuesPage() {
         </div>
     );
 }
+

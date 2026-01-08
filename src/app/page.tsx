@@ -45,7 +45,7 @@ const calculateAge = (birthDate?: Date) => {
 
 export default function StudentManagementPage() {
   const { students, updateStudent, deleteStudent, loading, deleteAllStudents } = useStudentContext();
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -60,6 +60,7 @@ export default function StudentManagementPage() {
   const handleExportStudents = () => {
     const dataToExport = (students ?? []).map(s => ({
         "الاسم الكامل": s.fullName,
+        "الفوج": (s as any).groupName || user?.group || 'غير محدد',
         "اسم الولي": s.guardianName,
         "رقم الهاتف 1": s.phone1,
         "رقم الهاتف 2": s.phone2 || '',
@@ -73,7 +74,7 @@ export default function StudentManagementPage() {
     }));
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
-    ws['!cols'] = [ { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 30 }];
+    ws['!cols'] = [ { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 30 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "قائمة الطلبة");
     XLSX.writeFile(wb, "قائمة_الطلبة_الحالية.xlsx");
@@ -105,7 +106,7 @@ export default function StudentManagementPage() {
         <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
             <h1 className="text-2xl font-bold mb-4">لا يوجد طلاب بعد</h1>
             <p className="text-muted-foreground mb-6">ابدأ بإضافة طالب جديد أو استيراد قائمة الطلاب.</p>
-            <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
+            {!isSuperAdmin && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
             <DialogTrigger asChild>
                 <Button>
                 <PlusCircle className="ml-2 h-4 w-4" />
@@ -118,7 +119,7 @@ export default function StudentManagementPage() {
                 onCancel={() => setAddStudentDialogOpen(false)}
                 />
             </DialogContent>
-            </Dialog>
+            </Dialog>}
         </div>
       )
   }
@@ -130,7 +131,7 @@ export default function StudentManagementPage() {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
         <h1 className="text-3xl font-headline font-bold">إدارة الطلبة</h1>
         <div className="flex w-full sm:w-auto items-center gap-2">
-          <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
+         {!isSuperAdmin && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
           <DialogTrigger asChild>
               <Button className="w-full sm:w-auto">
               <PlusCircle className="ml-2 h-4 w-4" />
@@ -143,7 +144,7 @@ export default function StudentManagementPage() {
               onCancel={() => setAddStudentDialogOpen(false)}
               />
           </DialogContent>
-          </Dialog>
+          </Dialog>}
         </div>
       </div>
 
@@ -162,7 +163,7 @@ export default function StudentManagementPage() {
                 <Download className="ml-2 h-4 w-4" />
                 تصدير الطلبة (Excel)
             </Button>
-            <AlertDialog>
+            {!isSuperAdmin && <AlertDialog>
                 <AlertDialogTrigger asChild>
                     <Button variant="destructive" disabled={(students ?? []).length === 0}>
                         <Trash2 className="ml-2 h-4 w-4" />
@@ -182,28 +183,29 @@ export default function StudentManagementPage() {
                         <AlertDialogAction onClick={deleteAllStudents}>نعم، قم بحذف الكل</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
-            </AlertDialog>
+            </AlertDialog>}
          </div>
        </div>
 
       <Card>
         <CardHeader>
           <CardTitle>قائمة الطلبة ({filteredStudents.length})</CardTitle>
-          <CardDescription>{user?.group ? `طلبة ${user.group}` : 'فوج غير محدد'}</CardDescription>
+          <CardDescription>{isSuperAdmin ? 'عرض شامل لجميع الطلبة في كل الأفواج' : (user?.group ? `طلبة ${user.group}` : 'فوج غير محدد')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="text-center">الاسم الكامل</TableHead>
+                {isSuperAdmin && <TableHead className="text-center">الفوج</TableHead>}
                 <TableHead className="hidden md:table-cell text-center">اسم الولي</TableHead>
                 <TableHead className="hidden lg:table-cell text-center">العمر</TableHead>
                 <TableHead className="text-center">الحالة</TableHead>
                 <TableHead className="text-center">فئة الاشتراك</TableHead>
                 <TableHead className="hidden md:table-cell text-center">السور المحفوظة</TableHead>
-                <TableHead className="text-center">
+                {!isSuperAdmin && <TableHead className="text-center">
                   <span className="sr-only">إجراءات</span>
-                </TableHead>
+                </TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -211,6 +213,7 @@ export default function StudentManagementPage() {
                 filteredStudents.map((student) => (
                     <TableRow key={student.id}>
                     <TableCell className="font-medium text-center">{student.fullName}</TableCell>
+                    {isSuperAdmin && <TableCell className="text-center"><Badge variant="outline">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
                     <TableCell className="hidden md:table-cell text-center">{student.guardianName}</TableCell>
                     <TableCell className="hidden lg:table-cell text-center">{calculateAge(student.birthDate)}</TableCell>
                     <TableCell className="text-center">
@@ -220,14 +223,14 @@ export default function StudentManagementPage() {
                         <Badge variant="outline">{student.subscriptionTier}</Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-center">{student.memorizedSurahsCount || 0}</TableCell>
-                    <TableCell className="text-center">
+                    {!isSuperAdmin && <TableCell className="text-center">
                         <StudentActions student={student} onStatusChange={handleStatusChange} />
-                    </TableCell>
+                    </TableCell>}
                     </TableRow>
                 ))
              ) : (
                 <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
+                    <TableCell colSpan={isSuperAdmin ? 7 : 8} className="h-24 text-center">
                        {searchTerm ? "لم يتم العثور على طلاب مطابقين للبحث." : "لا يوجد طلبة حاليًا. قم بإضافة طالب جديد."}
                     </TableCell>
                 </TableRow>
@@ -494,3 +497,4 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
