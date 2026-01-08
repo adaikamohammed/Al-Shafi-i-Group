@@ -7,11 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, Users, CalendarDays, BarChart, AlertTriangle, CheckCircle, XCircle, Clock, Replace, Plane } from 'lucide-react';
-import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, getDate, getDay } from 'date-fns';
+import { Loader2, Users, CalendarDays, BarChart, AlertTriangle, CheckCircle, XCircle, Clock, Replace, Plane, DollarSign, UserX, UserCheck } from 'lucide-react';
+import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, getDate, getDay, getQuarter } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Bar, XAxis, YAxis, CartesianGrid, Legend, BarChart as RechartsBarChart } from 'recharts';
-import type { Student, DailySession, SessionRecord, DailyReport } from '@/lib/types';
+import type { Student, DailySession, SessionRecord, DailyReport, Payment } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip as ShadTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
@@ -20,24 +20,37 @@ import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
 const ATTENDANCE_COLORS: { [key: string]: string } = { 'حاضر': '#10B981', 'غائب': '#EF4444', 'متأخر': '#F59E0B', 'تعويض': '#3B82F6' };
 const BEHAVIOR_COLORS: { [key: string]: string } = { 'هادئ': '#3B82F6', 'متوسط': '#F59E0B', 'غير منضبط': '#EF4444' };
 const EVALUATION_COLORS: { [key: string]: string } = { 'ممتاز': '#10B981', 'جيد': '#34D399', 'متوسط': '#F59E0B', 'ضعيف': '#EF4444', 'لا يوجد': '#9CA3AF' };
+const REVENUE_COLORS = { 'الإيرادات الفعلية': '#10B981', 'الإيرادات المتوقعة': '#F59E0B' };
 
 interface ChartData {
   name: string;
   value: number;
 }
+interface RevenueChartData {
+    name: string;
+    'الإيرادات الفعلية': number;
+    'الإيرادات المتوقعة': number;
+}
+
+const TIER_PRICES = {
+    firstPayment: { 'فئة الأكابر': 2500, 'فئة الأصاغر': 2000 },
+    renewal: { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 },
+};
 
 export default function MonthlyStatisticsPage() {
-    const { students, dailySessions, dailyReports, loading } = useStudentContext();
+    const { students, dailySessions, dailyReports, payments, settings, loading } = useStudentContext();
     const { user } = useAuth();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
+    const prices = settings?.prices || TIER_PRICES;
 
     const monthlyData = useMemo(() => {
-        const startDate = new Date(selectedYear, selectedMonth, 1);
-        const endDate = new Date(selectedYear, selectedMonth, getDaysInMonth(startDate));
+        const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
+        const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
+        const currentQuarter = getQuarter(startDate);
         
         const filteredSessions = Object.values(dailySessions ?? {}).filter(session => {
             const sessionDate = parseISO(session.date);
@@ -51,7 +64,12 @@ export default function MonthlyStatisticsPage() {
                  const reportDate = parseISO(report.date);
                  return reportDate >= startDate && reportDate <= endDate;
             });
-
+            
+        const paymentsInMonth = (payments ?? []).filter(p => {
+             const paymentDate = parseISO(p.date);
+             return paymentDate >= startDate && paymentDate <= endDate;
+        });
+        
         let recordsSource = selectedStudentId === 'all' 
             ? filteredSessions.flatMap(s => s.records ?? [])
             : filteredSessions.flatMap(s => (s.records ?? []).filter(r => r.studentId === selectedStudentId));
@@ -92,11 +110,32 @@ export default function MonthlyStatisticsPage() {
                  }
             });
         }
+        
+        const financialStats = {
+            totalRevenue: paymentsInMonth.reduce((sum, p) => sum + p.amount, 0),
+            expectedRevenue: 0,
+            paidStudentsCount: new Set(paymentsInMonth.map(p => p.studentId)).size,
+            unpaidStudentsCount: 0,
+        };
+        
+        const quarterStudents = activeStudents.filter(s => getYear(s.registrationDate) < selectedYear || (getYear(s.registrationDate) === selectedYear && getQuarter(s.registrationDate) <= currentQuarter));
+        const studentsWhoPaidThisYear = new Set((payments ?? []).filter(p => getYear(parseISO(p.date)) === selectedYear).map(p => p.studentId));
+        
+        financialStats.expectedRevenue = quarterStudents.reduce((total, student) => {
+            const hasPaidForQuarter = (payments ?? []).some(p => p.studentId === student.id && getQuarter(parseISO(p.date)) === currentQuarter && getYear(parseISO(p.date)) === selectedYear);
+            if (hasPaidForQuarter) return total;
+
+            const tier = student.subscriptionTier || 'فئة الأصاغر';
+            const isFirstEverPayment = !studentsWhoPaidThisYear.has(student.id);
+            return total + (isFirstEverPayment ? prices.firstPayment[tier] : prices.renewal[tier]);
+        }, 0);
+        
+        financialStats.unpaidStudentsCount = quarterStudents.length - financialStats.paidStudentsCount;
 
 
-        return { ...stats, studentSpecificRecords };
+        return { ...stats, studentSpecificRecords, financialStats };
 
-    }, [dailySessions, dailyReports, selectedMonth, selectedYear, selectedStudentId]);
+    }, [dailySessions, dailyReports, payments, settings, selectedMonth, selectedYear, selectedStudentId, students]);
     
     
      const renderStudentCalendar = () => {
@@ -173,6 +212,12 @@ export default function MonthlyStatisticsPage() {
     const evaluationData = Object.entries(monthlyData.evaluation)
         .map(([name, value]) => ({ name, value }));
         
+    const revenueData: RevenueChartData[] = [{
+        name: 'الإيرادات',
+        'الإيرادات الفعلية': monthlyData.financialStats.totalRevenue,
+        'الإيرادات المتوقعة': monthlyData.financialStats.expectedRevenue + monthlyData.financialStats.totalRevenue
+    }];
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-200px)]">
@@ -222,7 +267,7 @@ export default function MonthlyStatisticsPage() {
                             ))}
                         </SelectContent>
                     </Select>
-                    <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelecteYear(parseInt(val))}>
+                    <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
                         <SelectTrigger className="w-full md:w-[100px]"><SelectValue placeholder="السنة" /></SelectTrigger>
                         <SelectContent>
                             {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
@@ -233,55 +278,45 @@ export default function MonthlyStatisticsPage() {
                 </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                <Card>
+            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">حاضر</CardTitle>
-                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <CardTitle className="text-sm font-medium">الإيرادات المحققة</CardTitle>
+                        <DollarSign className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.attendance['حاضر']}</div>
-                        <p className="text-xs text-muted-foreground">يوم حضور</p>
+                        <div className="text-2xl font-bold">{monthlyData.financialStats.totalRevenue.toLocaleString()} د.ج</div>
+                        <p className="text-xs text-muted-foreground">في الشهر المحدد</p>
                     </CardContent>
                 </Card>
                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">غائب</CardTitle>
-                        <XCircle className="h-4 w-4 text-red-500" />
+                        <CardTitle className="text-sm font-medium">مبالغ مستحقة</CardTitle>
+                        <DollarSign className="h-4 w-4 text-red-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.attendance['غائب']}</div>
-                        <p className="text-xs text-muted-foreground">يوم غياب</p>
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">متأخر</CardTitle>
-                        <Clock className="h-4 w-4 text-yellow-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.attendance['متأخر']}</div>
-                        <p className="text-xs text-muted-foreground">يوم تأخر</p>
+                        <div className="text-2xl font-bold">{monthlyData.financialStats.expectedRevenue.toLocaleString()} د.ج</div>
+                        <p className="text-xs text-muted-foreground">متبقية لهذا الشهر</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">تعويض</CardTitle>
-                        <Replace className="h-4 w-4 text-blue-500" />
+                        <CardTitle className="text-sm font-medium">الطلاب الذين دفعوا</CardTitle>
+                        <UserCheck className="h-4 w-4 text-blue-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.attendance['تعويض']}</div>
-                        <p className="text-xs text-muted-foreground">حصة تعويضية</p>
+                        <div className="text-2xl font-bold">{monthlyData.financialStats.paidStudentsCount}</div>
+                        <p className="text-xs text-muted-foreground">طالب</p>
                     </CardContent>
                 </Card>
                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">عطلة</CardTitle>
-                        <Plane className="h-4 w-4 text-gray-500" />
+                        <CardTitle className="text-sm font-medium">الطلاب المتأخرون</CardTitle>
+                        <UserX className="h-4 w-4 text-yellow-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.holidays}</div>
-                         <p className="text-xs text-muted-foreground">أيام عطلة مسجلة</p>
+                        <div className="text-2xl font-bold">{monthlyData.financialStats.unpaidStudentsCount}</div>
+                         <p className="text-xs text-muted-foreground">طالب</p>
                     </CardContent>
                 </Card>
             </div>
@@ -312,8 +347,29 @@ export default function MonthlyStatisticsPage() {
                 </Card>
             )}
 
-            {monthlyData.totalRecords > 0 ? (
+            {monthlyData.totalRecords > 0 || monthlyData.financialStats.totalRevenue > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2">
+                     <Card className="md:col-span-2">
+                         <CardHeader>
+                            <CardTitle>📊 ملخص الإيرادات</CardTitle>
+                             <CardDescription>
+                                مقارنة بين الإيرادات الفعلية (المبالغ المدفوعة) والمتوقعة (إجمالي المستحقات) للشهر المحدد.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             <ResponsiveContainer width="100%" height={300}>
+                                <RechartsBarChart data={revenueData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis allowDecimals={false} unit=" د.ج" />
+                                    <Tooltip cursor={{fill: 'rgba(206, 206, 206, 0.2)'}} formatter={(value, name) => [`${(value as number).toLocaleString()} د.ج`, name as string]} />
+                                    <Legend />
+                                    <Bar dataKey="الإيرادات الفعلية" fill={REVENUE_COLORS['الإيرادات الفعلية']} />
+                                    <Bar dataKey="الإيرادات المتوقعة" fill={REVENUE_COLORS['الإيرادات المتوقعة']} />
+                                </RechartsBarChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
                     <Card>
                         <CardHeader>
                             <CardTitle>📊 توزيع الحضور</CardTitle>
