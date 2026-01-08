@@ -11,14 +11,14 @@ import { Loader2, Users, CalendarDays, BarChart, AlertTriangle, CheckCircle, XCi
 import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isToday, startOfQuarter, endOfQuarter, getQuarter } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 export default function OverviewPage() {
-    const { students, dailySessions, payments, loading } = useStudentContext();
+    const { students, dailySessions, payments, loading, settings } = useStudentContext();
     const { user, isSuperAdmin } = useAuth();
     const [timeFilter, setTimeFilter] = useState('today');
 
-    const TIER_PRICES = {
+    const TIER_PRICES = settings?.prices || {
         firstPayment: { 'فئة الأكابر': 2500, 'فئة الأصاغر': 2000 },
         renewal: { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 },
     };
@@ -34,9 +34,9 @@ export default function OverviewPage() {
         // Attendance
         const todaySession = dailySessions?.[todayStr];
         let attendancePercentage = 0;
-        if (todaySession && todaySession.records && todaySession.records.length > 0) {
+        if (todaySession && todaySession.records && activeStudents.length > 0 && todaySession.sessionType !== 'يوم عطلة') {
             const presentCount = todaySession.records.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
-            attendancePercentage = (presentCount / todaySession.records.length) * 100;
+            attendancePercentage = (presentCount / activeStudents.length) * 100;
         }
 
         // New Students
@@ -63,11 +63,9 @@ export default function OverviewPage() {
         });
         
         const studentsWhoPaidInQuarter = new Set(paymentsInQuarter.map(p => p.studentId));
+        let expectedRevenue = 0;
 
-        const pendingDues = studentsDueForQuarter.reduce((total, student) => {
-            if (studentsWhoPaidInQuarter.has(student.id)) {
-                return total;
-            }
+        studentsDueForQuarter.forEach(student => {
             const registrationYear = getYear(student.registrationDate);
             const registrationQuarter = getQuarter(student.registrationDate);
             const isFirstEverPayment = (payments ?? []).filter(p => p.studentId === student.id).length === 0;
@@ -76,19 +74,32 @@ export default function OverviewPage() {
             
             const tier = student.subscriptionTier || 'فئة الأصاغر';
             const amountDue = isFirstPaymentForThisStudent ? TIER_PRICES.firstPayment[tier] : TIER_PRICES.renewal[tier];
+            
+            expectedRevenue += amountDue;
+        });
 
-            return total + amountDue;
-        }, 0);
+        const totalPossibleRevenue = totalRevenue + (expectedRevenue - totalRevenue);
+        const pendingDues = expectedRevenue - paymentsInQuarter.filter(p => studentsDueForQuarter.some(s => s.id === p.studentId)).reduce((sum, p) => sum + p.amount, 0);
 
 
         return {
             attendanceToday: attendancePercentage,
             newStudentsThisMonth: newStudentsThisMonth,
             financialCollection: totalRevenue,
-            pendingDues: pendingDues,
+            pendingDues: Math.max(0, pendingDues),
+            totalPossibleRevenue: totalPossibleRevenue
         };
 
-    }, [students, dailySessions, payments]);
+    }, [students, dailySessions, payments, settings]);
+    
+    const attendanceChartData = [
+        { name: 'حضور', value: overviewData.attendanceToday },
+        { name: 'غياب', value: 100 - overviewData.attendanceToday }
+    ];
+
+    const financialProgress = overviewData.totalPossibleRevenue > 0 
+        ? (overviewData.financialCollection / overviewData.totalPossibleRevenue) * 100 
+        : 0;
 
     if (loading) {
         return (
@@ -115,45 +126,71 @@ export default function OverviewPage() {
                 </Tabs>
             </div>
             
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">الحضور اليومي</CardTitle>
-                        <Users className="h-4 w-4 text-muted-foreground" />
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                <Card className="shadow-lg rounded-2xl bg-gradient-to-tr from-blue-100 to-blue-200 dark:from-blue-900/50 dark:to-blue-950/50">
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-blue-800 dark:text-blue-200">الحضور اليومي</CardTitle>
+                        <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{overviewData.attendanceToday.toFixed(0)}%</div>
-                        <p className="text-xs text-muted-foreground">نسبة حضور الطلبة لهذا اليوم</p>
+                    <CardContent className="flex flex-col items-center justify-center">
+                         <ResponsiveContainer width={100} height={100}>
+                           <PieChart>
+                                <Pie 
+                                    data={attendanceChartData} 
+                                    cx="50%" cy="50%" 
+                                    innerRadius={30} 
+                                    outerRadius={40} 
+                                    startAngle={90}
+                                    endAngle={450}
+                                    paddingAngle={0}
+                                    dataKey="value"
+                                >
+                                    <Cell fill="#3b82f6" />
+                                    <Cell fill="rgba(59, 130, 246, 0.2)" />
+                                </Pie>
+                                <Tooltip content={() => null} />
+                           </PieChart>
+                        </ResponsiveContainer>
+                        <div className="text-3xl font-bold text-blue-900 dark:text-blue-100 -mt-20 mb-12">{overviewData.attendanceToday.toFixed(0)}%</div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">الطلبة الجدد (هذا الشهر)</CardTitle>
-                        <UserPlus className="h-4 w-4 text-muted-foreground" />
+                <Card className="shadow-lg rounded-2xl bg-gradient-to-tr from-green-100 to-green-200 dark:from-green-900/50 dark:to-green-950/50">
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-green-800 dark:text-green-200">الطلبة الجدد (هذا الشهر)</CardTitle>
+                        <UserPlus className="h-6 w-6 text-green-600 dark:text-green-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">+{overviewData.newStudentsThisMonth}</div>
-                        <p className="text-xs text-muted-foreground">طالب جديد تم إضافته هذا الشهر</p>
+                        <div className="text-5xl font-bold text-green-900 dark:text-green-100 mt-4">+{overviewData.newStudentsThisMonth}</div>
+                        <p className="text-xs text-muted-foreground text-green-700 dark:text-green-300">طالب جديد تم إضافته هذا الشهر</p>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">التحصيل المالي (الموسم)</CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <Card className="shadow-lg rounded-2xl bg-gradient-to-tr from-emerald-100 to-emerald-200 dark:from-emerald-900/50 dark:to-emerald-950/50">
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-emerald-800 dark:text-emerald-200">التحصيل المالي (الموسم)</CardTitle>
+                        <DollarSign className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{overviewData.financialCollection.toLocaleString()} د.ج</div>
-                        <p className="text-xs text-muted-foreground">المبالغ المحصلة في الموسم الحالي</p>
+                        <div className="text-4xl font-bold text-emerald-900 dark:text-emerald-100 mt-4">{overviewData.financialCollection.toLocaleString()} د.ج</div>
+                        <p className="text-xs text-muted-foreground text-emerald-700 dark:text-emerald-300">تم تحصيل {financialProgress.toFixed(0)}% من الهدف</p>
                     </CardContent>
                 </Card>
-                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">المستحقات المعلقة (الموسم)</CardTitle>
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                 <Card className="shadow-lg rounded-2xl bg-gradient-to-tr from-amber-100 to-amber-200 dark:from-amber-900/50 dark:to-amber-950/50">
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-amber-800 dark:text-amber-200">المستحقات المعلقة (الموسم)</CardTitle>
+                        <FileText className="h-6 w-6 text-amber-600 dark:text-amber-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{overviewData.pendingDues.toLocaleString()} د.ج</div>
-                        <p className="text-xs text-muted-foreground">المبالغ المتبقية للموسم الحالي</p>
+                        {overviewData.pendingDues > 0 ? (
+                             <>
+                                <div className="text-4xl font-bold text-amber-900 dark:text-amber-100 mt-4">{overviewData.pendingDues.toLocaleString()} د.ج</div>
+                                <p className="text-xs text-muted-foreground text-amber-700 dark:text-amber-300">المبالغ المتبقية للموسم الحالي</p>
+                             </>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full pt-4">
+                                <CheckCircle className="h-8 w-8 text-green-600" />
+                                <p className="font-semibold mt-2 text-green-800 dark:text-green-200">تم تسوية كل المستحقات</p>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -180,3 +217,5 @@ export default function OverviewPage() {
         </div>
     );
 }
+
+    
