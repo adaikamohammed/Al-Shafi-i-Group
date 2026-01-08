@@ -5,8 +5,8 @@ import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useStudentContext } from '@/context/StudentContext';
-import { format, subDays, startOfMonth, parseISO, getDate, getMonth, getYear } from 'date-fns';
-import { ClipboardCheck, DollarSign, ArrowRight, PartyPopper, AlertTriangle } from 'lucide-react';
+import { format, subDays, startOfMonth, parseISO, getDate, getMonth, getYear, getDay, startOfWeek } from 'date-fns';
+import { ClipboardCheck, DollarSign, ArrowRight, PartyPopper, AlertTriangle, BookOpenCheck } from 'lucide-react';
 import Link from 'next/link';
 
 interface Task {
@@ -22,50 +22,43 @@ export function DailyChecklist() {
 
     const tasks = useMemo(() => {
         const incompleteTasks: Task[] = [];
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const today = new Date();
+        const todayStr = format(today, 'yyyy-MM-dd');
+        const currentHour = today.getHours();
         
-        // 1. Attendance Task
-        if (!dailySessions[todayStr]) {
+        // Task 1: Attendance
+        if (currentHour >= 8 && !dailySessions[todayStr]) {
             incompleteTasks.push({
                 id: 'attendance',
-                text: 'لم يتم تسجيل حضور الطلاب اليوم.',
+                text: 'لم يتم رصد حضور وغياب الطلاب لليوم بعد.',
                 link: '/sessions',
-                buttonText: 'انتقل للتسجيل',
+                buttonText: 'سجل الحضور',
                 isUrgent: true,
             });
         }
-
-        // 2. Evaluation Task
-        const twoDaysAgo = format(subDays(new Date(), 2), 'yyyy-MM-dd');
-        const unevaluatedStudents = new Set<string>();
-        Object.values(dailySessions)
-            .filter(session => session.date >= twoDaysAgo && session.date < todayStr && session.sessionType === 'حصة أساسية')
-            .forEach(session => {
-                session.records.forEach(record => {
-                    if (record.attendance === 'حاضر' && !record.memorization) {
-                        unevaluatedStudents.add(record.studentId);
-                    }
-                });
-            });
         
-        if (unevaluatedStudents.size > 0) {
-            incompleteTasks.push({
-                id: 'evaluation',
-                text: `لديك ${unevaluatedStudents.size} طلاب يحتاجون لتقييم الحفظ.`,
-                link: '/surahs',
-                buttonText: 'متابعة الحفظ',
-                isUrgent: false,
-            });
+        // Task 2: Memorization Evaluation
+        const todaysSession = dailySessions[todayStr];
+        if(todaysSession && todaysSession.sessionType === 'حصة أساسية') {
+            const unevaluatedCount = todaysSession.records.filter(r => r.attendance === 'حاضر' && !r.memorization).length;
+            if (unevaluatedCount > 0) {
+                 incompleteTasks.push({
+                    id: 'evaluation',
+                    text: `لديك ${unevaluatedCount} طلاب يحتاجون لتقييم الحفظ لهذا اليوم.`,
+                    link: '/sessions',
+                    buttonText: 'تقييم الحفظ',
+                    isUrgent: false,
+                });
+            }
         }
 
-        // 3. Financial Task
-        const today = new Date();
-        const isBeginningOfMonth = getDate(today) <= 7;
-        const currentQuarter = Math.floor(getMonth(today) / 3) + 1;
-        const currentYear = getYear(today);
-        
+        // Task 3: Financial Dues
+        const isBeginningOfMonth = getDate(today) <= 5;
         if (isBeginningOfMonth) {
-            const activeStudents = (students ?? []).filter(s => s.status === 'نشط');
+            const currentQuarter = Math.floor(getMonth(today) / 3) + 1;
+            const currentYear = getYear(today);
+            
+            const activeStudents = (students ?? []).filter(s => s.status === 'نشط' && getYear(s.registrationDate) <= currentYear);
             const studentPaymentsThisQuarter = new Set(
                 (payments ?? [])
                     .filter(p => {
@@ -74,15 +67,54 @@ export function DailyChecklist() {
                     })
                     .map(p => p.studentId)
             );
-            
-            const unpaidCount = activeStudents.filter(s => !studentPaymentsThisQuarter.has(s.id)).length;
+            const unpaidCount = activeStudents.filter(s => {
+                const regQuarter = getQuarter(s.registrationDate);
+                const regYear = getYear(s.registrationDate);
+                const isDue = regYear < currentYear || (regYear === currentYear && regQuarter <= currentQuarter);
+                return isDue && !studentPaymentsThisQuarter.has(s.id);
+            }).length;
 
             if (unpaidCount > 0) {
                  incompleteTasks.push({
                     id: 'financial',
-                    text: `تذكير: ${unpaidCount} طلاب لم يسددوا رسوم هذا الموسم بعد.`,
+                    text: `هناك ${unpaidCount} طلاب بانتظار تسوية مستحقات الموسم.`,
                     link: '/dues',
                     buttonText: 'مراجعة المستحقات',
+                    isUrgent: false,
+                });
+            }
+        }
+        
+        // Task 4: Weekly Report Review
+        const isThursday = getDay(today) === 4;
+        if (isThursday) {
+            const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 6 });
+            const weeklySessions = Object.values(dailySessions).filter(s => parseISO(s.date) >= startOfCurrentWeek);
+            let lowPerformingStudents = 0;
+            const studentStats: {[key: string]: {absent: number, undisciplined: number}} = {};
+            (students ?? []).forEach(s => studentStats[s.id] = {absent: 0, undisciplined: 0});
+
+            weeklySessions.forEach(session => {
+                (session.records ?? []).forEach(record => {
+                    if (studentStats[record.studentId]) {
+                        if (record.attendance === 'غائب') studentStats[record.studentId].absent++;
+                        if (record.behavior === 'غير منضبط') studentStats[record.studentId].undisciplined++;
+                    }
+                })
+            });
+
+            for(const studentId in studentStats) {
+                if (studentStats[studentId].absent > 1 || studentStats[studentId].undisciplined > 1) {
+                    lowPerformingStudents++;
+                }
+            }
+            
+            if (lowPerformingStudents > 0) {
+                 incompleteTasks.push({
+                    id: 'review',
+                    text: `يوجد ${lowPerformingStudents} طلاب حصلوا على تقييم منخفض هذا الأسبوع.`,
+                    link: '/ranking',
+                    buttonText: 'مراجعة الأداء',
                     isUrgent: false,
                 });
             }
@@ -96,8 +128,8 @@ export function DailyChecklist() {
              <div className="p-6 rounded-lg bg-green-50 text-green-800 border border-green-200 flex items-center gap-4 transition-all duration-300">
                 <PartyPopper className="h-8 w-8 text-green-600" />
                 <div>
-                    <h4 className="font-bold text-lg">أحسنت!</h4>
-                    <p>لقد أتممت جميع مهام الفوج لهذا اليوم بنجاح.</p>
+                    <h4 className="font-bold text-lg">أحسنت يا شيخ!</h4>
+                    <p>لقد أتممت جميع المهام المطلوبة للفوج بنجاح لليوم.</p>
                 </div>
             </div>
         );
@@ -127,4 +159,3 @@ export function DailyChecklist() {
         </Card>
     );
 }
-

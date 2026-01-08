@@ -108,5 +108,3 @@ export const SmartAlerts = ({ students, sessions }: { students: Student[], sessi
       </Card>
     );
 };
-
-    

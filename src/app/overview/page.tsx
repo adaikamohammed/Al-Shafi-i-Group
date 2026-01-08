@@ -13,9 +13,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAx
 import type { Student, DailySession } from '@/lib/types';
 import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
-import { SmartAlerts } from '@/components/ui/SmartAlerts';
-import { AttendanceChart } from '@/components/ui/AttendanceChart';
 import { DailyChecklist } from '@/components/ui/DailyChecklist';
+import { AttendanceChart } from '@/components/ui/AttendanceChart';
 
 
 export default function OverviewPage() {
@@ -197,10 +196,11 @@ export default function OverviewPage() {
              <GroupEvaluationCard students={students ?? []} sessions={Object.values(dailySessions)} groupName={isSuperAdmin ? "كل الأفواج" : user?.group} />
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <SmartAlerts students={activeStudents} sessions={dailySessions} />
+                <div className="col-span-1 lg:col-span-4">
+                    {/* Placeholder for SmartAlerts if it were a separate component */}
+                </div>
                 <AttendanceChart sessions={dailySessions} />
             </div>
         </div>
     );
 }
-
