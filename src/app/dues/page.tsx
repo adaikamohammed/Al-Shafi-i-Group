@@ -8,10 +8,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle, Undo2 } from 'lucide-react';
 import { format, parseISO, getYear, getQuarter } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+
 
 const TIER_PRICES = {
     firstPayment: { 'فئة الأكابر': 2500, 'فئة الأصاغر': 2000 },
@@ -23,7 +25,7 @@ const getQuarterFromDate = (date: Date) => {
 };
 
 export default function DuesPage() {
-    const { students, payments, addPayment, loading, settings } = useStudentContext();
+    const { students, payments, addPayment, deletePayment, loading, settings } = useStudentContext();
     const { toast } = useToast();
     const [isProcessing, setIsProcessing] = useState<string | null>(null);
     const [currentYear, setCurrentYear] = useState(getYear(new Date()));
@@ -42,13 +44,20 @@ export default function DuesPage() {
                 const registrationQuarter = getQuarterFromDate(student.registrationDate);
                 const registrationYear = getYear(student.registrationDate);
 
-                const paidQuarters = studentPayments.map(p => p.quarter);
+                const paidQuartersInfo: { quarter: number, paymentId: string }[] = studentPayments.map(p => ({ quarter: p.quarter, paymentId: p.id }));
+                const paidQuarters = paidQuartersInfo.map(p => p.quarter);
+
                 const tier = student.subscriptionTier || 'فئة الأصاغر';
                 let totalPaid = 0;
                 let totalDue = 0;
                 let nextPayment = { quarter: 0, amount: 0, isFirstPayment: false };
 
-                const paymentStatus: Record<number, 'paid' | 'due' | 'not-applicable'> = { 1: 'not-applicable', 2: 'not-applicable', 3: 'not-applicable', 4: 'not-applicable' };
+                const paymentStatus: Record<number, {status: 'paid' | 'due' | 'not-applicable', paymentId?: string}> = { 
+                    1: {status: 'not-applicable'}, 
+                    2: {status: 'not-applicable'}, 
+                    3: {status: 'not-applicable'}, 
+                    4: {status: 'not-applicable'} 
+                };
 
                 for (let q = 1; q <= 4; q++) {
                     if (registrationYear > currentYear || (registrationYear === currentYear && q < registrationQuarter)) {
@@ -59,12 +68,13 @@ export default function DuesPage() {
                     const amountForQuarter = isFirstEverPayment ? prices.firstPayment[tier] : prices.renewal[tier];
                     totalDue += amountForQuarter;
                     
-                    if(paidQuarters.includes(q)) {
-                        paymentStatus[q] = 'paid';
+                    const paidInfo = paidQuartersInfo.find(p => p.quarter === q);
+                    if(paidInfo) {
+                        paymentStatus[q] = {status: 'paid', paymentId: paidInfo.paymentId};
                         const paymentForQuarter = studentPayments.find(p => p.quarter === q);
                         totalPaid += paymentForQuarter?.amount || 0;
                     } else {
-                        paymentStatus[q] = 'due';
+                        paymentStatus[q] = {status: 'due'};
                         if (nextPayment.quarter === 0) {
                             nextPayment = { quarter: q, amount: amountForQuarter, isFirstPayment: isFirstEverPayment };
                         }
@@ -108,6 +118,24 @@ export default function DuesPage() {
             setIsProcessing(null);
         }
     };
+    
+    const handleUndoPayment = async (paymentId: string | undefined) => {
+        if (!paymentId) return;
+        try {
+            await deletePayment(paymentId);
+            toast({
+                title: "✅ تم التراجع عن الدفعة",
+                description: "تم حذف سجل الدفعة بنجاح."
+            });
+        } catch (error) {
+             toast({
+                title: "❌ خطأ",
+                description: "فشل التراجع عن الدفعة.",
+                variant: 'destructive'
+            });
+        }
+    };
+
 
     if (loading) {
         return (
@@ -177,9 +205,32 @@ export default function DuesPage() {
                                     </TableCell>
                                     {[1, 2, 3, 4].map(q => (
                                         <TableCell key={q} className="text-center">
-                                            {student.paymentStatus[q] === 'paid' && <CheckCircle className="mx-auto h-5 w-5 text-green-500" />}
-                                            {student.paymentStatus[q] === 'due' && <XCircle className="mx-auto h-5 w-5 text-red-500" />}
-                                            {student.paymentStatus[q] === 'not-applicable' && <span className="text-muted-foreground">-</span>}
+                                            {student.paymentStatus[q].status === 'paid' && (
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <CheckCircle className="h-5 w-5 text-green-500" />
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                             <Button variant="ghost" size="icon" className="h-6 w-6">
+                                                                <Undo2 className="h-4 w-4 text-muted-foreground" />
+                                                            </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>تراجع عن الدفعة؟</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    هل أنت متأكد من رغبتك في التراجع عن هذه الدفعة المسجلة؟ سيتم حذفها نهائيا.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handleUndoPayment(student.paymentStatus[q].paymentId)}>نعم، قم بالتراجع</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </div>
+                                            )}
+                                            {student.paymentStatus[q].status === 'due' && <XCircle className="mx-auto h-5 w-5 text-red-500" />}
+                                            {student.paymentStatus[q].status === 'not-applicable' && <span className="text-muted-foreground">-</span>}
                                         </TableCell>
                                     ))}
                                     <TableCell>

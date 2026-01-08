@@ -31,6 +31,7 @@ interface StudentContextType {
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
   addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
+  deletePayment: (paymentId: string) => Promise<void>;
   saveSettings: (newSettings: AppSettings) => Promise<void>;
 }
 
@@ -82,11 +83,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
               }));
           }
 
+          const paymentsArray = data.payments ? Object.entries(data.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : [];
+
           setStudents(userStudents);
           setDailySessions(data.dailySessions || {});
           setDailyReports(data.dailyReports || {});
           setSurahProgress(data.surahProgress || {});
-          setPayments(data.payments ? Object.values(data.payments) : []);
+          setPayments(paymentsArray);
           setSettingsState(data.settings || null);
           setLoading(false);
       };
@@ -252,6 +255,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     await set(paymentRef, newPayment);
   };
   
+  const deletePayment = async (paymentId: string) => {
+    if (!authContextUser) throw new Error("User not authenticated");
+    const paymentRef = ref(db, `users/${authContextUser.uid}/payments/${paymentId}`);
+    await remove(paymentRef);
+  }
+
   const saveSettings = async (newSettings: AppSettings) => {
      if (!authContextUser) throw new Error("User not authenticated");
      const settingsRef = ref(db, `users/${authContextUser.uid}/settings`);
@@ -259,7 +268,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, saveSettings }}>
+    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
       {children}
     </StudentContext.Provider>
   );
