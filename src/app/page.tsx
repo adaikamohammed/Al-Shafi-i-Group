@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { Student, StudentStatus, MemorizationAmount } from '@/lib/types';
+import type { Student, StudentStatus, MemorizationAmount, SubscriptionTier } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -66,13 +66,14 @@ export default function StudentManagementPage() {
         "تاريخ الميلاد": format(s.birthDate, 'dd/MM/yyyy'),
         "تاريخ التسجيل": format(s.registrationDate, 'dd/MM/yyyy'),
         "الحالة": s.status,
+        "فئة الاشتراك": s.subscriptionTier,
         "مقدار الحفظ اليومي": s.dailyMemorizationAmount,
         "السور المحفوظة": s.memorizedSurahsCount,
         "ملاحظات": s.notes || '',
     }));
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
-    ws['!cols'] = [ { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 30 }];
+    ws['!cols'] = [ { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 30 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "قائمة الطلبة");
     XLSX.writeFile(wb, "قائمة_الطلبة_الحالية.xlsx");
@@ -194,12 +195,13 @@ export default function StudentManagementPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[25%] text-center">الاسم الكامل</TableHead>
-                <TableHead className="hidden md:table-cell w-[25%] text-center">اسم الولي</TableHead>
-                <TableHead className="hidden lg:table-cell w-[10%] text-center">العمر</TableHead>
-                <TableHead className="w-[15%] text-center">الحالة</TableHead>
-                <TableHead className="hidden md:table-cell w-[15%] text-center">السور المحفوظة</TableHead>
-                <TableHead className="w-[10%] text-center">
+                <TableHead className="text-center">الاسم الكامل</TableHead>
+                <TableHead className="hidden md:table-cell text-center">اسم الولي</TableHead>
+                <TableHead className="hidden lg:table-cell text-center">العمر</TableHead>
+                <TableHead className="text-center">الحالة</TableHead>
+                <TableHead className="text-center">فئة الاشتراك</TableHead>
+                <TableHead className="hidden md:table-cell text-center">السور المحفوظة</TableHead>
+                <TableHead className="text-center">
                   <span className="sr-only">إجراءات</span>
                 </TableHead>
               </TableRow>
@@ -214,6 +216,9 @@ export default function StudentManagementPage() {
                     <TableCell className="text-center">
                         <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
                     </TableCell>
+                     <TableCell className="text-center">
+                        <Badge variant="outline">{student.subscriptionTier}</Badge>
+                    </TableCell>
                     <TableCell className="hidden md:table-cell text-center">{student.memorizedSurahsCount || 0}</TableCell>
                     <TableCell className="text-center">
                         <StudentActions student={student} onStatusChange={handleStatusChange} />
@@ -222,7 +227,7 @@ export default function StudentManagementPage() {
                 ))
              ) : (
                 <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={7} className="h-24 text-center">
                        {searchTerm ? "لم يتم العثور على طلاب مطابقين للبحث." : "لا يوجد طلبة حاليًا. قم بإضافة طالب جديد."}
                     </TableCell>
                 </TableRow>
@@ -341,6 +346,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         birthDate: birthDate,
         registrationDate: registrationDate,
         status: data.status,
+        subscriptionTier: data.subscriptionTier,
         dailyMemorizationAmount: data.memorizationAmount,
         notes: data.notes,
     };
@@ -449,20 +455,32 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
                 </Select>
             </div>
              <div className="space-y-2">
-                <Label htmlFor="memorizationAmount">مقدار الحفظ اليومي</Label>
-                <Select dir="rtl" name="memorizationAmount" defaultValue={student?.dailyMemorizationAmount}>
-                    <SelectTrigger id="memorizationAmount">
-                        <SelectValue placeholder="اختر المقدار" />
+                <Label htmlFor="subscriptionTier">فئة الاشتراك</Label>
+                <Select dir="rtl" name="subscriptionTier" defaultValue={student?.subscriptionTier ?? 'فئة ب'}>
+                    <SelectTrigger id="subscriptionTier">
+                        <SelectValue placeholder="اختر الفئة" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="نصف صفحة">نصف صفحة</SelectItem>
-                        <SelectItem value="صفحة">صفحة</SelectItem>
-                        <SelectItem value="ثمن">ثمن</SelectItem>
-                        <SelectItem value="ربع">ربع</SelectItem>
-                        <SelectItem value="أكثر">أكثر</SelectItem>
+                        <SelectItem value="فئة أ">فئة أ</SelectItem>
+                        <SelectItem value="فئة ب">فئة ب</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
+        </div>
+         <div className="space-y-2">
+            <Label htmlFor="memorizationAmount">مقدار الحفظ اليومي</Label>
+            <Select dir="rtl" name="memorizationAmount" defaultValue={student?.dailyMemorizationAmount}>
+                <SelectTrigger id="memorizationAmount">
+                    <SelectValue placeholder="اختر المقدار" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="نصف صفحة">نصف صفحة</SelectItem>
+                    <SelectItem value="صفحة">صفحة</SelectItem>
+                    <SelectItem value="ثمن">ثمن</SelectItem>
+                    <SelectItem value="ربع">ربع</SelectItem>
+                    <SelectItem value="أكثر">أكثر</SelectItem>
+                </SelectContent>
+            </Select>
         </div>
         <div className="space-y-2">
             <Label htmlFor="notes">ملاحظات عامة</Label>

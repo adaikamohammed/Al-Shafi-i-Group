@@ -1,85 +1,133 @@
 
-import React from 'react';
+"use client";
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Clock, Database, Lock, Users, Smartphone, Palette, Search, BarChartHorizontal, FileDown, CalendarDays } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useStudentContext } from '@/context/StudentContext';
+import { Loader2, Save } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+const TIER_PRICES = {
+    initial: { 'فئة أ': 2500, 'فئة ب': 2000 },
+    subsequent: { 'فئة أ': 2000, 'فئة ب': 1500 },
+};
 
 export default function SettingsPage() {
+    const { settings, setSettings, loading: contextLoading } = useStudentContext();
+    const { toast } = useToast();
+    
+    const [prices, setPrices] = useState(settings?.prices || TIER_PRICES);
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (settings?.prices) {
+            setPrices(settings.prices);
+        }
+    }, [settings]);
+
+    const handlePriceChange = (period: 'initial' | 'subsequent', tier: 'فئة أ' | 'فئة ب', value: string) => {
+        const numericValue = Number(value);
+        if (!isNaN(numericValue)) {
+            setPrices(prev => ({
+                ...prev,
+                [period]: {
+                    ...prev[period],
+                    [tier]: numericValue
+                }
+            }));
+        }
+    };
+
+    const handleSaveChanges = async () => {
+        setIsLoading(true);
+        try {
+            await setSettings({ prices });
+            toast({
+                title: "✅ تم الحفظ",
+                description: "تم حفظ إعدادات الأسعار بنجاح."
+            });
+        } catch (error) {
+            toast({
+                title: "❌ خطأ",
+                description: "فشل حفظ الإعدادات.",
+                variant: 'destructive',
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    if (contextLoading) {
+        return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>
+    }
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-headline font-bold">الإعدادات</h1>
+      
       <Card>
         <CardHeader>
-          <CardTitle>✨ نظرة عامة على التطبيق</CardTitle>
+          <CardTitle>إدارة أسعار الاشتراكات</CardTitle>
           <CardDescription>
-            هذه الصفحة تعرض الميزات المفعّلة حاليًا، بالإضافة إلى الميزات التقنية المخطط إضافتها في المستقبل لتطوير المنصة.
+            هنا يمكنك تعديل أسعار الاشتراكات للفئات المختلفة. ستنعكس هذه التغييرات تلقائيًا في صفحة المستحقات.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 gap-8">
-            <div>
-                <h3 className="font-semibold text-lg font-headline mb-4">الميزات الحالية المفعّلة ✅</h3>
-                <ul className="space-y-3">
-                    <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
-                        <Lock className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
-                        <span><strong>نظام تسجيل دخول آمن</strong> يعتمد على البريد وكلمة المرور مع حفظ الجلسة.</span>
-                    </li>
-                    <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
-                        <Users className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
-                        <span><strong>إدارة كاملة للطلبة</strong> (إضافة، تعديل، حذف، طرد، وتصدير).</span>
-                    </li>
-                    <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
-                        <CalendarDays className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
-                        <span><strong>واجهة الحصص اليومية</strong> لتسجيل الأداء والمراجعة في الوقت الفعلي.</span>
-                    </li>
-                     <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
-                        <BarChartHorizontal className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
-                        <span><strong>تقارير مرئية</strong> شهرية وأسبوعية لمتابعة الحضور والسلوك والتقييم.</span>
-                    </li>
-                    <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
-                        <Search className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
-                        <span><strong>فلترة متقدمة</strong> في كل الصفحات (حسب الطالب، التاريخ، الحالة).</span>
-                    </li>
-                    <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
-                        <Smartphone className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
-                        <span><strong>تخزين محلي ذكي</strong> (LocalStorage) لضمان السرعة عند التنقل بين الصفحات.</span>
-                    </li>
-                    <li className="flex items-start p-3 bg-muted rounded-md border-r-4 border-primary">
-                        <FileDown className="ml-3 h-5 w-5 text-primary flex-shrink-0 mt-1" />
-                        <span><strong>دعم تصدير واستيراد Excel</strong> لتنظيم بيانات الطلبة والحصص.</span>
-                    </li>
-                </ul>
+        <CardContent className="space-y-6">
+            <div className="space-y-4 p-4 border rounded-lg">
+                 <h4 className="font-semibold text-lg">الفترة الأولى (أول 3 أشهر)</h4>
+                 <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="initial-tier-a">سعر الفئة أ (د.ج)</Label>
+                        <Input 
+                            id="initial-tier-a"
+                            type="number"
+                            value={prices.initial['فئة أ']}
+                            onChange={(e) => handlePriceChange('initial', 'فئة أ', e.target.value)}
+                        />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="initial-tier-b">سعر الفئة ب (د.ج)</Label>
+                        <Input 
+                            id="initial-tier-b"
+                            type="number"
+                            value={prices.initial['فئة ب']}
+                            onChange={(e) => handlePriceChange('initial', 'فئة ب', e.target.value)}
+                        />
+                    </div>
+                 </div>
             </div>
 
-            <div>
-                <h3 className="font-semibold text-lg font-headline mt-0 mb-4">الميزات القادمة في التحديثات المستقبلية 📌</h3>
-                <ul className="space-y-3">
-                    <li className="flex items-start p-3 bg-amber-50 rounded-md border-r-4 border-amber-400">
-                        <Database className="ml-3 h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
-                        <span><strong>ربط مباشر بقاعدة بيانات سحابية</strong> (مثل Firebase أو Supabase) لمزامنة البيانات.</span>
-                    </li>
-                    <li className="flex items-start p-3 bg-amber-50 rounded-md border-r-4 border-amber-400">
-                        <Clock className="ml-3 h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
-                        <span><strong>إرسال تقارير PDF تلقائيًا</strong> إلى البريد الإلكتروني للإدارة أو أولياء الأمور.</span>
-                    </li>
-                    <li className="flex items-start p-3 bg-amber-50 rounded-md border-r-4 border-amber-400">
-                        <Clock className="ml-3 h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
-                        <span><strong>نظام إشعارات ذكي</strong> لتنبيه المعلم، المدير، وأولياء الأمور بالأحداث المهمة.</span>
-                    </li>
-                     <li className="flex items-start p-3 bg-amber-50 rounded-md border-r-4 border-amber-400">
-                        <Clock className="ml-3 h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
-                        <span><strong>تخصيص الملف الشخصي للمعلم</strong> (صورة، اسم العرض، بريد التواصل).</span>
-                    </li>
-                    <li className="flex items-start p-3 bg-amber-50 rounded-md border-r-4 border-amber-400">
-                        <Clock className="ml-3 h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
-                        <span><strong>لوحة تحكم متقدمة للمدير</strong> مع صلاحيات مخصصة لمتابعة الأفواج.</span>
-                    </li>
-                    <li className="flex items-start p-3 bg-amber-50 rounded-md border-r-4 border-amber-400">
-                        <Clock className="ml-3 h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
-                        <span><strong>وضع مراجعة جماعية</strong> يتيح تتبع السور الأكثر ضعفًا على مستوى الفوج.</span>
-                    </li>
-                </ul>
+            <div className="space-y-4 p-4 border rounded-lg">
+                 <h4 className="font-semibold text-lg">الفترات اللاحقة</h4>
+                 <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="subsequent-tier-a">سعر الفئة أ (د.ج)</Label>
+                        <Input 
+                            id="subsequent-tier-a"
+                            type="number"
+                            value={prices.subsequent['فئة أ']}
+                            onChange={(e) => handlePriceChange('subsequent', 'فئة أ', e.target.value)}
+                        />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="subsequent-tier-b">سعر الفئة ب (د.ج)</Label>
+                        <Input 
+                            id="subsequent-tier-b"
+                            type="number"
+                            value={prices.subsequent['فئة ب']}
+                            onChange={(e) => handlePriceChange('subsequent', 'فئة ب', e.target.value)}
+                        />
+                    </div>
+                 </div>
             </div>
-          </div>
+            
+            <Button onClick={handleSaveChanges} disabled={isLoading}>
+                {isLoading ? <Loader2 className="h-4 w-4 ml-2 animate-spin"/> : <Save className="h-4 w-4 ml-2"/>}
+                حفظ التغييرات
+            </Button>
         </CardContent>
       </Card>
     </div>

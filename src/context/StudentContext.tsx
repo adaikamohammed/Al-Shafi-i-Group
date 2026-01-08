@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import type { Student, DailySession, DailyReport } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,10 +15,12 @@ interface StudentContextType {
   dailySessions: Record<string, DailySession>;
   dailyReports: { [date: string]: { [reportId: string]: DailyReport } };
   surahProgress: Record<string, number[]>;
+  payments: Payment[];
+  settings: AppSettings | null;
   loading: boolean;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => void;
-  updateStudent: (studentId: string, updatedData: Partial<Student>) => void;
-  deleteStudent: (studentId: string) => void;
+  updateStudent: (studentId: string, updatedData: Partial<Student>, ownerId: string) => void;
+  deleteStudent: (studentId: string, ownerId: string) => void;
   deleteAllStudents: () => void;
   addDailySession: (session: DailySession) => void;
   deleteDailySession: (date: string) => void;
@@ -28,6 +30,8 @@ interface StudentContextType {
   saveDailyReport: (report: Omit<DailyReport, 'id'>, reportIdToUpdate?: string) => Promise<void>;
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
+  addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
+  setSettings: (newSettings: AppSettings) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -39,6 +43,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
   const [dailyReports, setDailyReports] = useState<{ [date: string]: { [reportId: string]: DailyReport } }>({});
   const [surahProgress, setSurahProgress] = useState<Record<string, number[]>>({});
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [settings, setSettingsState] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
@@ -57,7 +63,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       
       const handleValueChange = (snapshot: any) => {
           if (!snapshot.exists()) {
-              setStudents([]); setDailySessions({}); setDailyReports({}); setSurahProgress({});
+              setStudents([]); setDailySessions({}); setDailyReports({}); setSurahProgress({}); setPayments([]); setSettingsState(null);
               setLoading(false);
               return;
           }
@@ -80,6 +86,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           setDailySessions(data.dailySessions || {});
           setDailyReports(data.dailyReports || {});
           setSurahProgress(data.surahProgress || {});
+          setPayments(data.payments ? Object.values(data.payments) : []);
+          setSettingsState(data.settings || null);
           setLoading(false);
       };
 
@@ -93,6 +101,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setDailySessions({});
       setDailyReports({});
       setSurahProgress({});
+      setPayments([]);
+      setSettingsState(null);
       setLoading(false);
     }
   
@@ -108,11 +118,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     if (!authContextUser) return;
 
     const studentId = uuidv4();
-    const newStudent: Student = {
+    const newStudent: Omit<Student, 'id'> & {id: string} = {
       ...studentData,
       id: studentId,
       ownerId: authContextUser.uid,
       memorizedSurahsCount: 0,
+      subscriptionTier: studentData.subscriptionTier || 'فئة ب',
       updatedAt: new Date(),
     };
     const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
@@ -129,8 +140,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
      newStudents.forEach(s => addStudent(s));
   }
 
-  const updateStudent = (studentId: string, updatedData: Partial<Student>) => {
-    if (!authContextUser) return;
+  const updateStudent = (studentId: string, updatedData: Partial<Student>, ownerId: string) => {
+    if (!authContextUser || authContextUser.uid !== ownerId) return;
     
     const originalStudent = (students ?? []).find(s => s.id === studentId);
     if (!originalStudent) return;
@@ -146,8 +157,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     });
   };
   
-  const deleteStudent = (studentId: string) => {
-      if (!authContextUser) return;
+  const deleteStudent = (studentId: string, ownerId: string) => {
+      if (!authContextUser || authContextUser.uid !== ownerId) return;
       const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
       remove(studentRef);
   }
@@ -226,11 +237,29 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const surahProgressRef = ref(db, `users/${authContextUser.uid}/surahProgress/${studentId}`);
     set(surahProgressRef, studentProgressList);
     
-    updateStudent(studentId, { memorizedSurahsCount: studentProgressList.length });
+    updateStudent(studentId, { memorizedSurahsCount: studentProgressList.length }, authContextUser.uid);
   }
 
+  const addPayment = async (paymentData: Omit<Payment, 'id'>) => {
+    if (!authContextUser) throw new Error("User not authenticated");
+    const paymentId = uuidv4();
+    const newPayment: Payment = {
+        ...paymentData,
+        id: paymentId,
+        date: paymentData.date.toISOString(),
+    };
+    const paymentRef = ref(db, `users/${authContextUser.uid}/payments/${paymentId}`);
+    await set(paymentRef, newPayment);
+  };
+  
+  const setSettings = async (newSettings: AppSettings) => {
+     if (!authContextUser) throw new Error("User not authenticated");
+     const settingsRef = ref(db, `users/${authContextUser.uid}/settings`);
+     await set(settingsRef, newSettings);
+  };
+
   return (
-    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus }}>
+    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, setSettings }}>
       {children}
     </StudentContext.Provider>
   );

@@ -2,6 +2,7 @@
 
 export type StudentStatus = "نشط" | "مطرود" | "غائب طويل" | "محذوف";
 export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "أكثر";
+export type SubscriptionTier = "فئة أ" | "فئة ب";
 
 export interface Student {
   id: string;
@@ -13,6 +14,7 @@ export interface Student {
   birthDate: Date;
   registrationDate: Date;
   status: StudentStatus;
+  subscriptionTier: SubscriptionTier;
   actionReason?: string; // Reason for deletion or expulsion
   memorizedSurahsCount: number;
   dailyMemorizationAmount: MemorizationAmount;
@@ -98,4 +100,18 @@ export interface AppUser {
 export interface StudentStat extends Partial<SessionRecord> {
   date: string;
   sessionType: string;
+}
+
+export interface Payment {
+    id: string;
+    studentId: string;
+    amount: number;
+    date: string; // ISO String
+}
+
+export interface AppSettings {
+    prices: {
+        initial: { 'فئة أ': number; 'فئة ب': number; };
+        subsequent: { 'فئة أ': number; 'فئة ب': number; };
+    };
 }

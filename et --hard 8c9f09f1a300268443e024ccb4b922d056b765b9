@@ -1,0 +1,75 @@
+[33m8c9f09f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m هذه رسالة سابقة لكن اعتقد انك لم تطبقها : يضيف ميزة احترافية ممتازة: إنش
+[33ma034e13[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m09701da[m لا اريد رفع صورة في صفحة التقرير اليومي
+[33m016de2a[m نشاء صفحة “📘 إرشادات الاستخدام للمشايخ”، بلغة بسيطة ومطمئنة، بأسلوب تفا
+[33medaa8e0[m الخطأ الظاهر في الصورة هو:
+[33m5a07e0c[m الجزء 1: معالجة خطأ "تقييم شهر فارغ أو قادم" 🎯 الهدف: عدم عرض تقييم أو
+[33mc601846[m من الصورة، واضح أن:
+[33mde4c551[m اين قمت ب اضافة اخر رسالة لم اجد صفحة جديدة
+[33mc81a4e3[m الهدف النهائي: نظام يقوم تلقائيًا بـ:
+[33m6607fb3[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m06497df[m المطلوب: ميزة	الهدف ✅ أكثر من تقرير في اليوم	يسمح بمرونة التوثيق وتسجيل
+[33m3cca3ff[m الحل: هندسة أوامر CSS + HTML لتناسق كامل في الجدول ✅ 1. 📦 تأكد من بنية
+[33mb124526[m أولًا: إزالة الحد على تاريخ الميلاد + سهولة الاختيار 🎯 الهدف: إلغاء الق
+[33m2145063[m هندسة أوامر دقيقة لموقعك لإصلاح هذا النوع من الأخطاء في جميع الصفحات: 🧱
+[33mdfbded2[m المطلوب: حذف زر "📷 حفظ كصورة (PNG)" نهائيًا.
+[33m0d78eec[m لحفظ تقرير أداء الطالب الشهري بشكل سليم بصيغ متعددة (PDF، PNG، Word)، أق
+[33m4db6342[m الهدف النهائي الجديد: 🔹 حذف جميع حسابات الإدارة (admin@gmail.com, admin
+[33ma6f86f8[m هندسة أوامر AI النهائية والدقيقة لتنفيذ التعديل الجديد: 🎯 الهدف المطلوب
+[33m3244595[m الخطأ:
+[33meb7c377[m المشكلة الحالية: ✅ عند الدخول من أحد حسابات المشايخ (admin1@gmail.com إل
+[33me67f314[m I see this error with the app, reported by NextJS, please fix it. The er
+[33mead78a1[m الهدف الجديد: حساب admin@gmail.com = مدير بصلاحيات كاملة يمكنه:
+[33m1ece3d5[m I see this error with the app, reported by NextJS, please fix it. The er
+[33ma1b2b02[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m9b1c7a5[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m768cd76[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m7b0bb0b[m سبب الخطأ: bash نسخ تحرير Firebase read failed: permission_denied at /us
+[33m478bb5d[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m0d6f4cb[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m39ca91e[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m9e77366[m I see this error with the app, reported by NextJS, please fix it. The er
+[33mf53e16c[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m9eeaf56[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m2357e12[m الحل النهائي حسب السيناريو: ✅ إذا كان الخطأ يحدث عند تعديل أو حذف طالب م
+[33m7e7ac76[m الهدف من هندسة الأوامر: 🔹 استعراض جميع طلاب الـ 10 مشايخ 🔹 ترتيبهم في
+[33me65bcab[m الهدف الأساسي: 📌 لدينا 10 مشايخ من admin1@gmail.com إلى admin10@gmail.c
+[33m639793b[m I see this error with the app, reported by NextJS, please fix it. The er
+[33mbf2d189[m الهدف النهائي المطلوب: ⚙️ تعديل صفحات حساب admin@gmail.com ليكون حساب إد
+[33m10b8c57[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m8d694f1[m الخطأ الذي يظهر في Console:
+[33m3cf9421[m المشكلة الفعلية التطبيق يحاول قراءة المسار /users/ مباشرة قبل التأكد من
+[33mdbec225[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m22506de[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m715971c[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m284e88e[m الهدف العام: بناء هيكل بيانات في Firebase Realtime Database بحيث:
+[33m0bd1146[m هندسة الأوامر لنظام AI (Firebase Studio / موقع Next.js): 🟩
+[33m7d2b7c8[m قاعدة Firebase Realtime Database الخاصة بك قد تم إنشاؤها بنجاح ولكن:
+[33mbd1bda2[m لتعديل نموذج تحميل الطلبة بحيث يدعم الأعمدة الجديدة ويقرأ تاريخ الميلاد
+[33ma6086eb[m حل الخطأ: FirebaseError: Firebase: Error (auth/invalid-credential) المرت
+[33mf991848[m I see this error with the app, reported by NextJS, please fix it. The er
+[33mf4d095f[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m04c765d[m The NextJS app server is having trouble starting. Please identify what c
+[33mcffaecd[m هندسة أوامر شاملة ودقيقة مخصصة لمطور موقع المدرسة القرآنية (موقع AI) لحل
+[33me9ff18b[m ضمان أن تقرير الطالب الشهري يتم حفظه في ملف PDF بشكل صحيح (بدون فراغات أ
+[33md504346[m تصميم جميل مناسب لكن لم يتم استدعاء احصائيات الشهر للطلبة من صفحة الإحصا
+[33mb5a7ff5[m ندسة أوامر قوية شاملة ومفصلة لتنفيذ التعديلات المطلوبة على صفحة تقرير ال
+[33mc9b6b81[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m8197121[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m5be462d[m Make the following changes:
+[33mde2e310[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m700cdae[m احذف صفحة تقرير الطالب بالكامل لا اريدها
+[33m470f4e8[m I see this error with the app, reported by NextJS, please fix it. The er
+[33m4788440[m لضمان طباعة تقارير PDF باللغة العربية بشكل صحيح دون تشويه أو ظهور رموز غ
+[33m2af5a10[m I see this error with the app, reported by NextJS, please fix it. The er
+[33mb36d7ac[m إليك هندسة أوامر شاملة وقوية لإنشاء صفحة تقرير PDF فردي لكل طالب، منسقة
+[33mffdc486[m هندسة أوامر قوية ومبتكرة لإضافة زر "إعادة تعيين/حذف بيانات يوم معين" في
+[33mebb0f57[m لتحسين واجهة صفحة "متابعة الحفظ" وجعلها أكثر جاذبية وتحفيزًا من خلال تعد
+[33m44a8f8d[m Make the following changes:
+[33mcc3fee3[m لم تقم بهذه تعديلات قبل قليل :
+[33mec74bda[m الهدف: ترتيب قائمة الطلاب تلقائيًا حسب الحالة (نشط، غائب طويل، مطرود...)
+[33m3203aed[m أولاً: الربط بين "متابعة الحفظ" و"إدارة الطلبة" ✅ التعديل المطلوب: عند ت
+[33m8b83af0[m الفكرة العامة: صفحة تفاعلية لمتابعة مدى حفظ الطالب لكل سورة وحزب من القر
+[33ma5d7e54[m الهدف: عند تسجيل دخول الشيخ بحسابه (مثلاً admin6@gmail.com) يتم:
+[33m35163ce[m ردّ منصة Gemini رائع، وقد أكّد أنهم سيقومون بتطبيق المرحلة الأولى من الت
+[33m51776b0[m أولًا: الإطار العام لتواف
