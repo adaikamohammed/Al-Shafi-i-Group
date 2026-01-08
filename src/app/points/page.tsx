@@ -7,17 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
 import { Loader2, AlertTriangle, Medal, Star, Gift, ShoppingCart, History, Coins } from 'lucide-react';
-import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
+import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
-
-interface StudentScore {
-    id: string;
-    name: string;
-    points: number;
-}
 
 const pointsConfig = {
     attendance: { 'حاضر': 3, 'متأخر': 1, 'تعويض': 1.5, 'غائب': -2 },
@@ -61,9 +55,9 @@ export default function PointsSystemPage() {
             (session.records ?? []).forEach(record => {
                 if (studentScores[record.studentId] !== undefined) {
                     let points = 0;
-                    if (record.attendance) points += pointsConfig.attendance[record.attendance] ?? 0;
-                    if (record.memorization) points += pointsConfig.evaluation[record.memorization] ?? 0;
-                    if (record.behavior) points += pointsConfig.behavior[record.behavior] ?? 0;
+                    if (record.attendance) points += pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] ?? 0;
+                    if (record.memorization) points += pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] ?? 0;
+                    if (record.behavior) points += pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] ?? 0;
                     if (record.review) points += pointsConfig.review.completed;
                     studentScores[record.studentId] += points;
                 }
@@ -108,7 +102,7 @@ export default function PointsSystemPage() {
 
         toast({
             title: '✅ تم الاستبدال بنجاح!',
-            description: `تم خصم ${prize.cost} نقطة من رصيد الطالب.`
+            description: `تم خصم ${prize.cost} نقطة من رصيد الطالب ${student?.fullName}.`
         });
     };
 
