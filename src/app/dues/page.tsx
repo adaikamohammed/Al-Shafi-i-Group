@@ -8,8 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, DollarSign } from 'lucide-react';
-import { format, differenceInMonths, addMonths, parseISO } from 'date-fns';
+import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle } from 'lucide-react';
+import { format, parseISO, getYear, getQuarter } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 
@@ -18,73 +18,85 @@ const TIER_PRICES = {
     renewal: { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 },
 };
 
+const getQuarterFromDate = (date: Date) => {
+    return getQuarter(date);
+};
+
 export default function DuesPage() {
     const { students, payments, addPayment, loading, settings } = useStudentContext();
     const { toast } = useToast();
-    const [filter, setFilter] = useState<'all' | 'paid' | 'overdue'>('all');
     const [isProcessing, setIsProcessing] = useState<string | null>(null);
-    
+    const [currentYear, setCurrentYear] = useState(getYear(new Date()));
+
     const prices = settings?.prices || TIER_PRICES;
 
     const studentsWithDues = useMemo(() => {
         return (students ?? [])
-            .filter(s => s.status === 'نشط')
+            .filter(s => s.status === 'نشط' && getYear(s.registrationDate) <= currentYear)
             .map(student => {
-                const studentPayments = (payments ?? []).filter(p => p.studentId === student.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                const lastPayment = studentPayments[0];
+                const studentPayments = (payments ?? [])
+                    .filter(p => p.studentId === student.id && getYear(parseISO(p.date)) === currentYear)
+                    .map(p => ({ ...p, quarter: getQuarterFromDate(parseISO(p.date)) }))
+                    .sort((a, b) => a.quarter - b.quarter);
                 
-                const isFirstPayment = !lastPayment;
+                const registrationQuarter = getQuarterFromDate(student.registrationDate);
+                const registrationYear = getYear(student.registrationDate);
 
+                const paidQuarters = studentPayments.map(p => p.quarter);
                 const tier = student.subscriptionTier || 'فئة الأصاغر';
-                const dueAmount = isFirstPayment ? prices.firstPayment[tier] : prices.renewal[tier];
-                
-                let status: 'paid' | 'overdue' = 'overdue';
-                let nextDueDate: Date | null = null;
-                
-                if (lastPayment) {
-                    const lastPaymentDate = parseISO(lastPayment.date);
-                    nextDueDate = addMonths(lastPaymentDate, 3);
-                    if (new Date() < nextDueDate) {
-                        status = 'paid';
-                    }
-                } else {
-                     nextDueDate = addMonths(student.registrationDate, 3);
-                     if (new Date() < nextDueDate) {
-                        status = 'paid'; // Still within the first 3 months, considered paid until due date passes
-                     }
-                }
+                let totalPaid = 0;
+                let totalDue = 0;
+                let nextPayment = { quarter: 0, amount: 0, isFirstPayment: false };
 
+                const paymentStatus: Record<number, 'paid' | 'due' | 'not-applicable'> = { 1: 'not-applicable', 2: 'not-applicable', 3: 'not-applicable', 4: 'not-applicable' };
+
+                for (let q = 1; q <= 4; q++) {
+                    if (registrationYear > currentYear || (registrationYear === currentYear && q < registrationQuarter)) {
+                        continue; // Skip quarters before registration
+                    }
+
+                    const isFirstEverPayment = registrationYear === currentYear && q === registrationQuarter && (payments ?? []).filter(p => p.studentId === student.id).length === 0;
+                    const amountForQuarter = isFirstEverPayment ? prices.firstPayment[tier] : prices.renewal[tier];
+                    totalDue += amountForQuarter;
+                    
+                    if(paidQuarters.includes(q)) {
+                        paymentStatus[q] = 'paid';
+                        const paymentForQuarter = studentPayments.find(p => p.quarter === q);
+                        totalPaid += paymentForQuarter?.amount || 0;
+                    } else {
+                        paymentStatus[q] = 'due';
+                        if (nextPayment.quarter === 0) {
+                            nextPayment = { quarter: q, amount: amountForQuarter, isFirstPayment: isFirstEverPayment };
+                        }
+                    }
+                }
+                
                 return {
                     ...student,
-                    lastPaymentDate: lastPayment ? parseISO(lastPayment.date) : null,
-                    dueAmount,
-                    status,
-                    nextDueDate
+                    paymentStatus,
+                    totalPaid,
+                    totalDue,
+                    nextPayment
                 };
-            })
-            .filter(s => {
-                if (filter === 'all') return true;
-                return s.status === filter;
-            })
-            .sort((a, b) => {
-                 if (a.status === 'overdue' && b.status !== 'overdue') return -1;
-                 if (b.status === 'overdue' && a.status !== 'overdue') return 1;
-                 return a.fullName.localeCompare(b.fullName);
             });
 
-    }, [students, payments, filter, prices]);
+    }, [students, payments, settings, currentYear]);
 
-    const handleRecordPayment = async (studentId: string, amount: number) => {
+    const handleRecordPayment = async (studentId: string, amount: number, quarter: number) => {
         setIsProcessing(studentId);
         try {
+            // We record the payment at the start of the quarter for consistency.
+            const monthOfQuarter = (quarter - 1) * 3;
+            const paymentDate = new Date(currentYear, monthOfQuarter, 1);
+
             await addPayment({
                 studentId,
                 amount,
-                date: new Date(),
+                date: paymentDate,
             });
             toast({
                 title: "✅ تم تسجيل الدفعة",
-                description: `تم تسجيل دفعة للطالب بنجاح.`,
+                description: `تم تسجيل دفعة للفصل ${quarter} للطالب بنجاح.`,
             });
         } catch (error) {
             toast({
@@ -116,30 +128,30 @@ export default function DuesPage() {
             </div>
         );
     }
+    
+    const yearOptions = Array.from({length: 5}, (_, i) => getYear(new Date()) - i);
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                 <h1 className="text-3xl font-headline font-bold">المستحقات المالية</h1>
-                  <Select dir="rtl" value={filter} onValueChange={(value: 'all' | 'paid' | 'overdue') => setFilter(value)}>
+                 <h1 className="text-3xl font-headline font-bold">المستحقات المالية الفصلية</h1>
+                 <Select dir="rtl" value={currentYear.toString()} onValueChange={(value) => setCurrentYear(parseInt(value))}>
                     <SelectTrigger className="w-full md:w-[200px]">
-                        <SelectValue placeholder="عرض حسب الحالة" />
+                        <SelectValue placeholder="اختر السنة" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">عرض الكل</SelectItem>
-                        <SelectItem value="paid">المدفوع فقط</SelectItem>
-                        <SelectItem value="overdue">المتأخر فقط</SelectItem>
+                        {yearOptions.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
                     </SelectContent>
                 </Select>
             </div>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>قائمة مستحقات الطلبة</CardTitle>
+                    <CardTitle>سجل الدفعات لسنة {currentYear}</CardTitle>
                     <CardDescription>
-                        عرض حالة الدفع للطلبة النشطين وتسجيل الدفعات الجديدة.
-                        الأسعار: دفعة أولى ({prices.firstPayment['فئة الأكابر']} / {prices.firstPayment['فئة الأصاغر']} د.ج),
-                        تجديد ({prices.renewal['فئة الأكابر']} / {prices.renewal['فئة الأصاغر']} د.ج).
+                       عرض حالة الدفع لكل فصل من فصول السنة.
+                       الأسعار: دفعة أولى ({prices.firstPayment['فئة الأكابر']}/{prices.firstPayment['فئة الأصاغر']} د.ج),
+                       تجديد ({prices.renewal['فئة الأكابر']}/{prices.renewal['فئة الأصاغر']} د.ج).
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -148,47 +160,52 @@ export default function DuesPage() {
                             <TableRow>
                                 <TableHead>اسم الطالب</TableHead>
                                 <TableHead>الفئة</TableHead>
-                                <TableHead>تاريخ آخر دفعة</TableHead>
-                                <TableHead>المبلغ المطلوب</TableHead>
-                                <TableHead>تاريخ الاستحقاق القادم</TableHead>
-                                <TableHead>الحالة</TableHead>
+                                <TableHead className="text-center">فصل 1</TableHead>
+                                <TableHead className="text-center">فصل 2</TableHead>
+                                <TableHead className="text-center">فصل 3</TableHead>
+                                <TableHead className="text-center">فصل 4</TableHead>
+                                <TableHead>الإجمالي</TableHead>
                                 <TableHead>إجراء</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {studentsWithDues.length > 0 ? studentsWithDues.map(student => (
-                                <TableRow key={student.id} className={student.status === 'overdue' ? 'bg-red-50 dark:bg-red-900/20' : ''}>
+                                <TableRow key={student.id} className={student.totalPaid < student.totalDue ? 'bg-red-50 dark:bg-red-900/20' : ''}>
                                     <TableCell className="font-medium">{student.fullName}</TableCell>
                                     <TableCell>
                                         <Badge variant="secondary">{student.subscriptionTier || 'فئة الأصاغر'}</Badge>
                                     </TableCell>
+                                    {[1, 2, 3, 4].map(q => (
+                                        <TableCell key={q} className="text-center">
+                                            {student.paymentStatus[q] === 'paid' && <CheckCircle className="mx-auto h-5 w-5 text-green-500" />}
+                                            {student.paymentStatus[q] === 'due' && <XCircle className="mx-auto h-5 w-5 text-red-500" />}
+                                            {student.paymentStatus[q] === 'not-applicable' && <span className="text-muted-foreground">-</span>}
+                                        </TableCell>
+                                    ))}
                                     <TableCell>
-                                        {student.lastPaymentDate ? format(student.lastPaymentDate, 'd MMMM yyyy', { locale: ar }) : 'لا يوجد'}
-                                    </TableCell>
-                                    <TableCell className="font-bold">{student.dueAmount} د.ج</TableCell>
-                                     <TableCell>
-                                        {student.nextDueDate ? format(student.nextDueDate, 'd MMMM yyyy', { locale: ar }) : 'N/A'}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant={student.status === 'paid' ? 'default' : 'destructive'}>
-                                            {student.status === 'paid' ? 'مدفوع' : 'متأخر'}
-                                        </Badge>
+                                        <div className="flex flex-col">
+                                           <span>مدفوع: {student.totalPaid} د.ج</span>
+                                           <span className="text-muted-foreground">مستحق: {student.totalDue} د.ج</span>
+                                        </div>
                                     </TableCell>
                                     <TableCell>
-                                        <Button
-                                            size="sm"
-                                            onClick={() => handleRecordPayment(student.id, student.dueAmount)}
-                                            disabled={isProcessing === student.id}
-                                        >
-                                            {isProcessing === student.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <DollarSign className="ml-2 h-4 w-4" />}
-                                            تسجيل دفعة
-                                        </Button>
+                                        {student.nextPayment.quarter > 0 && (
+                                            <Button
+                                                size="sm"
+                                                onClick={() => handleRecordPayment(student.id, student.nextPayment.amount, student.nextPayment.quarter)}
+                                                disabled={isProcessing === student.id}
+                                                variant={student.nextPayment.isFirstPayment ? 'default' : 'secondary'}
+                                            >
+                                                {isProcessing === student.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <DollarSign className="ml-2 h-4 w-4" />}
+                                                {`دفع فصل ${student.nextPayment.quarter} (${student.nextPayment.amount} د.ج)`}
+                                            </Button>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="h-24 text-center">
-                                        {filter === 'all' ? 'لا يوجد طلبة نشطين.' : `لا يوجد طلبة بحالة '${filter === 'paid' ? 'مدفوع' : 'متأخر'}'`}
+                                    <TableCell colSpan={8} className="h-24 text-center">
+                                        لا يوجد طلبة مسجلون في هذه السنة.
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -199,3 +216,5 @@ export default function DuesPage() {
         </div>
     );
 }
+
+    
