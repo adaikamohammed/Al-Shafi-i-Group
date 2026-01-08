@@ -67,6 +67,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
     };
 
+    if (!authContextUser) {
+        resetState();
+        return;
+    }
+
     const handleValueChange = (snapshot: any) => {
         if (!snapshot.exists()) {
             resetState();
@@ -122,7 +127,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             setPayments(allPayments);
             setSettingsState(adminSettings);
 
-        } else if (authContextUser) {
+        } else {
             let userStudents: Student[] = [];
             if (data.students) {
                 userStudents = Object.entries(data.students).map(([id, s]: [string, any]) => ({
@@ -143,17 +148,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
     };
 
-    if (authContextUser) {
-        setLoading(true);
-        const dataPath = isSuperAdmin ? 'users' : `users/${authContextUser.uid}`;
-        dataRef = ref(db, dataPath);
-        valueCallback = onValue(dataRef, handleValueChange, (error) => {
-            console.error(`Firebase read failed: ${error.message}`);
-            setLoading(false);
-        });
-    } else {
-        resetState();
-    }
+    setLoading(true);
+    const dataPath = isSuperAdmin ? 'users' : `users/${authContextUser.uid}`;
+    dataRef = ref(db, dataPath);
+    valueCallback = onValue(dataRef, handleValueChange, (error) => {
+        console.error(`Firebase read failed: ${error.message}`);
+        setLoading(false);
+    });
   
     return () => {
       if (dataRef && valueCallback) {
@@ -347,3 +348,6 @@ export const useStudentContext = () => {
     
 
 
+
+
+    
