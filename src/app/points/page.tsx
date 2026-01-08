@@ -36,7 +36,7 @@ interface Redemption {
 }
 
 export default function PointsSystemPage() {
-    const { students, dailySessions, loading } = useStudentContext();
+    const { students, dailySessions, surahProgress, loading } = useStudentContext();
     const { toast } = useToast();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
     const [spentPoints, setSpentPoints] = useState<Record<string, number>>({});
@@ -49,23 +49,31 @@ export default function PointsSystemPage() {
 
         activeStudents.forEach(student => {
             studentScores[student.id] = 0;
-        });
+            
+            // Points from sessions
+            Object.values(dailySessions ?? {}).forEach(session => {
+                (session.records ?? []).forEach(record => {
+                    if (record.studentId === student.id) {
+                        let points = 0;
+                        if (record.attendance) points += pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] ?? 0;
+                        if (record.memorization) points += pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] ?? 0;
+                        if (record.behavior) points += pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] ?? 0;
+                        if (record.review) points += pointsConfig.review.completed;
+                        studentScores[student.id] += points;
+                    }
+                });
+            });
 
-        Object.values(dailySessions ?? {}).forEach(session => {
-            (session.records ?? []).forEach(record => {
-                if (studentScores[record.studentId] !== undefined) {
-                    let points = 0;
-                    if (record.attendance) points += pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] ?? 0;
-                    if (record.memorization) points += pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] ?? 0;
-                    if (record.behavior) points += pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] ?? 0;
-                    if (record.review) points += pointsConfig.review.completed;
-                    studentScores[record.studentId] += points;
-                }
+            // Points from Surah mastery
+            const progress = surahProgress ? (surahProgress[student.id] || {}) : {};
+            Object.values(progress).forEach(status => {
+                if (status === 1) studentScores[student.id] += 20; // Memorized
+                if (status === 2) studentScores[student.id] += (20 + 50); // Memorized + Mastered
             });
         });
-
+        
         return studentScores;
-    }, [activeStudents, dailySessions]);
+    }, [activeStudents, dailySessions, surahProgress]);
 
     const studentCurrentBalance = useMemo(() => {
         if (!selectedStudentId) return 0;
@@ -232,3 +240,5 @@ export default function PointsSystemPage() {
         </div>
     );
 }
+
+    

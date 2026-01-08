@@ -9,6 +9,7 @@ import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/lib/firebase';
 import { ref, set, onValue, off, remove, DatabaseReference } from 'firebase/database';
+import { useToast } from '@/hooks/use-toast';
 
 interface StudentContextType {
   students: Student[];
@@ -39,6 +40,7 @@ const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const { user: authContextUser, loading: authLoading, isSuperAdmin } = useAuth();
+  const { toast } = useToast();
   
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
@@ -287,6 +289,20 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const nextStatus = (currentStatus + 1) % 3;
     studentProgressMap[surahId] = nextStatus;
     
+    // Point logic
+    if (currentStatus === 0 && nextStatus === 1) {
+      toast({ title: '✅ +20 نقطة', description: 'تم إضافة نقاط للحفظ الجديد.' });
+    } else if (currentStatus === 1 && nextStatus === 2) {
+      toast({ title: '✅ +50 نقطة', description: 'تم إضافة نقاط للإتقان.' });
+    } else if (currentStatus === 2 && nextStatus === 0) {
+      toast({ title: '🔄 -70 نقطة', description: 'تم خصم نقاط الحفظ والإتقان.', variant: 'destructive' });
+    } else if (currentStatus === 1 && nextStatus === 0) {
+        toast({ title: '🔄 -20 نقطة', description: 'تم خصم نقاط الحفظ.', variant: 'destructive' });
+    } else if (currentStatus === 2 && nextStatus === 1) {
+        toast({ title: '🔄 -50 نقطة', description: 'تم خصم نقاط الإتقان.', variant: 'destructive' });
+    }
+
+
     if (nextStatus === 0) {
         delete studentProgressMap[surahId];
     }
@@ -345,3 +361,5 @@ export const useStudentContext = () => {
   return context;
 };
 
+
+    
