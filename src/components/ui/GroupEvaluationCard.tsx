@@ -28,7 +28,7 @@ const calculateSentimentForWeek = (
     weekEndDate: Date
 ) => {
     const activeStudents = (students ?? []).filter(s => s.status === 'نشط');
-    if (activeStudents.length === 0) return 0;
+    if (activeStudents.length === 0) return { score: 0, attendanceRate: 0, badBehaviorCount: 0 };
     
     const weeklySessions = Object.values(sessions).filter(s => {
         const sessionDate = parseISO(s.date);
@@ -45,10 +45,12 @@ const calculateSentimentForWeek = (
     const totalPossibleAttendances = weeklySessions.filter(s => s.sessionType !== 'يوم عطلة').length * activeStudents.length;
     const totalActualAttendances = records.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
     const attendanceScore = totalPossibleAttendances > 0 ? (totalActualAttendances / totalPossibleAttendances) * 40 : 0;
+    const attendanceRate = totalPossibleAttendances > 0 ? (totalActualAttendances / totalPossibleAttendances) * 100 : 0;
 
     const totalBehaviorRecords = records.filter(r => r.behavior).length;
     const positiveBehavior = records.filter(r => r.behavior === 'هادئ').length;
     const neutralBehavior = records.filter(r => r.behavior === 'متوسط').length;
+    const badBehaviorCount = records.filter(r => r.behavior === 'غير منضبط').length;
     const disciplineScore = totalBehaviorRecords > 0 ? ((positiveBehavior * 1 + neutralBehavior * 0.5) / totalBehaviorRecords) * 30 : 0;
     
     const positiveReports = weeklyReports.filter(r => POSITIVE_REPORT_CATEGORIES.includes(r.category)).length;
@@ -59,7 +61,7 @@ const calculateSentimentForWeek = (
         reportScore = Math.max(0, Math.min(30, reportScore));
     }
     
-    return attendanceScore + disciplineScore + reportScore;
+    return { score: attendanceScore + disciplineScore + reportScore, attendanceRate, badBehaviorCount };
 }
 
 
@@ -70,7 +72,7 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
             const weekEndDate = endOfWeek(subWeeks(new Date(), i), { weekStartsOn: 6 });
             const weekStartDate = startOfWeek(weekEndDate, { weekStartsOn: 6 });
             
-            const score = calculateSentimentForWeek(students, sessions, reports, weekStartDate, weekEndDate);
+            const { score } = calculateSentimentForWeek(students, sessions, reports, weekStartDate, weekEndDate);
             
             return {
                 name: format(weekStartDate, 'dd/MM', { locale: ar }),
@@ -85,22 +87,16 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
         const weekStartDate = startOfWeek(today, { weekStartsOn: 6 });
         const weekEndDate = endOfWeek(today, { weekStartsOn: 6 });
 
-        const sentimentIndex = calculateSentimentForWeek(students, sessions, reports, weekStartDate, weekEndDate);
-        
-        const weeklyRecords = Object.values(sessions).filter(s => {
-            const sessionDate = parseISO(s.date);
-            return sessionDate >= weekStartDate && sessionDate <= weekEndDate;
-        }).flatMap(s => s.records ?? []);
-
-        const attendanceRate = weeklyRecords.length > 0 ? (weeklyRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length / weeklyRecords.length) * 100 : 0;
+        const { score, attendanceRate, badBehaviorCount } = calculateSentimentForWeek(students, sessions, reports, weekStartDate, weekEndDate);
 
         return {
-            sentimentIndex,
+            sentimentIndex: score,
             attendanceRate,
+            badBehaviorCount
         };
     }, [students, sessions, reports]);
 
-    const evaluateGroupPerformance = (sentimentIndex: number, attendanceRate: number) => {
+    const evaluateGroupPerformance = (sentimentIndex: number, attendanceRate: number, badBehaviorCount: number) => {
         let rating: string;
         let suggestions: string[] = [];
         let icon: React.ReactNode;
@@ -114,20 +110,32 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
             rating = "جيد ومستقر";
             ratingText = "أداء مستقر، نحتاج لدفعة بسيطة نحو التميز.";
             icon = <Smile className="h-10 w-10 text-blue-500" />;
+             if (badBehaviorCount > 2) {
+                suggestions.push("📈 لوحظ تكرار السلوك غير المنضبط. قد يكون من الجيد تخصيص وقت للتوجيه.");
+            }
         } else {
             rating = "بحاجة لتحسين";
             ratingText = "مؤشر الالتزام في هبوط.. ربما حان وقت مكافأة أو نشاط لكسر الروتين.";
             icon = <Frown className="h-10 w-10 text-red-500" />;
         }
         
-        if (attendanceRate < 75 && sentimentIndex < 85) {
+        if (attendanceRate < 75) {
             suggestions.push("📉 نسبة الحضور منخفضة. يُنصح بالتواصل مع أولياء أمور الطلبة الأكثر غيابًا.");
+        }
+
+        const weeklyMasteryChange = 0; // Placeholder logic
+        if (weeklyMasteryChange < 0 && sentimentIndex < 85) {
+            suggestions.push("📚 الحفظ في تباطؤ. ربما يحتاج الطلاب لمسابقة سريعة لتحفيزهم.");
         }
         
         return { rating, suggestions, icon, ratingText };
     }
 
-    const { rating, suggestions, icon, ratingText } = evaluateGroupPerformance(currentSentimentData.sentimentIndex, currentSentimentData.attendanceRate);
+    const { rating, suggestions, icon, ratingText } = evaluateGroupPerformance(
+        currentSentimentData.sentimentIndex, 
+        currentSentimentData.attendanceRate,
+        currentSentimentData.badBehaviorCount
+    );
     
     const getRatingBadgeClass = (currentRating: string) => {
         switch(currentRating) {
@@ -140,7 +148,7 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
     
     if (Object.keys(sessions).length === 0) {
         return (
-            <Card className="md:col-span-2">
+            <Card className="md:col-span-2 lg:col-span-4">
                  <CardHeader>
                     <div className="flex items-center gap-2">
                         <Bot className="h-6 w-6 text-primary" />
@@ -157,7 +165,7 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
     }
 
     return (
-        <Card className="md:col-span-2">
+        <Card className="md:col-span-2 lg:col-span-4">
             <CardHeader>
                 <div className="flex items-center gap-2">
                     <Bot className="h-6 w-6 text-primary" />
@@ -204,6 +212,14 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
                     </div>
                 </div>
             </CardContent>
+            {suggestions.length > 0 && (
+                <div className="p-4 border-t space-y-2">
+                    <h4 className="font-semibold flex items-center gap-2"><Lightbulb className="text-yellow-500" /> نصائح ذكية</h4>
+                    <ul className="list-disc pr-5 space-y-1 text-sm text-muted-foreground">
+                        {suggestions.map((tip, i) => <li key={i}>{tip}</li>)}
+                    </ul>
+                </div>
+            )}
         </Card>
     );
 }

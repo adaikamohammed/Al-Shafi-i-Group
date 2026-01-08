@@ -126,6 +126,13 @@ export default function OverviewPage() {
             </div>
             
             {!isSuperAdmin && <DailyChecklist />}
+
+             <GroupEvaluationCard 
+                students={students ?? []} 
+                sessions={dailySessions} 
+                reports={Object.values(dailyReports).flatMap(day => Object.values(day))}
+                groupName={isSuperAdmin ? "كل الأفواج" : user?.group} 
+             />
             
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <Card className="shadow-lg rounded-2xl bg-gradient-to-tr from-blue-100 to-blue-200 dark:from-blue-900/50 dark:to-blue-950/50">
@@ -195,13 +202,6 @@ export default function OverviewPage() {
                     </CardContent>
                 </Card>
             </div>
-            
-             <GroupEvaluationCard 
-                students={students ?? []} 
-                sessions={dailySessions} 
-                reports={Object.values(dailyReports).flatMap(day => Object.values(day))}
-                groupName={isSuperAdmin ? "كل الأفواج" : user?.group} 
-             />
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
                 <div className="col-span-1 lg:col-span-4">
