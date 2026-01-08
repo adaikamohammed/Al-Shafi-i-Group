@@ -50,26 +50,32 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   
  useEffect(() => {
     if (authLoading) {
-        setLoading(true);
-        return;
+      setLoading(true);
+      return;
     }
+
     if (!authContextUser) {
-        setLoading(false);
-        setStudents([]); setDailySessions({}); setDailyReports({});
-        setSurahProgress({}); setPayments([]); setSettingsState(null);
-        return;
+      setLoading(false);
+      setStudents([]);
+      setDailySessions({});
+      setDailyReports({});
+      setSurahProgress({});
+      setPayments([]);
+      setSettingsState(null);
+      return;
     }
 
     setLoading(true);
-    
+
     let dataRef: DatabaseReference;
-    let valueCallback: (snapshot: any) => void;
+    let listener: () => void;
 
     if (isSuperAdmin) {
       dataRef = ref(db, 'users');
-      valueCallback = (snapshot: any) => {
+      listener = onValue(dataRef, (snapshot) => {
         if (!snapshot.exists()) {
-            setLoading(false); return;
+          setLoading(false);
+          return;
         }
         const allUsersData = snapshot.val();
         let allStudents: Student[] = [];
@@ -80,31 +86,31 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         let adminSettings: AppSettings | null = null;
 
         for (const uid in allUsersData) {
-            const userData = allUsersData[uid];
-            if(userData.profile?.role === 'super_admin' && userData.settings) {
-                adminSettings = userData.settings;
+          const userData = allUsersData[uid];
+          if (userData.profile?.role === 'super_admin' && userData.settings) {
+            adminSettings = userData.settings;
+          }
+          if (userData.students) {
+            const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) => ({
+              ...s, id, ownerId: uid, groupName: userData.profile?.group || 'غير محدد',
+              birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+              registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+              updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+            }));
+            allStudents.push(...userStudents);
+          }
+          if (userData.dailySessions) Object.assign(allSessions, userData.dailySessions);
+          if (userData.dailyReports) {
+            for (const date in userData.dailyReports) {
+              if (!allReports[date]) allReports[date] = {};
+              Object.assign(allReports[date], userData.dailyReports[date]);
             }
-            if (userData.students) {
-                const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) => ({
-                    ...s, id, ownerId: uid, groupName: userData.profile?.group || 'غير محدد',
-                    birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-                    registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-                    updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-                }));
-                allStudents.push(...userStudents);
-            }
-            if(userData.dailySessions) Object.assign(allSessions, userData.dailySessions);
-            if(userData.dailyReports) {
-                for(const date in userData.dailyReports) {
-                    if(!allReports[date]) allReports[date] = {};
-                    Object.assign(allReports[date], userData.dailyReports[date]);
-                }
-            }
-            if(userData.surahProgress) Object.assign(allProgress, userData.surahProgress);
-            if(userData.payments) {
-                const userPayments = Object.entries(userData.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) }));
-                allPayments.push(...userPayments);
-            }
+          }
+          if (userData.surahProgress) Object.assign(allProgress, userData.surahProgress);
+          if (userData.payments) {
+            const userPayments = Object.entries(userData.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) }));
+            allPayments.push(...userPayments);
+          }
         }
         setStudents(allStudents);
         setDailySessions(allSessions);
@@ -113,22 +119,29 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setPayments(allPayments);
         setSettingsState(adminSettings);
         setLoading(false);
-      };
+      }, (error) => {
+        console.error(`Firebase read failed for super_admin: ${error.message}`);
+        setLoading(false);
+      });
+
     } else {
       dataRef = ref(db, `users/${authContextUser.uid}`);
-      valueCallback = (snapshot: any) => {
+      listener = onValue(dataRef, (snapshot) => {
         if (!snapshot.exists()) {
-             setLoading(false); return;
+          setLoading(false);
+          setStudents([]); setDailySessions({}); setDailyReports({});
+          setSurahProgress({}); setPayments([]); setSettingsState(null);
+          return;
         }
         const data = snapshot.val();
         let userStudents: Student[] = [];
         if (data.students) {
-            userStudents = Object.entries(data.students).map(([id, s]: [string, any]) => ({
-                ...s, id, ownerId: authContextUser.uid,
-                birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-                registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-                updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-            }));
+          userStudents = Object.entries(data.students).map(([id, s]: [string, any]) => ({
+            ...s, id, ownerId: authContextUser.uid,
+            birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+            registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+            updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+          }));
         }
         const paymentsArray = data.payments ? Object.entries(data.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : [];
         setStudents(userStudents);
@@ -138,16 +151,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setPayments(paymentsArray);
         setSettingsState(data.settings || null);
         setLoading(false);
-      };
-    }
-    
-    const listener = onValue(dataRef, valueCallback, (error) => {
-        console.error(`Firebase read failed: ${error.message}`);
+      }, (error) => {
+        console.error(`Firebase read failed for user ${authContextUser.uid}: ${error.message}`);
         setLoading(false);
-    });
-  
+      });
+    }
+
     return () => {
-        off(dataRef, 'value', listener);
+      off(dataRef, 'value', listener);
     };
   }, [authContextUser, authLoading, isSuperAdmin]);
 
