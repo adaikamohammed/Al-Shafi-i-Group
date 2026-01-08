@@ -15,6 +15,7 @@ import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { SmartAlerts } from '@/components/ui/SmartAlerts';
 import { AttendanceChart } from '@/components/ui/AttendanceChart';
+import { DailyChecklist } from '@/components/ui/DailyChecklist';
 
 
 export default function OverviewPage() {
@@ -122,6 +123,8 @@ export default function OverviewPage() {
                 </div>
             </div>
             
+            {!isSuperAdmin && <DailyChecklist />}
+            
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <Card className="shadow-lg rounded-2xl bg-gradient-to-tr from-blue-100 to-blue-200 dark:from-blue-900/50 dark:to-blue-950/50">
                     <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
@@ -201,4 +204,3 @@ export default function OverviewPage() {
     );
 }
 
-    
