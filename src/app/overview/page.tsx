@@ -18,7 +18,7 @@ import { AttendanceChart } from '@/components/ui/AttendanceChart';
 
 
 export default function OverviewPage() {
-    const { students, dailySessions, payments, loading, settings } = useStudentContext();
+    const { students, dailySessions, dailyReports, payments, loading, settings } = useStudentContext();
     const { user, isSuperAdmin } = useAuth();
     
     const TIER_PRICES = settings?.prices || {
@@ -193,7 +193,12 @@ export default function OverviewPage() {
                 </Card>
             </div>
             
-             <GroupEvaluationCard students={students ?? []} sessions={Object.values(dailySessions)} groupName={isSuperAdmin ? "كل الأفواج" : user?.group} />
+             <GroupEvaluationCard 
+                students={students ?? []} 
+                sessions={Object.values(dailySessions)} 
+                reports={Object.values(dailyReports).flatMap(day => Object.values(day))}
+                groupName={isSuperAdmin ? "كل الأفواج" : user?.group} 
+             />
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
                 <div className="col-span-1 lg:col-span-4">
