@@ -1,10 +1,9 @@
 
 "use client";
 
-import type { Metadata } from 'next';
 import '../../app/globals.css';
 import { Toaster } from '@/components/ui/toaster';
-import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
@@ -12,8 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import React, { useEffect, useMemo } from 'react';
-import { useAuth } from '@/context/AuthContext';
-
+import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { StudentProvider } from '@/context/StudentContext';
 
 const allNavItems = [
   { href: '/', label: 'إدارة الطلبة', icon: Users },
@@ -31,7 +30,7 @@ const allNavItems = [
   { href: '/settings', label: 'الإعدادات', icon: Settings },
 ];
 
-export function AuthWrapper({ children }: { children: React.ReactNode }) {
+function AppContent({ children }: { children: React.ReactNode }) {
     const { user, loading: authLoading, logout, isSuperAdmin } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
@@ -44,6 +43,18 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
         return allNavItems;
     }, [isSuperAdmin]);
     
+    useEffect(() => {
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js').then(registration => {
+            console.log('SW registered: ', registration);
+          }).catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+        });
+      }
+    }, []);
+
     useEffect(() => {
         if (!authLoading && !user && pathname !== '/login') {
             router.push('/login');
@@ -70,7 +81,7 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
     }
 
      if (pathname === '/login') {
-        return children;
+        return <>{children}</>;
     }
 
     const sidebarContent = (
@@ -116,7 +127,7 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
         <SidebarProvider>
             {isMobile ? (
               <Sheet>
-                <div className="flex flex-col">
+                <div className="flex flex-col min-h-screen">
                   <header className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
                     <div className="flex items-center gap-2">
                         <SheetTrigger asChild>
@@ -126,7 +137,7 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
                           </Button>
                         </SheetTrigger>
                         <h1 className="font-headline text-lg font-semibold text-primary">
-                          {user?.group ? `إدارة ${user.group}` : 'مدرسة الإمام الشافعي'}
+                          {navItems.find(item => item.href === pathname)?.label || 'مدرسة الشافعي'}
                         </h1>
                     </div>
                   </header>
@@ -143,14 +154,23 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
                 <Sidebar side="right">
                   {sidebarContent}
                 </Sidebar>
-                <SidebarInset>
-                  <main className="p-4 sm:p-6 lg:p-8">
-                    {children}
-                  </main>
-                </SidebarInset>
+                <main className="md:pl-[var(--sidebar-width)] p-4 sm:p-6 lg:p-8">
+                  {children}
+                </main>
               </>
             )}
             <Toaster />
           </SidebarProvider>
     )
+}
+
+
+export function AuthWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthProvider>
+        <StudentProvider>
+            <AppContent>{children}</AppContent>
+        </StudentProvider>
+    </AuthProvider>
+  )
 }
