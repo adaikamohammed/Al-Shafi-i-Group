@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,7 +14,7 @@ interface StudentContextType {
   students: Student[];
   dailySessions: Record<string, DailySession>;
   dailyReports: { [date: string]: { [reportId: string]: DailyReport } };
-  surahProgress: Record<string, number[]>;
+  surahProgress: Record<string, SurahMastery>;
   payments: Payment[];
   settings: AppSettings | null;
   loading: boolean;
@@ -43,7 +43,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
   const [dailyReports, setDailyReports] = useState<{ [date: string]: { [reportId: string]: DailyReport } }>({});
-  const [surahProgress, setSurahProgress] = useState<Record<string, number[]>>({});
+  const [surahProgress, setSurahProgress] = useState<Record<string, SurahMastery>>({});
   const [payments, setPayments] = useState<Payment[]>([]);
   const [settings, setSettingsState] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +81,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         let allStudents: Student[] = [];
         let allSessions: Record<string, DailySession> = {};
         let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
-        let allProgress: Record<string, number[]> = {};
+        let allProgress: Record<string, SurahMastery> = {};
         let allPayments: Payment[] = [];
         let adminSettings: AppSettings | null = null;
 
@@ -281,19 +281,21 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const studentOwnerId = students.find(s => s.id === studentId)?.ownerId;
     if(authContextUser.uid !== studentOwnerId) return;
 
-    const studentProgressList = [...(surahProgress[studentId] || [])];
-    const surahIndex = studentProgressList.indexOf(surahId);
+    const studentProgressMap = { ...(surahProgress[studentId] || {}) };
+    const currentStatus = studentProgressMap[surahId] || 0; // 0: not memorized, 1: memorized, 2: mastered
 
-    if (surahIndex > -1) {
-        studentProgressList.splice(surahIndex, 1);
-    } else {
-        studentProgressList.push(surahId);
+    const nextStatus = (currentStatus + 1) % 3;
+    studentProgressMap[surahId] = nextStatus;
+    
+    if (nextStatus === 0) {
+        delete studentProgressMap[surahId];
     }
-    
+
     const surahProgressRef = ref(db, `users/${authContextUser.uid}/surahProgress/${studentId}`);
-    set(surahProgressRef, studentProgressList);
+    set(surahProgressRef, studentProgressMap);
     
-    updateStudent(studentId, { memorizedSurahsCount: studentProgressList.length }, authContextUser.uid);
+    const memorizedCount = Object.values(studentProgressMap).filter(status => status > 0).length;
+    updateStudent(studentId, { memorizedSurahsCount: memorizedCount }, authContextUser.uid);
   }
 
   const addPayment = async (paymentData: Omit<Payment, 'id'>) => {

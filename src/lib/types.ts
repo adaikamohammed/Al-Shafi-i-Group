@@ -69,6 +69,8 @@ export type SurahStatus =
   | "مراجعة جماعية"
   | "مؤجلة مؤقتًا";
 
+export type SurahMastery = Record<number, 0 | 1 | 2>; // 0: not memorized, 1: memorized, 2: mastered
+
 export interface SurahProgress {
     studentId: string;
     surahId: number;

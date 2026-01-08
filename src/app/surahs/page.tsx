@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { useStudentContext } from '@/context/StudentContext';
 import { surahs as allSurahs } from '@/lib/surahs';
 import { cn } from '@/lib/utils';
-import { Loader2, AlertTriangle, CheckCircle, Award } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, Award, Check } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -26,20 +26,34 @@ export default function SurahProgressPage() {
     }, [activeStudents, selectedStudentId]);
 
     const studentProgress = useMemo(() => {
-        if (!selectedStudentId || !surahProgress) return [];
-        return surahProgress[selectedStudentId] || [];
+        if (!selectedStudentId || !surahProgress) return {};
+        return surahProgress[selectedStudentId] || {};
     }, [surahProgress, selectedStudentId]);
 
-    const progressPercentage = useMemo(() => {
-        if (studentProgress.length === 0) return 0;
-        return (studentProgress.length / allSurahs.length) * 100;
+    const progressCounts = useMemo(() => {
+        const memorized = Object.values(studentProgress).filter(s => s === 1).length;
+        const mastered = Object.values(studentProgress).filter(s => s === 2).length;
+        return { memorized, mastered, total: memorized + mastered };
     }, [studentProgress]);
+
+    const progressPercentage = useMemo(() => {
+        if (progressCounts.total === 0) return { memorized: 0, mastered: 0 };
+        const total = allSurahs.length;
+        return {
+            memorized: (progressCounts.memorized / total) * 100,
+            mastered: (progressCounts.mastered / total) * 100
+        };
+    }, [progressCounts]);
     
     const leaderboard = useMemo(() => {
-        return activeStudents.map(student => ({
-            ...student,
-            savedCount: (surahProgress && surahProgress[student.id]?.length) || 0
-        })).sort((a,b) => b.savedCount - a.savedCount);
+        return activeStudents.map(student => {
+             const progress = surahProgress ? (surahProgress[student.id] || {}) : {};
+             const savedCount = Object.values(progress).filter(status => status > 0).length;
+             return {
+                ...student,
+                savedCount,
+            }
+        }).sort((a,b) => b.savedCount - a.savedCount);
     }, [activeStudents, surahProgress]);
 
     const handleSurahClick = (surahId: number) => {
@@ -79,9 +93,9 @@ export default function SurahProgressPage() {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-3xl font-headline font-bold">📖 متابعة حفظ السور</CardTitle>
+                    <CardTitle className="text-3xl font-headline font-bold">📖 متابعة الحفظ والإتقان</CardTitle>
                     <CardDescription>
-                        حدد طالبًا لعرض وتحديث السور التي حفظها. اضغط على السورة لتبديل حالتها بين 'محفوظة' و 'غير محفوظة'.
+                        حدد طالبًا، ثم انقر على السورة لتغيير حالتها: <span className="p-1 rounded-md bg-gray-200">غير محفوظة</span> &larr; <span className="p-1 rounded-md bg-green-200 text-green-800">محفوظة</span> &larr; <span className="p-1 rounded-md bg-green-600 text-white">متقنة</span>
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -103,11 +117,24 @@ export default function SurahProgressPage() {
                         {selectedStudent && (
                              <div className="space-y-2">
                                 <div className="flex justify-between text-sm font-medium">
-                                    <span>معدل تقدم: {selectedStudent.fullName}</span>
-                                    <span className="text-muted-foreground">{studentProgress.length} من {allSurahs.length} سورة</span>
+                                    <span>تقدم الطالب: {selectedStudent.fullName}</span>
+                                    <span className="text-muted-foreground">{progressCounts.total} من {allSurahs.length} سورة</span>
                                 </div>
-                                <Progress value={progressPercentage} />
-                                <p className="text-xs text-center text-primary font-semibold">{progressPercentage.toFixed(1)}%</p>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger>
+                                            <Progress className="h-3">
+                                                 <Progress value={progressPercentage.mastered + progressPercentage.memorized} className="bg-green-300" />
+                                                 <Progress value={progressPercentage.mastered} className="bg-green-600 -mt-3" />
+                                            </Progress>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>المجموع: {progressCounts.total} ({((progressCounts.total / allSurahs.length) * 100).toFixed(1)}%)</p>
+                                            <p className="text-green-800">محفوظ: {progressCounts.memorized}</p>
+                                            <p className="text-green-600 font-bold">متقن: {progressCounts.mastered}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </div>
                         )}
                     </div>
@@ -118,7 +145,7 @@ export default function SurahProgressPage() {
                  <Card>
                     <CardHeader>
                         <CardTitle>🏆 لوحة شرف الحفظ</CardTitle>
-                        <CardDescription>ترتيب الطلبة حسب عدد السور المحفوظة.</CardDescription>
+                        <CardDescription>ترتيب الطلبة حسب عدد السور المحفوظة والمتقنة.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Table>
@@ -126,7 +153,7 @@ export default function SurahProgressPage() {
                                 <TableRow>
                                     <TableHead>الترتيب</TableHead>
                                     <TableHead>الطالب</TableHead>
-                                    <TableHead>السور</TableHead>
+                                    <TableHead>الإجمالي</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -174,7 +201,7 @@ export default function SurahProgressPage() {
 
                  <Card>
                     <CardHeader>
-                        <CardTitle>قائمة السور الكاملة</CardTitle>
+                        <CardTitle>خريطة المصحف</CardTitle>
                          <CardDescription>
                             انقر على اسم السورة لتغيير حالة حفظها للطالب المحدد.
                          </CardDescription>
@@ -182,20 +209,25 @@ export default function SurahProgressPage() {
                     <CardContent>
                         <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3">
                             {allSurahs.map(surah => {
-                                const isSaved = studentProgress.includes(surah.id);
+                                const status = studentProgress[surah.id] || 0;
+                                let buttonClass = "bg-gray-200 hover:bg-gray-300 text-gray-800";
+                                if (status === 1) buttonClass = "bg-green-200 hover:bg-green-300 text-green-800";
+                                if (status === 2) buttonClass = "bg-green-600 hover:bg-green-700 text-white";
+                                
                                 return (
                                     <Button
                                         key={surah.id}
-                                        variant={isSaved ? "default" : "outline"}
+                                        variant="outline"
                                         onClick={() => handleSurahClick(surah.id)}
                                         disabled={!selectedStudentId}
-                                        className="h-auto justify-between"
+                                        className={cn("h-auto justify-between transition-colors duration-300", buttonClass)}
                                     >
                                         <div className="flex items-center gap-2">
-                                            {isSaved && <CheckCircle className="h-4 w-4" />}
+                                            {status === 1 && <Check className="h-4 w-4" />}
+                                            {status === 2 && <CheckCircle className="h-4 w-4" />}
                                             <span>{surah.id}. {surah.name}</span>
                                         </div>
-                                        <span className="text-xs text-muted-foreground">{surah.verses}</span>
+                                        <span className="text-xs opacity-70">{surah.verses}</span>
                                     </Button>
                                 )
                             })}
