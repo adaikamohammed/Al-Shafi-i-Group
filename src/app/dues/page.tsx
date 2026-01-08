@@ -375,4 +375,3 @@ export default function DuesPage() {
         </div>
     );
 }
-

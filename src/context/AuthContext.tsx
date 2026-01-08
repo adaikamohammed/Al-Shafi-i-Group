@@ -56,7 +56,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         let appUser: AppUser;
         if (snapshot.exists()) {
-            appUser = { uid: currentUser.uid, ...snapshot.val() };
+            const profileData = snapshot.val();
+            appUser = { 
+                uid: currentUser.uid,
+                email: currentUser.email,
+                displayName: profileData.displayName,
+                photoURL: currentUser.photoURL,
+                group: profileData.group,
+                role: profileData.role 
+            };
         } else {
              const sheikhInfo = sheikhInitialData[currentUser.email || ''] || { name: currentUser.displayName || 'مستخدم جديد', group: 'فوج غير محدد', role: 'sheikh' };
              appUser = {
