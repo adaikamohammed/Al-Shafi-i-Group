@@ -39,7 +39,10 @@ export default function OverviewPage() {
         let attendancePercentage = 0;
         if (todaySession && todaySession.records && activeStudents.length > 0 && todaySession.sessionType !== 'يوم عطلة') {
             const presentCount = todaySession.records.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
-            attendancePercentage = (presentCount / activeStudents.length) * 100;
+            const relevantStudentsCount = todaySession.records.length;
+            if (relevantStudentsCount > 0) {
+              attendancePercentage = (presentCount / relevantStudentsCount) * 100;
+            }
         }
 
         // New Students
@@ -195,7 +198,7 @@ export default function OverviewPage() {
             
              <GroupEvaluationCard 
                 students={students ?? []} 
-                sessions={Object.values(dailySessions)} 
+                sessions={dailySessions} 
                 reports={Object.values(dailyReports).flatMap(day => Object.values(day))}
                 groupName={isSuperAdmin ? "كل الأفواج" : user?.group} 
              />

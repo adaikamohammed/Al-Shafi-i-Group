@@ -5,11 +5,14 @@ import React, { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { Student, DailySession, DailyReport } from '@/lib/types';
-import { Bot, Lightbulb, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
+import { Bot, Lightbulb, AlertTriangle, TrendingUp, TrendingDown, Smile, Frown, Meh } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { format, startOfWeek, endOfWeek, subWeeks, parseISO } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 interface GroupEvaluationCardProps {
     students: Student[];
-    sessions: DailySession[];
+    sessions: Record<string, DailySession>;
     reports: DailyReport[];
     groupName?: string | null;
 }
@@ -17,85 +20,114 @@ interface GroupEvaluationCardProps {
 const POSITIVE_REPORT_CATEGORIES = ["شكر", "اقتراح"];
 const NEGATIVE_REPORT_CATEGORIES = ["شكوى"];
 
+const calculateSentimentForWeek = (
+    students: Student[], 
+    sessions: Record<string, DailySession>, 
+    reports: DailyReport[], 
+    weekStartDate: Date, 
+    weekEndDate: Date
+) => {
+    const activeStudents = (students ?? []).filter(s => s.status === 'نشط');
+    if (activeStudents.length === 0) return 0;
+    
+    const weeklySessions = Object.values(sessions).filter(s => {
+        const sessionDate = parseISO(s.date);
+        return sessionDate >= weekStartDate && sessionDate <= weekEndDate;
+    });
+
+    const weeklyReports = reports.filter(r => {
+        const reportDate = parseISO(r.date);
+        return reportDate >= weekStartDate && reportDate <= weekEndDate;
+    });
+
+    const records = weeklySessions.flatMap(s => s.records ?? []);
+    
+    const totalPossibleAttendances = weeklySessions.filter(s => s.sessionType !== 'يوم عطلة').length * activeStudents.length;
+    const totalActualAttendances = records.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
+    const attendanceScore = totalPossibleAttendances > 0 ? (totalActualAttendances / totalPossibleAttendances) * 40 : 0;
+
+    const totalBehaviorRecords = records.filter(r => r.behavior).length;
+    const positiveBehavior = records.filter(r => r.behavior === 'هادئ').length;
+    const neutralBehavior = records.filter(r => r.behavior === 'متوسط').length;
+    const disciplineScore = totalBehaviorRecords > 0 ? ((positiveBehavior * 1 + neutralBehavior * 0.5) / totalBehaviorRecords) * 30 : 0;
+    
+    const positiveReports = weeklyReports.filter(r => POSITIVE_REPORT_CATEGORIES.includes(r.category)).length;
+    const negativeReports = weeklyReports.filter(r => NEGATIVE_REPORT_CATEGORIES.includes(r.category)).length;
+    let reportScore = 15;
+    if (weeklyReports.length > 0) {
+        reportScore = 15 + (positiveReports * 5) - (negativeReports * 5);
+        reportScore = Math.max(0, Math.min(30, reportScore));
+    }
+    
+    return attendanceScore + disciplineScore + reportScore;
+}
+
+
 export function GroupEvaluationCard({ students, sessions, reports, groupName }: GroupEvaluationCardProps) {
 
-    const evaluationData = useMemo(() => {
-        const activeStudents = (students ?? []).filter(s => s.status === 'نشط');
-        if (activeStudents.length === 0 || sessions.length === 0) return null;
+    const weeklySentiments = useMemo(() => {
+        const data = Array.from({ length: 4 }).map((_, i) => {
+            const weekEndDate = endOfWeek(subWeeks(new Date(), i), { weekStartsOn: 6 });
+            const weekStartDate = startOfWeek(weekEndDate, { weekStartsOn: 6 });
+            
+            const score = calculateSentimentForWeek(students, sessions, reports, weekStartDate, weekEndDate);
+            
+            return {
+                name: format(weekStartDate, 'dd/MM', { locale: ar }),
+                score: parseFloat(score.toFixed(1)),
+            };
+        }).reverse();
+        return data;
+    }, [students, sessions, reports]);
 
-        const records = (sessions ?? []).flatMap(s => s.records ?? []);
-        
-        // Attendance Score (40%)
-        const totalPossibleAttendances = (sessions ?? []).filter(s => s.sessionType !== 'يوم عطلة').length * activeStudents.length;
-        const totalActualAttendances = records.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
-        const attendanceScore = totalPossibleAttendances > 0 ? (totalActualAttendances / totalPossibleAttendances) * 40 : 0;
+    const currentSentimentData = useMemo(() => {
+        const today = new Date();
+        const weekStartDate = startOfWeek(today, { weekStartsOn: 6 });
+        const weekEndDate = endOfWeek(today, { weekStartsOn: 6 });
 
-        // Discipline Score (30%)
-        const totalBehaviorRecords = records.filter(r => r.behavior).length;
-        const positiveBehavior = records.filter(r => r.behavior === 'هادئ').length;
-        const neutralBehavior = records.filter(r => r.behavior === 'متوسط').length;
-        const disciplineScore = totalBehaviorRecords > 0 ? ((positiveBehavior * 1 + neutralBehavior * 0.5) / totalBehaviorRecords) * 30 : 0;
+        const sentimentIndex = calculateSentimentForWeek(students, sessions, reports, weekStartDate, weekEndDate);
         
-        // Reports/Feedback Score (30%)
-        const positiveReports = (reports ?? []).filter(r => POSITIVE_REPORT_CATEGORIES.includes(r.category)).length;
-        const negativeReports = (reports ?? []).filter(r => NEGATIVE_REPORT_CATEGORIES.includes(r.category)).length;
-        let reportScore = 15; // Start with neutral 15/30
-        if (reports.length > 0) {
-            reportScore = 15 + (positiveReports * 5) - (negativeReports * 5);
-            reportScore = Math.max(0, Math.min(30, reportScore)); // Clamp between 0 and 30
-        }
-        
-        const sentimentIndex = attendanceScore + disciplineScore + reportScore;
-        
+        const weeklyRecords = Object.values(sessions).filter(s => {
+            const sessionDate = parseISO(s.date);
+            return sessionDate >= weekStartDate && sessionDate <= weekEndDate;
+        }).flatMap(s => s.records ?? []);
+
+        const attendanceRate = weeklyRecords.length > 0 ? (weeklyRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length / weeklyRecords.length) * 100 : 0;
+
         return {
             sentimentIndex,
-            attendanceRate: totalPossibleAttendances > 0 ? (totalActualAttendances / totalPossibleAttendances) * 100 : 0,
-            positiveReports,
-            negativeReports,
-            positiveBehaviorCount: positiveBehavior,
-            totalBehaviorRecords
+            attendanceRate,
         };
     }, [students, sessions, reports]);
 
-    const evaluateGroupPerformance = (data: typeof evaluationData) => {
-        if (!data) {
-             return {
-                rating: "لا توجد بيانات",
-                suggestions: ["❌ لا توجد سجلات حضور كافية لتقييم الأداء."]
-            };
-        }
-        
+    const evaluateGroupPerformance = (sentimentIndex: number, attendanceRate: number) => {
         let rating: string;
         let suggestions: string[] = [];
+        let icon: React.ReactNode;
+        let ratingText: string;
 
-        if (data.sentimentIndex >= 85) {
+        if (sentimentIndex >= 85) {
             rating = "ممتاز";
-            suggestions.push("👍 أداء ممتاز وروح معنوية عالية في الفوج. استمروا في هذا العمل الرائع!");
-        } else if (data.sentimentIndex >= 60) {
+            ratingText = "الفوج في قمة عطائه.. استمروا!";
+            icon = <TrendingUp className="h-10 w-10 text-green-500" />;
+        } else if (sentimentIndex >= 60) {
             rating = "جيد ومستقر";
-            suggestions.push("📈 أداء الفوج جيد. يمكن التركيز على الجوانب الأقل أداءً لدفعه نحو التميز.");
+            ratingText = "أداء مستقر، نحتاج لدفعة بسيطة نحو التميز.";
+            icon = <Smile className="h-10 w-10 text-blue-500" />;
         } else {
             rating = "بحاجة لتحسين";
-            suggestions.push("⚠️ هناك تراجع في بعض المؤشرات. يُنصح بمراجعة أسباب تراجع الحضور أو الانضباط.");
+            ratingText = "مؤشر الالتزام في هبوط.. ربما حان وقت مكافأة أو نشاط لكسر الروتين.";
+            icon = <Frown className="h-10 w-10 text-red-500" />;
         }
         
-        if(data.attendanceRate < 75 && data.sentimentIndex < 85) {
+        if (attendanceRate < 75 && sentimentIndex < 85) {
             suggestions.push("📉 نسبة الحضور منخفضة. يُنصح بالتواصل مع أولياء أمور الطلبة الأكثر غيابًا.");
         }
         
-        if(data.negativeReports > data.positiveReports) {
-             suggestions.push("📝 الشكاوى أكثر من رسائل الشكر. قد يكون هناك استياء يتطلب المتابعة.");
-        }
-
-        if(data.totalBehaviorRecords > 0 && (data.positiveBehaviorCount / data.totalBehaviorRecords) < 0.6) {
-             suggestions.push("⚖️ مستوى الانضباط العام متوسط. يمكن تحفيز الطلاب على الهدوء والتركيز أكثر.");
-        }
-
-
-        return { rating, suggestions };
+        return { rating, suggestions, icon, ratingText };
     }
 
-    const { rating, suggestions } = evaluateGroupPerformance(evaluationData);
+    const { rating, suggestions, icon, ratingText } = evaluateGroupPerformance(currentSentimentData.sentimentIndex, currentSentimentData.attendanceRate);
     
     const getRatingBadgeClass = (currentRating: string) => {
         switch(currentRating) {
@@ -106,13 +138,13 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
         }
     }
     
-    if (!evaluationData) {
+    if (Object.keys(sessions).length === 0) {
         return (
             <Card className="md:col-span-2">
                  <CardHeader>
                     <div className="flex items-center gap-2">
                         <Bot className="h-6 w-6 text-primary" />
-                        <CardTitle>تقييم الأداء الآلي للفوج</CardTitle>
+                        <CardTitle>رادار الروح المعنوية للفوج</CardTitle>
                     </div>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center text-center p-8">
@@ -136,25 +168,40 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
                 </CardDescription>
             </CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-6">
-                <div className="flex flex-col items-center justify-center space-y-4 p-6 bg-muted rounded-lg">
-                    <p className="text-lg font-semibold text-muted-foreground">مؤشر السعادة والالتزام</p>
-                    <Badge className={`text-xl px-4 py-1 border ${getRatingBadgeClass(rating)}`}>{rating}</Badge>
-                    {rating === 'ممتاز' && <TrendingUp className="h-10 w-10 text-green-500" />}
-                    {(rating === 'جيد ومستقر') && <TrendingUp className="h-10 w-10 text-blue-500" />}
-                    {rating === 'بحاجة لتحسين' && <TrendingDown className="h-10 w-10 text-red-500" />}
+                <div className="flex flex-col justify-between space-y-4 p-6 bg-muted rounded-lg">
+                   <div className="flex justify-between items-start">
+                     <div>
+                        <p className="text-lg font-semibold text-muted-foreground">مؤشر الالتزام الحالي</p>
+                        <Badge className={`text-xl px-4 py-1 border ${getRatingBadgeClass(rating)}`}>{rating}</Badge>
+                     </div>
+                     {icon}
+                   </div>
+                   <p className="text-sm font-medium">{ratingText}</p>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-2">
                      <div className="flex items-center gap-2">
-                        <Lightbulb className="h-5 w-5 text-yellow-500"/>
-                        <h4 className="font-semibold text-lg">ملاحظات واقتراحات</h4>
+                        <h4 className="font-semibold text-lg">منحنى الالتزام (آخر 4 أسابيع)</h4>
                     </div>
-                    <ul className="space-y-2 list-inside">
-                        {(suggestions ?? []).map((suggestion, index) => (
-                            <li key={index} className="text-sm text-muted-foreground p-2 bg-background rounded-md">
-                                {suggestion}
-                            </li>
-                        ))}
-                    </ul>
+                    <div className="h-[150px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={weeklySentiments} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                <defs>
+                                    <linearGradient id="sentimentGradient" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
+                                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                                <YAxis domain={[0, 100]} fontSize={12} tickLine={false} axisLine={false} />
+                                <Tooltip
+                                    contentStyle={{ borderRadius: '0.5rem', direction: 'rtl', fontSize: '12px', padding: '4px 8px' }}
+                                    formatter={(value: number) => [`${value}%`, 'الالتزام']}
+                                />
+                                <Area type="monotone" dataKey="score" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#sentimentGradient)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
             </CardContent>
         </Card>
