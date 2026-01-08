@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -27,7 +28,7 @@ const calculateAge = (birthDate?: Date) => {
 };
 
 export default function StudentReportPage() {
-    const { students, dailySessions, loading } = useStudentContext();
+    const { students, dailySessions, surahProgress, loading } = useStudentContext();
     const { user } = useAuth();
     const { toast } = useToast();
     
@@ -87,7 +88,7 @@ export default function StudentReportPage() {
             return sessionDate >= startDate && sessionDate <= endDate;
         });
 
-        const stats = { present: 0, absent: 0, late: 0, makeup: 0, holidays: 0, excellence: 0, good: 0, average: 0, poor: 0, calm: 0, mediumBehavior: 0, undisciplined: 0, totalEvaluated: 0, totalBehavior: 0 };
+        const stats = { present: 0, absent: 0, late: 0, makeup: 0, holidays: 0, calm: 0, mediumBehavior: 0, undisciplined: 0, totalBehavior: 0 };
 
         sessionsInRange.forEach(session => {
             if (session.sessionType === 'يوم عطلة') {
@@ -101,16 +102,7 @@ export default function StudentReportPage() {
                         case 'تعويض': stats.makeup++; break;
                         case 'غائب': stats.absent++; break;
                     }
-                    if(record.memorization) {
-                        stats.totalEvaluated++;
-                        switch(record.memorization){
-                            case 'ممتاز': stats.excellence++; break;
-                            case 'جيد': stats.good++; break;
-                            case 'متوسط': stats.average++; break;
-                            case 'ضعيف': stats.poor++; break;
-                        }
-                    }
-                     if(record.behavior) {
+                    if(record.behavior) {
                         stats.totalBehavior++;
                         switch(record.behavior){
                             case 'هادئ': stats.calm++; break;
@@ -124,8 +116,12 @@ export default function StudentReportPage() {
 
         const totalSessionDays = stats.present + stats.absent + stats.late + stats.makeup;
         const attendanceScore = totalSessionDays > 0 ? ((stats.present + stats.late) / totalSessionDays) * 10 : 0;
-        const memorizationScore = stats.totalEvaluated > 0 ? ((stats.excellence * 3 + stats.good * 2 + stats.average * 1) / (stats.totalEvaluated * 3)) * 10 : 0;
         const disciplineScore = stats.totalBehavior > 0 ? ((stats.calm * 2 + stats.mediumBehavior * 1) / (stats.totalBehavior * 2)) * 10 : 0;
+        
+        const studentMastery = surahProgress[selectedStudentId] || {};
+        const masteredCount = Object.values(studentMastery).filter(s => s === 2).length;
+        const memorizationScore = (masteredCount / allSurahs.length) * 10;
+
 
         const radarData = [
             { subject: 'الحضور', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
@@ -140,7 +136,7 @@ export default function StudentReportPage() {
         if (minScoreItem.score < 5) {
             switch(minScoreItem.subject) {
                 case 'الحضور': autoNote = 'نوصي بالتركيز على تحسين جانب الحضور والالتزام بمواعيد الحصص.'; break;
-                case 'الحفظ': autoNote = 'نوصي بتكثيف المراجعة ومتابعة الحفظ اليومي في المنزل.'; break;
+                case 'الحفظ': autoNote = 'نوصي بتكثيف المراجعة والتركيز على تثبيت السور المحفوظة للوصول لمرحلة الإتقان.'; break;
                 case 'الانضباط': autoNote = 'نوصي بالعمل على تحسين السلوك والانضباط داخل الحلقة.'; break;
                 case 'التجويد': autoNote = 'نوصي بالتركيز على مخارج الحروف وأحكام التجويد.'; break;
                 case 'الأخلاق': autoNote = 'نوصي بتعزيز جانب الأخلاق والآداب الإسلامية العامة.'; break;
@@ -159,7 +155,7 @@ export default function StudentReportPage() {
             autoNote
         };
 
-    }, [selectedStudentId, reportPeriod, selectedMonth, selectedSeason, selectedYear, students, dailySessions, tajweedScore, akhlaqScore]);
+    }, [selectedStudentId, reportPeriod, selectedMonth, selectedSeason, selectedYear, students, dailySessions, surahProgress, tajweedScore, akhlaqScore, loading]);
     
     const getReportFilename = (extension: string) => {
         if (!reportData) return `report.${extension}`;

@@ -184,6 +184,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         registrationDate: newStudent.registrationDate.toISOString(), 
         updatedAt: newStudent.updatedAt.toISOString() 
     });
+    
+    // Initialize surah progress for the new student
+    const surahProgressRef = ref(db, `users/${authContextUser.uid}/surahProgress/${studentId}`);
+    set(surahProgressRef, {});
   };
   
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
