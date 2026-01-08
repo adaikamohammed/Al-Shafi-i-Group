@@ -46,26 +46,32 @@ export function DailyInspiration() {
   const [quote, setQuote] = useState({ text: '', source: '' });
 
   useEffect(() => {
-    // This effect should only run on the client
+    // This effect should only run on the client to avoid hydration mismatch
     const today = new Date();
     const dayOfMonth = today.getDate();
+    // Select a quote based on the day of the month
     const currentQuote = quranQuotes[(dayOfMonth - 1) % quranQuotes.length];
     
     // Set greeting based on time
     const currentHour = today.getHours();
+    const displayName = user?.displayName || 'شيخنا الكريم';
+
     if (currentHour < 12) {
-      setGreeting(`طاب صباحك ${user?.displayName || 'شيخنا الكريم'}`);
+      setGreeting(`طاب صباحك ${displayName}`);
     } else if (currentHour < 18) {
-      setGreeting(`طاب يومك ${user?.displayName || 'شيخنا الكريم'}`);
+      setGreeting(`طاب يومك ${displayName}`);
     } else {
-      setGreeting(`طاب مساؤك ${user?.displayName || 'شيخنا الكريم'}`);
+      setGreeting(`طاب مساؤك ${displayName}`);
     }
     
     setQuote(currentQuote);
 
   }, [user]);
 
-  if (!quote.text) return null;
+  if (!quote.text) {
+    // Return null or a loader on initial render to prevent hydration mismatch
+    return null;
+  }
 
   return (
     <div className="flex items-start gap-4 p-4 rounded-lg border-l-4 border-yellow-500 bg-yellow-50 text-yellow-800">
