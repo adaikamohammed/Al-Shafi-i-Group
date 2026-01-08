@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
 import { Loader2, AlertTriangle, DollarSign } from 'lucide-react';
-import { format, differenceInMonths, addMonths } from 'date-fns';
+import { format, differenceInMonths, addMonths, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 
@@ -42,7 +42,7 @@ export default function DuesPage() {
                 let nextDueDate: Date | null = null;
                 
                 if (lastPayment) {
-                    const lastPaymentDate = new Date(lastPayment.date);
+                    const lastPaymentDate = parseISO(lastPayment.date);
                     nextDueDate = addMonths(lastPaymentDate, 3);
                     if (new Date() < nextDueDate) {
                         status = 'paid';
@@ -56,7 +56,7 @@ export default function DuesPage() {
 
                 return {
                     ...student,
-                    lastPaymentDate: lastPayment ? new Date(lastPayment.date) : null,
+                    lastPaymentDate: lastPayment ? parseISO(lastPayment.date) : null,
                     dueAmount,
                     status,
                     nextDueDate
