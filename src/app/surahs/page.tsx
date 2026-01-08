@@ -47,13 +47,19 @@ export default function SurahProgressPage() {
     const leaderboard = useMemo(() => {
         return activeStudents.map(student => {
              const progress = surahProgress ? (surahProgress[student.id] || {}) : {};
-             const savedCount = Object.values(progress).filter(status => status > 0).length;
+             const memorizedCount = Object.values(progress).filter(status => status === 1).length;
+             const masteredCount = Object.values(progress).filter(status => status === 2).length;
+             const masteryScore = (memorizedCount * 1) + (masteredCount * 3);
+             
              return {
                 ...student,
-                savedCount,
+                masteryScore,
+                memorizedCount,
+                masteredCount
             }
-        }).sort((a,b) => b.savedCount - a.savedCount);
+        }).sort((a,b) => b.masteryScore - a.masteryScore);
     }, [activeStudents, surahProgress]);
+
 
     const handleSurahClick = (surahId: number) => {
         if (!selectedStudent) return;
@@ -143,7 +149,7 @@ export default function SurahProgressPage() {
                      <Card className="md:col-span-1">
                         <CardHeader>
                             <CardTitle>🏆 لوحة شرف الحفظ</CardTitle>
-                            <CardDescription>ترتيب الطلبة حسب عدد السور المحفوظة والمتقنة.</CardDescription>
+                            <CardDescription>الترتيب حسب نقاط الإتقان: (المحفوظ * 1) + (المتقن * 3)</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Table>
@@ -151,7 +157,7 @@ export default function SurahProgressPage() {
                                     <TableRow>
                                         <TableHead>الترتيب</TableHead>
                                         <TableHead>الطالب</TableHead>
-                                        <TableHead>الإجمالي</TableHead>
+                                        <TableHead>النقاط</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -161,6 +167,10 @@ export default function SurahProgressPage() {
                                      if (rank === 1) rankClass = "bg-yellow-100 dark:bg-yellow-900/50 hover:bg-yellow-100/80";
                                      else if (rank === 2) rankClass = "bg-gray-200 dark:bg-gray-700/50 hover:bg-gray-200/80";
                                      else if (rank === 3) rankClass = "bg-orange-100 dark:bg-orange-900/50 hover:bg-orange-100/80";
+                                     
+                                      const totalSurahs = student.memorizedCount + student.masteredCount;
+                                      const memorizedPercent = (student.memorizedCount / allSurahs.length) * 100;
+                                      const masteredPercent = (student.masteredCount / allSurahs.length) * 100;
 
                                     return (
                                     <TableRow key={student.id} className={rankClass}>
@@ -168,25 +178,36 @@ export default function SurahProgressPage() {
                                            {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                <span>{student.fullName}</span>
-                                                {student.savedCount === 114 && 
-                                                    <Tooltip>
-                                                        <TooltipTrigger>
-                                                             <Award className="h-5 w-5 text-yellow-500" />
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p>🎉 خاتم للقرآن الكريم</p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                }
+                                            <div className="flex flex-col">
+                                                 <div className="flex items-center gap-2">
+                                                    <span>{student.fullName}</span>
+                                                    {totalSurahs === 114 && 
+                                                        <Tooltip>
+                                                            <TooltipTrigger>
+                                                                 <Award className="h-5 w-5 text-yellow-500" />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>🎉 خاتم للقرآن الكريم</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    }
+                                                </div>
+                                                <Tooltip>
+                                                    <TooltipTrigger>
+                                                        <Progress className="h-2 w-28 mt-1">
+                                                            <Progress value={masteredPercent + memorizedPercent} className="bg-green-300" />
+                                                            <Progress value={masteredPercent} className="bg-green-600 -mt-2" />
+                                                        </Progress>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>محفوظ: {student.memorizedCount}</p>
+                                                        <p>متقن: {student.masteredCount}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
                                             </div>
                                         </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                <span className="w-8 font-bold">{student.savedCount}</span>
-                                                <Progress value={(student.savedCount / allSurahs.length) * 100} className="w-20"/>
-                                            </div>
+                                        <TableCell className="font-bold">
+                                            {student.masteryScore}
                                         </TableCell>
                                     </TableRow>
                                 )})}
