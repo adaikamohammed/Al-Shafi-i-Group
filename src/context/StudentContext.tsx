@@ -50,31 +50,27 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   
  useEffect(() => {
     if (authLoading) {
-      setLoading(true);
-      return;
+        setLoading(true);
+        return;
     }
-
-    let dataRef: DatabaseReference | null = null;
-    let valueCallback: any = null;
-
-    const resetState = () => {
+    if (!authContextUser) {
+        setLoading(false);
         setStudents([]);
         setDailySessions({});
         setDailyReports({});
         setSurahProgress({});
         setPayments([]);
         setSettingsState(null);
-        setLoading(false);
-    };
-
-    if (!authContextUser) {
-        resetState();
         return;
     }
 
+    setLoading(true);
+    const dataPath = isSuperAdmin ? 'users' : `users/${authContextUser.uid}`;
+    const dataRef = ref(db, dataPath);
+
     const handleValueChange = (snapshot: any) => {
         if (!snapshot.exists()) {
-            resetState();
+            setLoading(false);
             return;
         }
 
@@ -148,18 +144,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
     };
 
-    setLoading(true);
-    const dataPath = isSuperAdmin ? 'users' : `users/${authContextUser.uid}`;
-    dataRef = ref(db, dataPath);
-    valueCallback = onValue(dataRef, handleValueChange, (error) => {
+    const valueCallback = onValue(dataRef, handleValueChange, (error) => {
         console.error(`Firebase read failed: ${error.message}`);
         setLoading(false);
     });
   
     return () => {
-      if (dataRef && valueCallback) {
         off(dataRef, 'value', valueCallback);
-      }
     };
   }, [authContextUser, authLoading, isSuperAdmin]);
 
