@@ -7,11 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, Save, WandSparkles, Palette, ShieldCheck, Check, Info, Trash2, PlusCircle } from 'lucide-react';
+import { Loader2, Save, WandSparkles, ShieldCheck, Info, Trash2, PlusCircle, History } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { AppSettings, PointsConfig, Reward, BadgeConfig } from '@/lib/types';
+import type { AppSettings, PointsConfig, Reward } from '@/lib/types';
 import { produce } from 'immer';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 type Category = keyof PointsConfig;
 type Key<C extends Category> = keyof PointsConfig[C];
@@ -66,6 +69,29 @@ export default function SettingsPage() {
         setLocalSettings(nextState);
     }
     
+    const handleEndSeason = async () => {
+        setIsLoading(true);
+        const nextState = produce(localSettings, draft => {
+            draft.seasonStartDate = new Date().toISOString();
+        });
+        try {
+            await saveSettings(nextState);
+            setLocalSettings(nextState);
+            toast({
+                title: "🎉 موسم جديد قد بدأ!",
+                description: "تمت أرشفة نقاط الموسم السابق وبدء موسم جديد بنقاط صفرية."
+            });
+        } catch (error) {
+             toast({
+                title: "❌ خطأ",
+                description: "فشل إنهاء الموسم الحالي.",
+                variant: 'destructive',
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
     const handleSaveChanges = async () => {
         setIsLoading(true);
         try {
@@ -93,6 +119,45 @@ export default function SettingsPage() {
     <TooltipProvider>
         <div className="space-y-6">
         <h1 className="text-3xl font-headline font-bold">إعدادات قوانين الفوج</h1>
+        
+        <Card>
+             <CardHeader>
+                <CardTitle className="flex items-center gap-2"><History /> إدارة المواسم</CardTitle>
+                <CardDescription>
+                    قم بإنهاء الموسم الحالي وأرشفة نقاط الطلبة لبدء موسم جديد بنقاط صفرية. هذا الإجراء نهائي ولا يمكن التراجع عنه.
+                </CardDescription>
+            </CardHeader>
+             <CardContent>
+                <div className="flex flex-col sm:flex-row justify-between items-center p-4 border rounded-lg bg-background">
+                    <div>
+                        <p className="font-semibold">تاريخ بدء الموسم الحالي:</p>
+                        <p className="text-muted-foreground">
+                            {localSettings.seasonStartDate 
+                                ? format(new Date(localSettings.seasonStartDate), 'd MMMM yyyy', { locale: ar }) 
+                                : 'لم يحدد بعد (يحسب من بداية التسجيلات)'}
+                        </p>
+                    </div>
+                     <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive">إنهاء الموسم وبدء موسم جديد</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    سيؤدي هذا الإجراء إلى تصفير نقاط الموسم الحالي لجميع الطلبة ونقلها إلى أرشيفهم التاريخي. سيبدأ الموسم الجديد من تاريخ اليوم. هذا الإجراء لا يمكن التراجع عنه.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleEndSeason}>نعم، قم بإنهاء الموسم</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
+            </CardContent>
+        </Card>
+
         <Card>
             <CardHeader>
             <CardTitle className="flex items-center gap-2"><WandSparkles />محرك النقاط</CardTitle>
@@ -110,10 +175,10 @@ export default function SettingsPage() {
                         tooltip="النقاط التي يحصل عليها الطالب مقابل كل يوم حضور."
                     />
                     <PointInput 
-                        label="نقاط التأخر (خصم)" 
+                        label="نقاط التأخر" 
                         value={localSettings.points.attendance['متأخر']}
                         onChange={e => handlePointsChange('attendance', 'متأخر', e.target.value)}
-                        tooltip="النقاط التي تخصم عند تسجيل الطالب كـ 'متأخر'."
+                        tooltip="النقاط التي يحصل عليها عند تسجيل الطالب كـ 'متأخر'."
                     />
                     <PointInput 
                         label="نقاط الغياب (خصم)" 
@@ -180,7 +245,7 @@ export default function SettingsPage() {
         
         <Card>
             <CardHeader>
-                 <CardTitle className="flex items-center gap-2"><Palette/>إدارة الجوائز</CardTitle>
+                 <CardTitle className="flex items-center gap-2">🎁 إدارة الجوائز</CardTitle>
                  <CardDescription>تحكم في الجوائز المتوفرة في "سوق النقاط" وتكلفتها.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useStudentContext } from '@/context/StudentContext';
 import { Loader2, AlertTriangle, Medal, BookOpenCheck, ShieldCheck, UserCheck } from 'lucide-react';
-import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
+import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, isAfter } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Student, DailySession } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
@@ -41,12 +41,19 @@ export default function RankingPage() {
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
 
     const rankingData: StudentScore[] = useMemo(() => {
-        const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
-        const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
+        // Use season start date from settings, or fall back to the start of the student's registration year if not set.
+        const seasonStartDate = settings.seasonStartDate ? parseISO(settings.seasonStartDate) : null;
+        
+        const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
+        const monthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
+
+        // Ensure we only calculate for the selected month, but also respect the season start date.
+        const calculationStartDate = seasonStartDate && isAfter(seasonStartDate, monthStartDate) ? seasonStartDate : monthStartDate;
 
         const filteredSessions = Object.values(dailySessions ?? {}).filter(session => {
             const sessionDate = parseISO(session.date);
-            return sessionDate >= startDate && sessionDate <= endDate;
+            // The session must be within the selected month AND after the season start date.
+            return sessionDate >= calculationStartDate && sessionDate <= monthEndDate;
         });
 
         const studentScores: Record<string, StudentScore> = {};
@@ -93,7 +100,8 @@ export default function RankingPage() {
         });
 
         return Object.values(studentScores).sort((a, b) => b.points - a.points);
-    }, [activeStudents, dailySessions, selectedMonth, selectedYear, pointsConfig]);
+    }, [activeStudents, dailySessions, selectedMonth, selectedYear, pointsConfig, settings.seasonStartDate]);
+
 
     const topStudents = rankingData.slice(0, 3);
     
@@ -150,7 +158,7 @@ export default function RankingPage() {
                 </div>
             </div>
 
-            {rankingData.length > 0 ? (
+            {rankingData.length > 0 && rankingData.some(d => d.points !== 0) ? (
                 <>
                     <Card>
                         <CardHeader className="text-center">

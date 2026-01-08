@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
 import { Loader2, AlertTriangle, Medal, Star, Gift, ShoppingCart, History, Coins } from 'lucide-react';
-import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, isAfter } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -35,14 +35,11 @@ export default function PointsSystemPage() {
 
     const studentTotalPoints = useMemo(() => {
         const studentScores: Record<string, number> = {};
-         const selectedMonth = new Date().getMonth();
-        const selectedYear = new Date().getFullYear();
-        const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
-        const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
+        const seasonStartDate = settings.seasonStartDate ? parseISO(settings.seasonStartDate) : null;
 
         const filteredSessions = Object.values(dailySessions ?? {}).filter(session => {
             const sessionDate = parseISO(session.date);
-            return sessionDate >= startDate && sessionDate <= endDate;
+            return !seasonStartDate || isAfter(sessionDate, seasonStartDate);
         });
 
         activeStudents.forEach(student => {
@@ -72,7 +69,8 @@ export default function PointsSystemPage() {
         });
         
         return studentScores;
-    }, [activeStudents, dailySessions, surahProgress, pointsConfig]);
+    }, [activeStudents, dailySessions, surahProgress, pointsConfig, settings.seasonStartDate]);
+
 
     const studentCurrentBalance = useMemo(() => {
         if (!selectedStudentId) return 0;
