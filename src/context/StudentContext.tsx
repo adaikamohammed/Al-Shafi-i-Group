@@ -332,8 +332,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const nextStatus = (currentStatus + 1) % 3;
     studentProgressMap[surahId] = nextStatus;
     
-    const pointsMemorized = settings.points.surah.memorized;
-    const pointsMastered = settings.points.surah.mastered;
+    const pointsMemorized = settings.points.surah['memorized'];
+    const pointsMastered = settings.points.surah['mastered'];
 
     // Point logic
     if (currentStatus === 0 && nextStatus === 1) {

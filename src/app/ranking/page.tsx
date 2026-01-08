@@ -65,20 +65,20 @@ export default function RankingPage() {
                 if (studentScores[record.studentId]) {
                     let points = 0;
                     if (record.attendance) {
-                        points += pointsConfig.attendance[record.attendance] ?? 0;
+                        points += pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] ?? 0;
                         if(record.attendance === 'حاضر') studentScores[record.studentId].stats.present++;
                         if(record.attendance === 'غائب') studentScores[record.studentId].stats.absent++;
                         if(record.attendance === 'متأخر') studentScores[record.studentId].stats.late++;
                         if(record.attendance === 'تعويض') studentScores[record.studentId].stats.makeup++;
                     }
                     if (record.memorization) {
-                        points += pointsConfig.evaluation[record.memorization] ?? 0;
+                        points += pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] ?? 0;
                         if(record.memorization === 'ممتاز') studentScores[record.studentId].stats.excellent++;
                         if(record.memorization === 'جيد') studentScores[record.studentId].stats.good++;
                         if(record.memorization === 'متوسط') studentScores[record.studentId].stats.average++;
                     }
                     if (record.behavior) {
-                        points += pointsConfig.behavior[record.behavior] ?? 0;
+                        points += pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] ?? 0;
                          if(record.behavior === 'هادئ') studentScores[record.studentId].stats.calm++;
                          if(record.behavior === 'متوسط') studentScores[record.studentId].stats.medium++;
                          if(record.behavior === 'غير منضبط') studentScores[record.studentId].stats.undisciplined++;

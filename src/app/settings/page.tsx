@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, Save, WandSparkles, Palette, ShieldCheck, Check, Info } from 'lucide-react';
+import { Loader2, Save, WandSparkles, Palette, ShieldCheck, Check, Info, Trash2, PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { AppSettings, PointsConfig, Reward } from '@/lib/types';
+import type { AppSettings, PointsConfig, Reward, BadgeConfig } from '@/lib/types';
 import { produce } from 'immer';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -39,7 +39,7 @@ export default function SettingsPage() {
         }
     };
     
-    const handleRewardChange = (index: number, field: keyof Reward, value: string | number) => {
+    const handleRewardChange = (index: number, field: keyof Omit<Reward, 'id'>, value: string | number) => {
          const nextState = produce(localSettings, draft => {
             const reward = draft.rewards[index];
             if(field === 'cost') {
@@ -48,6 +48,20 @@ export default function SettingsPage() {
             } else {
                 (reward[field] as any) = value;
             }
+        });
+        setLocalSettings(nextState);
+    }
+    
+    const handleAddReward = () => {
+         const nextState = produce(localSettings, draft => {
+             draft.rewards.push({ id: `custom-${Date.now()}`, name: 'جائزة جديدة', description: 'وصف الجائزة', cost: 100, icon: 'Gift' });
+         });
+         setLocalSettings(nextState);
+    }
+    
+    const handleRemoveReward = (index: number) => {
+        const nextState = produce(localSettings, draft => {
+            draft.rewards.splice(index, 1);
         });
         setLocalSettings(nextState);
     }
@@ -78,7 +92,7 @@ export default function SettingsPage() {
   return (
     <TooltipProvider>
         <div className="space-y-6">
-        <h1 className="text-3xl font-headline font-bold">إعدادات النقاط والسياسات</h1>
+        <h1 className="text-3xl font-headline font-bold">إعدادات قوانين الفوج</h1>
         <Card>
             <CardHeader>
             <CardTitle className="flex items-center gap-2"><WandSparkles />محرك النقاط</CardTitle>
@@ -171,16 +185,17 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
                 {localSettings.rewards.map((reward, index) => (
-                    <div key={reward.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg items-center">
+                    <div key={reward.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg items-center">
                         <Input value={reward.name} onChange={e => handleRewardChange(index, 'name', e.target.value)} placeholder="اسم الجائزة"/>
                         <Input value={reward.description} onChange={e => handleRewardChange(index, 'description', e.target.value)} placeholder="وصف قصير"/>
                         <div className="space-y-1">
                              <Label>التكلفة (نقاط)</Label>
                              <Input type="number" value={reward.cost} onChange={e => handleRewardChange(index, 'cost', e.target.value)} />
                         </div>
+                        <Button variant="ghost" size="icon" onClick={() => handleRemoveReward(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
                     </div>
                 ))}
-                {/* Add new reward functionality can be added here */}
+                <Button variant="outline" onClick={handleAddReward}><PlusCircle className="ml-2 h-4 w-4"/> إضافة جائزة جديدة</Button>
             </CardContent>
         </Card>
 
