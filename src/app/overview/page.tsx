@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Loader2, Users, DollarSign, UserPlus, FileText, CheckCircle, Bot, Lightbulb } from 'lucide-react';
-import { format, getMonth, getYear, startOfQuarter, endOfQuarter, getQuarter, startOfWeek, endOfWeek, subDays, isSameDay } from 'date-fns';
+import { format, getMonth, getYear, startOfQuarter, endOfQuarter, getQuarter, startOfWeek, endOfWeek, subDays, isSameDay, startOfMonth, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -350,3 +350,5 @@ export default function OverviewPage() {
         </div>
     );
 }
+
+    
