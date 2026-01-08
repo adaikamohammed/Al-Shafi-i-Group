@@ -42,9 +42,9 @@ function AppContent({ children }: { children: React.ReactNode }) {
     
     const navItems = useMemo(() => {
         if (isSuperAdmin) {
-            return allNavItems.filter(item => !['/reports/daily', '/points'].includes(item.href));
+            return allNavItems.filter(item => !['/reports/daily', '/points', '/settings'].includes(item.href));
         }
-        return allNavItems.filter(item => isSuperAdmin ? item.href !== '/settings' : true);
+        return allNavItems;
     }, [isSuperAdmin]);
     
     useEffect(() => {
@@ -136,7 +136,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
     return (
         <SidebarProvider>
-            <CommandBar students={students} isOpen={isCommandBarOpen} onOpenChange={setCommandBarOpen} />
+            <CommandBar students={students ?? []} isOpen={isCommandBarOpen} onOpenChange={setCommandBarOpen} router={router} />
             {isMobile ? (
               <Sheet>
                 <div className="flex flex-col min-h-screen">
