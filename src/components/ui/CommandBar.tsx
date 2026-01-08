@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/command";
 import { 
     Users, ClipboardList, BarChart3, Settings, Award, BookCheck, 
-    FileText, User, ChevronsRight 
+    FileText, User, ChevronsRight, DollarSign, ArrowRightLeft, HelpCircle
 } from 'lucide-react';
 import type { Student } from '@/lib/types';
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
@@ -28,9 +28,12 @@ interface CommandBarProps {
 const mainActions = [
     { name: "إدارة الطلبة", icon: <Users className="ml-2 h-4 w-4" />, href: "/" },
     { name: "الحصص اليومية", icon: <ClipboardList className="ml-2 h-4 w-4" />, href: "/sessions" },
-    { name: "الإحصائيات", icon: <BarChart3 className="ml-2 h-4 w-4" />, href: "/reports/monthly" },
+    { name: "المستحقات المالية", icon: <DollarSign className="ml-2 h-4 w-4" />, href: "/dues" },
+    { name: "الإحصائيات الشهرية", icon: <BarChart3 className="ml-2 h-4 w-4" />, href: "/reports/monthly" },
     { name: "ترتيب الطلبة", icon: <Award className="ml-2 h-4 w-4" />, href: "/ranking" },
     { name: "متابعة الحفظ", icon: <BookCheck className="ml-2 h-4 w-4" />, href: "/surahs" },
+    { name: "استيراد/تصدير", icon: <ArrowRightLeft className="ml-2 h-4 w-4" />, href: "/data" },
+    { name: "دليل الاستخدام", icon: <HelpCircle className="ml-2 h-4 w-4" />, href: "/guide" },
     { name: "الإعدادات", icon: <Settings className="ml-2 h-4 w-4" />, href: "/settings" },
 ];
 
@@ -43,12 +46,12 @@ export function CommandBar({ students, isOpen, onOpenChange, router }: CommandBa
 
   return (
     <CommandDialog open={isOpen} onOpenChange={onOpenChange}>
-      <CommandInput placeholder="ابحث عن طالب أو مهمة..." />
+      <CommandInput placeholder="ابحث عن طالب أو انتقل إلى صفحة..." />
       <CommandList>
         <CommandEmpty>لم يتم العثور على نتائج.</CommandEmpty>
         
         <CommandGroup heading="الطلبة">
-          {(students ?? []).filter(s => s.status === 'نشط').map((student) => (
+          {(students ?? []).filter(s => s.status === 'نشط').slice(0, 5).map((student) => (
             <CommandItem
               key={student.id}
               value={student.fullName}
@@ -59,8 +62,8 @@ export function CommandBar({ students, isOpen, onOpenChange, router }: CommandBa
                 <User className="ml-2 h-4 w-4" />
                 <span>{student.fullName}</span>
               </div>
-              <div className="flex items-center gap-2 opacity-60">
-                 <span className="text-xs">عرض الملف</span>
+              <div className="flex items-center gap-2 opacity-60 text-xs">
+                 <span>عرض التقرير</span>
                  <ChevronsRight className="h-4 w-4" />
               </div>
             </CommandItem>
@@ -69,7 +72,7 @@ export function CommandBar({ students, isOpen, onOpenChange, router }: CommandBa
 
         <CommandSeparator />
 
-        <CommandGroup heading="الإجراءات السريعة">
+        <CommandGroup heading="الانتقال السريع">
             {mainActions.map((action) => (
                 <CommandItem key={action.href} onSelect={() => handleSelect(() => router.push(action.href))}>
                    {action.icon}

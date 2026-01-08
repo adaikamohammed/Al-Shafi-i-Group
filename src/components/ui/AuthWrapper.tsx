@@ -152,6 +152,15 @@ function AppContent({ children }: { children: React.ReactNode }) {
                           {navItems.find(item => item.href === pathname)?.label || 'مدرسة الشافعي'}
                         </h1>
                     </div>
+                    <Button
+                        onClick={() => setCommandBarOpen(true)}
+                        variant="ghost"
+                        size="icon"
+                        className="md:hidden"
+                    >
+                        <Search className="h-5 w-5" />
+                        <span className="sr-only">بحث</span>
+                    </Button>
                   </header>
                   <main className="flex-grow p-4">
                     {children}
@@ -167,18 +176,22 @@ function AppContent({ children }: { children: React.ReactNode }) {
                   {sidebarContent}
                 </Sidebar>
                 <main className="md:pl-[var(--sidebar-width)] p-4 sm:p-6 lg:p-8">
+                    <div className="flex justify-end mb-4">
+                        <Button
+                            onClick={() => setCommandBarOpen(true)}
+                            variant="outline"
+                            className="w-full max-w-xs"
+                        >
+                            <span className="mr-auto text-muted-foreground">ابحث عن طالب أو مهمة...</span>
+                            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                                <span className="text-xs">⌘</span>K
+                            </kbd>
+                        </Button>
+                    </div>
                   {children}
                 </main>
               </>
             )}
-             <Button
-                onClick={() => setCommandBarOpen(true)}
-                className="fixed bottom-4 left-4 h-12 w-12 rounded-full shadow-lg z-50 flex items-center justify-center md:hidden"
-                size="icon"
-                >
-                <Search className="h-6 w-6" />
-                <span className="sr-only">بحث</span>
-            </Button>
             <Toaster />
           </SidebarProvider>
     )
