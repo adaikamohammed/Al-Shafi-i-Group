@@ -235,7 +235,7 @@ export default function OverviewPage() {
             totalPossibleRevenue: totalPossibleRevenue
         };
 
-    }, [students, dailySessions, payments, settings]);
+    }, [activeStudents, dailySessions, payments, settings, TIER_PRICES]);
     
     const attendanceChartData = [
         { name: 'حضور', value: overviewData.attendanceToday },
