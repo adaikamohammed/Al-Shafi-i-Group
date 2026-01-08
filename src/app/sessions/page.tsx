@@ -44,6 +44,7 @@ export default function DailySessionsPage() {
   const { toast } = useToast();
   
   const { students, dailySessions, loading, getSessionForDate, addDailySession, deleteDailySession } = useStudentContext();
+  const { isSuperAdmin } = useAuth();
   const activeStudents = useMemo(() => 
     (students ?? []).filter(s => s.status === "نشط"), 
   [students]);
@@ -159,7 +160,7 @@ export default function DailySessionsPage() {
         >
             <div className="flex justify-between w-full items-start">
                  <span className="font-bold">{day}</span>
-                 {session && (
+                 {session && !isSuperAdmin && (
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <DropdownMenu>
                          <DropdownMenuTrigger asChild>
@@ -282,6 +283,7 @@ export default function DailySessionsPage() {
                 onClose={() => setSessionDialogOpen(false)}
                 addDailySession={addDailySession}
                 getSessionForDate={getSessionForDate}
+                isSuperAdmin={isSuperAdmin}
               />
             </div>
           </DialogContent>
@@ -298,10 +300,11 @@ interface DailySessionFormProps {
     onClose: () => void;
     addDailySession: (session: DailySession) => void;
     getSessionForDate: (date: string) => DailySession | undefined;
+    isSuperAdmin?: boolean;
 }
 
 
-function DailySessionForm({ day, students, onClose, addDailySession, getSessionForDate }: DailySessionFormProps) {
+function DailySessionForm({ day, students, onClose, addDailySession, getSessionForDate, isSuperAdmin }: DailySessionFormProps) {
   const [sessionType, setSessionType] = useState<SessionType>('حصة أساسية');
   const [records, setRecords] = useState<DailyRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -379,7 +382,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
         <div className="flex items-center gap-4">
           <Label className="font-bold">نوع الحصة:</Label>
           <div className="flex items-center gap-2">
-            <Select dir="rtl" value={sessionType} onValueChange={(value: SessionType) => setSessionType(value)}>
+            <Select dir="rtl" value={sessionType} onValueChange={(value: SessionType) => setSessionType(value)} disabled={isSuperAdmin}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="اختر نوع الحصة" />
               </SelectTrigger>
@@ -427,7 +430,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
                   <TableRow key={student.id} className={cn(isAbsent && 'bg-muted/50')}>
                     <TableCell className="font-medium">{student.fullName}</TableCell>
                     <TableCell>
-                      <RadioGroup dir="rtl" value={record.attendance} onValueChange={(value: AttendanceStatus) => handleRecordChange(student.id, 'attendance', value)} className="flex gap-2 flex-wrap">
+                      <RadioGroup dir="rtl" value={record.attendance} onValueChange={(value: AttendanceStatus) => handleRecordChange(student.id, 'attendance', value)} className="flex gap-2 flex-wrap" disabled={isSuperAdmin}>
                         {attendanceOptions.map(opt => (
                            <div key={opt} className="flex items-center space-x-2 space-x-reverse">
                              <RadioGroupItem value={opt} id={`att-${opt}-${student.id}`} />
@@ -440,7 +443,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
                     {!isActivitySession && (
                       <>
                         <TableCell>
-                          <Select dir="rtl" value={record.memorization ?? ''} onValueChange={(value: PerformanceLevel) => handleRecordChange(student.id, 'memorization', value)} disabled={isRowDisabled}>
+                          <Select dir="rtl" value={record.memorization ?? ''} onValueChange={(value: PerformanceLevel) => handleRecordChange(student.id, 'memorization', value)} disabled={isRowDisabled || isSuperAdmin}>
                             <SelectTrigger><SelectValue placeholder="التقييم" /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="ممتاز">ممتاز</SelectItem><SelectItem value="جيد">جيد</SelectItem>
@@ -451,14 +454,14 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2 space-x-reverse">
-                            <Switch id={`review-${student.id}`} checked={record.review ?? false} onCheckedChange={(checked) => handleRecordChange(student.id, 'review', checked)} disabled={isRowDisabled}/>
+                            <Switch id={`review-${student.id}`} checked={record.review ?? false} onCheckedChange={(checked) => handleRecordChange(student.id, 'review', checked)} disabled={isRowDisabled || isSuperAdmin}/>
                             <Label htmlFor={`review-${student.id}`}>{record.review ? 'تمت' : 'لم تتم'}</Label>
                           </div>
                         </TableCell>
                       </>
                     )}
                     <TableCell>
-                      <Select dir="rtl" value={record.behavior ?? ''} onValueChange={(value: BehaviorLevel) => handleRecordChange(student.id, 'behavior', value)} disabled={isAbsent}>
+                      <Select dir="rtl" value={record.behavior ?? ''} onValueChange={(value: BehaviorLevel) => handleRecordChange(student.id, 'behavior', value)} disabled={isAbsent || isSuperAdmin}>
                         <SelectTrigger><SelectValue placeholder="السلوك" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="هادئ">هادئ</SelectItem><SelectItem value="متوسط">متوسط</SelectItem>
@@ -467,7 +470,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Textarea placeholder="ملاحظة (مثل سبب الغياب)..." value={record.notes ?? ''} onChange={(e) => handleRecordChange(student.id, 'notes', e.target.value)} className="h-10"/>
+                      <Textarea placeholder="ملاحظة (مثل سبب الغياب)..." value={record.notes ?? ''} onChange={(e) => handleRecordChange(student.id, 'notes', e.target.value)} className="h-10" disabled={isSuperAdmin}/>
                     </TableCell>
                   </TableRow>
                 );
@@ -484,11 +487,13 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
         )}
 
         <DialogFooter className="mt-6">
-            <Button variant="outline" onClick={onClose}>إلغاء</Button>
-            <Button onClick={handleSave} disabled={isLoading}>
-                {isLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-                حفظ بيانات اليوم
-            </Button>
+            <Button variant="outline" onClick={onClose}>إغلاق</Button>
+            {!isSuperAdmin && (
+                <Button onClick={handleSave} disabled={isLoading}>
+                    {isLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+                    حفظ بيانات اليوم
+                </Button>
+            )}
         </DialogFooter>
       </div>
     </TooltipProvider>

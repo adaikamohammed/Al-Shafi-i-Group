@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useStudentContext } from '@/context/StudentContext';
+import { useAuth } from '@/context/AuthContext';
 import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle, Undo2, Download, Search } from 'lucide-react';
 import { format, parseISO, getYear, getQuarter } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -31,6 +32,7 @@ type QuarterStatusFilter = 'all' | 'paid' | 'unpaid';
 
 export default function DuesPage() {
     const { students, payments, addPayment, deletePayment, loading, settings } = useStudentContext();
+    const { isSuperAdmin } = useAuth();
     const { toast } = useToast();
     const [isProcessing, setIsProcessing] = useState<string | null>(null);
     const [currentYear, setCurrentYear] = useState(getYear(new Date()));
@@ -292,7 +294,7 @@ export default function DuesPage() {
                                 <TableHead className="text-center">فصل 3</TableHead>
                                 <TableHead className="text-center">فصل 4</TableHead>
                                 <TableHead>الإجمالي</TableHead>
-                                <TableHead>إجراء</TableHead>
+                                {!isSuperAdmin && <TableHead>إجراء</TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -307,25 +309,27 @@ export default function DuesPage() {
                                             {student.paymentStatus[q].status === 'paid' && (
                                                 <div className="flex items-center justify-center gap-2">
                                                     <CheckCircle className="h-5 w-5 text-green-500" />
-                                                    <AlertDialog>
-                                                        <AlertDialogTrigger asChild>
-                                                             <Button variant="ghost" size="icon" className="h-6 w-6">
-                                                                <Undo2 className="h-4 w-4 text-muted-foreground" />
-                                                            </Button>
-                                                        </AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader>
-                                                                <AlertDialogTitle>تراجع عن الدفعة؟</AlertDialogTitle>
-                                                                <AlertDialogDescription>
-                                                                    هل أنت متأكد من رغبتك في التراجع عن هذه الدفعة المسجلة؟ سيتم حذفها نهائيا.
-                                                                </AlertDialogDescription>
-                                                            </AlertDialogHeader>
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                                                <AlertDialogAction onClick={() => handleUndoPayment(student.paymentStatus[q].paymentId)}>نعم، قم بالتراجع</AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
+                                                    {!isSuperAdmin && (
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-6 w-6">
+                                                                    <Undo2 className="h-4 w-4 text-muted-foreground" />
+                                                                </Button>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>تراجع عن الدفعة؟</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                        هل أنت متأكد من رغبتك في التراجع عن هذه الدفعة المسجلة؟ سيتم حذفها نهائيا.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => handleUndoPayment(student.paymentStatus[q].paymentId)}>نعم، قم بالتراجع</AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    )}
                                                 </div>
                                             )}
                                             {student.paymentStatus[q].status === 'due' && <XCircle className="mx-auto h-5 w-5 text-red-500" />}
@@ -338,19 +342,21 @@ export default function DuesPage() {
                                            <span className="text-muted-foreground">مستحق: {student.totalDue} د.ج</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell>
-                                        {student.nextPayment.quarter > 0 && (
-                                            <Button
-                                                size="sm"
-                                                onClick={() => handleRecordPayment(student.id, student.nextPayment.amount, student.nextPayment.quarter)}
-                                                disabled={isProcessing === student.id}
-                                                variant={student.nextPayment.isFirstPayment ? 'default' : 'secondary'}
-                                            >
-                                                {isProcessing === student.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <DollarSign className="ml-2 h-4 w-4" />}
-                                                {`دفع فصل ${student.nextPayment.quarter} (${student.nextPayment.amount} د.ج)`}
-                                            </Button>
-                                        )}
-                                    </TableCell>
+                                    {!isSuperAdmin && (
+                                        <TableCell>
+                                            {student.nextPayment.quarter > 0 && (
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => handleRecordPayment(student.id, student.nextPayment.amount, student.nextPayment.quarter)}
+                                                    disabled={isProcessing === student.id}
+                                                    variant={student.nextPayment.isFirstPayment ? 'default' : 'secondary'}
+                                                >
+                                                    {isProcessing === student.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <DollarSign className="ml-2 h-4 w-4" />}
+                                                    {`دفع فصل ${student.nextPayment.quarter} (${student.nextPayment.amount} د.ج)`}
+                                                </Button>
+                                            )}
+                                        </TableCell>
+                                    )}
                                 </TableRow>
                             )) : (
                                 <TableRow>
@@ -366,6 +372,3 @@ export default function DuesPage() {
         </div>
     );
 }
-
-    
-    
