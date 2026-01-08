@@ -11,8 +11,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Tajawal', 'sans-serif'],
-        headline: ['Cairo', 'sans-serif'],
+        body: ['Alegreya', 'serif'],
+        headline: ['Belleza', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {
@@ -98,3 +98,5 @@ export default {
   },
   plugins: [require('tailwindcss-animate')],
 } satisfies Config;
+
+    
