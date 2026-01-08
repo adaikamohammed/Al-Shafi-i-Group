@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,13 +11,45 @@ import { db } from '@/lib/firebase';
 import { ref, set, onValue, off, remove, DatabaseReference } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
 
+const DEFAULT_POINTS_CONFIG: PointsConfig = {
+    attendance: { 'حاضر': 3, 'متأخر': 1, 'تعويض': 1.5, 'غائب': -2 },
+    evaluation: { 'ممتاز': 3, 'جيد': 2, 'متوسط': 1, 'ضعيف': 0 },
+    behavior: { 'هادئ': 2, 'متوسط': 1, 'غير منضبط': -1 },
+    review: { 'completed': 1 },
+    surah: { 'memorized': 20, 'mastered': 50 }
+};
+
+const DEFAULT_REWARDS: Reward[] = [
+    { id: 'weekly_reader', name: 'لقب قارئ الأسبوع', cost: 500, icon: "Star", description: 'تعزيز الثقة بالنفس أمام الزملاء.' },
+    { id: 'review_exempt', name: 'إعفاء من تسميع مراجعة', cost: 1000, icon: "Medal", description: 'مكافأة على الحفظ المتقن السابق.' },
+    { id: 'leader_for_day', name: 'قائد الفوج لليوم', cost: 800, icon: "UserCheck", description: 'تنمية المهارات القيادية لدى الطالب.' },
+    { id: 'physical_gift', name: 'هدية عينية (مصحف/قلم)', cost: 3000, icon: "Gift", description: 'تشجيع مادي ملموس.' },
+];
+
+const DEFAULT_BADGES: BadgeConfig[] = [
+    { id: 'mastery_king', name: 'ملك الإتقان', icon: 'Crown', threshold: 1000, metric: 'masteryScore' },
+];
+
+const TIER_PRICES = {
+    firstPayment: { 'فئة الأكابر': 2500, 'فئة الأصاغر': 2000 },
+    renewal: { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 },
+};
+
+const DEFAULT_SETTINGS: AppSettings = {
+    prices: TIER_PRICES,
+    points: DEFAULT_POINTS_CONFIG,
+    rewards: DEFAULT_REWARDS,
+    badges: DEFAULT_BADGES
+};
+
+
 interface StudentContextType {
   students: Student[];
   dailySessions: Record<string, DailySession>;
   dailyReports: { [date: string]: { [reportId: string]: DailyReport } };
   surahProgress: Record<string, SurahMastery>;
   payments: Payment[];
-  settings: AppSettings | null;
+  settings: AppSettings;
   loading: boolean;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => void;
   updateStudent: (studentId: string, updatedData: Partial<Student>, ownerId: string) => void;
@@ -33,7 +65,7 @@ interface StudentContextType {
   toggleSurahStatus: (studentId: string, surahId: number) => void;
   addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
   deletePayment: (paymentId: string) => Promise<void>;
-  saveSettings: (newSettings: AppSettings) => Promise<void>;
+  saveSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -47,7 +79,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [dailyReports, setDailyReports] = useState<{ [date: string]: { [reportId: string]: DailyReport } }>({});
   const [surahProgress, setSurahProgress] = useState<Record<string, SurahMastery>>({});
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [settings, setSettingsState] = useState<AppSettings | null>(null);
+  const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   
  useEffect(() => {
@@ -63,7 +95,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setDailyReports({});
       setSurahProgress({});
       setPayments([]);
-      setSettingsState(null);
+      setSettingsState(DEFAULT_SETTINGS);
       return;
     }
 
@@ -85,13 +117,18 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
         let allProgress: Record<string, SurahMastery> = {};
         let allPayments: Payment[] = [];
-        let adminSettings: AppSettings | null = null;
+        let finalSettings: AppSettings = DEFAULT_SETTINGS;
+
+        // Super admin sees their own settings if they exist, otherwise default.
+        if (allUsersData[authContextUser.uid]?.settings) {
+            finalSettings = {
+                ...DEFAULT_SETTINGS,
+                ...allUsersData[authContextUser.uid].settings
+            }
+        }
 
         for (const uid in allUsersData) {
           const userData = allUsersData[uid];
-          if (userData.profile?.role === 'super_admin' && userData.settings) {
-            adminSettings = userData.settings;
-          }
           if (userData.students) {
             const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) => ({
               ...s, id, ownerId: uid, groupName: userData.profile?.group || 'غير محدد',
@@ -119,7 +156,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setDailyReports(allReports);
         setSurahProgress(allProgress);
         setPayments(allPayments);
-        setSettingsState(adminSettings);
+        setSettingsState(finalSettings);
         setLoading(false);
       }, (error) => {
         console.error(`Firebase read failed for super_admin: ${error.message}`);
@@ -132,7 +169,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         if (!snapshot.exists()) {
           setLoading(false);
           setStudents([]); setDailySessions({}); setDailyReports({});
-          setSurahProgress({}); setPayments([]); setSettingsState(null);
+          setSurahProgress({}); setPayments([]); setSettingsState(DEFAULT_SETTINGS);
           return;
         }
         const data = snapshot.val();
@@ -146,12 +183,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           }));
         }
         const paymentsArray = data.payments ? Object.entries(data.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : [];
+        const userSettings = data.settings ? { ...DEFAULT_SETTINGS, ...data.settings } : DEFAULT_SETTINGS;
+        
         setStudents(userStudents);
         setDailySessions(data.dailySessions || {});
         setDailyReports(data.dailyReports || {});
         setSurahProgress(data.surahProgress || {});
         setPayments(paymentsArray);
-        setSettingsState(data.settings || null);
+        setSettingsState(userSettings);
         setLoading(false);
       }, (error) => {
         console.error(`Firebase read failed for user ${authContextUser.uid}: ${error.message}`);
@@ -293,17 +332,20 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const nextStatus = (currentStatus + 1) % 3;
     studentProgressMap[surahId] = nextStatus;
     
+    const pointsMemorized = settings.points.surah.memorized;
+    const pointsMastered = settings.points.surah.mastered;
+
     // Point logic
     if (currentStatus === 0 && nextStatus === 1) {
-      toast({ title: '✅ +20 نقطة', description: 'تم إضافة نقاط للحفظ الجديد.' });
+      toast({ title: `✅ +${pointsMemorized} نقطة`, description: 'تم إضافة نقاط للحفظ الجديد.' });
     } else if (currentStatus === 1 && nextStatus === 2) {
-      toast({ title: '✅ +50 نقطة', description: 'تم إضافة نقاط للإتقان.' });
+      toast({ title: `✅ +${pointsMastered} نقطة`, description: 'تم إضافة نقاط للإتقان.' });
     } else if (currentStatus === 2 && nextStatus === 0) {
-      toast({ title: '🔄 -70 نقطة', description: 'تم خصم نقاط الحفظ والإتقان.', variant: 'destructive' });
+      toast({ title: `🔄 -${pointsMemorized + pointsMastered} نقطة`, description: 'تم خصم نقاط الحفظ والإتقان.', variant: 'destructive' });
     } else if (currentStatus === 1 && nextStatus === 0) {
-        toast({ title: '🔄 -20 نقطة', description: 'تم خصم نقاط الحفظ.', variant: 'destructive' });
+        toast({ title: `🔄 -${pointsMemorized} نقطة`, description: 'تم خصم نقاط الحفظ.', variant: 'destructive' });
     } else if (currentStatus === 2 && nextStatus === 1) {
-        toast({ title: '🔄 -50 نقطة', description: 'تم خصم نقاط الإتقان.', variant: 'destructive' });
+        toast({ title: `🔄 -${pointsMastered} نقطة`, description: 'تم خصم نقاط الإتقان.', variant: 'destructive' });
     }
 
 
@@ -344,8 +386,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     await remove(paymentRef);
   }
 
-  const saveSettings = async (newSettings: AppSettings) => {
-     if (!authContextUser || !isSuperAdmin) throw new Error("Only Super Admin can save settings");
+  const saveSettings = async (newSettings: Partial<AppSettings>) => {
+     if (!authContextUser) throw new Error("User not authenticated");
      const settingsRef = ref(db, `users/${authContextUser.uid}/settings`);
      await set(settingsRef, newSettings);
   };

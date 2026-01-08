@@ -113,9 +113,36 @@ export interface Payment {
     date: string; // ISO String
 }
 
+export interface PointsConfig {
+    attendance: { 'حاضر': number; 'متأخر': number; 'تعويض': number; 'غائب': number };
+    evaluation: { 'ممتاز': number; 'جيد': number; 'متوسط': number; 'ضعيف': number };
+    behavior: { 'هادئ': number; 'متوسط': number; 'غير منضبط': number };
+    review: { 'completed': number };
+    surah: { 'memorized': number; 'mastered': number };
+}
+
+export interface Reward {
+    id: string;
+    name: string;
+    cost: number;
+    icon: string; // Storing icon name as string
+    description: string;
+}
+
+export interface BadgeConfig {
+    id: string;
+    name: string;
+    icon: string; // Icon name
+    threshold: number; // Points needed
+    metric: 'totalPoints' | 'masteryScore';
+}
+
 export interface AppSettings {
     prices: {
         firstPayment: { 'فئة الأكابر': number; 'فئة الأصاغر': number; };
         renewal: { 'فئة الأكابر': number; 'فئة الأصاغر': number; };
     };
+    points: PointsConfig;
+    rewards: Reward[];
+    badges: BadgeConfig[];
 }
