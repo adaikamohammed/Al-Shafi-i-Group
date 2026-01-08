@@ -249,7 +249,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const newPayment: Payment = {
         ...paymentData,
         id: paymentId,
-        date: paymentData.date.toISOString(),
     };
     const paymentRef = ref(db, `users/${authContextUser.uid}/payments/${paymentId}`);
     await set(paymentRef, newPayment);
@@ -281,3 +280,5 @@ export const useStudentContext = () => {
   }
   return context;
 };
+
+    

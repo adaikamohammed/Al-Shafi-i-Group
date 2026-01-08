@@ -2,13 +2,15 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle, Undo2 } from 'lucide-react';
+import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle, Undo2, Download, Search } from 'lucide-react';
 import { format, parseISO, getYear, getQuarter } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -24,11 +26,18 @@ const getQuarterFromDate = (date: Date) => {
     return getQuarter(date);
 };
 
+type PaymentStatusFilter = 'all' | 'paid' | 'partially-paid' | 'not-paid';
+type QuarterStatusFilter = 'all' | 'paid' | 'unpaid';
+
 export default function DuesPage() {
     const { students, payments, addPayment, deletePayment, loading, settings } = useStudentContext();
     const { toast } = useToast();
     const [isProcessing, setIsProcessing] = useState<string | null>(null);
     const [currentYear, setCurrentYear] = useState(getYear(new Date()));
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<PaymentStatusFilter>('all');
+    const [quarterFilter, setQuarterFilter] = useState('all');
+    const [quarterStatusFilter, setQuarterStatusFilter] = useState<QuarterStatusFilter>('all');
 
     const prices = settings?.prices || TIER_PRICES;
 
@@ -91,18 +100,40 @@ export default function DuesPage() {
             });
 
     }, [students, payments, settings, currentYear]);
+    
+     const filteredStudents = useMemo(() => {
+        return studentsWithDues.filter(student => {
+            const nameMatch = student.fullName.toLowerCase().includes(searchTerm.toLowerCase());
+
+            let statusMatch = true;
+            if (statusFilter !== 'all') {
+                if (statusFilter === 'paid') statusMatch = student.totalPaid >= student.totalDue && student.totalDue > 0;
+                else if (statusFilter === 'partially-paid') statusMatch = student.totalPaid > 0 && student.totalPaid < student.totalDue;
+                else if (statusFilter === 'not-paid') statusMatch = student.totalPaid === 0 && student.totalDue > 0;
+            }
+
+            let quarterMatch = true;
+            if (quarterFilter !== 'all' && quarterStatusFilter !== 'all') {
+                const q = parseInt(quarterFilter);
+                if (quarterStatusFilter === 'paid') quarterMatch = student.paymentStatus[q].status === 'paid';
+                if (quarterStatusFilter === 'unpaid') quarterMatch = student.paymentStatus[q].status === 'due';
+            }
+            
+            return nameMatch && statusMatch && quarterMatch;
+        });
+    }, [studentsWithDues, searchTerm, statusFilter, quarterFilter, quarterStatusFilter]);
+
 
     const handleRecordPayment = async (studentId: string, amount: number, quarter: number) => {
         setIsProcessing(studentId);
         try {
-            // We record the payment at the start of the quarter for consistency.
             const monthOfQuarter = (quarter - 1) * 3;
             const paymentDate = new Date(currentYear, monthOfQuarter, 1);
 
             await addPayment({
                 studentId,
                 amount,
-                date: paymentDate,
+                date: paymentDate.toISOString(),
             });
             toast({
                 title: "✅ تم تسجيل الدفعة",
@@ -135,6 +166,27 @@ export default function DuesPage() {
             });
         }
     };
+    
+    const handleExport = () => {
+        const dataToExport = filteredStudents.map(s => {
+            const statusSummary = `مدفوع: ${s.totalPaid} / مستحق: ${s.totalDue}`;
+            return {
+                "اسم الطالب": s.fullName,
+                "الفئة": s.subscriptionTier,
+                "تاريخ التسجيل": format(s.registrationDate, 'yyyy-MM-dd'),
+                "فصل 1": s.paymentStatus[1].status,
+                "فصل 2": s.paymentStatus[2].status,
+                "فصل 3": s.paymentStatus[3].status,
+                "فصل 4": s.paymentStatus[4].status,
+                "الملخص المالي": statusSummary,
+            }
+        });
+
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, `مستحقات_${currentYear}`);
+        XLSX.writeFile(wb, `تقرير_المستحقات_${currentYear}.xlsx`);
+    }
 
 
     if (loading) {
@@ -172,6 +224,53 @@ export default function DuesPage() {
                     </SelectContent>
                 </Select>
             </div>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle>أدوات الفلترة والبحث</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                     <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                            placeholder="بحث باسم الطالب..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-9"
+                        />
+                    </div>
+                    <Select dir="rtl" value={statusFilter} onValueChange={(v) => setStatusFilter(v as PaymentStatusFilter)}>
+                        <SelectTrigger><SelectValue placeholder="فلترة حسب حالة الدفع" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">الكل</SelectItem>
+                            <SelectItem value="paid">مدفوع بالكامل</SelectItem>
+                            <SelectItem value="partially-paid">مدفوع جزئيًا</SelectItem>
+                            <SelectItem value="not-paid">لم يدفع</SelectItem>
+                        </SelectContent>
+                    </Select>
+                     <div className="flex gap-2">
+                        <Select dir="rtl" value={quarterFilter} onValueChange={setQuarterFilter}>
+                            <SelectTrigger className="w-1/2"><SelectValue placeholder="اختر الفصل" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">كل الفصول</SelectItem>
+                                <SelectItem value="1">فصل 1</SelectItem>
+                                <SelectItem value="2">فصل 2</SelectItem>
+                                <SelectItem value="3">فصل 3</SelectItem>
+                                <SelectItem value="4">فصل 4</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select dir="rtl" value={quarterStatusFilter} onValueChange={(v) => setQuarterStatusFilter(v as QuarterStatusFilter)} disabled={quarterFilter === 'all'}>
+                            <SelectTrigger className="w-1/2"><SelectValue placeholder="حالة الفصل" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">الكل</SelectItem>
+                                <SelectItem value="paid">مدفوع</SelectItem>
+                                <SelectItem value="unpaid">غير مدفوع</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <Button onClick={handleExport}><Download className="ml-2 h-4 w-4"/> تصدير (Excel)</Button>
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>
@@ -197,8 +296,8 @@ export default function DuesPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {studentsWithDues.length > 0 ? studentsWithDues.map(student => (
-                                <TableRow key={student.id} className={student.totalPaid < student.totalDue ? 'bg-red-50 dark:bg-red-900/20' : ''}>
+                            {filteredStudents.length > 0 ? filteredStudents.map(student => (
+                                <TableRow key={student.id} className={(student.totalPaid < student.totalDue && student.totalDue > 0) ? 'bg-red-50 dark:bg-red-900/20' : ''}>
                                     <TableCell className="font-medium">{student.fullName}</TableCell>
                                     <TableCell>
                                         <Badge variant="secondary">{student.subscriptionTier || 'فئة الأصاغر'}</Badge>
@@ -256,7 +355,7 @@ export default function DuesPage() {
                             )) : (
                                 <TableRow>
                                     <TableCell colSpan={8} className="h-24 text-center">
-                                        لا يوجد طلبة مسجلون في هذه السنة.
+                                        لا يوجد طلبة مطابقون لخيارات البحث الحالية.
                                     </TableCell>
                                 </TableRow>
                             )}
