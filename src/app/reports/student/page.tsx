@@ -14,7 +14,10 @@ import { ar } from 'date-fns/locale';
 import { surahs as allSurahs } from '@/lib/surahs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-
+import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
+import html2canvas from 'html2canvas';
 
 const calculateAge = (birthDate?: Date) => {
   if (!birthDate) return 'N/A';
@@ -24,7 +27,7 @@ const calculateAge = (birthDate?: Date) => {
 };
 
 export default function StudentReportPage() {
-    const { students, dailySessions, surahProgress, loading } = useStudentContext();
+    const { students, dailySessions, loading } = useStudentContext();
     const { user } = useAuth();
     const { toast } = useToast();
     
@@ -34,6 +37,8 @@ export default function StudentReportPage() {
     const [selectedSeason, setSelectedSeason] = useState<number>(1);
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [teacherNote, setTeacherNote] = useState('');
+    const [tajweedScore, setTajweedScore] = useState(5);
+    const [akhlaqScore, setAkhlaqScore] = useState(5);
 
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
 
@@ -77,16 +82,12 @@ export default function StudentReportPage() {
                 break;
         }
 
-        const stats = {
-            present: 0, absent: 0, late: 0, makeup: 0, holidays: 0,
-        };
-
-        const totalDaysInRange = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24) + 1;
-        
         const sessionsInRange = Object.values(dailySessions ?? {}).filter(session => {
             const sessionDate = parseISO(session.date);
             return sessionDate >= startDate && sessionDate <= endDate;
         });
+
+        const stats = { present: 0, absent: 0, late: 0, makeup: 0, holidays: 0, excellence: 0, good: 0, average: 0, poor: 0, calm: 0, mediumBehavior: 0, undisciplined: 0, totalEvaluated: 0, totalBehavior: 0 };
 
         sessionsInRange.forEach(session => {
             if (session.sessionType === 'يوم عطلة') {
@@ -100,22 +101,65 @@ export default function StudentReportPage() {
                         case 'تعويض': stats.makeup++; break;
                         case 'غائب': stats.absent++; break;
                     }
+                    if(record.memorization) {
+                        stats.totalEvaluated++;
+                        switch(record.memorization){
+                            case 'ممتاز': stats.excellence++; break;
+                            case 'جيد': stats.good++; break;
+                            case 'متوسط': stats.average++; break;
+                            case 'ضعيف': stats.poor++; break;
+                        }
+                    }
+                     if(record.behavior) {
+                        stats.totalBehavior++;
+                        switch(record.behavior){
+                            case 'هادئ': stats.calm++; break;
+                            case 'متوسط': stats.mediumBehavior++; break;
+                            case 'غير منضبط': stats.undisciplined++; break;
+                        }
+                    }
                 }
             }
         });
 
-        const studentSurahs = (surahProgress ?? {})[selectedStudentId] || [];
-        const memorizedSurahObjects = allSurahs.filter(s => studentSurahs.includes(s.id));
+        const totalSessionDays = stats.present + stats.absent + stats.late + stats.makeup;
+        const attendanceScore = totalSessionDays > 0 ? ((stats.present + stats.late) / totalSessionDays) * 10 : 0;
+        const memorizationScore = stats.totalEvaluated > 0 ? ((stats.excellence * 3 + stats.good * 2 + stats.average * 1) / (stats.totalEvaluated * 3)) * 10 : 0;
+        const disciplineScore = stats.totalBehavior > 0 ? ((stats.calm * 2 + stats.mediumBehavior * 1) / (stats.totalBehavior * 2)) * 10 : 0;
+
+        const radarData = [
+            { subject: 'الحضور', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
+            { subject: 'الحفظ', score: parseFloat(memorizationScore.toFixed(1)), fullMark: 10 },
+            { subject: 'الانضباط', score: parseFloat(disciplineScore.toFixed(1)), fullMark: 10 },
+            { subject: 'التجويد', score: tajweedScore, fullMark: 10 },
+            { subject: 'الأخلاق', score: akhlaqScore, fullMark: 10 },
+        ];
+        
+        let autoNote = '';
+        const minScoreItem = radarData.reduce((min, item) => item.score < min.score ? item : min, radarData[0]);
+        if (minScoreItem.score < 5) {
+            switch(minScoreItem.subject) {
+                case 'الحضور': autoNote = 'نوصي بالتركيز على تحسين جانب الحضور والالتزام بمواعيد الحصص.'; break;
+                case 'الحفظ': autoNote = 'نوصي بتكثيف المراجعة ومتابعة الحفظ اليومي في المنزل.'; break;
+                case 'الانضباط': autoNote = 'نوصي بالعمل على تحسين السلوك والانضباط داخل الحلقة.'; break;
+                case 'التجويد': autoNote = 'نوصي بالتركيز على مخارج الحروف وأحكام التجويد.'; break;
+                case 'الأخلاق': autoNote = 'نوصي بتعزيز جانب الأخلاق والآداب الإسلامية العامة.'; break;
+            }
+        }
+
+        const studentSurahs = ((loading ? [] : (students ?? []).find(s => s.id === selectedStudentId)?.memorizedSurahsCount) || 0);
 
         return {
             student,
-            stats: { ...stats, totalPeriodDays: Math.round(totalDaysInRange) },
-            memorizedSurahs: memorizedSurahObjects,
+            stats,
+            memorizedSurahsCount: studentSurahs,
             reportTitle,
-            statsPeriod
+            statsPeriod,
+            radarData,
+            autoNote
         };
 
-    }, [selectedStudentId, reportPeriod, selectedMonth, selectedSeason, selectedYear, students, dailySessions, surahProgress]);
+    }, [selectedStudentId, reportPeriod, selectedMonth, selectedSeason, selectedYear, students, dailySessions, tajweedScore, akhlaqScore]);
     
     const getReportFilename = (extension: string) => {
         if (!reportData) return `report.${extension}`;
@@ -127,17 +171,36 @@ export default function StudentReportPage() {
         const reportElement = document.getElementById('report-content');
         if (reportElement) {
             const html2pdf = (await import('html2pdf.js')).default;
+            
+            // Temporarily make a clone for printing to avoid messing the UI
+            const clone = reportElement.cloneNode(true) as HTMLElement;
+            clone.style.position = 'absolute';
+            clone.style.left = '-9999px';
+            clone.style.width = '210mm'; // A4 width
+            document.body.appendChild(clone);
+            
+            // Use html2canvas to render the chart
+            const canvas = await html2canvas(clone.querySelector('#radar-chart-container') as HTMLElement, { scale: 2 });
+            const chartImage = canvas.toDataURL('image/png');
+            
+            // Replace chart container with image in the clone
+            const chartContainerInClone = clone.querySelector('#radar-chart-container') as HTMLElement;
+            chartContainerInClone.innerHTML = `<img src="${chartImage}" style="width: 100%; height: auto;"/>`;
+
             const opt = {
                 margin:       [5, 5, 5, 5],
                 filename:     getReportFilename('pdf'),
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, allowTaint: false },
+                html2canvas:  { scale: 2, useCORS: true },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
                 pagebreak: { avoid: ['.avoid-break'] }
             };
-            html2pdf().set(opt).from(reportElement).save();
+            html2pdf().set(opt).from(clone).save().then(() => {
+                document.body.removeChild(clone);
+            });
         }
     };
+
 
     const handleDownloadAsWord = () => {
         const reportElement = document.getElementById('report-content');
@@ -162,15 +225,18 @@ export default function StudentReportPage() {
     const handleCopyWhatsAppReport = () => {
         if (!reportData) return;
 
-        const { student, stats, memorizedSurahs, reportTitle, statsPeriod } = reportData;
-        const surahsText = memorizedSurahs.length > 0 
-            ? memorizedSurahs.map(s => s.name).join('، ') 
-            : "لا توجد سور محفوظة مسجلة.";
+        const { student, stats, memorizedSurahsCount, reportTitle, statsPeriod, autoNote } = reportData;
         const totalSessionDays = stats.present + stats.absent + stats.late + stats.makeup;
         const attendanceRate = totalSessionDays > 0 
-            ? Math.round((stats.present / totalSessionDays) * 100) + "%" 
+            ? Math.round(((stats.present + stats.late) / totalSessionDays) * 100) + "%" 
             : "غير متاح";
-        const notes = teacherNote.trim() || "لا توجد ملاحظات إضافية.";
+        
+        let finalNote = teacherNote.trim();
+        if(autoNote) {
+            finalNote = finalNote ? `${autoNote}\n${finalNote}` : autoNote;
+        }
+        if(!finalNote) finalNote = "لا توجد ملاحظات إضافية.";
+
         const sheikhName = user?.displayName || "الشيخ";
 
         const message = `📢 *تقرير ${reportTitle} شامل لأداء الطالب: ${student.fullName}*
@@ -179,11 +245,11 @@ export default function StudentReportPage() {
 👨‍🏫 *الشيخ المسؤول*: ${sheikhName}
 👨‍👦 *اسم الولي*: ${student.guardianName || 'غير محدد'}
 
-📖 *السور المحفوظة (${memorizedSurahs.length})*: ${surahsText}
-📊 *معدل الحضور*: ${attendanceRate} (حضر ${stats.present} من ${totalSessionDays} حصة)
+📖 *عدد السور المحفوظة*: ${memorizedSurahsCount}
+📊 *معدل الحضور*: ${attendanceRate} (حضر ${stats.present + stats.late} من ${totalSessionDays} حصة)
 
-📝 *ملاحظات الشيخ*:
-${notes}
+📝 *ملاحظات وتوصيات الشيخ*:
+${finalNote}
 
 📤 هذا التقرير تم إعداده تلقائيًا من قبل نظام إدارة مدرسة الإمام الشافعي.`;
 
@@ -249,7 +315,7 @@ ${notes}
                                 <SelectTrigger className="w-full md:w-[150px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
                                 <SelectContent>
                                     {Array.from({length: 12}, (_, i) => (
-                                        <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
+                                        <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', { locale: ar })}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -292,11 +358,26 @@ ${notes}
                 </CardContent>
             </Card>
             
-            <Card className="print:hidden">
-                <CardHeader><CardTitle>ملاحظات الشيخ للتقرير</CardTitle></CardHeader>
-                <CardContent>
+             <Card className="print:hidden">
+                <CardHeader>
+                  <CardTitle>ملاحظات وتقييمات الشيخ للتقرير</CardTitle>
+                  <CardDescription>
+                    أضف ملاحظاتك الكتابية هنا، وقم بتقييم التجويد والأخلاق يدويًا. ستظهر هذه التقييمات في الرسم البياني والتقرير المطبوع.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                           <Label htmlFor="tajweed-slider">تقييم التجويد: {tajweedScore}/10</Label>
+                           <Slider id="tajweed-slider" defaultValue={[tajweedScore]} max={10} step={1} onValueChange={(val) => setTajweedScore(val[0])} />
+                        </div>
+                         <div className="space-y-3">
+                           <Label htmlFor="akhlaq-slider">تقييم الأخلاق: {akhlaqScore}/10</Label>
+                           <Slider id="akhlaq-slider" defaultValue={[akhlaqScore]} max={10} step={1} onValueChange={(val) => setAkhlaqScore(val[0])} />
+                        </div>
+                   </div>
                     <Textarea 
-                        placeholder="أضف ملاحظاتك هنا لتظهر في التقرير المطبوع ورسالة واتساب..."
+                        placeholder="أضف ملاحظاتك الكتابية هنا..."
                         value={teacherNote}
                         onChange={e => setTeacherNote(e.target.value)}
                         rows={4}
@@ -329,6 +410,23 @@ ${notes}
                                 </CardContent>
                             </Card>
                         </section>
+                        
+                        <section className="avoid-break">
+                             <Card className="bg-white shadow-none border border-gray-300">
+                                <CardHeader><CardTitle className="text-lg text-gray-800">🎯 رادار المهارات</CardTitle></CardHeader>
+                                <CardContent id="radar-chart-container" className="h-[350px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={reportData.radarData}>
+                                            <PolarGrid />
+                                            <PolarAngleAxis dataKey="subject" />
+                                            <PolarRadiusAxis angle={30} domain={[0, 10]}/>
+                                            <Radar name="التقييم" dataKey="score" stroke="#808000" fill="#808000" fillOpacity={0.6} />
+                                            <Legend />
+                                        </RadarChart>
+                                    </ResponsiveContainer>
+                                </CardContent>
+                            </Card>
+                        </section>
 
                         <section className="avoid-break">
                             <Card className="bg-white shadow-none border border-gray-300">
@@ -345,13 +443,11 @@ ${notes}
                                             <tr><td className="p-2 border border-gray-300 font-medium">حاضر</td><td className="border border-gray-300">{reportData.stats.present}</td></tr>
                                             <tr><td className="p-2 border border-gray-300 font-medium">غائب</td><td className="border border-gray-300">{reportData.stats.absent}</td></tr>
                                             <tr><td className="p-2 border border-gray-300 font-medium">متأخر</td><td className="border border-gray-300">{reportData.stats.late}</td></tr>
-                                            <tr><td className="p-2 border border-gray-300 font-medium">تعويض</td><td className="border border-gray-300">{reportData.stats.makeup}</td></tr>
-                                            <tr><td className="p-2 border border-gray-300 font-medium">عطلة</td><td className="border border-gray-300">{reportData.stats.holidays}</td></tr>
                                         </tbody>
                                         <tfoot>
                                             <tr className="border-t border-gray-300 font-bold bg-gray-100">
-                                                <td className="p-2 border border-gray-300">إجمالي أيام الفترة</td>
-                                                <td className="border border-gray-300">{reportData.stats.totalPeriodDays} يوم</td>
+                                                <td className="p-2 border border-gray-300">إجمالي أيام الدراسة</td>
+                                                <td className="border border-gray-300">{reportData.stats.present + reportData.stats.absent + reportData.stats.late} يوم</td>
                                             </tr>
                                         </tfoot>
                                     </table>
@@ -362,17 +458,13 @@ ${notes}
                         <section className="avoid-break">
                             <Card className="bg-white shadow-none border border-gray-300">
                                 <CardHeader>
-                                    <CardTitle className="text-lg text-gray-800">📚 متابعة حفظ السور ({reportData.memorizedSurahs.length} / 114)</CardTitle>
+                                    <CardTitle className="text-lg text-gray-800">📚 متابعة حفظ السور ({reportData.memorizedSurahsCount} / 114)</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    {reportData.memorizedSurahs.length > 0 ? (
-                                        <div className="flex flex-wrap gap-2 text-sm">
-                                            {reportData.memorizedSurahs.map(surah => (
-                                                <Badge key={surah.id} variant="secondary" className="bg-green-100 text-green-800 font-medium">
-                                                    {surah.name}
-                                                </Badge>
-                                            ))}
-                                        </div>
+                                    {reportData.memorizedSurahsCount > 0 ? (
+                                        <p className="text-gray-600 text-center">
+                                            أتم الطالب حفظ {reportData.memorizedSurahsCount} سورة من القرآن الكريم.
+                                        </p>
                                     ) : (
                                         <p className="text-gray-500 text-center">لم يحفظ الطالب أي سورة بعد.</p>
                                     )}
@@ -380,16 +472,15 @@ ${notes}
                             </Card>
                         </section>
                         
-                        {teacherNote && (
-                            <section className="avoid-break">
+                         <section className="avoid-break">
                                 <Card className="bg-white shadow-none border border-gray-300">
-                                    <CardHeader><CardTitle className="text-lg text-gray-800">🖊️ ملاحظات الشيخ</CardTitle></CardHeader>
+                                    <CardHeader><CardTitle className="text-lg text-gray-800">🖊️ ملاحظات وتوصيات الشيخ</CardTitle></CardHeader>
                                     <CardContent>
-                                        <p className="whitespace-pre-wrap text-sm">{teacherNote}</p>
+                                        {reportData.autoNote && <p className="whitespace-pre-wrap text-sm font-bold mb-2 p-2 bg-amber-100 text-amber-800 rounded-md">التوصية الآلية: {reportData.autoNote}</p>}
+                                        <p className="whitespace-pre-wrap text-sm">{teacherNote || 'لا توجد ملاحظات إضافية.'}</p>
                                     </CardContent>
                                 </Card>
                             </section>
-                        )}
 
                         <footer className="pt-12 text-center text-xs text-gray-500">
                             <div className="flex justify-between items-end">
@@ -415,7 +506,7 @@ ${notes}
                     body > *:not(#report-container) {
                         display: none;
                     }
-                    .print\:hidden {
+                    .print\\:hidden {
                         display: none !important;
                     }
                     #report-display {
@@ -445,5 +536,3 @@ ${notes}
         </div>
     );
 }
-
-    
