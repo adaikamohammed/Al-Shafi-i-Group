@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Lightbulb } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 const quranQuotes = [
   { text: "تعليم أبنائنا القرآن هو أساس التربية الإسلامية. قال النبي ﷺ: 'خيركم من تعلّم القرآن وعلمه'.", source: "حديث شريف" },
@@ -40,41 +41,40 @@ const quranQuotes = [
 
 
 export function DailyInspiration() {
-  const [quote, setQuote] = useState({ text: 'جارٍ التحميل...', source: '' });
+  const { user } = useAuth();
+  const [greeting, setGreeting] = useState('');
+  const [quote, setQuote] = useState({ text: '', source: '' });
 
   useEffect(() => {
     // This effect should only run on the client
-    const today = new Date().getDate();
-    const currentQuote = quranQuotes[(today - 1) % quranQuotes.length];
+    const today = new Date();
+    const dayOfMonth = today.getDate();
+    const currentQuote = quranQuotes[(dayOfMonth - 1) % quranQuotes.length];
     
-    const storedDate = localStorage.getItem('quote-date');
-    
-    let quoteText, quoteSource;
-
-    if (storedDate !== today.toString()) {
-      localStorage.setItem('quote-date', today.toString());
-      localStorage.setItem('quote-text', currentQuote.text);
-      localStorage.setItem('quote-source', currentQuote.source);
-      quoteText = currentQuote.text;
-      quoteSource = currentQuote.source;
+    // Set greeting based on time
+    const currentHour = today.getHours();
+    if (currentHour < 12) {
+      setGreeting(`طاب صباحك ${user?.displayName || 'شيخنا الكريم'}`);
+    } else if (currentHour < 18) {
+      setGreeting(`طاب يومك ${user?.displayName || 'شيخنا الكريم'}`);
     } else {
-      quoteText = localStorage.getItem('quote-text') || currentQuote.text;
-      quoteSource = localStorage.getItem('quote-source') || currentQuote.source;
+      setGreeting(`طاب مساؤك ${user?.displayName || 'شيخنا الكريم'}`);
     }
     
-    setQuote({ text: quoteText, source: quoteSource });
+    setQuote(currentQuote);
 
-  }, []);
+  }, [user]);
+
+  if (!quote.text) return null;
 
   return (
-    <div className="flex items-center gap-3 p-4 rounded-lg border-l-4 border-yellow-500 bg-yellow-50 text-yellow-800">
-        <Lightbulb className="h-8 w-8 text-yellow-600 flex-shrink-0" />
+    <div className="flex items-start gap-4 p-4 rounded-lg border-l-4 border-yellow-500 bg-yellow-50 text-yellow-800">
+        <Lightbulb className="h-8 w-8 text-yellow-600 flex-shrink-0 mt-1" />
         <div className="flex flex-col">
+            <p className="font-bold text-lg">{greeting}</p>
             <p className="font-medium">{quote.text}</p>
             <p className="text-sm text-yellow-700 font-semibold mt-1">– {quote.source}</p>
         </div>
     </div>
   );
 }
-
-    

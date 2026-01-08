@@ -4,17 +4,16 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import type { Student, DailySession, DailyReport } from '@/lib/types';
+import type { Student, DailySession } from '@/lib/types';
 import { Bot, Lightbulb, AlertTriangle } from 'lucide-react';
 
 interface GroupEvaluationCardProps {
     students: Student[];
     sessions: DailySession[];
-    reports: DailyReport[];
     groupName?: string | null;
 }
 
-export function GroupEvaluationCard({ students, sessions, reports, groupName }: GroupEvaluationCardProps) {
+export function GroupEvaluationCard({ students, sessions, groupName }: GroupEvaluationCardProps) {
 
     const evaluationData = useMemo(() => {
         const activeStudents = (students ?? []).filter(s => s.status === 'نشط');
@@ -31,21 +30,16 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
         const totalMemorizedSurahs = (students ?? []).reduce((sum, s) => sum + (s.memorizedSurahsCount || 0), 0);
         const averageProgress = activeStudents.length > 0 ? totalMemorizedSurahs / activeStudents.length : 0;
         
-        const numReportsThisMonth = (reports ?? []).length;
-        const numComplaints = (reports ?? []).filter(r => r.category === 'شكوى').length;
-
         return {
             attendanceRate,
             averageProgress,
-            numReportsThisMonth,
-            numComplaints,
             numInactiveStudents: inactiveStudentsCount,
         };
-    }, [students, sessions, reports]);
+    }, [students, sessions]);
 
     const isValidDataSet = (data: typeof evaluationData) => {
         if (!data) return false;
-        return data.numReportsThisMonth > 0 || data.attendanceRate > 0 || data.averageProgress > 0 || sessions.length > 0;
+        return data.attendanceRate > 0 || data.averageProgress > 0 || sessions.length > 0;
     }
 
     const evaluateGroupPerformance = (data: typeof evaluationData) => {
@@ -59,27 +53,20 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
         
         let score = 0;
 
-        // Attendance weight
-        if (data.attendanceRate >= 90) score += 25;
-        else if (data.attendanceRate >= 75) score += 20;
+        // Attendance weight (50 points)
+        if (data.attendanceRate >= 95) score += 50;
+        else if (data.attendanceRate >= 85) score += 40;
+        else if (data.attendanceRate >= 70) score += 25;
         else if (data.attendanceRate >= 50) score += 10;
 
-        // Memorization progress weight
-        if (data.averageProgress >= 5) score += 25;
-        else if (data.averageProgress >= 3) score += 15;
-        else score += 5;
+        // Memorization progress weight (30 points)
+        if (data.averageProgress >= 5) score += 30;
+        else if (data.averageProgress >= 3) score += 20;
+        else if (data.averageProgress >= 1) score += 10;
 
-        // Reporting weight
-        if (data.numReportsThisMonth >= 10) score += 20;
-        else if (data.numReportsThisMonth >= 5) score += 10;
-
-        // Complaints weight (negative)
-        if (data.numComplaints === 0) score += 15;
-        else if (data.numComplaints <= 2) score += 5;
-
-        // Inactive students weight (negative)
-        if (data.numInactiveStudents === 0) score += 15;
-        else if (data.numInactiveStudents <= 2) score += 5;
+        // Inactive students weight (20 points)
+        if (data.numInactiveStudents === 0) score += 20;
+        else if (data.numInactiveStudents <= 2) score += 10;
 
         const finalScore = Math.min(score, 100);
         const rating = finalScore >= 90 ? "ممتاز" : finalScore >= 75 ? "جيد جدًا" : finalScore >= 60 ? "جيد" : "ضعيف";
@@ -110,14 +97,8 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
         if (data.averageProgress < 2) {
             suggestions.push("📚 مستوى الحفظ ضعيف — أضف جلسة مراجعة يومية مكثفة.");
         }
-        if (data.numComplaints >= 3) {
-            suggestions.push("🚨 الشكاوى مرتفعة — راجع أسبابها مع الطلاب المعنيين بسرعة.");
-        }
         if (data.numInactiveStudents >= 2) {
             suggestions.push("👥 بعض الطلبة غير نشطين، خصص جلسات فردية معهم.");
-        }
-         if (data.numReportsThisMonth < 5) {
-            suggestions.push("📝 حاول كتابة تقارير أكثر لتوثيق الأداء والمشاكل بشكل أفضل.");
         }
         
         if(suggestions.length === 0) {
