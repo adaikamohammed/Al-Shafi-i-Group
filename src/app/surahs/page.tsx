@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -90,40 +89,40 @@ export default function SurahProgressPage() {
 
 
     return (
-        <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-3xl font-headline font-bold">📖 متابعة الحفظ والإتقان</CardTitle>
-                    <CardDescription>
-                        حدد طالبًا، ثم انقر على السورة لتغيير حالتها: <span className="p-1 rounded-md bg-gray-200">غير محفوظة</span> &larr; <span className="p-1 rounded-md bg-green-200 text-green-800">محفوظة</span> &larr; <span className="p-1 rounded-md bg-green-600 text-white">متقنة</span>
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                        <div className="max-w-md">
-                            <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="اختر طالبًا..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {activeStudents.map(student => (
-                                        <SelectItem key={student.id} value={student.id}>
-                                            {student.fullName}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {selectedStudent && (
-                             <div className="space-y-2">
-                                <div className="flex justify-between text-sm font-medium">
-                                    <span>تقدم الطالب: {selectedStudent.fullName}</span>
-                                    <span className="text-muted-foreground">{progressCounts.total} من {allSurahs.length} سورة</span>
-                                </div>
-                                <TooltipProvider>
+        <TooltipProvider>
+            <div className="space-y-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-3xl font-headline font-bold">📖 متابعة الحفظ والإتقان</CardTitle>
+                        <CardDescription>
+                            حدد طالبًا، ثم انقر على السورة لتغيير حالتها: <span className="p-1 rounded-md bg-gray-200">غير محفوظة</span> &larr; <span className="p-1 rounded-md bg-green-200 text-green-800">محفوظة</span> &larr; <span className="p-1 rounded-md bg-green-600 text-white">متقنة</span>
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                            <div className="max-w-md">
+                                <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="اختر طالبًا..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {activeStudents.map(student => (
+                                            <SelectItem key={student.id} value={student.id}>
+                                                {student.fullName}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            {selectedStudent && (
+                                 <div className="space-y-2">
+                                    <div className="flex justify-between text-sm font-medium">
+                                        <span>تقدم الطالب: {selectedStudent.fullName}</span>
+                                        <span className="text-muted-foreground">{progressCounts.total} من {allSurahs.length} سورة</span>
+                                    </div>
                                     <Tooltip>
-                                        <TooltipTrigger>
-                                            <Progress className="h-3">
+                                        <TooltipTrigger className="w-full">
+                                            <Progress className="h-3 w-full">
                                                  <Progress value={progressPercentage.mastered + progressPercentage.memorized} className="bg-green-300" />
                                                  <Progress value={progressPercentage.mastered} className="bg-green-600 -mt-3" />
                                             </Progress>
@@ -134,46 +133,44 @@ export default function SurahProgressPage() {
                                             <p className="text-green-600 font-bold">متقن: {progressCounts.mastered}</p>
                                         </TooltipContent>
                                     </Tooltip>
-                                </TooltipProvider>
-                            </div>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
 
-            <div className="grid md:grid-cols-2 gap-6">
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>🏆 لوحة شرف الحفظ</CardTitle>
-                        <CardDescription>ترتيب الطلبة حسب عدد السور المحفوظة والمتقنة.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>الترتيب</TableHead>
-                                    <TableHead>الطالب</TableHead>
-                                    <TableHead>الإجمالي</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                            {leaderboard.map((student, index) => {
-                                 const rank = index + 1;
-                                 let rankClass = "";
-                                 if (rank === 1) rankClass = "bg-yellow-100 dark:bg-yellow-900/50 hover:bg-yellow-100/80";
-                                 else if (rank === 2) rankClass = "bg-gray-200 dark:bg-gray-700/50 hover:bg-gray-200/80";
-                                 else if (rank === 3) rankClass = "bg-orange-100 dark:bg-orange-900/50 hover:bg-orange-100/80";
+                <div className="grid md:grid-cols-3 gap-6">
+                     <Card className="md:col-span-1">
+                        <CardHeader>
+                            <CardTitle>🏆 لوحة شرف الحفظ</CardTitle>
+                            <CardDescription>ترتيب الطلبة حسب عدد السور المحفوظة والمتقنة.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>الترتيب</TableHead>
+                                        <TableHead>الطالب</TableHead>
+                                        <TableHead>الإجمالي</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                {leaderboard.map((student, index) => {
+                                     const rank = index + 1;
+                                     let rankClass = "";
+                                     if (rank === 1) rankClass = "bg-yellow-100 dark:bg-yellow-900/50 hover:bg-yellow-100/80";
+                                     else if (rank === 2) rankClass = "bg-gray-200 dark:bg-gray-700/50 hover:bg-gray-200/80";
+                                     else if (rank === 3) rankClass = "bg-orange-100 dark:bg-orange-900/50 hover:bg-orange-100/80";
 
-                                return (
-                                <TableRow key={student.id} className={rankClass}>
-                                    <TableCell className="font-bold text-lg">
-                                       {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <span>{student.fullName}</span>
-                                            {student.savedCount === 114 && 
-                                                <TooltipProvider>
+                                    return (
+                                    <TableRow key={student.id} className={rankClass}>
+                                        <TableCell className="font-bold text-lg">
+                                           {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <span>{student.fullName}</span>
+                                                {student.savedCount === 114 && 
                                                     <Tooltip>
                                                         <TooltipTrigger>
                                                              <Award className="h-5 w-5 text-yellow-500" />
@@ -182,60 +179,67 @@ export default function SurahProgressPage() {
                                                             <p>🎉 خاتم للقرآن الكريم</p>
                                                         </TooltipContent>
                                                     </Tooltip>
-                                                </TooltipProvider>
-                                            }
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-8 font-bold">{student.savedCount}</span>
-                                            <Progress value={(student.savedCount / allSurahs.length) * 100} className="w-20"/>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            )})}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                                                }
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-8 font-bold">{student.savedCount}</span>
+                                                <Progress value={(student.savedCount / allSurahs.length) * 100} className="w-20"/>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )})}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
 
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>خريطة المصحف</CardTitle>
-                         <CardDescription>
-                            انقر على اسم السورة لتغيير حالة حفظها للطالب المحدد.
-                         </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3">
-                            {allSurahs.map(surah => {
-                                const status = studentProgress[surah.id] || 0;
-                                let buttonClass = "bg-gray-200 hover:bg-gray-300 text-gray-800";
-                                if (status === 1) buttonClass = "bg-green-200 hover:bg-green-300 text-green-800";
-                                if (status === 2) buttonClass = "bg-green-600 hover:bg-green-700 text-white";
-                                
-                                return (
-                                    <Button
-                                        key={surah.id}
-                                        variant="outline"
-                                        onClick={() => handleSurahClick(surah.id)}
-                                        disabled={!selectedStudentId}
-                                        className={cn("h-auto justify-between transition-colors duration-300", buttonClass)}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            {status === 1 && <Check className="h-4 w-4" />}
-                                            {status === 2 && <CheckCircle className="h-4 w-4" />}
-                                            <span>{surah.id}. {surah.name}</span>
-                                        </div>
-                                        <span className="text-xs opacity-70">{surah.verses}</span>
-                                    </Button>
-                                )
-                            })}
-                        </div>
-                    </CardContent>
-                </Card>
+                     <Card className="md:col-span-2">
+                        <CardHeader>
+                            <CardTitle>خريطة المصحف</CardTitle>
+                             <CardDescription>
+                                انقر على اسم السورة لتغيير حالة حفظها للطالب المحدد.
+                             </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3">
+                                {allSurahs.map(surah => {
+                                    const status = studentProgress[surah.id] || 0;
+                                    let buttonClass = "bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200";
+                                    if (status === 1) buttonClass = "bg-green-200 hover:bg-green-300 text-green-800 dark:bg-green-800 dark:hover:bg-green-700 dark:text-green-100";
+                                    if (status === 2) buttonClass = "bg-green-600 hover:bg-green-700 text-white dark:bg-green-600 dark:hover:bg-green-500";
+                                    
+                                    return (
+                                        <Tooltip key={surah.id}>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => handleSurahClick(surah.id)}
+                                                    disabled={!selectedStudentId}
+                                                    className={cn("h-auto justify-between transition-colors duration-300", buttonClass)}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        {status === 1 && <Check className="h-4 w-4" />}
+                                                        {status === 2 && <CheckCircle className="h-4 w-4" />}
+                                                        <span>{surah.id}. {surah.name}</span>
+                                                    </div>
+                                                    <span className="text-xs opacity-70">{surah.verses}</span>
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>
+                                                    {surah.name} - {status === 0 ? "غير محفوظة" : status === 1 ? "محفوظة" : "متقنة"}
+                                                </p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    )
+                                })}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
-
-        </div>
+        </TooltipProvider>
     );
 }
