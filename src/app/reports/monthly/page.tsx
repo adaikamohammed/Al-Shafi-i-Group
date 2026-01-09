@@ -129,7 +129,9 @@ export default function MonthlyStatisticsPage() {
             }
         });
 
-        const unrecordedPastDays = daysPassed - recordedDays.size;
+        const unrecordedDaysInPast = isCurrentMonthAndYear
+          ? daysPassed - recordedDays.size
+          : daysInMonth - recordedDays.size;
 
         if (selectedStudentId === 'all') {
             sessionsInMonth.forEach(session => {
@@ -190,7 +192,7 @@ export default function MonthlyStatisticsPage() {
         const unpaidStudents = studentsDueForQuarter.filter(s => !studentsWhoPaidInQuarter.has(s.id));
         financialStats.unpaidStudentsCount = unpaidStudents.length;
 
-        return { ...stats, daysPassed, recordedDaysCount: recordedDays.size, unrecordedPastDays, studentSpecificRecords, financialStats };
+        return { ...stats, daysPassed, recordedDaysCount: recordedDays.size, unrecordedPastDays: unrecordedDaysInPast, studentSpecificRecords, financialStats };
 
     }, [dailySessions, dailyReports, payments, settings, selectedMonth, selectedYear, selectedStudentId, students]);
     
@@ -386,16 +388,14 @@ export default function MonthlyStatisticsPage() {
                 </Card>
             </div>
             
-             {selectedStudentId === 'all' && (
+             {selectedStudentId === 'all' ? (
                 <GroupEvaluationCard
                     students={students ?? []}
                     sessions={dailySessions}
                     reports={monthlyData.reports}
                     groupName={user?.group}
                 />
-            )}
-
-             {selectedStudentId !== 'all' && (
+            ) : (
                 <Card>
                     <CardHeader>
                         <CardTitle>تقويم الطالب: {(students ?? []).find(s => s.id === selectedStudentId)?.fullName}</CardTitle>
@@ -412,7 +412,7 @@ export default function MonthlyStatisticsPage() {
                 </Card>
             )}
 
-            {monthlyData.totalRecords > 0 || monthlyData.financialStats.totalRevenue > 0 ? (
+             {(monthlyData.totalRecords > 0 || monthlyData.financialStats.totalRevenue > 0) && selectedStudentId !== 'all' ? (
                 <>
                 <div className="grid gap-6 md:grid-cols-2">
                      <Card className="md:col-span-2">
@@ -513,13 +513,26 @@ export default function MonthlyStatisticsPage() {
                 </Card>
                 </>
             ) : (
-                 <div className="space-y-6 flex flex-col items-center justify-center h-60 border border-dashed rounded-lg">
-                    <AlertTriangle className="h-16 w-16 text-muted-foreground" />
-                    <h2 className="text-xl font-headline font-bold text-center">لا توجد بيانات مسجلة لهذا الشهر</h2>
-                    <p className="text-muted-foreground text-center">
-                        يرجى اختيار شهر آخر أو تسجيل بيانات في صفحة "الحصص اليومية".
-                    </p>
-                </div>
+                <>
+                { selectedStudentId === 'all' && (
+                    <div className="space-y-6 flex flex-col items-center justify-center h-60 border border-dashed rounded-lg">
+                        <AlertTriangle className="h-16 w-16 text-muted-foreground" />
+                        <h2 className="text-xl font-headline font-bold text-center">الرجاء تحديد طالب لعرض إحصائياته</h2>
+                        <p className="text-muted-foreground text-center">
+                            الإحصائيات الفردية تظهر عند اختيار طالب معين من القائمة أعلاه.
+                        </p>
+                    </div>
+                )}
+                 { selectedStudentId !== 'all' && monthlyData.totalRecords === 0 && (
+                     <div className="space-y-6 flex flex-col items-center justify-center h-60 border border-dashed rounded-lg">
+                        <AlertTriangle className="h-16 w-16 text-muted-foreground" />
+                        <h2 className="text-xl font-headline font-bold text-center">لا توجد بيانات مسجلة لهذا الشهر</h2>
+                        <p className="text-muted-foreground text-center">
+                            يرجى اختيار شهر آخر أو تسجيل بيانات في صفحة "الحصص اليومية".
+                        </p>
+                    </div>
+                 )}
+                </>
             )}
         </div>
     );
