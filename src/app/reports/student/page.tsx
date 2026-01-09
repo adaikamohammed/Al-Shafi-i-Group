@@ -211,7 +211,7 @@ export default function StudentReportPage() {
 
         const { student, stats, autoNote } = reportData;
         const groupName = user?.group || "المدرسة";
-        let finalNote = teacherNote.trim() ? `ملاحظة الشيخ: ${teacherNote.trim()}` : (autoNote ? `ملاحظة الشيخ: ${autoNote}` : '');
+        const sheikhNote = teacherNote.trim() ? `\n\n*ملاحظة الشيخ:* ${teacherNote.trim()}` : (autoNote ? `\n\n*ملاحظة الشيخ:* ${autoNote}`: '');
         let message = '';
         
         const absenceThreshold = 3;
@@ -221,42 +221,36 @@ export default function StudentReportPage() {
         if (stats.absent >= absenceThreshold) {
             message = `السلام عليكم ورحمة الله وبركاته،
 نود إفادتكم من إدارة (${groupName}) بأن ابننا ${student.fullName} قد تغيب عن الحلقات لـ ${stats.absent} أيام.
-استمرارية الحضور هي سر الإنجاز، نرجو التنسيق معنا لضمان عودته للمسار.
-${finalNote}
-تم الإرسال عبر نظام إدارة فوج 3 - الشيخ ${user?.displayName || ''}.`;
+استمرارية الحضور هي سر الإنجاز، نرجو التنسيق معنا لضمان عودته للمسار.${sheikhNote}`;
         } else if (stats.undisciplined >= undisciplinedThreshold) {
             message = `عناية ولي أمر الطالب ${student.fullName} المحترم،
 نود إشراككم في متابعة سلوك الابن خلال الحلقة، حيث تم رصد سلوك غير منضبط ${stats.undisciplined} مرات.
-نؤمن بأن تكامل البيت والمسجد هو أساس التربية.
-${finalNote}
-تم الإرسال عبر نظام إدارة فوج 3 - الشيخ ${user?.displayName || ''}.`;
+نؤمن بأن تكامل البيت والمسجد هو أساس التربية.${sheikhNote}`;
         } else if (stats.poor >= poorEvaluationThreshold) {
-             const lastEvaluation = stats.poor > 0 ? "ضعيف" : "متوسط";
+            const lastEvaluation = stats.poor > 0 ? "ضعيف" : "متوسط";
             message = `تحية طيبة من إدارة (${groupName})،
 نود إحاطتكم علماً بأن مستوى ${student.fullName} شهد تراجعاً طفيفاً في التقييم الأخير (من ممتاز إلى ${lastEvaluation}).
-حرصاً منا على تميزه، نرجو منكم حثه على المراجعة بالمنزل.
-${finalNote}
-تم الإرسال عبر نظام إدارة فوج 3 - الشيخ ${user?.displayName || ''}.`;
+حرصاً منا على تميزه، نرجو منكم حثه على المراجعة بالمنزل.${sheikhNote}`;
         } else {
-             const attendanceRate = reportData.totalSessionsHeld > 0 
+            const attendanceRate = reportData.totalSessionsHeld > 0 
                 ? Math.round(((stats.present + stats.late) / reportData.totalSessionsHeld) * 100) + "%" 
                 : "غير متاح";
-            message = `📢 *تقرير شامل لأداء الطالب: ${student.fullName}*
+            message = `*📢 تقرير أداء الطالب: ${student.fullName}*
     
-📆 *الفترة*: ${reportData.statsPeriod}
-👨‍🏫 *الشيخ المسؤول*: ${user?.displayName || "الشيخ"}
+*📆 الفترة:* ${reportData.statsPeriod}
+*👨‍🏫 الشيخ المسؤول:* ${user?.displayName || "الشيخ"}
     
-📖 *عدد السور المحفوظة*: ${reportData.memorizedSurahsCount}
-📊 *معدل الحضور*: ${attendanceRate}
+*📖 عدد السور المحفوظة:* ${reportData.memorizedSurahsCount}
+*📊 معدل الحضور:* ${attendanceRate}
     
-📝 *ملاحظات وتوصيات الشيخ*:
-${teacherNote.trim() || autoNote || "لا توجد ملاحظات إضافية."}
-    
-📤 هذا التقرير تم إعداده تلقائيًا من قبل نظام إدارة مدرسة الإمام الشافعي.`;
+*📝 ملاحظات وتوصيات الشيخ:*
+${teacherNote.trim() || autoNote || "لا توجد ملاحظات إضافية."}`;
         }
 
+        const finalMessage = `${message.trim()}\n\n---\n*تم الإرسال عبر نظام إدارة مدرسة الإمام الشافعي.*`;
 
-        navigator.clipboard.writeText(message.trim()).then(() => {
+
+        navigator.clipboard.writeText(finalMessage).then(() => {
             toast({
                 title: "✅ تم النسخ بنجاح!",
                 description: "الرسالة جاهزة للصق في واتساب.",
@@ -355,7 +349,7 @@ ${teacherNote.trim() || autoNote || "لا توجد ملاحظات إضافية."
                         </Button>
                         <Button onClick={handleCopyWhatsAppReport} disabled={!selectedStudentId} variant="secondary">
                             <MessageCircle className="ml-2 h-4 w-4" />
-                            نسخ رسالة واتساب
+                            تجهيز رسالة واتساب
                         </Button>
                     </div>
                 </CardContent>
