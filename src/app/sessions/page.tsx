@@ -5,13 +5,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, DailySession } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, ArrowLeft, ArrowRight, Loader2, Download, MoreVertical, Trash2, PlusCircle, Copy } from 'lucide-react';
+import { Info, ArrowLeft, ArrowRight, Loader2, Download, MoreVertical, Trash2, PlusCircle, Copy, Dot } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -40,7 +40,7 @@ const sessionTypeOptions: SessionType[] = ["حصة أساسية", "حصة أنش
 export default function DailySessionsPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
-  const [selectedSessionNumber, setSelectedSessionNumber] = useState<1 | 2>(1);
+  const [sessionToOpen, setSessionToOpen] = useState<1 | 2>(1);
   const [isSessionDialogOpen, setSessionDialogOpen] = useState(false);
   const { toast } = useToast();
   
@@ -53,7 +53,7 @@ export default function DailySessionsPage() {
   const handleDayClick = (day: number, sessionNumber: 1 | 2 = 1) => {
     const newSelectedDay = new Date(getYear(currentDate), getMonth(currentDate), day);
     setSelectedDay(newSelectedDay);
-    setSelectedSessionNumber(sessionNumber);
+    setSessionToOpen(sessionNumber);
     setSessionDialogOpen(true);
   };
   
@@ -154,7 +154,13 @@ export default function DailySessionsPage() {
           )}
         >
             <div className="flex justify-between w-full items-start">
-                 <span className="font-bold">{day}</span>
+                 <div className="flex items-center">
+                    <span className="font-bold">{day}</span>
+                    <div className="flex mr-1">
+                        {sessionsForDay.includes(s => s.sessionNumber === 1) && <Dot className="h-4 w-4 text-primary" />}
+                        {sessionsForDay.includes(s => s.sessionNumber === 2) && <Dot className="h-4 w-4 text-accent" />}
+                    </div>
+                 </div>
                  {sessionsForDay.length > 0 && !isSuperAdmin && (
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <DropdownMenu>
@@ -287,14 +293,14 @@ export default function DailySessionsPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="overflow-y-auto pr-4">
-              <DailySessionForm 
+              <DailySessionManager 
                 day={selectedDay} 
+                initialSessionNumber={sessionToOpen}
                 students={activeStudents}
                 onClose={() => setSessionDialogOpen(false)}
                 addDailySession={addDailySession}
                 getSessionById={getSessionById}
                 isSuperAdmin={isSuperAdmin}
-                sessionNumber={selectedSessionNumber}
               />
             </div>
           </DialogContent>
@@ -304,6 +310,52 @@ export default function DailySessionsPage() {
   );
 }
 
+
+interface DailySessionManagerProps {
+    day: Date;
+    initialSessionNumber: 1 | 2;
+    students: Student[];
+    onClose: () => void;
+    addDailySession: (session: DailySession) => void;
+    getSessionById: (sessionId: string) => DailySession | undefined;
+    isSuperAdmin?: boolean;
+}
+
+function DailySessionManager({ day, initialSessionNumber, students, onClose, addDailySession, getSessionById, isSuperAdmin }: DailySessionManagerProps) {
+    const [selectedSession, setSelectedSession] = useState<1 | 2>(initialSessionNumber);
+
+    return (
+        <div className="space-y-4">
+            <div className="flex border-b">
+                <Button 
+                    variant={selectedSession === 1 ? 'ghost' : 'ghost'}
+                    className={cn("flex-1 rounded-none", selectedSession === 1 && "border-b-2 border-primary font-bold bg-muted")}
+                    onClick={() => setSelectedSession(1)}
+                >
+                    الحصة الأولى (أساسية)
+                </Button>
+                <Button 
+                    variant={selectedSession === 2 ? 'ghost' : 'ghost'}
+                     className={cn("flex-1 rounded-none", selectedSession === 2 && "border-b-2 border-primary font-bold bg-muted")}
+                    onClick={() => setSelectedSession(2)}
+                >
+                    الحصة الثانية (إضافية)
+                </Button>
+            </div>
+            
+            <DailySessionForm
+                key={selectedSession} // Force re-mount when session number changes
+                day={day}
+                sessionNumber={selectedSession}
+                students={students}
+                onClose={onClose}
+                addDailySession={addDailySession}
+                getSessionById={getSessionById}
+                isSuperAdmin={isSuperAdmin}
+            />
+        </div>
+    );
+}
 
 interface DailySessionFormProps {
     day: Date;
@@ -396,7 +448,6 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     <TooltipProvider>
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Label className="font-bold text-lg">الحصة رقم: {sessionNumber}</Label>
           <div className="flex items-center gap-2">
             <Select dir="rtl" value={sessionType} onValueChange={(value: SessionType) => setSessionType(value)} disabled={isSuperAdmin}>
               <SelectTrigger className="w-[200px]">
@@ -515,3 +566,4 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     </TooltipProvider>
   );
 }
+

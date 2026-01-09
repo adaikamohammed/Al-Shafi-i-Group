@@ -58,8 +58,10 @@ export default function MonthlyStatisticsPage() {
         const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(sessionsOnDate => 
             Object.values(sessionsOnDate).filter(session => {
                 if (!session || !session.date) return false;
-                const sessionDate = parseISO(session.date);
-                return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
+                try {
+                    const sessionDate = parseISO(session.date);
+                    return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
+                } catch(e) { return false; }
             })
         );
         
@@ -67,8 +69,10 @@ export default function MonthlyStatisticsPage() {
             .flatMap(dayReports => Object.values(dayReports))
             .filter(report => {
                  if(!report?.date) return false;
-                 const reportDate = parseISO(report.date);
-                 return reportDate >= monthStartDate && reportDate <= monthEndDate;
+                 try {
+                    const reportDate = parseISO(report.date);
+                    return reportDate >= monthStartDate && reportDate <= monthEndDate;
+                 } catch(e) { return false; }
             });
             
         const paymentsInQuarter = (payments ?? []).filter(p => {
@@ -109,8 +113,10 @@ export default function MonthlyStatisticsPage() {
         if (selectedStudentId !== 'all') {
             const studentSessions = Object.values(dailySessions ?? {}).flatMap(Object.values).filter(session => {
                 if (!session || !session.date) return false;
-                const sessionDate = parseISO(session.date);
-                return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
+                try {
+                    const sessionDate = parseISO(session.date);
+                    return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
+                } catch(e) { return false; }
             });
             studentSessions.forEach(session => {
                  if (!studentSpecificRecords[session.date]) {
@@ -467,5 +473,6 @@ export default function MonthlyStatisticsPage() {
 }
 
     
+
 
 

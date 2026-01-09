@@ -51,8 +51,11 @@ export default function RankingPage() {
 
         const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(sessionsOnDate => 
             Object.values(sessionsOnDate).filter(session => {
-                const sessionDate = parseISO(session.date);
-                return sessionDate >= calculationStartDate && sessionDate <= monthEndDate;
+                if(!session?.date) return false;
+                try {
+                    const sessionDate = parseISO(session.date);
+                    return sessionDate >= calculationStartDate && sessionDate <= monthEndDate;
+                } catch(e) { return false; }
             })
         );
 
