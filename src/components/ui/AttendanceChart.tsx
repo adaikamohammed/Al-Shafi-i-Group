@@ -7,16 +7,20 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tool
 import { format, subDays, parseISO } from 'date-fns';
 import type { DailySession } from '@/lib/types';
 
-export const AttendanceChart = ({ sessions }: { sessions: Record<string, DailySession> }) => {
+export const AttendanceChart = ({ sessions }: { sessions: Record<string, Record<string, DailySession>> }) => {
     const attendanceLast7Days = useMemo(() => {
         const data = Array.from({ length: 7 }).map((_, i) => {
             const date = subDays(new Date(), i);
             const dateStr = format(date, 'yyyy-MM-dd');
-            const session = sessions[dateStr];
+            const daySessions = sessions[dateStr] ? Object.values(sessions[dateStr]) : [];
+            
             let attendance = 0;
-            if (session && session.records && session.records.length > 0) {
-                const present = session.records.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
-                attendance = (present / session.records.length) * 100;
+            if (daySessions.length > 0) {
+                const allRecords = daySessions.flatMap(s => s.records ?? []);
+                 if (allRecords.length > 0) {
+                    const present = allRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
+                    attendance = (present / allRecords.length) * 100;
+                }
             }
             return { date: format(date, 'd/M'), attendance: parseFloat(attendance.toFixed(1)) };
         }).reverse();
@@ -24,7 +28,7 @@ export const AttendanceChart = ({ sessions }: { sessions: Record<string, DailySe
     }, [sessions]);
 
     return (
-        <Card className="col-span-1 lg:col-span-3">
+        <Card className="col-span-1 lg:col-span-7">
             <CardHeader>
                 <CardTitle>متابعة نسبة الحضور (آخر 7 أيام)</CardTitle>
             </CardHeader>

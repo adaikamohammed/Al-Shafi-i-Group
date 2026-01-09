@@ -36,10 +36,9 @@ export default function OverviewPage() {
         const currentYear = getYear(new Date());
 
         // Attendance
-        const todaySession = dailySessions?.[todayStr];
+        const sessionsToday = dailySessions?.[todayStr] ? Object.values(dailySessions[todayStr]) : [];
         let attendancePercentage = 0;
-        if (todaySession && Object.values(todaySession).length > 0) {
-            const sessionsToday = Object.values(todaySession);
+        if (sessionsToday.length > 0) {
             const allRecords = sessionsToday.flatMap(s => s.records ?? []);
             if (allRecords.length > 0) {
                 const presentCount = allRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
@@ -249,9 +248,6 @@ export default function OverviewPage() {
             </div>
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <div className="col-span-1 lg:col-span-4">
-                    {/* Placeholder for SmartAlerts if it were a separate component */}
-                </div>
                 <AttendanceChart sessions={dailySessions} />
             </div>
         </div>

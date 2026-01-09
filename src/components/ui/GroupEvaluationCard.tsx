@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo } from 'react';
@@ -12,7 +11,7 @@ import { ar } from 'date-fns/locale';
 
 interface GroupEvaluationCardProps {
     students: Student[];
-    sessions: Record<string, DailySession>;
+    sessions: Record<string, Record<string, DailySession>>;
     reports: DailyReport[];
     groupName?: string | null;
 }
@@ -22,7 +21,7 @@ const NEGATIVE_REPORT_CATEGORIES = ["شكوى"];
 
 const calculateSentimentForWeek = (
     students: Student[], 
-    sessions: Record<string, DailySession>, 
+    sessions: Record<string, Record<string, DailySession>>, 
     reports: DailyReport[], 
     weekStartDate: Date, 
     weekEndDate: Date
@@ -32,8 +31,10 @@ const calculateSentimentForWeek = (
     
     const weeklySessions = Object.values(sessions).flatMap(s => Object.values(s)).filter(s => {
         if (!s || !s.date) return false;
-        const sessionDate = parseISO(s.date);
-        return sessionDate >= weekStartDate && sessionDate <= weekEndDate;
+        try {
+          const sessionDate = parseISO(s.date);
+          return sessionDate >= weekStartDate && sessionDate <= weekEndDate;
+        } catch(e) { return false; }
     });
 
     const weeklyReports = reports.filter(r => {
