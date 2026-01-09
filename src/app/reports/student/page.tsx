@@ -136,7 +136,7 @@ export default function StudentReportPage() {
 
 
         const radarData = [
-            { subject: 'الحاضر', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
+            { subject: 'الحضور', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
             { subject: 'الحفظ', score: parseFloat(memorizationScore.toFixed(1)), fullMark: 10 },
             { subject: 'الانضباط', score: parseFloat(disciplineScore.toFixed(1)), fullMark: 10 },
             { subject: 'التجويد', score: tajweedScore, fullMark: 10 },
@@ -548,3 +548,5 @@ ${teacherNote.trim() || autoNote || "لا توجد ملاحظات إضافية."
     );
 }
 
+
+    

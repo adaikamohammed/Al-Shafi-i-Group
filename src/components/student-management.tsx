@@ -27,6 +27,7 @@ import { ar } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 const statusVariant: { [key in StudentStatus]: "default" | "destructive" | "secondary" | "outline" } = {
@@ -94,10 +95,10 @@ export default function StudentManagementPage() {
         .sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
   }, [students, searchTerm]);
   
-  const getActiveCard = (student: Student): CovenantCard | null => {
-    const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط' && c.card !== 'بدون');
-    return activeCovenant ? activeCovenant.card : null;
-  }
+  const getActiveCovenant = (student: Student): Covenant | null => {
+      if (!student.covenants || student.covenants.length === 0) return null;
+      return student.covenants.find(c => c.status === 'نشط' && c.card !== 'بدون') || null;
+  };
 
 
   if (loading) {
@@ -132,6 +133,7 @@ export default function StudentManagementPage() {
   }
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
        <DailyInspiration />
        
@@ -218,13 +220,25 @@ export default function StudentManagementPage() {
             <TableBody>
              {filteredStudents.length > 0 ? (
                 filteredStudents.map((student) => {
-                    const activeCard = getActiveCard(student);
+                    const activeCovenant = getActiveCovenant(student);
                     return (
-                        <TableRow key={student.id}>
+                        <TableRow key={student.id} className={cn(
+                            activeCovenant?.card === 'بطاقة صفراء' && 'bg-yellow-50 dark:bg-yellow-900/20',
+                            activeCovenant?.card === 'بطاقة حمراء' && 'bg-red-50 dark:bg-red-900/20'
+                        )}>
                             <TableCell className="font-medium text-center">
                                 <div className="flex items-center justify-center gap-2">
-                                     {activeCard === 'بطاقة صفراء' && <div className="w-2.5 h-2.5 bg-yellow-400 rounded-full" title="بطاقة صفراء"></div>}
-                                     {activeCard === 'بطاقة حمراء' && <div className="w-2.5 h-2.5 bg-red-500 rounded-full" title="بطاقة حمراء"></div>}
+                                     {activeCovenant && (
+                                        <Tooltip>
+                                            <TooltipTrigger>
+                                                <ShieldAlert className={cn("h-5 w-5", activeCovenant.card === 'بطاقة صفراء' ? 'text-yellow-500' : 'text-red-500')} />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p className="font-bold">الطالب تحت التعهد ({activeCovenant.card}):</p>
+                                                <p>{activeCovenant.text}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                     )}
                                      <span>{student.fullName}</span>
                                 </div>
                             </TableCell>
@@ -256,6 +270,7 @@ export default function StudentManagementPage() {
         </CardContent>
       </Card>
     </div>
+    </TooltipProvider>
   );
 }
 
@@ -611,3 +626,5 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
+    
