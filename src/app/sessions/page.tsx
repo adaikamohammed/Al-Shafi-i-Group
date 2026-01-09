@@ -473,9 +473,13 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
   const isHoliday = sessionType === 'يوم عطلة';
   const isTeacherAbsentNoSub = sessionType === 'غياب الشيخ' && !hasSubstitute;
 
-  const getActiveCovenant = (student: Student): Covenant | null => {
+  const getActiveCovenant = (student: Student, type: 'any' | 'task' = 'any'): Covenant | null => {
       if (!student.covenants || student.covenants.length === 0) return null;
-      return student.covenants.find(c => c.status === 'نشط' && c.card !== 'بدون') || null;
+      const activeCovenants = student.covenants.filter(c => c.status === 'نشط' && c.card !== 'بدون');
+      if (type === 'task') {
+          return activeCovenants.find(c => c.type === 'ميثاق حفظ') || null;
+      }
+      return activeCovenants[0] || null; // Return the first active covenant of any type
   };
   
   const CovenantIcon = ({ covenant }: { covenant: Covenant }) => {
@@ -560,16 +564,27 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
                 const isAbsent = record.attendance === 'غائب';
                 const isRowDisabled = isAbsent || isActivitySession;
                 const activeCovenant = getActiveCovenant(student);
+                const empowermentTask = getActiveCovenant(student, 'task');
                 
                 return (
                   <TableRow key={student.id} className={cn(isAbsent && 'bg-muted/50')}>
                     <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                             <span>{student.fullName}</span>
-                            {activeCovenant && (
+                            {empowermentTask ? (
                                 <Tooltip>
                                     <TooltipTrigger>
-                                        <CovenantIcon covenant={activeCovenant} />
+                                        <FilePen className={cn("h-5 w-5", empowermentTask.card === 'بطاقة صفراء' ? 'text-yellow-500' : 'text-red-500')} />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p className="font-bold">مهمة تمكين نشطة:</p>
+                                        <p>{empowermentTask.text}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            ) : activeCovenant && (
+                                <Tooltip>
+                                    <TooltipTrigger>
+                                        <ShieldAlert className={cn("h-5 w-5", activeCovenant.card === 'بطاقة صفراء' ? 'text-yellow-500' : 'text-red-500')} />
                                     </TooltipTrigger>
                                     <TooltipContent>
                                         <p className="font-bold">الطالب تحت "{activeCovenant.type}" ({activeCovenant.card}):</p>
@@ -665,3 +680,4 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     
 
     
+
