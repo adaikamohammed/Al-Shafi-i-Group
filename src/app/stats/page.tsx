@@ -11,7 +11,7 @@ import { Loader2, AlertTriangle, ArrowLeft, ArrowRight, Star } from 'lucide-reac
 import { format, startOfWeek, endOfWeek, addDays, subDays, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import type { Student, DailySession, DailyRecord } from '@/lib/types';
+import type { Student, DailySession, DailyRecord, PerformanceLevel } from '@/lib/types';
 
 
 const getAttendanceColor = (status?: string) => {
@@ -34,11 +34,12 @@ const getBehaviorClass = (behavior?: string | null) => {
     }
 }
 
-const getEvaluationIcon = (evaluation?: string | null) => {
+const getEvaluationIcon = (evaluation?: PerformanceLevel | null) => {
     switch(evaluation) {
-        case 'ممتاز': return <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />;
-        case 'جيد': return <Star className="h-3 w-3 text-yellow-500" />;
-        case 'متوسط': return <Star className="h-3 w-3 text-gray-400" />;
+        case 'ممتاز': return <Star className="h-3 w-3 text-green-500 fill-green-500" />;
+        case 'جيد': return <Star className="h-3 w-3 text-blue-500 fill-blue-500" />;
+        case 'متوسط': return <Star className="h-3 w-3 text-orange-500 fill-orange-500" />;
+        case 'ضعيف': return <Star className="h-3 w-3 text-red-500 fill-red-500" />;
         default: return null;
     }
 }
@@ -53,14 +54,12 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
 
     const isHoliday = session1?.sessionType === 'يوم عطلة' || session2?.sessionType === 'يوم عطلة';
     
-    // Determine primary status for background color
     let primaryStatus = record1?.attendance || (record2?.attendance ? record2.attendance : (isHoliday ? 'عطلة' : undefined));
     
     const attendanceColor = getAttendanceColor(primaryStatus);
 
-    // Determine behavior for border color, only if present
     let behaviorClass = 'border-transparent';
-    if (primaryStatus === 'حاضر' || primaryStatus === 'متأخر' || primaryStatus === 'تعويض') {
+    if (primaryStatus && ['حاضر', 'متأخر', 'تعويض'].includes(primaryStatus)) {
         const primaryBehavior = record1?.behavior || record2?.behavior;
         behaviorClass = getBehaviorClass(primaryBehavior);
     }
@@ -77,21 +76,20 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
     if (isHoliday) {
          tooltipContent = <p>يوم عطلة</p>;
     } else if (record1 || record2) {
+        const renderRecordDetails = (record: DailyRecord, session?: DailySession) => (
+            <div className="text-right">
+                <p className="font-semibold">الحصة {session?.sessionNumber} ({session?.sessionType})</p>
+                <p className="text-xs"><span className="font-bold">الحضور:</span> {record.attendance || 'لم يسجل'}</p>
+                <p className="text-xs"><span className="font-bold">السلوك:</span> {record.behavior || 'لم يسجل'}</p>
+                <p className="text-xs"><span className="font-bold">التقييم:</span> {record.memorization || 'لم يقيم'}</p>
+            </div>
+        );
         tooltipContent = (
-            <div className="text-right space-y-2">
+            <div className="space-y-2">
                  <p className="font-bold border-b pb-1 mb-1">{format(date, 'd MMMM yyyy', { locale: ar })}</p>
-                 {record1 && <div>
-                    <p className="font-semibold">الحصة 1 ({session1?.sessionType})</p>
-                    <p className="text-xs"><span className="font-bold">الحضور:</span> {record1.attendance}</p>
-                    <p className="text-xs"><span className="font-bold">السلوك:</span> {record1.behavior || 'لم يسجل'}</p>
-                    <p className="text-xs"><span className="font-bold">التقييم:</span> {record1.memorization || 'لم يقيم'}</p>
-                 </div>}
-                 {record2 && <div>
-                    <p className="font-semibold">الحصة 2 ({session2?.sessionType})</p>
-                    <p className="text-xs"><span className="font-bold">الحضور:</span> {record2.attendance}</p>
-                    <p className="text-xs"><span className="font-bold">السلوك:</span> {record2.behavior || 'لم يسجل'}</p>
-                    <p className="text-xs"><span className="font-bold">التقييم:</span> {record2.memorization || 'لم يقيم'}</p>
-                 </div>}
+                 {record1 && renderRecordDetails(record1, session1)}
+                 {record2 && record1 && <hr className="my-1"/>}
+                 {record2 && renderRecordDetails(record2, session2)}
             </div>
         );
     }
@@ -239,10 +237,11 @@ export default function WeeklyFollowUpPage() {
                          <div>
                             <h4 className="font-semibold mb-2">⭐ التقييم (أيقونة النجمة)</h4>
                              <ul className="space-y-1 text-sm">
-                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500 fill-yellow-500" /> ممتاز</li>
-                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500" /> جيد</li>
-                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-gray-400" /> متوسط</li>
-                                <li className="flex items-center gap-2">لا توجد نجمة: ضعيف أو لم يقيم</li>
+                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-green-500 fill-green-500" /> ممتاز</li>
+                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-blue-500 fill-blue-500" /> جيد</li>
+                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-orange-500 fill-orange-500" /> متوسط</li>
+                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-red-500 fill-red-500" /> ضعيف</li>
+                                <li className="flex items-center gap-2">لا توجد نجمة: لم يقيم</li>
                             </ul>
                         </div>
                          <div>
