@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, Download, History, Loader2, CalendarClock } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { Student, SessionRecord, SessionType } from '@/lib/types';
+import type { Student, DailyRecord, SessionType, DailySession } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
 import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -184,12 +184,14 @@ export default function DataExchangePage() {
 
         let sessionDateStr = '';
         let sessionType: SessionType | null = null;
-        const recordsToSave: SessionRecord[] = [];
+        let sessionNumber: 1 | 2 = 1;
+        const recordsToSave: Omit<DailyRecord, 'sessionId'>[] = [];
 
         json.forEach((row, index) => {
             const currentSessionType = row['نوع الحصة'] as SessionType;
             const currentStudentName = row['اسم الطالب'];
             const currentDateStr = row['التاريخ'];
+            const currentSessionNumber = row['رقم الحصة'] || 1;
 
              if (!currentDateStr) {
                 errors.push(`❌ الصف رقم ${index + 2}: عمود التاريخ فارغ.`);
@@ -199,6 +201,7 @@ export default function DataExchangePage() {
             if (!sessionDateStr) {
                 sessionDateStr = format(parse(currentDateStr, 'dd/MM/yyyy', new Date()), 'yyyy-MM-dd');
             }
+            if(index === 0) sessionNumber = currentSessionNumber;
 
             if (!currentSessionType || !validSessionTypes.includes(currentSessionType)) {
                 errors.push(`❌ الصف رقم ${index + 2}: نوع الحصة "${currentSessionType}" غير صالح.`);
@@ -237,15 +240,20 @@ export default function DataExchangePage() {
         if (errors.length > 0) {
             throw new Error(errors.join('\n'));
         }
+        
+        const sessionId = `${sessionDateStr}-${sessionNumber}`;
+        const finalRecords: DailyRecord[] = recordsToSave.map(r => ({ ...r, sessionId }));
 
         if (sessionDateStr && sessionType) {
-             addDailySession({ date: sessionDateStr, sessionType, records: recordsToSave });
+             const session: DailySession = { id: sessionId, date: sessionDateStr, sessionType, sessionNumber, records: finalRecords };
+             addDailySession(session);
              toast({
                 title: "نجاح ✅",
-                description: `تم استيراد وحفظ ${recordsToSave.length} سجل حصة بنجاح ليوم ${sessionDateStr}.`,
+                description: `تم استيراد وحفظ ${finalRecords.length} سجل حصة بنجاح للحصة رقم ${sessionNumber} ليوم ${sessionDateStr}.`,
             });
-        } else if (recordsToSave.length === 0 && sessionType === 'يوم عطلة' && sessionDateStr) {
-             addDailySession({ date: sessionDateStr, sessionType: 'يوم عطلة', records: [] });
+        } else if (finalRecords.length === 0 && sessionType === 'يوم عطلة' && sessionDateStr) {
+             const session: DailySession = { id: sessionId, date: sessionDateStr, sessionType: 'يوم عطلة', sessionNumber, records: [] };
+             addDailySession(session);
              toast({
                 title: "نجاح ✅",
                 description: `تم تسجيل يوم ${sessionDateStr} كـ "يوم عطلة".`,
@@ -287,49 +295,53 @@ export default function DataExchangePage() {
         try {
             const data = new Uint8Array(e.target?.result as ArrayBuffer);
             const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-            const daysInSelectedMonth = getDaysInMonth(new Date(importYear, importMonth));
-            const monthStr = (importMonth + 1).toString().padStart(2, '0');
+            
+            workbook.SheetNames.forEach(sheetName => {
+                // Sheet names could be '2024-05-20-1' or '2024-05-20' for backward compatibility
+                const parts = sheetName.split('-');
+                if (parts.length < 3) return; // Ignore invalid sheet names
 
-            for(let day = 1; day <= daysInSelectedMonth; day++) {
-                const dayStr = day.toString().padStart(2, '0');
-                const sheetName = `${importYear}-${monthStr}-${dayStr}`;
+                const dateStr = parts.slice(0, 3).join('-');
+                const sessionNumber = parts.length > 3 ? parseInt(parts[3], 10) as 1 | 2 : 1;
+                
+                const worksheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json<any>(worksheet);
 
-                if (workbook.SheetNames.includes(sheetName)) {
-                    const worksheet = workbook.Sheets[sheetName];
-                    const json = XLSX.utils.sheet_to_json<any>(worksheet);
+                if (json.length === 0) return;
 
-                    if (json.length === 0) continue;
+                let sessionType: SessionType | null = null;
+                const recordsToSave: Omit<DailyRecord, 'sessionId'>[] = [];
 
-                    let sessionType: SessionType | null = null;
-                    const recordsToSave: SessionRecord[] = [];
+                json.forEach((row, index) => {
+                   const currentSessionType = row['نوع الحصة'] as SessionType;
+                   if(index === 0) sessionType = currentSessionType;
+                   if (currentSessionType === 'يوم عطلة') return;
 
-                    json.forEach((row, index) => {
-                       const currentSessionType = row['نوع الحصة'] as SessionType;
-                       if(index === 0) sessionType = currentSessionType;
-                       if (currentSessionType === 'يوم عطلة') return;
+                   const studentName = row['اسم الطالب']?.trim();
+                   if (!studentName) return;
 
-                       const studentName = row['اسم الطالب']?.trim();
-                       if (!studentName) return; // Skip if no student name
-
-                       const student = (students ?? []).find(s => s.fullName === studentName);
-                       if (!student) {
-                           errors.push(`لم يتم العثور على الطالب "${studentName}" في ورقة ${sheetName}`);
-                           return;
-                       }
-                       recordsToSave.push({
-                           studentId: student.id,
-                           attendance: row['الحضور'], behavior: row['السلوك'],
-                           memorization: row['التقييم'], review: row['مراجعة'] === 'نعم',
-                           notes: row['ملاحظات'],
-                       });
-                    });
-                    
-                     if(sessionType) {
-                        addDailySession({ date: sheetName, sessionType, records: recordsToSave });
-                        successCount++;
-                     }
+                   const student = (students ?? []).find(s => s.fullName === studentName);
+                   if (!student) {
+                       errors.push(`لم يتم العثور على الطالب "${studentName}" في ورقة ${sheetName}`);
+                       return;
+                   }
+                   recordsToSave.push({
+                       studentId: student.id,
+                       attendance: row['الحضور'], behavior: row['السلوك'],
+                       memorization: row['التقييم'], review: row['مراجعة'] === 'نعم',
+                       notes: row['ملاحظات'],
+                   });
+                });
+                
+                if(sessionType) {
+                    const sessionId = `${dateStr}-${sessionNumber}`;
+                    const finalRecords = recordsToSave.map(r => ({...r, sessionId}));
+                    const session: DailySession = { id: sessionId, date: dateStr, sessionType, sessionNumber, records: finalRecords };
+                    addDailySession(session);
+                    successCount++;
                 }
-            }
+            });
+
 
             if (errors.length > 0) {
                 throw new Error(errors.join('\n'));
@@ -337,7 +349,7 @@ export default function DataExchangePage() {
 
             toast({
                 title: "اكتمل الاستيراد الشهري ✅",
-                description: `تم استيراد ${successCount} يومًا بنجاح.`,
+                description: `تم استيراد ${successCount} حصة بنجاح.`,
             });
 
         } catch (error) {
@@ -382,6 +394,7 @@ export default function DataExchangePage() {
     const data = activeStudents.map(student => ({
       'التاريخ': formattedDate,
       'اليوم': dayName,
+      'رقم الحصة': 1,
       'نوع الحصة': 'حصة أساسية',
       'اسم الطالب': student.fullName,
       'الحضور': '', 'التقييم': '', 'السلوك': '',
@@ -390,7 +403,7 @@ export default function DataExchangePage() {
 
     const ws = XLSX.utils.json_to_sheet(data);
     ws['!cols'] = [
-      { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+      { wch: 12 }, { wch: 10 }, {wch: 10}, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
       { wch: 12 }, { wch: 10 }, { wch: 30 }
     ];
     const wb = XLSX.utils.book_new();
@@ -414,39 +427,43 @@ export default function DataExchangePage() {
 
         const workbook = XLSX.utils.book_new();
 
-        Object.entries(monthRecords).sort(([dateA], [dateB]) => dateA.localeCompare(dateB)).forEach(([date, session]) => {
-            const formattedDate = format(parseISO(date), 'yyyy-MM-dd');
-            let dataForSheet;
+        Object.entries(monthRecords).sort(([dateA], [dateB]) => dateA.localeCompare(dateB)).forEach(([date, sessions]) => {
+            sessions.forEach(session => {
+                const sheetName = `${date}-${session.sessionNumber}`;
+                let dataForSheet;
 
-            if (session.sessionType === 'يوم عطلة') {
-                 dataForSheet = [{
-                    'التاريخ': format(parseISO(date), 'dd/MM/yyyy'),
-                    'اليوم': format(parseISO(date), 'EEEE', { locale: ar }),
-                    'نوع الحصة': 'يوم عطلة',
-                }];
-            } else {
-                 dataForSheet = (session.records ?? []).map(record => {
-                    const student = (students ?? []).find(s => s.id === record.studentId);
-                    return {
+                 if (session.sessionType === 'يوم عطلة') {
+                    dataForSheet = [{
                         'التاريخ': format(parseISO(date), 'dd/MM/yyyy'),
                         'اليوم': format(parseISO(date), 'EEEE', { locale: ar }),
-                        'نوع الحصة': session.sessionType,
-                        'اسم الطالب': student?.fullName || 'غير معروف',
-                        'الحضور': record.attendance || '',
-                        'التقييم': record.memorization || '',
-                        'السلوك': record.behavior || '',
-                        'مراجعة': record.review ? 'نعم' : 'لا',
-                        'ملاحظات': record.notes || '',
-                    }
-                });
-            }
-            
-            const ws = XLSX.utils.json_to_sheet(dataForSheet);
-             ws['!cols'] = [
-                { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
-                { wch: 12 }, { wch: 10 }, { wch: 30 }
-            ];
-            XLSX.utils.book_append_sheet(workbook, ws, formattedDate);
+                        'رقم الحصة': session.sessionNumber,
+                        'نوع الحصة': 'يوم عطلة',
+                    }];
+                } else {
+                    dataForSheet = (session.records ?? []).map(record => {
+                        const student = (students ?? []).find(s => s.id === record.studentId);
+                        return {
+                            'التاريخ': format(parseISO(date), 'dd/MM/yyyy'),
+                            'اليوم': format(parseISO(date), 'EEEE', { locale: ar }),
+                            'رقم الحصة': session.sessionNumber,
+                            'نوع الحصة': session.sessionType,
+                            'اسم الطالب': student?.fullName || 'غير معروف',
+                            'الحضور': record.attendance || '',
+                            'التقييم': record.memorization || '',
+                            'السلوك': record.behavior || '',
+                            'مراجعة': record.review ? 'نعم' : 'لا',
+                            'ملاحظات': record.notes || '',
+                        }
+                    });
+                }
+                
+                const ws = XLSX.utils.json_to_sheet(dataForSheet);
+                ws['!cols'] = [
+                    { wch: 12 }, { wch: 10 }, {wch: 10}, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+                    { wch: 12 }, { wch: 10 }, { wch: 30 }
+                ];
+                XLSX.utils.book_append_sheet(workbook, ws, sheetName);
+            });
         });
 
         XLSX.writeFile(workbook, `تقرير_حصص_شهر_${format(startDate, 'yyyy-MM')}.xlsx`);
@@ -513,7 +530,7 @@ export default function DataExchangePage() {
           <CardHeader>
             <CardTitle>🗓️ بيانات شهر كامل</CardTitle>
             <CardDescription>
-              استيراد أو تصدير ملف Excel واحد يحتوي على بيانات شهر كامل، حيث تكون كل ورقة (sheet) يومًا منفصلاً.
+              استيراد أو تصدير ملف Excel واحد يحتوي على بيانات شهر كامل، حيث تكون كل ورقة (sheet) حصة منفصلة.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">

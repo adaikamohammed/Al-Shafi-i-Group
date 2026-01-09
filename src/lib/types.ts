@@ -29,6 +29,7 @@ export type BehaviorLevel = "هادئ" | "متوسط" | "غير منضبط";
 export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة" | "حصة تعويضية";
 
 export interface DailyRecord {
+  sessionId: string; // To link record to a specific session on a given date
   studentId: string;
   attendance: AttendanceStatus;
   memorization: PerformanceLevel | null;
@@ -37,11 +38,13 @@ export interface DailyRecord {
   notes?: string;
 }
 
-// This represents the entire session for a given day
+// A day can have multiple sessions
 export interface DailySession {
+    id: string; // Unique ID for the session, e.g., YYYY-MM-DD-1
     date: string; // YYYY-MM-DD
+    sessionNumber: 1 | 2;
     sessionType: SessionType;
-    records: SessionRecord[];
+    records: DailyRecord[];
 }
 
 export interface DailyReport {
@@ -55,7 +58,7 @@ export interface DailyReport {
 }
 
 
-export interface SessionRecord extends DailyRecord {
+export interface SessionRecord extends Omit<DailyRecord, 'sessionId'> {
   // SessionRecord is now the same as DailyRecord
   // but we keep it for potential future differences
 }

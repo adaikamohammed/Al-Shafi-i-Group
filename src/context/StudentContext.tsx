@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -46,7 +46,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 interface StudentContextType {
   students: Student[];
-  dailySessions: Record<string, DailySession>;
+  dailySessions: Record<string, DailySession[]>;
   dailyReports: { [date: string]: { [reportId: string]: DailyReport } };
   surahProgress: Record<string, SurahMastery>;
   payments: Payment[];
@@ -57,9 +57,9 @@ interface StudentContextType {
   deleteStudent: (studentId: string, ownerId: string) => void;
   deleteAllStudents: () => void;
   addDailySession: (session: DailySession) => void;
-  deleteDailySession: (date: string) => void;
-  getSessionForDate: (date: string) => DailySession | undefined;
-  getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession>;
+  deleteDailySession: (sessionId: string) => void;
+  getSessionsForDate: (date: string) => DailySession[];
+  getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession[]>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
   saveDailyReport: (report: Omit<DailyReport, 'id'>, reportIdToUpdate?: string) => Promise<void>;
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
@@ -76,7 +76,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   
   const [students, setStudents] = useState<Student[]>([]);
-  const [dailySessions, setDailySessions] = useState<Record<string, DailySession>>({});
+  const [dailySessions, setDailySessions] = useState<Record<string, DailySession[]>>({});
   const [dailyReports, setDailyReports] = useState<{ [date: string]: { [reportId: string]: DailyReport } }>({});
   const [surahProgress, setSurahProgress] = useState<Record<string, SurahMastery>>({});
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -114,7 +114,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         }
         const allUsersData = snapshot.val();
         let allStudents: Student[] = [];
-        let allSessions: Record<string, DailySession> = {};
+        let allSessions: Record<string, DailySession[]> = {};
         let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
         let allProgress: Record<string, SurahMastery> = {};
         let allPayments: Payment[] = [];
@@ -270,29 +270,31 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
   const addDailySession = (session: DailySession) => {
     if (!authContextUser || isSuperAdmin) return;
-    const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${session.date}`);
+    const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${session.date}/${session.id}`);
     set(sessionRef, session);
   };
   
-  const deleteDailySession = (date: string) => {
+  const deleteDailySession = (sessionId: string) => {
     if (!authContextUser || isSuperAdmin) return;
-    const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${date}`);
+    const date = sessionId.substring(0, 10); // Extract YYYY-MM-DD from session ID
+    const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${date}/${sessionId}`);
     remove(sessionRef);
   }
 
-  const getSessionForDate = (date: string): DailySession | undefined => {
-      return (dailySessions ?? {})[date];
+  const getSessionsForDate = (date: string): DailySession[] => {
+      const sessionsForDate = (dailySessions ?? {})[date];
+      return sessionsForDate ? Object.values(sessionsForDate) : [];
   }
 
-  const getRecordsForDateRange = (startDate: string, endDate: string): Record<string, DailySession> => {
+  const getRecordsForDateRange = (startDate: string, endDate: string): Record<string, DailySession[]> => {
       const start = parseISO(startDate);
       const end = parseISO(endDate);
-      const filteredSessions: Record<string, DailySession> = {};
+      const filteredSessions: Record<string, DailySession[]> = {};
 
-       Object.entries(dailySessions ?? {}).forEach(([date, session]) => {
+       Object.entries(dailySessions ?? {}).forEach(([date, sessions]) => {
            try {
                 if(isWithinInterval(parseISO(date), { start, end })) {
-                    filteredSessions[date] = session;
+                    filteredSessions[date] = Object.values(sessions);
                 }
            } catch(e) {
                 console.warn(`Invalid date found in records: ${date}`);
@@ -394,7 +396,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionForDate, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
+    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionsForDate, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
       {children}
     </StudentContext.Provider>
   );
