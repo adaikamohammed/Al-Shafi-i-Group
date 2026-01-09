@@ -545,7 +545,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(students ?? []).map(student => {
+              {students.map(student => {
                 const record = (records ?? []).find(r => r.studentId === student.id);
                 if (!record) return null;
                 const isAbsent = record.attendance === 'غائب';
@@ -648,6 +648,8 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
 
 
 
+
+    
 
     
 
