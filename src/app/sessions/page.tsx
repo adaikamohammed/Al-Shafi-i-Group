@@ -170,17 +170,16 @@ export default function DailySessionsPage() {
                             </Button>
                          </DropdownMenuTrigger>
                          <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
-                            {sessionsForDay.map(session => (
-                                <React.Fragment key={session.id}>
-                                <DropdownMenuItem onClick={() => handleDayClick(day, session.sessionNumber)}>
+                            {sessionsForDay.map(session => ([
+                                <DropdownMenuItem key={`edit-${session.id}`} onClick={() => handleDayClick(day, session.sessionNumber)}>
                                     <Copy className="ml-2 h-4 w-4" />
                                     <span>تعديل حصة {session.sessionNumber}</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => handleExportSession(e, session.id)}>
+                                </DropdownMenuItem>,
+                                <DropdownMenuItem key={`export-${session.id}`} onClick={(e) => handleExportSession(e, session.id)}>
                                     <Download className="ml-2 h-4 w-4" />
                                     <span>تحميل حصة {session.sessionNumber}</span>
-                                </DropdownMenuItem>
-                                 <AlertDialog>
+                                </DropdownMenuItem>,
+                                 <AlertDialog key={`delete-dialog-${session.id}`}>
                                     <AlertDialogTrigger asChild>
                                         <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
                                             <Trash2 className="ml-2 h-4 w-4" />
@@ -200,8 +199,7 @@ export default function DailySessionsPage() {
                                         </AlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
-                                </React.Fragment>
-                            ))}
+                            ]))}
                          </DropdownMenuContent>
                     </DropdownMenu>
                     </div>
@@ -566,5 +564,6 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     </TooltipProvider>
   );
 }
+
 
 
