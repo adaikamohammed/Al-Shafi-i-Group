@@ -250,20 +250,23 @@ export default function StudentReportPage() {
 
         if (stats.absent >= absenceThreshold) {
             message = `السلام عليكم ورحمة الله وبركاته،
-نود إفادتكم من إدارة (${groupName}) بأن ابننا ${student.fullName} قد تغيب عن الحلقات لـ ${stats.absent} أيام خلال الفترة الأخيرة.
+نود إفادتكم من إدارة (${groupName}) بأن ابننا ${student.fullName} قد تغيب عن الحلقات لـ ${stats.absent} أيام.
 استمرارية الحضور هي سر الإنجاز، نرجو التنسيق معنا لضمان عودته للمسار.
-${finalNote}`;
+${finalNote}
+تم الإرسال عبر نظام إدارة فوج 3 - الشيخ ${user?.displayName || ''}.`;
         } else if (stats.undisciplined >= undisciplinedThreshold) {
             message = `عناية ولي أمر الطالب ${student.fullName} المحترم،
 نود إشراككم في متابعة سلوك الابن خلال الحلقة، حيث تم رصد سلوك غير منضبط ${stats.undisciplined} مرات.
 نؤمن بأن تكامل البيت والمسجد هو أساس التربية.
-${finalNote}`;
+${finalNote}
+تم الإرسال عبر نظام إدارة فوج 3 - الشيخ ${user?.displayName || ''}.`;
         } else if (stats.poor >= poorEvaluationThreshold) {
              const lastEvaluation = stats.poor > 0 ? "ضعيف" : "متوسط";
             message = `تحية طيبة من إدارة (${groupName})،
 نود إحاطتكم علماً بأن مستوى ${student.fullName} شهد تراجعاً طفيفاً في التقييم الأخير (من ممتاز إلى ${lastEvaluation}).
 حرصاً منا على تميزه، نرجو منكم حثه على المراجعة بالمنزل.
-${finalNote}`;
+${finalNote}
+تم الإرسال عبر نظام إدارة فوج 3 - الشيخ ${user?.displayName || ''}.`;
         } else {
              const attendanceRate = reportData.totalSessionsHeld > 0 
                 ? Math.round(((stats.present + stats.late) / reportData.totalSessionsHeld) * 100) + "%" 
