@@ -54,10 +54,7 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
 
     const isHoliday = session1?.sessionType === 'يوم عطلة' || session2?.sessionType === 'يوم عطلة';
     
-    let primaryStatus = record1?.attendance || (isHoliday ? 'عطلة' : undefined);
-    if (!primaryStatus && record2) {
-      primaryStatus = record2.attendance;
-    }
+    let primaryStatus = isHoliday ? 'عطلة' : record1?.attendance || record2?.attendance;
     
     const attendanceColor = getAttendanceColor(primaryStatus);
 
@@ -65,35 +62,40 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
     let evaluationIcon = null;
 
     if (primaryStatus && ['حاضر', 'متأخر', 'تعويض'].includes(primaryStatus)) {
-        const primaryBehavior = record1?.behavior || record2?.behavior;
-        behaviorClass = getBehaviorClass(primaryBehavior);
-        evaluationIcon = getEvaluationIcon(record1?.memorization || record2?.memorization);
+        // Prioritize session 1 for display, fallback to session 2
+        const primaryRecord = record1 || record2;
+        if(primaryRecord){
+            behaviorClass = getBehaviorClass(primaryRecord.behavior);
+            evaluationIcon = getEvaluationIcon(primaryRecord.memorization);
+        }
     }
     
-    let tooltipContent = (
-         <div className="text-right">
-            <p><span className="font-bold">التاريخ:</span> {format(date, 'd MMMM yyyy', { locale: ar })}</p>
-            <p>لا يوجد تسجيل لهذا اليوم.</p>
+    const renderRecordDetails = (record: DailyRecord, session?: DailySession) => (
+        <div className="text-right">
+            <p className="font-semibold">الحصة {session?.sessionNumber} ({session?.sessionType})</p>
+            <p className="text-xs"><span className="font-bold">الحضور:</span> {record.attendance || 'لم يسجل'}</p>
+            <p className="text-xs"><span className="font-bold">السلوك:</span> {record.behavior || 'لم يسجل'}</p>
+            <p className="text-xs"><span className="font-bold">التقييم:</span> {record.memorization || 'لم يقيم'}</p>
         </div>
     );
 
+    let tooltipContent;
     if (isHoliday) {
-         tooltipContent = <p>يوم عطلة</p>;
+        tooltipContent = <p>يوم عطلة</p>;
     } else if (record1 || record2) {
-        const renderRecordDetails = (record: DailyRecord, session?: DailySession) => (
-            <div className="text-right">
-                <p className="font-semibold">الحصة {session?.sessionNumber} ({session?.sessionType})</p>
-                <p className="text-xs"><span className="font-bold">الحضور:</span> {record.attendance || 'لم يسجل'}</p>
-                <p className="text-xs"><span className="font-bold">السلوك:</span> {record.behavior || 'لم يسجل'}</p>
-                <p className="text-xs"><span className="font-bold">التقييم:</span> {record.memorization || 'لم يقيم'}</p>
-            </div>
-        );
         tooltipContent = (
             <div className="space-y-2">
                  <p className="font-bold border-b pb-1 mb-1">{format(date, 'd MMMM yyyy', { locale: ar })}</p>
                  {record1 ? renderRecordDetails(record1, session1) : <p className="text-xs text-muted-foreground">الحصة 1 لم تسجل.</p>}
                  {record2 && <hr className="my-1"/>}
                  {record2 && renderRecordDetails(record2, session2)}
+            </div>
+        );
+    } else {
+        tooltipContent = (
+             <div className="text-right">
+                <p><span className="font-bold">التاريخ:</span> {format(date, 'd MMMM yyyy', { locale: ar })}</p>
+                <p>لا يوجد تسجيل لهذا اليوم.</p>
             </div>
         );
     }
@@ -260,3 +262,5 @@ export default function WeeklyFollowUpPage() {
         </TooltipProvider>
     );
 }
+
+    
