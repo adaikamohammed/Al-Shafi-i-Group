@@ -139,7 +139,7 @@ export default function StudentReportPage() {
 
 
         const radarData = [
-            { subject: 'الحاضر', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
+            { subject: 'الحضور', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
             { subject: 'الحفظ', score: parseFloat(memorizationScore.toFixed(1)), fullMark: 10 },
             { subject: 'الانضباط', score: parseFloat(disciplineScore.toFixed(1)), fullMark: 10 },
             { subject: 'التجويد', score: tajweedScore, fullMark: 10 },
@@ -215,50 +215,34 @@ export default function StudentReportPage() {
     
     const handleCopyWhatsAppReport = () => {
         if (!reportData) return;
-
+    
         const { student, stats, autoNote, activeCovenant } = reportData;
         const groupName = user?.group || "المدرسة";
-        const sheikhNote = teacherNote.trim() ? `\n\n*ملاحظة الشيخ:* ${teacherNote.trim()}` : (autoNote ? `\n\n*ملاحظة الشيخ:* ${autoNote}`: '');
-        let message = '';
-        
-        const absenceThreshold = 3;
-        const undisciplinedThreshold = 2;
-        const poorEvaluationThreshold = 2;
-
-        if (activeCovenant) {
-            message = `إدارة ${groupName}: تم وضع الابن ${student.fullName} تحت ميثاق *${activeCovenant.type}* نظراً لـ ${activeCovenant.text.toLowerCase()}. نأمل منكم حثه على الالتزام بالعهد ومتابعة بطاقته في سجل الطالب.${sheikhNote}`;
-        } else if (stats.absent >= absenceThreshold) {
-            message = `السلام عليكم ورحمة الله وبركاته،
-نود إفادتكم من إدارة (${groupName}) بأن ابننا ${student.fullName} قد تغيب عن الحلقات لـ ${stats.absent} أيام.
-استمرارية الحضور هي سر الإنجاز، نرجو التنسيق معنا لضمان عودته للمسار.${sheikhNote}`;
-        } else if (stats.undisciplined >= undisciplinedThreshold) {
-            message = `عناية ولي أمر الطالب ${student.fullName} المحترم،
-نود إشراككم في متابعة سلوك الابن خلال الحلقة، حيث تم رصد سلوك غير منضبط ${stats.undisciplined} مرات.
-نؤمن بأن تكامل البيت والمسجد هو أساس التربية.${sheikhNote}`;
-        } else if (stats.poor >= poorEvaluationThreshold) {
-            const lastEvaluation = stats.poor > 0 ? "ضعيف" : "متوسط";
-            message = `تحية طيبة من إدارة (${groupName})،
-نود إحاطتكم علماً بأن مستوى ${student.fullName} شهد تراجعاً طفيفاً في التقييم الأخير (من ممتاز إلى ${lastEvaluation}).
-حرصاً منا على تميزه، نرجو منكم حثه على المراجعة بالمنزل.${sheikhNote}`;
-        } else {
-            const attendanceRate = reportData.totalSessionsHeld > 0 
-                ? Math.round(((stats.present + stats.late) / reportData.totalSessionsHeld) * 100) + "%" 
-                : "غير متاح";
-            message = `*📢 تقرير أداء الطالب: ${student.fullName}*
+        let message = `*📢 تقرير أداء الطالب: ${student.fullName}*\n\n*📆 الفترة:* ${reportData.statsPeriod}\n*👨‍🏫 الشيخ المسؤول:* ${user?.displayName || "الشيخ"}`;
     
-*📆 الفترة:* ${reportData.statsPeriod}
-*👨‍🏫 الشيخ المسؤول:* ${user?.displayName || "الشيخ"}
-    
-*📖 عدد السور المحفوظة:* ${reportData.memorizedSurahsCount}
-*📊 معدل الحضور:* ${attendanceRate}
-    
-*📝 ملاحظات وتوصيات الشيخ:*
-${teacherNote.trim() || autoNote || "لا توجد ملاحظات إضافية."}`;
+        // Commitment Balance
+        const attendanceBalance = stats.absent - stats.compensationBalance;
+        if (attendanceBalance > 0) {
+            message += `\n\n*ميزان الالتزام:*\n*رصيد حصص الغياب غير المعوضة:* ${attendanceBalance}`;
         }
+    
+        // Empowerment Task
+        const empowermentTask = (student.covenants || []).find(c => c.type === 'ميثاق حفظ' && c.status === 'نشط');
+        if (empowermentTask) {
+            message += `\n*مهمة التمكين الحالية:* ${empowermentTask.text} - *حالة التسليم:* ${empowermentTask.status}`;
+        }
+    
+        // Teacher's Note
+        const sheikhNote = teacherNote.trim() ? `\n\n*ملاحظة الشيخ:* ${teacherNote.trim()}` : (autoNote ? `\n\n*ملاحظة الشيخ:* ${autoNote}` : '');
+        message += sheikhNote;
 
+        // Closing Note
+        if (attendanceBalance > 0 || empowermentTask) {
+            message += `\n\n*نرجو منكم حث الابن على تعويض الحصص الفائتة وتسليم المهمة في موعدها لضمان سير خطة الحفظ.*`;
+        }
+    
         const finalMessage = `${message.trim()}\n\n---\n*تم الإرسال عبر نظام إدارة مدرسة الإمام الشافعي.*`;
-
-
+    
         navigator.clipboard.writeText(finalMessage).then(() => {
             toast({
                 title: "✅ تم النسخ بنجاح!",
@@ -585,3 +569,4 @@ ${teacherNote.trim() || autoNote || "لا توجد ملاحظات إضافية."
 
 
     
+
