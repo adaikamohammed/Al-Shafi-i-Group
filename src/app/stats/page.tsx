@@ -54,17 +54,21 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
 
     const isHoliday = session1?.sessionType === 'يوم عطلة' || session2?.sessionType === 'يوم عطلة';
     
-    let primaryStatus = record1?.attendance || (record2?.attendance ? record2.attendance : (isHoliday ? 'عطلة' : undefined));
+    let primaryStatus = record1?.attendance || (isHoliday ? 'عطلة' : undefined);
+    if (!primaryStatus && record2) {
+      primaryStatus = record2.attendance;
+    }
     
     const attendanceColor = getAttendanceColor(primaryStatus);
 
     let behaviorClass = 'border-transparent';
+    let evaluationIcon = null;
+
     if (primaryStatus && ['حاضر', 'متأخر', 'تعويض'].includes(primaryStatus)) {
         const primaryBehavior = record1?.behavior || record2?.behavior;
         behaviorClass = getBehaviorClass(primaryBehavior);
+        evaluationIcon = getEvaluationIcon(record1?.memorization || record2?.memorization);
     }
-    
-    const evaluationIcon = getEvaluationIcon(record1?.memorization || record2?.memorization);
     
     let tooltipContent = (
          <div className="text-right">
@@ -87,8 +91,8 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
         tooltipContent = (
             <div className="space-y-2">
                  <p className="font-bold border-b pb-1 mb-1">{format(date, 'd MMMM yyyy', { locale: ar })}</p>
-                 {record1 && renderRecordDetails(record1, session1)}
-                 {record2 && record1 && <hr className="my-1"/>}
+                 {record1 ? renderRecordDetails(record1, session1) : <p className="text-xs text-muted-foreground">الحصة 1 لم تسجل.</p>}
+                 {record2 && <hr className="my-1"/>}
                  {record2 && renderRecordDetails(record2, session2)}
             </div>
         );
