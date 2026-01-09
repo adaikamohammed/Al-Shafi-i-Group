@@ -263,7 +263,7 @@ export default function ComparisonPage() {
                     <CardHeader>
                         <CardTitle>نتائج المقارنة</CardTitle>
                          <CardDescription>
-                            مقارنة شاملة بين الطالبين خلال الفترة المحددة. {<Crown className="inline-block h-4 w-4 text-yellow-500" />} تشير إلى الأداء الأفضل.
+                            مقارنة شاملة بين الطالبين خلال الفترة المحددة. <Crown className="inline-block h-4 w-4 text-yellow-500" /> تشير إلى الأداء الأفضل.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6 p-6">
@@ -280,5 +280,3 @@ export default function ComparisonPage() {
         </div>
     );
 }
-
-    
