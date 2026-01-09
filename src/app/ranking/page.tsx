@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, Medal, BookOpenCheck, ShieldCheck, UserCheck } from 'lucide-react';
+import { Loader2, AlertTriangle, Medal, BookOpenCheck, ShieldCheck, UserCheck, CheckCircle, XCircle } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, isAfter } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Student, DailySession } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface StudentScore {
     id: string;
@@ -29,6 +30,7 @@ interface StudentScore {
         medium: number;
         undisciplined: number;
         reviewed: number;
+        commitmentBalance: number;
     }
 }
 
@@ -66,8 +68,17 @@ export default function RankingPage() {
                 id: student.id,
                 name: student.fullName,
                 points: 0,
-                stats: { present: 0, absent: 0, late: 0, makeup: 0, excellent: 0, good: 0, average: 0, calm: 0, medium: 0, undisciplined: 0, reviewed: 0 }
+                stats: { present: 0, absent: 0, late: 0, makeup: 0, excellent: 0, good: 0, average: 0, calm: 0, medium: 0, undisciplined: 0, reviewed: 0, commitmentBalance: 0 }
             };
+            // Add bonus points for fulfilled covenants in the selected month
+            (student.covenants || []).forEach(covenant => {
+                if (covenant.status === 'تم الوفاء به') {
+                     const covenantDate = parseISO(covenant.date);
+                     if(getMonth(covenantDate) === selectedMonth && getYear(covenantDate) === selectedYear) {
+                        studentScores[student.id].points += pointsConfig.covenantCompleted;
+                     }
+                }
+            })
         });
 
         sessionsInMonth.forEach(session => {
@@ -100,6 +111,10 @@ export default function RankingPage() {
                     studentScores[record.studentId].points += points;
                 }
             });
+        });
+        
+        Object.values(studentScores).forEach(score => {
+            score.stats.commitmentBalance = (score.stats.present + score.stats.makeup) - score.stats.absent;
         });
 
         return Object.values(studentScores).sort((a, b) => b.points - a.points);
@@ -138,6 +153,7 @@ export default function RankingPage() {
 
 
     return (
+        <TooltipProvider>
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <h1 className="text-3xl font-headline font-bold">🏅 لوحة شرف الطلبة</h1>
@@ -248,9 +264,10 @@ export default function RankingPage() {
                                         <TableHead>الاسم</TableHead>
                                         <TableHead className="text-center">حضور</TableHead>
                                         <TableHead className="text-center">غياب</TableHead>
-                                        <TableHead className="text-center">تقييم ممتاز</TableHead>
-                                        <TableHead className="text-center">سلوك هادئ</TableHead>
+                                        <TableHead className="text-center">ممتاز</TableHead>
+                                        <TableHead className="text-center">هادئ</TableHead>
                                         <TableHead className="text-center">مراجعات</TableHead>
+                                        <TableHead className="text-center">الالتزام</TableHead>
                                         <TableHead className="text-center font-bold">إجمالي النقاط</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -264,6 +281,19 @@ export default function RankingPage() {
                                             <TableCell className="text-center">{student.stats.excellent}</TableCell>
                                             <TableCell className="text-center">{student.stats.calm}</TableCell>
                                             <TableCell className="text-center">{student.stats.reviewed}</TableCell>
+                                            <TableCell className="text-center">
+                                                <Tooltip>
+                                                    <TooltipTrigger>
+                                                        {student.stats.commitmentBalance >= 0 ? 
+                                                            <CheckCircle className="h-5 w-5 text-green-500 mx-auto" /> : 
+                                                            <XCircle className="h-5 w-5 text-red-500 mx-auto" />
+                                                        }
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>رصيد الالتزام: {student.stats.commitmentBalance}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TableCell>
                                             <TableCell className="text-center"><Badge variant="default" className="text-base">{student.points.toFixed(1)}</Badge></TableCell>
                                         </TableRow>
                                     ))}
@@ -282,6 +312,7 @@ export default function RankingPage() {
                 </div>
             )}
         </div>
+        </TooltipProvider>
     );
 }
 

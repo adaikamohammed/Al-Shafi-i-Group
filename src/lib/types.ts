@@ -138,6 +138,7 @@ export interface PointsConfig {
     behavior: { 'هادئ': number; 'متوسط': number; 'غير منضبط': number };
     review: { 'completed': number };
     surah: { 'memorized': number; 'mastered': number };
+    covenantCompleted: number; // Bonus for completing an empowerment task
 }
 
 export interface Reward {

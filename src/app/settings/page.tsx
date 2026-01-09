@@ -221,6 +221,12 @@ export default function SettingsPage() {
                         value={localSettings.points.surah['mastered']}
                         onChange={e => handlePointsChange('surah', 'mastered', e.target.value)}
                     />
+                     <PointInput 
+                        label="مكافأة الوفاء بميثاق" 
+                        value={localSettings.points.covenantCompleted}
+                        onChange={e => handlePointsChange('covenantCompleted', 'covenantCompleted' as any, e.target.value)}
+                        tooltip="نقاط إضافية تمنح للطالب عند إكماله لمهمة تمكين (ميثاق)."
+                    />
                 </CategoryCard>
                 
                 <CategoryCard title="السلوك والانضباط" description="نقاط السلوك داخل الحلقة.">
@@ -319,5 +325,3 @@ const PointInput = ({ label, value, onChange, tooltip }: { label: string, value:
         <Input type="number" value={value} onChange={onChange} />
     </div>
 );
-
-    

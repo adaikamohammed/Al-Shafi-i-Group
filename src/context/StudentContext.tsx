@@ -16,7 +16,8 @@ const DEFAULT_POINTS_CONFIG: PointsConfig = {
     evaluation: { 'ممتاز': 3, 'جيد': 2, 'متوسط': 1, 'ضعيف': 0 },
     behavior: { 'هادئ': 2, 'متوسط': 1, 'غير منضبط': -1 },
     review: { 'completed': 1 },
-    surah: { 'memorized': 20, 'mastered': 50 }
+    surah: { 'memorized': 20, 'mastered': 50 },
+    covenantCompleted: 50,
 };
 
 const DEFAULT_REWARDS: Reward[] = [
