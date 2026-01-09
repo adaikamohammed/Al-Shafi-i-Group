@@ -7,8 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, Users, CalendarDays, BarChart, AlertTriangle, CheckCircle, XCircle, Clock, Replace, Plane, DollarSign, UserX, UserCheck } from 'lucide-react';
-import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, getDate, getDay, getQuarter, startOfQuarter, endOfQuarter, isAfter, isToday, startOfToday } from 'date-fns';
+import { Loader2, Users, CalendarDays, BarChart, AlertTriangle, CheckCircle, XCircle, Clock, Replace, Plane, DollarSign, UserX, UserCheck, Info } from 'lucide-react';
+import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, getDate, getDay, getQuarter, startOfQuarter, endOfQuarter, isAfter, isToday, startOfToday, isBefore } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Bar, XAxis, YAxis, CartesianGrid, Legend, BarChart as RechartsBarChart } from 'recharts';
 import type { Student, DailySession, SessionRecord, DailyReport, Payment } from '@/lib/types';
@@ -51,17 +51,15 @@ export default function MonthlyStatisticsPage() {
         const today = startOfToday();
         const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
         let monthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
-        let isCurrentMonth = false;
-
-        // If the selected month/year is the current one, only calculate up to today.
-        if (getMonth(monthStartDate) === getMonth(today) && getYear(monthStartDate) === getYear(today)) {
+        
+        const isCurrentMonthAndYear = getMonth(monthStartDate) === getMonth(today) && getYear(monthStartDate) === getYear(today);
+        if (isCurrentMonthAndYear) {
             monthEndDate = today;
-            isCurrentMonth = true;
         }
 
         const fullMonthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
-        const daysInCurrentMonthContext = isCurrentMonth ? getDate(today) : getDaysInMonth(monthStartDate);
-
+        const daysInMonth = getDaysInMonth(monthStartDate);
+        const daysPassed = isCurrentMonthAndYear ? getDate(today) : daysInMonth;
 
         const quarterStartDate = startOfQuarter(monthStartDate);
         const quarterEndDate = endOfQuarter(monthStartDate);
@@ -120,22 +118,18 @@ export default function MonthlyStatisticsPage() {
             sessionTypes: { 'حصة أساسية': 0, 'حصة أنشطة': 0, 'حصة تعويضية': 0 }
         };
 
-        let totalDaysWithRecords = 0;
         const recordedDays = new Set<string>();
-
         (recordsSource ?? []).forEach(record => {
             const session = applicableSessions.find(s => s.id === record.sessionId);
-            if(session && !recordedDays.has(session.date)) {
+            if(session) {
                 recordedDays.add(session.date);
-                totalDaysWithRecords++;
+                if (record.attendance) stats.attendance[record.attendance]++;
+                if (record.behavior) stats.behavior[record.behavior]++;
+                if (record.memorization) stats.evaluation[record.memorization]++;
             }
-
-            if (record.attendance) stats.attendance[record.attendance]++;
-            if (record.behavior) stats.behavior[record.behavior]++;
-            if (record.memorization) stats.evaluation[record.memorization]++;
         });
 
-        const unrecordedDays = daysInCurrentMonthContext - recordedDays.size;
+        const unrecordedPastDays = daysPassed - recordedDays.size;
 
         if (selectedStudentId === 'all') {
             sessionsInMonth.forEach(session => {
@@ -196,7 +190,7 @@ export default function MonthlyStatisticsPage() {
         const unpaidStudents = studentsDueForQuarter.filter(s => !studentsWhoPaidInQuarter.has(s.id));
         financialStats.unpaidStudentsCount = unpaidStudents.length;
 
-        return { ...stats, unrecordedDays, studentSpecificRecords, financialStats };
+        return { ...stats, daysPassed, recordedDaysCount: recordedDays.size, unrecordedPastDays, studentSpecificRecords, financialStats };
 
     }, [dailySessions, dailyReports, payments, settings, selectedMonth, selectedYear, selectedStudentId, students]);
     
@@ -266,18 +260,19 @@ export default function MonthlyStatisticsPage() {
         return dayCells;
     }
 
-
+    const totalAttendance = Object.values(monthlyData.attendance).reduce((a, b) => a + b, 0);
     const attendanceData: ChartData[] = Object.entries(monthlyData.attendance)
         .filter(([, value]) => value > 0)
         .map(([name, value]) => ({ name, value }));
-    if(monthlyData.unrecordedDays > 0) attendanceData.push({ name: 'لم يسجل', value: monthlyData.unrecordedDays });
+    if(monthlyData.unrecordedPastDays > 0) attendanceData.push({ name: 'لم يسجل', value: monthlyData.unrecordedPastDays });
 
-
+    const totalBehavior = Object.values(monthlyData.behavior).reduce((a, b) => a + b, 0);
     const behaviorData: ChartData[] = Object.entries(monthlyData.behavior)
         .filter(([, value]) => value > 0)
         .map(([name, value]) => ({ name, value }));
-    if(monthlyData.unrecordedDays > 0) behaviorData.push({ name: 'لم يسجل', value: monthlyData.unrecordedDays });
-
+    if(monthlyData.unrecordedPastDays > 0 && totalBehavior < monthlyData.recordedDaysCount) {
+        behaviorData.push({ name: 'لم يسجل', value: monthlyData.recordedDaysCount - totalBehavior });
+    }
 
     const evaluationData = Object.entries(monthlyData.evaluation)
         .map(([name, value]) => ({ name, value }));
@@ -418,6 +413,7 @@ export default function MonthlyStatisticsPage() {
             )}
 
             {monthlyData.totalRecords > 0 || monthlyData.financialStats.totalRevenue > 0 ? (
+                <>
                 <div className="grid gap-6 md:grid-cols-2">
                      <Card className="md:col-span-2">
                          <CardHeader>
@@ -502,6 +498,20 @@ export default function MonthlyStatisticsPage() {
                         </CardContent>
                     </Card>
                 </div>
+                 <Card className="mt-6 border-dashed">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Info className="text-blue-500" />حالة الشهر الحالية</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                         <p className="text-muted-foreground">تم تسجيل <span className="font-bold text-foreground">{monthlyData.recordedDaysCount}</span> يوم من أصل <span className="font-bold text-foreground">{monthlyData.daysPassed}</span> يوم مضت من الشهر.</p>
+                        {monthlyData.unrecordedPastDays > 0 && (
+                            <div className="mt-2 p-3 bg-red-50 text-red-800 border-l-4 border-red-500 rounded-md">
+                                <p className="font-bold flex items-center gap-2"><AlertTriangle /> تنبيه: يوجد {monthlyData.unrecordedPastDays} أيام سابقة لم يتم تسجيل حضورها. يرجى مراجعة سجل الحصص.</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+                </>
             ) : (
                  <div className="space-y-6 flex flex-col items-center justify-center h-60 border border-dashed rounded-lg">
                     <AlertTriangle className="h-16 w-16 text-muted-foreground" />
@@ -514,19 +524,5 @@ export default function MonthlyStatisticsPage() {
         </div>
     );
 }
-
-    
-
-
-
-
-
-
-
-    
-
-    
-
-    
 
     
