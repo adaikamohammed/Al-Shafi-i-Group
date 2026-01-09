@@ -1,8 +1,9 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -14,16 +15,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { Student, StudentStatus, MemorizationAmount, SubscriptionTier } from '@/lib/types';
+import type { Student, StudentStatus, MemorizationAmount, SubscriptionTier, Covenant, CovenantCard, CovenantStatus, CovenantType } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
+import { v4 as uuidv4 } from 'uuid';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
 
 
@@ -91,6 +93,12 @@ export default function StudentManagementPage() {
         .filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()))
         .sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
   }, [students, searchTerm]);
+  
+  const getActiveCard = (student: Student): CovenantCard | null => {
+    const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط' && c.card !== 'بدون');
+    return activeCovenant ? activeCovenant.card : null;
+  }
+
 
   if (loading) {
     return (
@@ -209,24 +217,33 @@ export default function StudentManagementPage() {
             </TableHeader>
             <TableBody>
              {filteredStudents.length > 0 ? (
-                filteredStudents.map((student) => (
-                    <TableRow key={student.id}>
-                    <TableCell className="font-medium text-center">{student.fullName}</TableCell>
-                    {isSuperAdmin && <TableCell className="text-center"><Badge variant="outline">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
-                    <TableCell className="hidden md:table-cell text-center">{student.guardianName}</TableCell>
-                    <TableCell className="hidden lg:table-cell text-center">{calculateAge(student.birthDate)}</TableCell>
-                    <TableCell className="text-center">
-                        <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
-                    </TableCell>
-                     <TableCell className="text-center">
-                        <Badge variant="outline">{student.subscriptionTier}</Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-center">{student.memorizedSurahsCount || 0}</TableCell>
-                    {!isSuperAdmin && <TableCell className="text-center">
-                        <StudentActions student={student} onStatusChange={handleStatusChange} />
-                    </TableCell>}
-                    </TableRow>
-                ))
+                filteredStudents.map((student) => {
+                    const activeCard = getActiveCard(student);
+                    return (
+                        <TableRow key={student.id}>
+                            <TableCell className="font-medium text-center">
+                                <div className="flex items-center justify-center gap-2">
+                                     {activeCard === 'بطاقة صفراء' && <div className="w-2.5 h-2.5 bg-yellow-400 rounded-full" title="بطاقة صفراء"></div>}
+                                     {activeCard === 'بطاقة حمراء' && <div className="w-2.5 h-2.5 bg-red-500 rounded-full" title="بطاقة حمراء"></div>}
+                                     <span>{student.fullName}</span>
+                                </div>
+                            </TableCell>
+                            {isSuperAdmin && <TableCell className="text-center"><Badge variant="outline">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
+                            <TableCell className="hidden md:table-cell text-center">{student.guardianName}</TableCell>
+                            <TableCell className="hidden lg:table-cell text-center">{calculateAge(student.birthDate)}</TableCell>
+                            <TableCell className="text-center">
+                                <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                                <Badge variant="outline">{student.subscriptionTier}</Badge>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell text-center">{student.memorizedSurahsCount || 0}</TableCell>
+                            {!isSuperAdmin && <TableCell className="text-center">
+                                <StudentActions student={student} onStatusChange={handleStatusChange} />
+                            </TableCell>}
+                        </TableRow>
+                    )
+                })
              ) : (
                 <TableRow>
                     <TableCell colSpan={isSuperAdmin ? 8 : 7} className="h-24 text-center">
@@ -329,6 +346,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
   const { addStudent, updateStudent } = useStudentContext();
   const [birthDate, setBirthDate] = useState<Date | undefined>(student?.birthDate ? new Date(student.birthDate) : undefined);
   const [registrationDate, setRegistrationDate] = useState<Date | undefined>(student?.registrationDate ? new Date(student.registrationDate) : new Date());
+  const [covenants, setCovenants] = useState<Covenant[]>(student?.covenants || []);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -351,6 +369,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         subscriptionTier: data.subscriptionTier,
         dailyMemorizationAmount: data.memorizationAmount,
         notes: data.notes,
+        covenants: covenants,
     };
 
     if (student) {
@@ -363,6 +382,39 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     
     onSuccess();
   };
+  
+    const handleAddCovenant = () => {
+        const newCovenant: Covenant = {
+            id: uuidv4(),
+            type: 'تعهد غياب',
+            text: 'أتعهد بعدم الغياب دون إذن مسبق.',
+            status: 'نشط',
+            card: 'بدون',
+            date: new Date().toISOString(),
+        };
+        setCovenants(prev => [...prev, newCovenant]);
+    };
+
+    const handleCovenantChange = <K extends keyof Covenant>(index: number, field: K, value: Covenant[K]) => {
+        const updatedCovenants = [...covenants];
+        updatedCovenants[index] = { ...updatedCovenants[index], [field]: value };
+        
+        // Auto-fill text based on type
+        if (field === 'type') {
+            const covenantType = value as CovenantType;
+            if (covenantType === 'تعهد غياب') updatedCovenants[index].text = 'أتعهد بعدم الغياب دون إذن مسبق.';
+            else if (covenantType === 'ميثاق حفظ') updatedCovenants[index].text = 'أتعهد أمام الله بالالتزام بالحفظ والمراجعة.';
+            else if (covenantType === 'التزام سلوكي') updatedCovenants[index].text = 'أتعهد بالالتزام بالسلوك الحسن داخل الحلقة.';
+        }
+        
+        setCovenants(updatedCovenants);
+    };
+
+    const handleRemoveCovenant = (index: number) => {
+        const updatedCovenants = [...covenants];
+        updatedCovenants.splice(index, 1);
+        setCovenants(updatedCovenants);
+    };
 
   return (
     <form onSubmit={handleSubmit}>
@@ -488,6 +540,69 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
             <Label htmlFor="notes">ملاحظات عامة</Label>
             <Textarea name="notes" id="notes" defaultValue={student?.notes} placeholder="أي ملاحظات إضافية حول الطالب..." />
         </div>
+        
+        {/* Covenants Section */}
+        <div className="space-y-4 pt-4 border-t">
+            <div className="flex justify-between items-center">
+                 <h3 className="text-lg font-semibold flex items-center gap-2"><ShieldAlert /> سجل المواثيق والالتزامات</h3>
+                 <Button type="button" variant="outline" size="sm" onClick={handleAddCovenant}>
+                    <PlusCircle className="ml-2 h-4 w-4" />
+                    إضافة ميثاق جديد
+                </Button>
+            </div>
+
+            {covenants.map((covenant, index) => (
+                <Card key={covenant.id} className="p-4 space-y-4 bg-muted/50">
+                    <div className="flex justify-between items-center">
+                        <p className="font-semibold">ميثاق بتاريخ: {format(parseISO(covenant.date), 'dd/MM/yyyy')}</p>
+                         <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveCovenant(index)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                         </Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                             <Label>نوع الميثاق</Label>
+                             <Select dir="rtl" value={covenant.type} onValueChange={(val: CovenantType) => handleCovenantChange(index, 'type', val)}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="تعهد غياب">تعهد غياب</SelectItem>
+                                    <SelectItem value="ميثاق حفظ">ميثاق حفظ</SelectItem>
+                                    <SelectItem value="التزام سلوكي">التزام سلوكي</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                             <Label>الحالة</Label>
+                             <Select dir="rtl" value={covenant.status} onValueChange={(val: CovenantStatus) => handleCovenantChange(index, 'status', val)}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="نشط">نشط</SelectItem>
+                                    <SelectItem value="تم الوفاء به">تم الوفاء به</SelectItem>
+                                    <SelectItem value="نُقِض">نُقِض</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                             <Label>البطاقة</Label>
+                              <Select dir="rtl" value={covenant.card} onValueChange={(val: CovenantCard) => handleCovenantChange(index, 'card', val)}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="بدون">بدون</SelectItem>
+                                    <SelectItem value="بطاقة صفراء">🟡 بطاقة صفراء</SelectItem>
+                                    <SelectItem value="بطاقة حمراء">🔴 بطاقة حمراء</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                     <div className="space-y-2">
+                        <Label>نص التعهد</Label>
+                        <Textarea value={covenant.text} onChange={e => handleCovenantChange(index, 'text', e.target.value)} />
+                    </div>
+                </Card>
+            ))}
+             {covenants.length === 0 && <p className="text-sm text-center text-muted-foreground py-4">لا توجد مواثيق مسجلة لهذا الطالب.</p>}
+        </div>
+
       </div>
       <DialogFooter>
         <Button variant="outline" type="button" onClick={onCancel}>إلغاء</Button>

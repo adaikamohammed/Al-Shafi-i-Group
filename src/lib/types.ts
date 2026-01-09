@@ -4,6 +4,19 @@ export type StudentStatus = "نشط" | "مطرود" | "غائب طويل" | "م�
 export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "أكثر";
 export type SubscriptionTier = "فئة الأكابر" | "فئة الأصاغر";
 
+export type CovenantType = "تعهد غياب" | "ميثاق حفظ" | "التزام سلوكي";
+export type CovenantStatus = "نشط" | "تم الوفاء به" | "نُقِض";
+export type CovenantCard = "بدون" | "بطاقة صفراء" | "بطاقة حمراء";
+
+export interface Covenant {
+  id: string;
+  type: CovenantType;
+  text: string;
+  status: CovenantStatus;
+  card: CovenantCard;
+  date: string; // ISO String
+}
+
 export interface Student {
   id: string;
   ownerId: string; // UID of the user who owns this student record
@@ -21,6 +34,7 @@ export interface Student {
   dailyMemorizationAmount: MemorizationAmount;
   notes?: string;
   updatedAt: Date;
+  covenants?: Covenant[];
 }
 
 export type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "تعويض";

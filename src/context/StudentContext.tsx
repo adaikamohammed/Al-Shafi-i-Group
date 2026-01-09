@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -106,6 +106,18 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     let dataRef: DatabaseReference;
     let listener: () => void;
 
+    const processStudentData = (studentData: any, uid: string, groupName?: string): Student => ({
+        ...studentData,
+        id: studentData.id,
+        ownerId: uid,
+        groupName: groupName || 'غير محدد',
+        birthDate: studentData.birthDate ? parseISO(studentData.birthDate) : new Date(),
+        registrationDate: studentData.registrationDate ? parseISO(studentData.registrationDate) : new Date(),
+        updatedAt: studentData.updatedAt ? parseISO(studentData.updatedAt) : new Date(),
+        covenants: studentData.covenants ? Object.values(studentData.covenants) : [],
+    });
+
+
     if (isSuperAdmin) {
       dataRef = ref(db, 'users');
       listener = onValue(dataRef, (snapshot) => {
@@ -132,12 +144,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         for (const uid in allUsersData) {
           const userData = allUsersData[uid];
           if (userData.students) {
-            const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) => ({
-              ...s, id, ownerId: uid, groupName: userData.profile?.group || 'غير محدد',
-              birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-              registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-              updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-            }));
+            const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) => 
+                processStudentData({ ...s, id }, uid, userData.profile?.group)
+            );
             allStudents.push(...userStudents);
           }
           if (userData.dailySessions) Object.assign(allSessions, userData.dailySessions);
@@ -177,12 +186,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         const data = snapshot.val();
         let userStudents: Student[] = [];
         if (data.students) {
-          userStudents = Object.entries(data.students).map(([id, s]: [string, any]) => ({
-            ...s, id, ownerId: authContextUser.uid,
-            birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
-            registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
-            updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
-          }));
+          userStudents = Object.entries(data.students).map(([id, s]: [string, any]) => 
+              processStudentData({ ...s, id }, authContextUser.uid)
+          );
         }
         const paymentsArray = data.payments ? Object.entries(data.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : [];
         const userSettings = data.settings ? { ...DEFAULT_SETTINGS, ...data.settings } : DEFAULT_SETTINGS;
@@ -217,13 +223,15 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       memorizedSurahsCount: 0,
       subscriptionTier: studentData.subscriptionTier || 'فئة الأصاغر',
       updatedAt: new Date(),
+      covenants: [],
     };
     const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
     set(studentRef, {
         ...newStudent, 
         birthDate: newStudent.birthDate.toISOString(), 
         registrationDate: newStudent.registrationDate.toISOString(), 
-        updatedAt: newStudent.updatedAt.toISOString() 
+        updatedAt: newStudent.updatedAt.toISOString(),
+        covenants: newStudent.covenants || null // Use null for empty array
     });
     
     // Initialize surah progress for the new student
@@ -248,11 +256,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
     const finalData = { ...originalStudent, ...updatedData, updatedAt: new Date() };
 
+    const covenantsObject = (finalData.covenants || []).reduce((acc, cov) => {
+      acc[cov.id] = cov;
+      return acc;
+    }, {} as Record<string, Covenant>);
+
     set(studentRef, {
         ...finalData,
         birthDate: finalData.birthDate.toISOString(),
         registrationDate: finalData.registrationDate.toISOString(),
-        updatedAt: finalData.updatedAt.toISOString()
+        updatedAt: finalData.updatedAt.toISOString(),
+        covenants: Object.keys(covenantsObject).length > 0 ? covenantsObject : null
     });
   };
   
