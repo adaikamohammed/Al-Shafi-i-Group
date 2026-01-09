@@ -5,8 +5,8 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, Users, DollarSign, UserPlus, FileText, CheckCircle } from 'lucide-react';
-import { format, getMonth, getYear, startOfQuarter, getQuarter, startOfWeek, endOfWeek, subDays, isSameDay, startOfMonth, parseISO } from 'date-fns';
+import { Loader2, Users, DollarSign, UserPlus, FileText, CheckCircle, Award } from 'lucide-react';
+import { format, getMonth, getYear, startOfQuarter, getQuarter, startOfWeek, endOfWeek, subDays, isSameDay, startOfMonth, parseISO, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -31,17 +31,19 @@ export default function OverviewPage() {
     const overviewData = useMemo(() => {
         const todayStr = format(new Date(), 'yyyy-MM-dd');
         const currentMonthStart = startOfMonth(new Date());
+        const currentMonthEnd = endOfMonth(new Date());
         const currentQuarter = getQuarter(new Date());
         const currentYear = getYear(new Date());
 
         // Attendance
         const todaySession = dailySessions?.[todayStr];
         let attendancePercentage = 0;
-        if (todaySession && todaySession.records && activeStudents.length > 0 && todaySession.sessionType !== 'يوم عطلة') {
-            const presentCount = todaySession.records.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
-            const relevantStudentsCount = todaySession.records.length;
-            if (relevantStudentsCount > 0) {
-              attendancePercentage = (presentCount / relevantStudentsCount) * 100;
+        if (todaySession && Object.values(todaySession).length > 0) {
+            const sessionsToday = Object.values(todaySession);
+            const allRecords = sessionsToday.flatMap(s => s.records ?? []);
+            if (allRecords.length > 0) {
+                const presentCount = allRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
+                attendancePercentage = (presentCount / allRecords.length) * 100;
             }
         }
 
@@ -88,12 +90,43 @@ export default function OverviewPage() {
         
         const totalPossibleRevenue = totalRevenue + expectedRevenue;
         
+        // Extra sessions stats
+        const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(day => Object.values(day)).filter(session => {
+            if(!session.date) return false;
+            const sessionDate = parseISO(session.date);
+            return sessionDate >= currentMonthStart && sessionDate <= currentMonthEnd;
+        });
+        
+        const extraSessions = sessionsInMonth.filter(s => s.sessionNumber === 2 || s.sessionType === 'حصة تعويضية' || s.sessionType === 'حصة أنشطة');
+        const extraSessionsCount = extraSessions.length;
+        
+        let mostActiveStudentInExtra = { name: 'لا يوجد', count: 0 };
+        if (extraSessions.length > 0) {
+            const studentAttendanceCount: Record<string, number> = {};
+            extraSessions.forEach(session => {
+                (session.records ?? []).forEach(record => {
+                    if (record.attendance === 'حاضر' || record.attendance === 'متأخر' || record.attendance === 'تعويض') {
+                        studentAttendanceCount[record.studentId] = (studentAttendanceCount[record.studentId] || 0) + 1;
+                    }
+                })
+            });
+            
+            const sortedStudents = Object.entries(studentAttendanceCount).sort((a,b) => b[1] - a[1]);
+            if (sortedStudents.length > 0) {
+                const topStudentId = sortedStudents[0][0];
+                const topStudent = activeStudents.find(s => s.id === topStudentId);
+                mostActiveStudentInExtra = { name: topStudent?.fullName || 'غير معروف', count: sortedStudents[0][1] };
+            }
+        }
+        
         return {
             attendanceToday: attendancePercentage,
             newStudentsThisMonth: newStudentsThisMonth,
             financialCollection: totalRevenue,
             pendingDues: expectedRevenue,
-            totalPossibleRevenue: totalPossibleRevenue
+            totalPossibleRevenue: totalPossibleRevenue,
+            extraSessionsCount,
+            mostActiveStudentInExtra
         };
 
     }, [activeStudents, dailySessions, payments, settings]);
@@ -134,7 +167,7 @@ export default function OverviewPage() {
                 groupName={isSuperAdmin ? "كل الأفواج" : user?.group} 
              />
             
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 <Card className="shadow-lg rounded-2xl bg-gradient-to-tr from-blue-100 to-blue-200 dark:from-blue-900/50 dark:to-blue-950/50">
                     <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-blue-800 dark:text-blue-200">الحضور اليومي</CardTitle>
@@ -172,7 +205,19 @@ export default function OverviewPage() {
                         <p className="text-xs text-muted-foreground text-green-700 dark:text-green-300">طالب جديد تم إضافته هذا الشهر</p>
                     </CardContent>
                 </Card>
-                <Card className="shadow-lg rounded-2xl bg-gradient-to-tr from-emerald-100 to-emerald-200 dark:from-emerald-900/50 dark:to-emerald-950/50">
+                 <Card className="shadow-lg rounded-2xl bg-gradient-to-tr from-purple-100 to-purple-200 dark:from-purple-900/50 dark:to-purple-950/50">
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-purple-800 dark:text-purple-200">الحصص الإضافية (هذا الشهر)</CardTitle>
+                        <Award className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-5xl font-bold text-purple-900 dark:text-purple-100 mt-4">{overviewData.extraSessionsCount}</div>
+                        <p className="text-xs text-muted-foreground text-purple-700 dark:text-purple-300">
+                           الأكثر حضورًا: {overviewData.mostActiveStudentInExtra.name} ({overviewData.mostActiveStudentInExtra.count} حصص)
+                        </p>
+                    </CardContent>
+                </Card>
+                <Card className="shadow-lg rounded-2xl bg-gradient-to-tr from-emerald-100 to-emerald-200 dark:from-emerald-900/50 dark:to-emerald-950/50 md:col-span-2 lg:col-span-1">
                     <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-emerald-800 dark:text-emerald-200">التحصيل المالي (الموسم)</CardTitle>
                         <DollarSign className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
@@ -182,7 +227,7 @@ export default function OverviewPage() {
                         <p className="text-xs text-muted-foreground text-emerald-700 dark:text-emerald-300">تم تحصيل {financialProgress.toFixed(0)}% من الهدف</p>
                     </CardContent>
                 </Card>
-                 <Card className="shadow-lg rounded-2xl bg-gradient-to-tr from-amber-100 to-amber-200 dark:from-amber-900/50 dark:to-amber-950/50">
+                 <Card className="shadow-lg rounded-2xl bg-gradient-to-tr from-amber-100 to-amber-200 dark:from-amber-900/50 dark:to-amber-950/50 md:col-span-2 lg:col-span-2">
                     <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-amber-800 dark:text-amber-200">المستحقات المعلقة (الموسم)</CardTitle>
                         <FileText className="h-6 w-6 text-amber-600 dark:text-amber-400" />
