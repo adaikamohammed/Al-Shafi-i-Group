@@ -30,12 +30,14 @@ const calculateSentimentForWeek = (
     const activeStudents = (students ?? []).filter(s => s.status === 'نشط');
     if (activeStudents.length === 0) return { score: 0, attendanceRate: 0, badBehaviorCount: 0 };
     
-    const weeklySessions = Object.values(sessions).filter(s => {
+    const weeklySessions = Object.values(sessions).flatMap(s => Object.values(s)).filter(s => {
+        if (!s || !s.date) return false;
         const sessionDate = parseISO(s.date);
         return sessionDate >= weekStartDate && sessionDate <= weekEndDate;
     });
 
     const weeklyReports = reports.filter(r => {
+        if (!r || !r.date) return false;
         const reportDate = parseISO(r.date);
         return reportDate >= weekStartDate && reportDate <= weekEndDate;
     });
