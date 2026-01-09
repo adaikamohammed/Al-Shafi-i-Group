@@ -68,25 +68,32 @@ const StudentCard = ({ student, onSelectStudent, studentList, disabledStudentId 
     );
 };
 
-const ComparisonStat = ({ title, value1, value2, suffix = '' }: { title: string, value1: number, value2: number, suffix?: string }) => {
+const ComparisonStat = ({ title, value1, value2, suffix = '', higherIsBetter = true }: { title: string, value1: number, value2: number, suffix?: string, higherIsBetter?: boolean }) => {
     const total = value1 + value2;
     const percentage1 = total > 0 ? (value1 / total) * 100 : 50;
-    const isWinner1 = value1 > value2;
-    const isWinner2 = value2 > value1;
+    
+    let isWinner1 = higherIsBetter ? value1 > value2 : value1 < value2;
+    let isWinner2 = higherIsBetter ? value2 > value1 : value2 < value1;
     const isDraw = value1 === value2;
+    
+    // In a draw, no one is a winner
+    if (isDraw) {
+        isWinner1 = false;
+        isWinner2 = false;
+    }
 
     return (
         <div className="space-y-2">
             <h4 className="text-center font-semibold text-muted-foreground">{title}</h4>
             <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 w-1/4 justify-start">
-                    {isWinner1 && !isDraw && <Crown className="h-4 w-4 text-yellow-500" />}
+                    {isWinner1 && <Crown className="h-4 w-4 text-yellow-500" />}
                     <span className="font-bold">{value1} {suffix}</span>
                 </div>
                 <Progress value={percentage1} className="flex-1 h-3" />
                 <div className="flex items-center gap-1 w-1/4 justify-end">
                     <span className="font-bold">{value2} {suffix}</span>
-                    {isWinner2 && !isDraw && <Crown className="h-4 w-4 text-yellow-500" />}
+                    {isWinner2 && <Crown className="h-4 w-4 text-yellow-500" />}
                 </div>
             </div>
         </div>
@@ -268,8 +275,8 @@ export default function ComparisonPage() {
                     </CardHeader>
                     <CardContent className="space-y-6 p-6">
                         <ComparisonStat title="الحضور" value1={comparisonData.student1.present} value2={comparisonData.student2.present} suffix="يوم" />
-                        <ComparisonStat title="الغياب" value1={comparisonData.student2.absent} value2={comparisonData.student1.absent} suffix="يوم" />
-                        <ComparisonStat title="التأخر" value1={comparisonData.student2.late} value2={comparisonData.student1.late} suffix="مرة" />
+                        <ComparisonStat title="الغياب" value1={comparisonData.student1.absent} value2={comparisonData.student2.absent} suffix="يوم" higherIsBetter={false} />
+                        <ComparisonStat title="التأخر" value1={comparisonData.student1.late} value2={comparisonData.student2.late} suffix="مرة" higherIsBetter={false} />
                         <ComparisonStat title="حصص التعويض" value1={comparisonData.student1.makeup} value2={comparisonData.student2.makeup} suffix="حصص" />
                         <ComparisonStat title="تقييم 'ممتاز'" value1={comparisonData.student1.excellent} value2={comparisonData.student2.excellent} suffix="مرة" />
                         <ComparisonStat title="السلوك الهادئ" value1={comparisonData.student1.calm} value2={comparisonData.student2.calm} suffix="مرة" />
@@ -280,3 +287,5 @@ export default function ComparisonPage() {
         </div>
     );
 }
+
+    
