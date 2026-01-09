@@ -182,37 +182,7 @@ export default function StudentReportPage() {
     }
 
     const handleDownloadAsPDF = async () => {
-        const reportElement = document.getElementById('report-content');
-        if (reportElement) {
-            const html2pdf = (await import('html2pdf.js')).default;
-            
-            // Temporarily make a clone for printing to avoid messing the UI
-            const clone = reportElement.cloneNode(true) as HTMLElement;
-            clone.style.position = 'absolute';
-            clone.style.left = '-9999px';
-            clone.style.width = '210mm'; // A4 width
-            document.body.appendChild(clone);
-            
-            // Use html2canvas to render the chart
-            const canvas = await html2canvas(clone.querySelector('#radar-chart-container') as HTMLElement, { scale: 2 });
-            const chartImage = canvas.toDataURL('image/png');
-            
-            // Replace chart container with image in the clone
-            const chartContainerInClone = clone.querySelector('#radar-chart-container') as HTMLElement;
-            chartContainerInClone.innerHTML = `<img src="${chartImage}" style="width: 100%; height: auto;"/>`;
-
-            const opt = {
-                margin:       [5, 5, 5, 5],
-                filename:     getReportFilename('pdf'),
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                pagebreak: { avoid: ['.avoid-break'] }
-            };
-            html2pdf().set(opt).from(clone).save().then(() => {
-                document.body.removeChild(clone);
-            });
-        }
+        window.print();
     };
 
 
@@ -419,10 +389,10 @@ ${teacherNote.trim() || autoNote || "لا توجد ملاحظات إضافية."
             </Card>
 
             {reportData && (
-                <Card id="report-display" className="p-6 md:p-8 bg-white text-black rounded-lg shadow-lg font-body">
+                <Card id="report-display" className="p-6 md:p-8 bg-white text-black rounded-lg shadow-lg">
                    <div id="report-content" className="space-y-6">
                         <header className="text-center border-b-2 pb-4 border-gray-300">
-                            <h1 className="text-2xl font-headline font-bold text-gray-800">{`تقرير أداء الطالب ${reportData.reportTitle}`}</h1>
+                            <h1 className="text-2xl font-bold text-gray-800">{`تقرير أداء الطالب ${reportData.reportTitle}`}</h1>
                             <p className="text-lg font-semibold text-gray-700">المدرسة القرآنية للإمام الشافعي</p>
                             {user?.group && <p className="text-md text-gray-600">{`فوج ${user.group} — ${user.displayName}`}</p>}
                             <p className="font-semibold mt-2 text-lg">{reportData.statsPeriod}</p>
@@ -528,42 +498,27 @@ ${teacherNote.trim() || autoNote || "لا توجد ملاحظات إضافية."
             )}
             
             <style jsx global>{`
-                @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-                
-                #report-content, #report-content * {
-                    font-family: 'Cairo', sans-serif !important;
-                    color: black;
-                }
-
                 @media print {
-                    body > *:not(#report-container) {
-                        display: none;
-                    }
-                    .print\\:hidden {
-                        display: none !important;
-                    }
-                    #report-display {
-                       display: none !important;
-                    }
-                    body {
-                       -webkit-print-color-adjust: exact;
-                       print-color-adjust: exact;
-                    }
-                     #report-content {
-                        visibility: visible;
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        right: 0;
-                        width: 100%;
-                        border: none !important;
-                        box-shadow: none !important;
-                        page-break-inside: avoid;
-                    }
-                }
-                @page {
-                    size: A4 portrait;
-                    margin: 1cm;
+                  body * {
+                    visibility: hidden;
+                  }
+                  #report-display, #report-display * {
+                    visibility: visible;
+                  }
+                  #report-display {
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    right: 0;
+                    width: 100%;
+                    margin: 0;
+                    padding: 0;
+                    border: none;
+                    box-shadow: none;
+                  }
+                  .avoid-break {
+                    page-break-inside: avoid;
+                  }
                 }
             `}</style>
         </div>
