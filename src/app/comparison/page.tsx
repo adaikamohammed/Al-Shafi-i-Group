@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import type { Student, DailySession } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
 
 const calculateAge = (birthDate?: Date) => {
   if (!birthDate) return 'N/A';
@@ -97,6 +98,8 @@ const ComparisonStat = ({ title, value1, value2, suffix = '', higherIsBetter = t
 
 export default function ComparisonPage() {
     const { students, dailySessions, loading } = useStudentContext();
+    const { toast } = useToast();
+
     const [periodType, setPeriodType] = useState<'month' | 'season' | 'year'>('month');
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedSeason, setSelectedSeason] = useState<number>(1);
@@ -140,10 +143,13 @@ export default function ComparisonPage() {
         });
         
         const getStatsForStudent = (studentId: string) => {
-            const stats = { present: 0, absent: 0, late: 0, makeup: 0, excellent: 0, good: 0, calm: 0 };
+            const stats = { present: 0, absent: 0, late: 0, makeup: 0, excellent: 0, good: 0, calm: 0, totalSessions: 0 };
             sessionsInRange.forEach(session => {
+                if (session.sessionType === 'يوم عطلة' || (session.sessionType === 'غياب الشيخ' && !session.substituteTeacher)) return;
+                
                 const record = (session.records ?? []).find(r => r.studentId === studentId);
                 if (record) {
+                    stats.totalSessions++;
                     if (record.attendance === 'حاضر') stats.present++;
                     if (record.attendance === 'غائب') stats.absent++;
                     if (record.attendance === 'متأخر') stats.late++;
@@ -163,6 +169,43 @@ export default function ComparisonPage() {
 
     }, [student1, student2, periodType, selectedMonth, selectedSeason, selectedYear, dailySessions]);
 
+
+    const handleCrownWinner = () => {
+        if (!comparisonData || !student1 || !student2) return;
+
+        const { student1: stats1, student2: stats2 } = comparisonData;
+
+        // Scoring: Excellent = 3, Calm = 2, Present/Makeup = 1, Late = 0.5, Absent = -2
+        const score1 = (stats1.excellent * 3) + (stats1.calm * 2) + (stats1.present + stats1.makeup) + (stats1.late * 0.5) - (stats1.absent * 2) + ((student1.memorizedSurahsCount || 0) * 0.1);
+        const score2 = (stats2.excellent * 3) + (stats2.calm * 2) + (stats2.present + stats2.makeup) + (stats2.late * 0.5) - (stats2.absent * 2) + ((student2.memorizedSurahsCount || 0) * 0.1);
+        
+        let winner: Student;
+        let reason = '';
+
+        if (score1 > score2) {
+            winner = student1;
+            if (stats1.excellent > stats2.excellent) reason = "لتفوقه الدراسي وحصوله على تقييم 'ممتاز' في أغلب الحصص.";
+            else if (stats1.calm > stats2.calm) reason = "لانضباطه المتميز وسلوكه الهادئ في الحلقة.";
+            else reason = "لالتزامه الملحوظ بالحضور والمواظبة على الحصص.";
+        } else if (score2 > score1) {
+            winner = student2;
+            if (stats2.excellent > stats1.excellent) reason = "لتفوقه الدراسي وحصوله على تقييم 'ممتاز' في أغلب الحصص.";
+            else if (stats2.calm > stats1.calm) reason = "لانضباطه المتميز وسلوكه الهادئ في الحلقة.";
+            else reason = "لالتزامه الملحوظ بالحضور والمواظبة على الحصص.";
+        } else {
+             toast({
+                title: "🤝 تعادل!",
+                description: "أداء الطالبين متقارب جدًا. لا يوجد فائز واضح.",
+            });
+            return;
+        }
+        
+        toast({
+            title: `🏆 الفائز هو: ${winner.fullName}`,
+            description: reason,
+            duration: 5000,
+        });
+    }
 
     if (loading) {
         return (
@@ -260,6 +303,7 @@ export default function ComparisonPage() {
             </div>
             
             {student1 && student2 && comparisonData && (
+                <>
                  <Card>
                     <CardHeader>
                         <CardTitle>نتائج المقارنة</CardTitle>
@@ -277,9 +321,14 @@ export default function ComparisonPage() {
                          <ComparisonStat title="السور المتقنة" value1={student1.memorizedSurahsCount || 0} value2={student2.memorizedSurahsCount || 0} suffix="سورة" />
                     </CardContent>
                 </Card>
+                 <div className="flex justify-center">
+                    <Button onClick={handleCrownWinner} size="lg" className="bg-gradient-to-r from-yellow-400 to-amber-500 text-white shadow-lg hover:shadow-xl transition-shadow">
+                        <Crown className="ml-2 h-5 w-5" />
+                        تتويج الفائز وتوليد شهادة
+                    </Button>
+                </div>
+                </>
             )}
         </div>
     );
 }
-
-    
