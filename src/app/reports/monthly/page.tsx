@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, Users, CalendarDays, BarChart, AlertTriangle, CheckCircle, XCircle, Clock, Replace, Plane, DollarSign, UserX, UserCheck, Info } from 'lucide-react';
+import { Loader2, Users, CalendarDays, BarChart, AlertTriangle, CheckCircle, XCircle, Clock, Replace, Plane, DollarSign, UserX, UserCheck, Info, ShieldAlert } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, getDate, getDay, getQuarter, startOfQuarter, endOfQuarter, isAfter, isToday, startOfToday, isBefore } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Bar, XAxis, YAxis, CartesianGrid, Legend, BarChart as RechartsBarChart } from 'recharts';
@@ -193,7 +193,12 @@ export default function MonthlyStatisticsPage() {
         const unpaidStudents = studentsDueForQuarter.filter(s => !studentsWhoPaidInQuarter.has(s.id));
         financialStats.unpaidStudentsCount = unpaidStudents.length;
 
-        return { ...stats, daysPassed, recordedDaysCount: recordedDays.size, unrecordedPastDays: unrecordedDaysInPast, studentSpecificRecords, financialStats };
+        const activeCovenantsCount = activeStudents.reduce((count, student) => {
+            const hasActiveCovenant = (student.covenants || []).some(c => c.status === 'نشط');
+            return hasActiveCovenant ? count + 1 : count;
+        }, 0);
+
+        return { ...stats, daysPassed, recordedDaysCount: recordedDays.size, unrecordedPastDays: unrecordedDaysInPast, studentSpecificRecords, financialStats, activeCovenantsCount };
 
     }, [dailySessions, dailyReports, payments, settings, selectedMonth, selectedYear, selectedStudentId, students]);
     
@@ -346,7 +351,7 @@ export default function MonthlyStatisticsPage() {
                 </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">الإيرادات المحققة (الموسم)</CardTitle>
@@ -385,6 +390,16 @@ export default function MonthlyStatisticsPage() {
                     <CardContent>
                         <div className="text-2xl font-bold">{monthlyData.financialStats.unpaidStudentsCount}</div>
                          <p className="text-xs text-muted-foreground">طالب</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">المواثيق النشطة</CardTitle>
+                        <ShieldAlert className="h-4 w-4 text-orange-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{monthlyData.activeCovenantsCount}</div>
+                         <p className="text-xs text-muted-foreground">تعهدات نشطة حالياً</p>
                     </CardContent>
                 </Card>
             </div>

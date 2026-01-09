@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, ArrowLeft, ArrowRight, Star, Info } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, ArrowRight, Star, Info, ShieldAlert } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addDays, subDays, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import type { Student, DailySession, DailyRecord, PerformanceLevel } from '@/lib/types';
+import type { Student, DailySession, DailyRecord, PerformanceLevel, Covenant } from '@/lib/types';
 
 
 const getAttendanceColor = (status?: string) => {
@@ -25,11 +25,11 @@ const getAttendanceColor = (status?: string) => {
   }
 };
 
-const getBehaviorClass = (behavior?: string | null) => {
-    switch(behavior) {
-        case 'هادئ': return 'border-blue-500';
-        case 'متوسط': return 'border-yellow-500';
-        case 'غير منضبط': return 'border-red-500';
+const getBehaviorClass = (activeCovenant: Covenant | null) => {
+    if (!activeCovenant) return 'border-transparent';
+    switch(activeCovenant.card) {
+        case 'بطاقة صفراء': return 'border-yellow-500';
+        case 'بطاقة حمراء': return 'border-red-500';
         default: return 'border-transparent';
     }
 }
@@ -55,18 +55,17 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
 
     const isHoliday = session1?.sessionType === 'يوم عطلة' || session2?.sessionType === 'يوم عطلة';
     
-    // Prioritize session 1 for display status
     const primaryRecord = record1 || record2;
     let primaryStatus = isHoliday ? 'عطلة' : primaryRecord?.attendance;
     
     const attendanceColor = getAttendanceColor(primaryStatus);
     const isAbsent = primaryStatus === 'غائب';
 
-    let behaviorClass = 'border-transparent';
+    const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط' && c.card !== 'بدون') || null;
+    let behaviorClass = getBehaviorClass(activeCovenant);
     let evaluationSymbol = null;
 
     if (primaryRecord && !isAbsent && !isHoliday) {
-        behaviorClass = getBehaviorClass(primaryRecord.behavior);
         evaluationSymbol = getEvaluationSymbol(primaryRecord.memorization);
     }
     
@@ -80,7 +79,24 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
     );
 
     let tooltipContent;
-    if (isHoliday) {
+    if (activeCovenant) {
+        tooltipContent = (
+            <div className="space-y-2">
+                <div className="p-2 bg-red-50 text-red-800 rounded-md">
+                    <p className="font-bold">الطالب تحت التعهد ({activeCovenant.card}):</p>
+                    <p className="text-xs">{activeCovenant.text}</p>
+                </div>
+                <hr/>
+                {record1 || record2 ? (
+                     <>
+                         {record1 ? renderRecordDetails(record1, session1) : <p className="text-xs text-muted-foreground">الحصة 1 لم تسجل.</p>}
+                         {record2 && <hr className="my-1"/>}
+                         {record2 && renderRecordDetails(record2, session2)}
+                    </>
+                ) : <p>لا يوجد تسجيل لهذا اليوم.</p>}
+            </div>
+        );
+    } else if (isHoliday) {
         tooltipContent = <p>يوم عطلة</p>;
     } else if (record1 || record2) {
         tooltipContent = (
@@ -103,7 +119,7 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <div className={cn("h-16 w-full rounded-md p-1 border-2 transition-all relative flex items-center justify-center text-lg font-bold", attendanceColor, isAbsent ? 'border-transparent' : behaviorClass)}>
+                <div className={cn("h-16 w-full rounded-md p-1 border-4 transition-all relative flex items-center justify-center text-lg font-bold", attendanceColor, behaviorClass)}>
                     {evaluationSymbol}
                     {record2 && <div className="absolute top-1 right-1 h-2 w-2 bg-slate-800 rounded-full" title="توجد حصة ثانية"></div>}
                 </div>
@@ -226,14 +242,14 @@ export default function WeeklyFollowUpPage() {
                                     <Info className="h-4 w-4 text-muted-foreground"/>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p>لون الخلفية = حضور | لون الإطار = سلوك | الرمز الداخلي = تقييم</p>
+                                    <p>لون الخلفية = حضور | لون الإطار = بطاقة تعهد | الرمز الداخلي = تقييم</p>
                                 </TooltipContent>
                            </Tooltip>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div>
-                            <h4 className="font-semibold mb-2">الحضُور (لون الخلفية)</h4>
+                            <h4 className="font-semibold mb-2">الحضور (لون الخلفية)</h4>
                             <ul className="space-y-1 text-sm">
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-green-300"></div> حاضر</li>
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-red-400"></div> غائب</li>
@@ -244,11 +260,11 @@ export default function WeeklyFollowUpPage() {
                             </ul>
                         </div>
                         <div>
-                            <h4 className="font-semibold mb-2">السلوك (لون الإطار)</h4>
+                            <h4 className="font-semibold mb-2">بطاقة التعهد (لون الإطار)</h4>
                              <ul className="space-y-1 text-sm">
-                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-blue-500"></div> هادئ</li>
-                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-yellow-500"></div> متوسط</li>
-                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-red-500"></div> غير منضبط</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-4 border-yellow-500"></div> بطاقة صفراء</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-4 border-red-500"></div> بطاقة حمراء</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-4 border-transparent bg-gray-200"></div> لا يوجد تعهد</li>
                             </ul>
                         </div>
                          <div>
