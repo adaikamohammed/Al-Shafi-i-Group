@@ -358,10 +358,12 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
 }
 
 function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSuccess: () => void, onCancel: () => void }) {
-  const { addStudent, updateStudent } = useStudentContext();
+  const { addStudent, updateStudent, settings } = useStudentContext();
+  const { toast } = useToast();
   const [birthDate, setBirthDate] = useState<Date | undefined>(student?.birthDate ? new Date(student.birthDate) : undefined);
   const [registrationDate, setRegistrationDate] = useState<Date | undefined>(student?.registrationDate ? new Date(student.registrationDate) : new Date());
   const [covenants, setCovenants] = useState<Covenant[]>(student?.covenants || []);
+  const [originalCovenants, setOriginalCovenants] = useState<Covenant[]>(student?.covenants || []);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -372,6 +374,17 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
       // Handle error - dates are required
       return;
     }
+    
+    // Check for status change from "نشط" to "تم الوفاء به"
+    covenants.forEach((newCovenant, index) => {
+        const oldCovenant = originalCovenants.find(oc => oc.id === newCovenant.id);
+        if (oldCovenant && oldCovenant.status === 'نشط' && newCovenant.status === 'تم الوفاء به') {
+             toast({
+                title: `🎉 +${settings.points.covenantCompleted} نقطة`,
+                description: `تمت مكافأة الطالب ${student?.fullName} لإنجازه المهمة بنجاح. سيتم تحديث ترتيبه.`,
+            });
+        }
+    });
 
     const studentData: Partial<Student> = {
         fullName: data.fullName,
@@ -559,46 +572,55 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         {/* Covenants Section */}
         <div className="space-y-4 pt-4 border-t">
             <div className="flex justify-between items-center">
-                 <h3 className="text-lg font-semibold flex items-center gap-2"><ShieldAlert /> سجل المواثيق والالتزامات</h3>
+                 <h3 className="text-lg font-semibold flex items-center gap-2"><ShieldAlert /> سجل مهام التمكين (المواثيق)</h3>
                  <Button type="button" variant="outline" size="sm" onClick={handleAddCovenant}>
                     <PlusCircle className="ml-2 h-4 w-4" />
-                    إضافة ميثاق جديد
+                    إضافة مهمة جديدة
                 </Button>
             </div>
 
             {covenants.map((covenant, index) => (
                 <Card key={covenant.id} className="p-4 space-y-4 bg-muted/50">
-                    <div className="flex justify-between items-center">
-                        <p className="font-semibold">ميثاق بتاريخ: {format(parseISO(covenant.date), 'dd/MM/yyyy')}</p>
-                         <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveCovenant(index)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                         </Button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <div className="flex justify-between items-start">
                         <div className="space-y-2">
-                             <Label>نوع الميثاق</Label>
+                             <Label>نوع المهمة / الميثاق</Label>
                              <Select dir="rtl" value={covenant.type} onValueChange={(val: CovenantType) => handleCovenantChange(index, 'type', val)}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="ميثاق حفظ">مهمة تمكين (حفظ)</SelectItem>
                                     <SelectItem value="تعهد غياب">تعهد غياب</SelectItem>
-                                    <SelectItem value="ميثاق حفظ">مهمة حفظ</SelectItem>
                                     <SelectItem value="التزام سلوكي">التزام سلوكي</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
+                         <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveCovenant(index)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                         </Button>
+                    </div>
+
+                     <div className="space-y-2">
+                        <Label>نص المهمة / التعهد</Label>
+                        <Textarea value={covenant.text} onChange={e => handleCovenantChange(index, 'text', e.target.value)} />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
-                             <Label>الحالة</Label>
+                             <Label>تاريخ التكليف</Label>
+                             <Input disabled value={format(parseISO(covenant.date), 'dd MMMM yyyy', {locale: ar})} />
+                        </div>
+                        <div className="space-y-2">
+                             <Label>حالة المهمة</Label>
                              <Select dir="rtl" value={covenant.status} onValueChange={(val: CovenantStatus) => handleCovenantChange(index, 'status', val)}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="نشط">نشط</SelectItem>
-                                    <SelectItem value="تم الوفاء به">تم الوفاء به</SelectItem>
-                                    <SelectItem value="نُقِض">نُقِض</SelectItem>
+                                    <SelectItem value="نشط">نشطة</SelectItem>
+                                    <SelectItem value="تم الوفاء به">تم الوفاء بها</SelectItem>
+                                    <SelectItem value="نُقِض">نُقِضت</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div className="space-y-2">
-                             <Label>البطاقة</Label>
+                             <Label>البطاقة المرتبطة</Label>
                               <Select dir="rtl" value={covenant.card} onValueChange={(val: CovenantCard) => handleCovenantChange(index, 'card', val)}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
@@ -609,13 +631,9 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
                             </Select>
                         </div>
                     </div>
-                     <div className="space-y-2">
-                        <Label>نص التعهد / المهمة</Label>
-                        <Textarea value={covenant.text} onChange={e => handleCovenantChange(index, 'text', e.target.value)} />
-                    </div>
                 </Card>
             ))}
-             {covenants.length === 0 && <p className="text-sm text-center text-muted-foreground py-4">لا توجد مواثيق مسجلة لهذا الطالب.</p>}
+             {covenants.length === 0 && <p className="text-sm text-center text-muted-foreground py-4">لا توجد مهام أو مواثيق مسجلة لهذا الطالب.</p>}
         </div>
 
       </div>
@@ -628,4 +646,3 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 }
 
     
-
