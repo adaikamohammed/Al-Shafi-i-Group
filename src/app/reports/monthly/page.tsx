@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Loader2, Users, CalendarDays, BarChart, AlertTriangle, CheckCircle, XCircle, Clock, Replace, Plane, DollarSign, UserX, UserCheck } from 'lucide-react';
-import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, getDate, getDay, getQuarter, startOfQuarter, endOfQuarter } from 'date-fns';
+import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, getDate, getDay, getQuarter, startOfQuarter, endOfQuarter, isAfter, isToday, startOfToday } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Bar, XAxis, YAxis, CartesianGrid, Legend, BarChart as RechartsBarChart } from 'recharts';
 import type { Student, DailySession, SessionRecord, DailyReport, Payment } from '@/lib/types';
@@ -48,9 +48,17 @@ export default function MonthlyStatisticsPage() {
     const prices = settings?.prices || TIER_PRICES;
 
     const monthlyData = useMemo(() => {
+        const today = startOfToday();
         const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
-        const monthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
-        
+        let monthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
+
+        // If the selected month/year is the current one, only calculate up to today.
+        if (getMonth(monthStartDate) === getMonth(today) && getYear(monthStartDate) === getYear(today)) {
+            monthEndDate = today;
+        }
+
+        const fullMonthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
+
         const quarterStartDate = startOfQuarter(monthStartDate);
         const quarterEndDate = endOfQuarter(monthStartDate);
         const currentQuarter = getQuarter(monthStartDate);
@@ -61,6 +69,17 @@ export default function MonthlyStatisticsPage() {
                 try {
                     const sessionDate = parseISO(session.date);
                     return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
+                } catch(e) { return false; }
+            })
+        );
+
+        const allSessionsInMonthForCalendar = Object.values(dailySessions ?? {}).flatMap(sessionsOnDate => 
+            Object.values(sessionsOnDate).filter(session => {
+                if (!session?.date) return false;
+                try {
+                    const sessionDate = parseISO(session.date);
+                    const fullMonthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
+                    return sessionDate >= fullMonthStartDate && sessionDate <= fullMonthEndDate;
                 } catch(e) { return false; }
             })
         );
@@ -113,13 +132,7 @@ export default function MonthlyStatisticsPage() {
         
         const studentSpecificRecords: { [key: string]: (SessionRecord & {sessionType: string; sessionNumber: 1 | 2})[] } = {};
         if (selectedStudentId !== 'all') {
-            const studentSessions = Object.values(dailySessions ?? {}).flatMap(Object.values).filter(session => {
-                if (!session?.date) return false;
-                try {
-                    const sessionDate = parseISO(session.date);
-                    return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
-                } catch(e) { return false; }
-            });
+            const studentSessions = allSessionsInMonthForCalendar;
             studentSessions.forEach(session => {
                  if (!studentSpecificRecords[session.date]) {
                     studentSpecificRecords[session.date] = [];
@@ -177,6 +190,7 @@ export default function MonthlyStatisticsPage() {
         const daysInMonth = getDaysInMonth(new Date(selectedYear, selectedMonth));
         const firstDayOfMonth = getDay(startOfMonth(new Date(selectedYear, selectedMonth)));
         const startDayIndex = (firstDayOfMonth + 1) % 7; 
+        const today = startOfToday();
 
         const dayCells = [];
         for (let i = 0; i < startDayIndex; i++) {
@@ -184,16 +198,19 @@ export default function MonthlyStatisticsPage() {
         }
 
         for(let day = 1; day <= daysInMonth; day++) {
-            const dateStr = format(new Date(selectedYear, selectedMonth, day), 'yyyy-MM-dd');
+            const date = new Date(selectedYear, selectedMonth, day);
+            const dateStr = format(date, 'yyyy-MM-dd');
             const records = monthlyData.studentSpecificRecords[dateStr];
             
-            let cellClass = 'bg-gray-200 dark:bg-gray-700 text-gray-700';
-            let tooltipText = 'لا يوجد تسجيل لهذا اليوم';
-            let mainStatus = 'لم يسجل';
-
-            if (records && records.length > 0) {
+            let cellClass = 'bg-gray-100 dark:bg-gray-800'; // Upcoming day default
+            let tooltipText = 'يوم قادم';
+            let mainStatus = 'قادم';
+            
+            if (isAfter(date, today)) {
+                 // It's a future day, keep defaults
+            } else if (records && records.length > 0) {
                 const primaryRecord = records.find(r => r.sessionNumber === 1) || records[0];
-                mainStatus = primaryRecord.attendance || mainStatus;
+                mainStatus = primaryRecord.attendance || 'لم يسجل';
                 
                 tooltipText = records.map(r => `الحصة ${r.sessionNumber}: ${r.sessionType}, الحضور: ${r.attendance}`).join('\n');
                 
@@ -207,6 +224,11 @@ export default function MonthlyStatisticsPage() {
                 } else if (records.some(r => r.attendance === 'غائب')) {
                     cellClass = 'bg-yellow-400 dark:bg-yellow-600 text-black'; // Mix of presence and absence
                 }
+            } else {
+                 // Past day with no record
+                cellClass = 'bg-gray-300 dark:bg-gray-700';
+                tooltipText = 'لا يوجد تسجيل لهذا اليوم';
+                mainStatus = 'لم يسجل';
             }
             
             dayCells.push(
@@ -481,5 +503,7 @@ export default function MonthlyStatisticsPage() {
 
 
 
+
+    
 
     
