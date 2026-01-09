@@ -7,7 +7,7 @@ import type { Student, DailySession } from '@/lib/types';
 import { Bot, Lightbulb } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, subDays, parseISO } from 'date-fns';
 
-export const SmartAlerts = ({ students, sessions }: { students: Student[], sessions: Record<string, DailySession> }) => {
+export const SmartAlerts = ({ students, sessions }: { students: Student[], sessions: Record<string, Record<string, DailySession>> }) => {
     const today = new Date();
     const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 6 }); // Saturday
     const endOfCurrentWeek = endOfWeek(today, { weekStartsOn: 6 }); // Friday
@@ -16,7 +16,7 @@ export const SmartAlerts = ({ students, sessions }: { students: Student[], sessi
         const attendanceMap: Record<string, number> = {};
         (students ?? []).forEach(s => attendanceMap[s.id] = 0);
 
-        Object.values(sessions ?? {}).forEach(session => {
+        Object.values(sessions ?? {}).flatMap(day => Object.values(day)).forEach(session => {
             const sessionDate = parseISO(session.date);
             if (sessionDate >= startOfCurrentWeek && sessionDate <= endOfCurrentWeek) {
                 (session.records ?? []).forEach(record => {
@@ -42,27 +42,30 @@ export const SmartAlerts = ({ students, sessions }: { students: Student[], sessi
         const absenceMap: Record<string, number> = {};
         const lastSessionDates: Record<string, Date | null> = {};
 
-        const sortedSessionDates = Object.keys(sessions).sort((a, b) => b.localeCompare(a));
+        const sortedSessionDates = Object.keys(sessions ?? {}).sort((a, b) => b.localeCompare(a));
         
         sortedSessionDates.slice(0, 5).forEach(dateStr => { // Check last 5 sessions
-            const session = sessions[dateStr];
-            if(!session) return;
-            (session.records ?? []).forEach(record => {
-                 if (lastSessionDates[record.studentId] === undefined) lastSessionDates[record.studentId] = null;
-                 
-                 const currentDate = parseISO(dateStr);
-                 const lastDate = lastSessionDates[record.studentId];
+            const daySessions = sessions[dateStr];
+            if(!daySessions) return;
 
-                 if(record.attendance === 'غائب') {
-                    if (lastDate && subDays(lastDate, 1).getDate() === currentDate.getDate()) {
-                       absenceMap[record.studentId] = (absenceMap[record.studentId] || 1) + 1;
-                    } else {
-                       absenceMap[record.studentId] = 1;
-                    }
-                 } else {
-                    absenceMap[record.studentId] = 0;
-                 }
-                 lastSessionDates[record.studentId] = currentDate;
+            Object.values(daySessions).forEach(session => {
+                (session.records ?? []).forEach(record => {
+                     if (lastSessionDates[record.studentId] === undefined) lastSessionDates[record.studentId] = null;
+                     
+                     const currentDate = parseISO(dateStr);
+                     const lastDate = lastSessionDates[record.studentId];
+
+                     if(record.attendance === 'غائب') {
+                        if (lastDate && subDays(lastDate, 1).getDate() === currentDate.getDate()) {
+                           absenceMap[record.studentId] = (absenceMap[record.studentId] || 1) + 1;
+                        } else {
+                           absenceMap[record.studentId] = 1;
+                        }
+                     } else {
+                        absenceMap[record.studentId] = 0;
+                     }
+                     lastSessionDates[record.studentId] = currentDate;
+                });
             });
         });
         
@@ -75,7 +78,7 @@ export const SmartAlerts = ({ students, sessions }: { students: Student[], sessi
     const isEndOfMonth = today.getDate() > 20;
 
     return (
-      <Card className="col-span-1 lg:col-span-4">
+      <Card className="col-span-1 lg:col-span-3">
         <CardHeader>
            <div className="flex items-center gap-2">
                 <Bot className="h-6 w-6 text-primary" />

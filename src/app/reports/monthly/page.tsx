@@ -15,6 +15,7 @@ import type { Student, DailySession, SessionRecord, DailyReport, Payment } from 
 import { cn } from '@/lib/utils';
 import { Tooltip as ShadTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
+import { SmartAlerts } from '@/components/ui/SmartAlerts';
 
 
 const ATTENDANCE_COLORS: { [key: string]: string } = { 'حاضر': '#10B981', 'غائب': '#EF4444', 'متأخر': '#F59E0B', 'تعويض': '#3B82F6', 'لم يسجل': '#9CA3AF' };
@@ -388,29 +389,33 @@ export default function MonthlyStatisticsPage() {
                 </Card>
             </div>
             
-             {selectedStudentId === 'all' ? (
-                <GroupEvaluationCard
-                    students={students ?? []}
-                    sessions={dailySessions}
-                    reports={monthlyData.reports}
-                    groupName={user?.group}
-                />
-            ) : (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>تقويم الطالب: {(students ?? []).find(s => s.id === selectedStudentId)?.fullName}</CardTitle>
-                        <CardDescription>نظرة سريعة على حضور الطالب خلال الشهر المحدد.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                         <div className="grid grid-cols-7 gap-2 text-center text-sm font-semibold mb-2">
-                            {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map(d => <div key={d}>{d}</div>)}
-                        </div>
-                        <div className="grid grid-cols-7 gap-2">
-                            {renderStudentCalendar()}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
+             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                 <SmartAlerts students={activeStudents} sessions={dailySessions} />
+
+                 {selectedStudentId === 'all' ? (
+                    <GroupEvaluationCard
+                        students={students ?? []}
+                        sessions={dailySessions}
+                        reports={monthlyData.reports}
+                        groupName={user?.group}
+                    />
+                ) : (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>تقويم الطالب: {(students ?? []).find(s => s.id === selectedStudentId)?.fullName}</CardTitle>
+                            <CardDescription>نظرة سريعة على حضور الطالب خلال الشهر المحدد.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             <div className="grid grid-cols-7 gap-2 text-center text-sm font-semibold mb-2">
+                                {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map(d => <div key={d}>{d}</div>)}
+                            </div>
+                            <div className="grid grid-cols-7 gap-2">
+                                {renderStudentCalendar()}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
 
              {(monthlyData.totalRecords > 0 || monthlyData.financialStats.totalRevenue > 0) && selectedStudentId !== 'all' ? (
                 <>
