@@ -108,6 +108,7 @@ export default function MonthlyStatisticsPage() {
         const studentSpecificRecords: { [key: string]: (SessionRecord & {sessionType: string})[] } = {};
         if (selectedStudentId !== 'all') {
             const studentSessions = Object.values(dailySessions ?? {}).flatMap(Object.values).filter(session => {
+                if (!session || !session.date) return false;
                 const sessionDate = parseISO(session.date);
                 return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
             });
@@ -466,4 +467,5 @@ export default function MonthlyStatisticsPage() {
 }
 
     
+
 
