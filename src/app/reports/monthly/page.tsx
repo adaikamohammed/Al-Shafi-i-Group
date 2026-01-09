@@ -55,10 +55,12 @@ export default function MonthlyStatisticsPage() {
         const quarterEndDate = endOfQuarter(monthStartDate);
         const currentQuarter = getQuarter(monthStartDate);
         
-        const filteredSessions = Object.values(dailySessions ?? {}).filter(session => {
-            const sessionDate = parseISO(session.date);
-            return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
-        });
+        const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(sessionsOnDate => 
+            Object.values(sessionsOnDate).filter(session => {
+                const sessionDate = parseISO(session.date);
+                return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
+            })
+        );
         
         const filteredReports = Object.values(dailyReports ?? {})
             .flatMap(dayReports => Object.values(dayReports))
@@ -74,17 +76,17 @@ export default function MonthlyStatisticsPage() {
         });
         
         let recordsSource = selectedStudentId === 'all' 
-            ? filteredSessions.flatMap(s => s.records ?? [])
-            : filteredSessions.flatMap(s => (s.records ?? []).filter(r => r.studentId === selectedStudentId));
+            ? sessionsInMonth.flatMap(s => s.records ?? [])
+            : sessionsInMonth.flatMap(s => (s.records ?? []).filter(r => r.studentId === selectedStudentId));
 
         const stats = {
             totalRecords: recordsSource.length,
             attendance: { 'حاضر': 0, 'غائب': 0, 'متأخر': 0, 'تعويض': 0 },
             behavior: { 'هادئ': 0, 'متوسط': 0, 'غير منضبط': 0 },
             evaluation: { 'ممتاز': 0, 'جيد': 0, 'متوسط': 0, 'ضعيف': 0, 'لا يوجد': 0 },
-            sessions: filteredSessions,
+            sessions: sessionsInMonth,
             reports: filteredReports,
-            holidays: filteredSessions.filter(s => s.sessionType === 'يوم عطلة').length,
+            holidays: sessionsInMonth.filter(s => s.sessionType === 'يوم عطلة').length,
             sessionTypes: { 'حصة أساسية': 0, 'حصة أنشطة': 0, 'حصة تعويضية': 0 }
         };
 
@@ -95,25 +97,28 @@ export default function MonthlyStatisticsPage() {
         });
 
         if (selectedStudentId === 'all') {
-            filteredSessions.forEach(session => {
+            sessionsInMonth.forEach(session => {
                if(session.sessionType !== 'يوم عطلة') {
                    stats.sessionTypes[session.sessionType]++;
                }
             });
         }
         
-        const studentSpecificRecords: { [key: string]: SessionRecord & {sessionType: string} } = {};
+        const studentSpecificRecords: { [key: string]: (SessionRecord & {sessionType: string})[] } = {};
         if (selectedStudentId !== 'all') {
-            const studentSessions = Object.values(dailySessions ?? {}).filter(session => {
+            const studentSessions = Object.values(dailySessions ?? {}).flatMap(Object.values).filter(session => {
                 const sessionDate = parseISO(session.date);
                 return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
             });
             studentSessions.forEach(session => {
+                 if (!studentSpecificRecords[session.date]) {
+                    studentSpecificRecords[session.date] = [];
+                 }
                  const record = (session.records ?? []).find(r => r.studentId === selectedStudentId);
                  if (record) {
-                     studentSpecificRecords[session.date] = {...record, sessionType: session.sessionType};
+                     studentSpecificRecords[session.date].push({...record, sessionType: session.sessionType});
                  } else if (session.sessionType === 'يوم عطلة') {
-                     studentSpecificRecords[session.date] = { studentId: selectedStudentId, attendance: 'يوم عطلة', behavior: null, memorization: null, review: null, notes: 'يوم عطلة', sessionType: 'يوم عطلة' };
+                     studentSpecificRecords[session.date].push({ studentId: selectedStudentId, attendance: 'يوم عطلة', behavior: null, memorization: null, review: null, notes: 'يوم عطلة', sessionType: 'يوم عطلة' });
                  }
             });
         }
@@ -170,35 +175,27 @@ export default function MonthlyStatisticsPage() {
 
         for(let day = 1; day <= daysInMonth; day++) {
             const dateStr = format(new Date(selectedYear, selectedMonth, day), 'yyyy-MM-dd');
-            const record = monthlyData.studentSpecificRecords[dateStr];
+            const records = monthlyData.studentSpecificRecords[dateStr];
             
-            let cellClass = 'bg-gray-200 text-gray-700';
+            let cellClass = 'bg-gray-200 dark:bg-gray-700 text-gray-700';
             let tooltipText = 'لا يوجد تسجيل لهذا اليوم';
+            let mainStatus = 'لم يسجل';
 
-            if (record) {
-                switch(record.attendance) {
-                    case 'حاضر': 
-                        cellClass = 'bg-green-500 text-white'; 
-                        tooltipText = 'حاضر';
-                        break;
-                    case 'غائب': 
-                        cellClass = 'bg-red-500 text-white';
-                        tooltipText = record.notes ? `غائب: ${record.notes}` : 'غائب (بدون سبب)';
-                        break;
-                    case 'متأخر': 
-                        cellClass = 'bg-yellow-400 text-black';
-                        tooltipText = 'متأخر';
-                        break;
-                    case 'تعويض': 
-                        cellClass = 'bg-blue-400 text-white';
-                        tooltipText = 'حصة تعويضية';
-                        break;
-                    case 'يوم عطلة':
-                        cellClass = 'bg-gray-400 text-white';
-                        tooltipText = 'يوم عطلة';
-                        break;
-                    default: 
-                        break;
+            if (records && records.length > 0) {
+                const primaryRecord = records.find(r => r.sessionType === 'حصة أساسية') || records[0];
+                mainStatus = primaryRecord.attendance || mainStatus;
+                
+                tooltipText = records.map(r => `الحصة: ${r.sessionType}, الحضور: ${r.attendance}`).join('\n');
+                
+                if (records.some(r => r.attendance === 'يوم عطلة')) {
+                    cellClass = 'bg-gray-400 dark:bg-gray-600 text-white';
+                    mainStatus = 'عطلة';
+                } else if (records.every(r => r.attendance === 'غائب')) {
+                    cellClass = 'bg-red-500 dark:bg-red-800 text-white';
+                } else if (records.some(r => r.attendance === 'حاضر' || r.attendance === 'متأخر')) {
+                    cellClass = 'bg-green-500 dark:bg-green-700 text-white';
+                } else if (records.some(r => r.attendance === 'غائب')) {
+                    cellClass = 'bg-yellow-400 dark:bg-yellow-600 text-black'; // Mix of presence and absence
                 }
             }
             
@@ -206,12 +203,14 @@ export default function MonthlyStatisticsPage() {
                 <TooltipProvider key={day}>
                     <ShadTooltip>
                         <TooltipTrigger asChild>
-                            <div className={cn("h-14 rounded-md font-bold flex items-center justify-center", cellClass)}>
-                                {day}
+                            <div className={cn("h-16 rounded-md font-bold flex flex-col items-center justify-center p-1", cellClass)}>
+                                <span>{day}</span>
+                                <span className="text-xs font-normal">{mainStatus}</span>
+                                {records && records.length > 1 && <div className="absolute top-1 right-1 h-2 w-2 bg-white rounded-full"></div>}
                             </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                           <p>{tooltipText}</p>
+                           <p className="whitespace-pre-wrap">{tooltipText}</p>
                         </TooltipContent>
                     </ShadTooltip>
                 </TooltipProvider>
@@ -344,7 +343,7 @@ export default function MonthlyStatisticsPage() {
              {selectedStudentId === 'all' && (
                 <GroupEvaluationCard
                     students={students ?? []}
-                    sessions={monthlyData.sessions}
+                    sessions={dailySessions}
                     reports={monthlyData.reports}
                     groupName={user?.group}
                 />
@@ -402,7 +401,7 @@ export default function MonthlyStatisticsPage() {
                                             <Cell key={`cell-${index}`} fill={ATTENDANCE_COLORS[entry.name]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip formatter={(value, name) => [`${value} يوم`, name]} />
+                                    <Tooltip formatter={(value, name) => [`${value} حصة`, name]} />
                                     <Legend />
                                 </PieChart>
                             </ResponsiveContainer>

@@ -42,20 +42,19 @@ export default function RankingPage() {
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
 
     const rankingData: StudentScore[] = useMemo(() => {
-        // Use season start date from settings, or fall back to the start of the student's registration year if not set.
         const seasonStartDate = settings.seasonStartDate ? parseISO(settings.seasonStartDate) : null;
         
         const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
         const monthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
 
-        // Ensure we only calculate for the selected month, but also respect the season start date.
         const calculationStartDate = seasonStartDate && isAfter(seasonStartDate, monthStartDate) ? seasonStartDate : monthStartDate;
 
-        const filteredSessions = Object.values(dailySessions ?? {}).filter(session => {
-            const sessionDate = parseISO(session.date);
-            // The session must be within the selected month AND after the season start date.
-            return sessionDate >= calculationStartDate && sessionDate <= monthEndDate;
-        });
+        const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(sessionsOnDate => 
+            Object.values(sessionsOnDate).filter(session => {
+                const sessionDate = parseISO(session.date);
+                return sessionDate >= calculationStartDate && sessionDate <= monthEndDate;
+            })
+        );
 
         const studentScores: Record<string, StudentScore> = {};
 
@@ -68,7 +67,7 @@ export default function RankingPage() {
             };
         });
 
-        filteredSessions.forEach(session => {
+        sessionsInMonth.forEach(session => {
             (session.records ?? []).forEach(record => {
                 if (studentScores[record.studentId]) {
                     let points = 0;
