@@ -11,7 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, DailySession } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, ArrowLeft, ArrowRight, Loader2, Download, MoreVertical, Trash2 } from 'lucide-react';
+import { Info, ArrowLeft, ArrowRight, Loader2, Download, MoreVertical, Trash2, PlusCircle, Copy } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -40,18 +40,20 @@ const sessionTypeOptions: SessionType[] = ["حصة أساسية", "حصة أنش
 export default function DailySessionsPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [selectedSessionNumber, setSelectedSessionNumber] = useState<1 | 2>(1);
   const [isSessionDialogOpen, setSessionDialogOpen] = useState(false);
   const { toast } = useToast();
   
-  const { students, dailySessions, loading, getSessionForDate, addDailySession, deleteDailySession } = useStudentContext();
+  const { students, dailySessions, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById } = useStudentContext();
   const { isSuperAdmin } = useAuth();
   const activeStudents = useMemo(() => 
     (students ?? []).filter(s => s.status === "نشط"), 
   [students]);
 
-  const handleDayClick = (day: number) => {
+  const handleDayClick = (day: number, sessionNumber: 1 | 2 = 1) => {
     const newSelectedDay = new Date(getYear(currentDate), getMonth(currentDate), day);
     setSelectedDay(newSelectedDay);
+    setSelectedSessionNumber(sessionNumber);
     setSessionDialogOpen(true);
   };
   
@@ -63,25 +65,22 @@ export default function DailySessionsPage() {
       setCurrentDate(prev => offset > 0 ? addMonths(prev, 12) : subMonths(prev, 12));
   }
   
-  const handleDeleteDay = (e: React.MouseEvent, day: number) => {
+  const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    const date = new Date(getYear(currentDate), getMonth(currentDate), day);
-    const formattedDate = format(date, 'yyyy-MM-dd');
-    deleteDailySession(formattedDate);
-    toast({ title: "✅ تم الحذف", description: `تم حذف بيانات يوم ${formattedDate} بنجاح.` });
+    deleteDailySession(sessionId);
+    toast({ title: "✅ تم الحذف", description: `تم حذف بيانات الحصة بنجاح.` });
   }
 
-  const handleExportDay = (e: React.MouseEvent, day: number) => {
+  const handleExportSession = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation(); // Prevent dialog from opening
-    const date = new Date(getYear(currentDate), getMonth(currentDate), day);
-    const formattedDate = format(date, 'yyyy-MM-dd');
-    const session = getSessionForDate(formattedDate);
+    const session = getSessionById(sessionId);
 
     if (!session) {
-        toast({ title: "لا توجد بيانات", description: "لا توجد سجلات لهذا اليوم لتصديرها.", variant: "destructive" });
+        toast({ title: "لا توجد بيانات", description: "لا توجد سجلات لهذه الحصة لتصديرها.", variant: "destructive" });
         return;
     }
-
+    
+    const date = parseISO(session.date);
     const dayName = format(date, 'EEEE', { locale: ar });
     const readableDate = format(date, 'dd/MM/yyyy');
     
@@ -89,35 +88,30 @@ export default function DailySessionsPage() {
     
     if (session.sessionType === 'يوم عطلة') {
         dataForSheet = [{
-            'التاريخ': readableDate,
-            'اليوم': dayName,
-            'نوع الحصة': 'يوم عطلة',
+            'التاريخ': readableDate, 'اليوم': dayName,
+            'رقم الحصة': session.sessionNumber, 'نوع الحصة': 'يوم عطلة',
         }];
     } else {
         dataForSheet = (session.records ?? []).map(record => {
             const student = (students ?? []).find(s => s.id === record.studentId);
             return {
-                'التاريخ': readableDate,
-                'اليوم': dayName,
-                'نوع الحصة': session.sessionType,
-                'اسم الطالب': student?.fullName || 'غير معروف',
-                'الحضور': record.attendance || '',
-                'التقييم': record.memorization || '',
-                'السلوك': record.behavior || '',
-                'مراجعة': record.review ? 'نعم' : 'لا',
-                'ملاحظات': record.notes || '',
+                'التاريخ': readableDate, 'اليوم': dayName,
+                'رقم الحصة': session.sessionNumber, 'نوع الحصة': session.sessionType,
+                'اسم الطالب': student?.fullName || 'غير معروف', 'الحضور': record.attendance || '',
+                'التقييم': record.memorization || '', 'السلوك': record.behavior || '',
+                'مراجعة': record.review ? 'نعم' : 'لا', 'ملاحظات': record.notes || '',
             }
         });
     }
 
     const ws = XLSX.utils.json_to_sheet(dataForSheet);
     ws['!cols'] = [
-        { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+        { wch: 12 }, { wch: 10 }, {wch: 8}, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
         { wch: 12 }, { wch: 10 }, { wch: 30 }
     ];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `سجل حصة ${formattedDate}`);
-    XLSX.writeFile(wb, `سجل_حصة_${formattedDate}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, `سجل حصة ${session.id}`);
+    XLSX.writeFile(wb, `سجل_حصة_${session.id}.xlsx`);
   }
 
   const renderCalendar = () => {
@@ -136,14 +130,15 @@ export default function DailySessionsPage() {
     for (let day = 1; day <= daysInMonth; day++) {
         const dayDate = new Date(year, month, day);
         const formattedDayDate = format(dayDate, 'yyyy-MM-dd');
-        const session = dailySessions ? dailySessions[formattedDayDate] : undefined;
-        const isHoliday = session?.sessionType === 'يوم عطلة';
+        const sessionsForDay = getSessionsForDay(formattedDayDate);
         
         let dayStatusClass = '';
-        if (isHoliday) {
-            dayStatusClass = 'bg-yellow-200 dark:bg-yellow-800';
-        } else if (session) {
-            dayStatusClass = 'bg-green-200 dark:bg-green-800';
+        if (sessionsForDay.length > 0) {
+            if (sessionsForDay.some(s => s.sessionType === 'يوم عطلة')) {
+                dayStatusClass = 'bg-yellow-200 dark:bg-yellow-800';
+            } else {
+                dayStatusClass = 'bg-green-200 dark:bg-green-800';
+            }
         } else if (isPast(dayDate) && !isToday(dayDate)) {
              dayStatusClass = 'bg-red-200 dark:bg-red-900';
         }
@@ -153,14 +148,14 @@ export default function DailySessionsPage() {
           key={day}
           onClick={() => handleDayClick(day)}
           className={cn(
-            "p-2 text-start border rounded-md transition-colors h-24 flex flex-col justify-between relative group",
+            "p-2 text-start border rounded-md transition-colors h-28 flex flex-col justify-between relative group",
             "hover:bg-accent hover:text-accent-foreground cursor-pointer",
             dayStatusClass
           )}
         >
             <div className="flex justify-between w-full items-start">
                  <span className="font-bold">{day}</span>
-                 {session && !isSuperAdmin && (
+                 {sessionsForDay.length > 0 && !isSuperAdmin && (
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <DropdownMenu>
                          <DropdownMenuTrigger asChild>
@@ -169,36 +164,51 @@ export default function DailySessionsPage() {
                             </Button>
                          </DropdownMenuTrigger>
                          <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
-                             <DropdownMenuItem onClick={(e) => handleExportDay(e, day)}>
-                                <Download className="ml-2 h-4 w-4" />
-                                <span>تحميل بيانات اليوم</span>
-                            </DropdownMenuItem>
-                             <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                                        <Trash2 className="ml-2 h-4 w-4" />
-                                        <span>حذف بيانات اليوم</span>
-                                    </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                    <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        سيؤدي هذا إلى حذف جميع سجلات هذا اليوم نهائيًا. هذا الإجراء لا يمكن التراجع عنه.
-                                    </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                    <AlertDialogAction onClick={(e) => handleDeleteDay(e, day)}>نعم، قم بالحذف</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
+                            {sessionsForDay.map(session => (
+                                <React.Fragment key={session.id}>
+                                <DropdownMenuItem onClick={() => handleDayClick(day, session.sessionNumber)}>
+                                    <Copy className="ml-2 h-4 w-4" />
+                                    <span>تعديل حصة {session.sessionNumber}</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={(e) => handleExportSession(e, session.id)}>
+                                    <Download className="ml-2 h-4 w-4" />
+                                    <span>تحميل حصة {session.sessionNumber}</span>
+                                </DropdownMenuItem>
+                                 <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                            <Trash2 className="ml-2 h-4 w-4" />
+                                            <span>حذف حصة {session.sessionNumber}</span>
+                                        </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                        <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            سيؤدي هذا إلى حذف سجلات هذه الحصة نهائيًا.
+                                        </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                        <AlertDialogAction onClick={(e) => handleDeleteSession(e, session.id)}>نعم، قم بالحذف</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                                </React.Fragment>
+                            ))}
                          </DropdownMenuContent>
                     </DropdownMenu>
                     </div>
                  )}
             </div>
-           <span className="text-xs text-muted-foreground self-end">{format(dayDate, 'EEEE', { locale: ar })}</span>
+             <div className="self-end text-right">
+                {sessionsForDay.length < 2 && !isSuperAdmin && (
+                     <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); handleDayClick(day, 2);}}>
+                        <PlusCircle className="h-4 w-4" />
+                     </Button>
+                )}
+                <span className="text-xs text-muted-foreground self-end">{format(dayDate, 'EEEE', { locale: ar })}</span>
+             </div>
         </div>
       );
     }
@@ -282,8 +292,9 @@ export default function DailySessionsPage() {
                 students={activeStudents}
                 onClose={() => setSessionDialogOpen(false)}
                 addDailySession={addDailySession}
-                getSessionForDate={getSessionForDate}
+                getSessionById={getSessionById}
                 isSuperAdmin={isSuperAdmin}
+                sessionNumber={selectedSessionNumber}
               />
             </div>
           </DialogContent>
@@ -296,22 +307,24 @@ export default function DailySessionsPage() {
 
 interface DailySessionFormProps {
     day: Date;
+    sessionNumber: 1 | 2;
     students: Student[];
     onClose: () => void;
     addDailySession: (session: DailySession) => void;
-    getSessionForDate: (date: string) => DailySession | undefined;
+    getSessionById: (sessionId: string) => DailySession | undefined;
     isSuperAdmin?: boolean;
 }
 
 
-function DailySessionForm({ day, students, onClose, addDailySession, getSessionForDate, isSuperAdmin }: DailySessionFormProps) {
+function DailySessionForm({ day, sessionNumber, students, onClose, addDailySession, getSessionById, isSuperAdmin }: DailySessionFormProps) {
   const [sessionType, setSessionType] = useState<SessionType>('حصة أساسية');
   const [records, setRecords] = useState<DailyRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const formattedDate = format(day, 'yyyy-MM-dd');
+  const sessionId = `${formattedDate}-${sessionNumber}`;
 
   useEffect(() => {
-    const formattedDate = format(day, 'yyyy-MM-dd');
-    const existingSession = getSessionForDate(formattedDate);
+    const existingSession = getSessionById(sessionId);
 
     if (existingSession) {
         setSessionType(existingSession.sessionType);
@@ -322,6 +335,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
                 const existingRec = (existingSession.records ?? []).find(r => r.studentId === s.id);
                 return existingRec || {
                     studentId: s.id,
+                    sessionId: sessionId,
                     attendance: 'حاضر',
                     memorization: null, review: false, behavior: 'هادئ',
                     notes: '',
@@ -332,14 +346,15 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
     } else {
         const initialRecords = (students ?? []).map(s => ({
             studentId: s.id,
+            sessionId: sessionId,
             attendance: 'حاضر',
             memorization: null, review: false, behavior: 'هادئ',
             notes: '',
         }));
         setRecords(initialRecords);
-        setSessionType('حصة أساسية');
+        setSessionType(sessionNumber === 1 ? 'حصة أساسية' : 'حصة تعويضية');
     }
-  }, [day, students, getSessionForDate]);
+  }, [day, students, getSessionById, sessionId, sessionNumber]);
 
   const handleRecordChange = <K extends keyof DailyRecord>(studentId: string, field: K, value: DailyRecord[K]) => {
     setRecords(prevRecords =>
@@ -359,10 +374,11 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
 
   const handleSave = () => {
     setIsLoading(true);
-    const formattedDate = format(day, 'yyyy-MM-dd');
     
     const sessionToSave: DailySession = {
+        id: sessionId,
         date: formattedDate,
+        sessionNumber,
         sessionType: sessionType,
         records: sessionType === 'يوم عطلة' ? [] : records,
     };
@@ -380,7 +396,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
     <TooltipProvider>
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Label className="font-bold">نوع الحصة:</Label>
+          <Label className="font-bold text-lg">الحصة رقم: {sessionNumber}</Label>
           <div className="flex items-center gap-2">
             <Select dir="rtl" value={sessionType} onValueChange={(value: SessionType) => setSessionType(value)} disabled={isSuperAdmin}>
               <SelectTrigger className="w-[200px]">
@@ -491,7 +507,7 @@ function DailySessionForm({ day, students, onClose, addDailySession, getSessionF
             {!isSuperAdmin && (
                 <Button onClick={handleSave} disabled={isLoading}>
                     {isLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-                    حفظ بيانات اليوم
+                    حفظ بيانات الحصة
                 </Button>
             )}
         </DialogFooter>

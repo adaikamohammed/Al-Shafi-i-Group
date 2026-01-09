@@ -46,7 +46,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 interface StudentContextType {
   students: Student[];
-  dailySessions: Record<string, DailySession[]>;
+  dailySessions: Record<string, Record<string, DailySession>>;
   dailyReports: { [date: string]: { [reportId: string]: DailyReport } };
   surahProgress: Record<string, SurahMastery>;
   payments: Payment[];
@@ -58,7 +58,8 @@ interface StudentContextType {
   deleteAllStudents: () => void;
   addDailySession: (session: DailySession) => void;
   deleteDailySession: (sessionId: string) => void;
-  getSessionsForDate: (date: string) => DailySession[];
+  getSessionsForDay: (date: string) => DailySession[];
+  getSessionById: (sessionId: string) => DailySession | undefined;
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession[]>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
   saveDailyReport: (report: Omit<DailyReport, 'id'>, reportIdToUpdate?: string) => Promise<void>;
@@ -76,7 +77,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   
   const [students, setStudents] = useState<Student[]>([]);
-  const [dailySessions, setDailySessions] = useState<Record<string, DailySession[]>>({});
+  const [dailySessions, setDailySessions] = useState<Record<string, Record<string, DailySession>>>({});
   const [dailyReports, setDailyReports] = useState<{ [date: string]: { [reportId: string]: DailyReport } }>({});
   const [surahProgress, setSurahProgress] = useState<Record<string, SurahMastery>>({});
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -114,7 +115,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         }
         const allUsersData = snapshot.val();
         let allStudents: Student[] = [];
-        let allSessions: Record<string, DailySession[]> = {};
+        let allSessions: Record<string, Record<string, DailySession>> = {};
         let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
         let allProgress: Record<string, SurahMastery> = {};
         let allPayments: Payment[] = [];
@@ -281,9 +282,15 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     remove(sessionRef);
   }
 
-  const getSessionsForDate = (date: string): DailySession[] => {
+  const getSessionsForDay = (date: string): DailySession[] => {
       const sessionsForDate = (dailySessions ?? {})[date];
       return sessionsForDate ? Object.values(sessionsForDate) : [];
+  }
+  
+  const getSessionById = (sessionId: string): DailySession | undefined => {
+      const date = sessionId.substring(0, 10);
+      const sessionsForDate = (dailySessions ?? {})[date];
+      return sessionsForDate ? sessionsForDate[sessionId] : undefined;
   }
 
   const getRecordsForDateRange = (startDate: string, endDate: string): Record<string, DailySession[]> => {
@@ -291,10 +298,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const end = parseISO(endDate);
       const filteredSessions: Record<string, DailySession[]> = {};
 
-       Object.entries(dailySessions ?? {}).forEach(([date, sessions]) => {
+       Object.entries(dailySessions ?? {}).forEach(([date, sessionsOnDay]) => {
            try {
                 if(isWithinInterval(parseISO(date), { start, end })) {
-                    filteredSessions[date] = Object.values(sessions);
+                    filteredSessions[date] = Object.values(sessionsOnDay);
                 }
            } catch(e) {
                 console.warn(`Invalid date found in records: ${date}`);
@@ -396,7 +403,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionsForDate, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
+    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
       {children}
     </StudentContext.Provider>
   );
