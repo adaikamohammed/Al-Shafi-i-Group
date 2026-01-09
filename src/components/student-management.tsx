@@ -581,7 +581,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="تعهد غياب">تعهد غياب</SelectItem>
-                                    <SelectItem value="ميثاق حفظ">ميثاق حفظ</SelectItem>
+                                    <SelectItem value="ميثاق حفظ">مهمة حفظ</SelectItem>
                                     <SelectItem value="التزام سلوكي">التزام سلوكي</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -610,7 +610,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
                         </div>
                     </div>
                      <div className="space-y-2">
-                        <Label>نص التعهد</Label>
+                        <Label>نص التعهد / المهمة</Label>
                         <Textarea value={covenant.text} onChange={e => handleCovenantChange(index, 'text', e.target.value)} />
                     </div>
                 </Card>
@@ -628,3 +628,4 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 }
 
     
+
