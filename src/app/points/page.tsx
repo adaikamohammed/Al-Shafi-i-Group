@@ -37,10 +37,13 @@ export default function PointsSystemPage() {
         const studentScores: Record<string, number> = {};
         const seasonStartDate = settings.seasonStartDate ? parseISO(settings.seasonStartDate) : null;
 
-        const filteredSessions = Object.values(dailySessions ?? {}).filter(session => {
-            const sessionDate = parseISO(session.date);
-            return !seasonStartDate || isAfter(sessionDate, seasonStartDate);
-        });
+        const filteredSessions = Object.values(dailySessions ?? {}).flatMap(daySessions => 
+            Object.values(daySessions).filter(session => {
+                if (!session || !session.date) return false;
+                const sessionDate = parseISO(session.date);
+                return !seasonStartDate || isAfter(sessionDate, seasonStartDate);
+            })
+        );
 
         activeStudents.forEach(student => {
             let totalPoints = 0;
