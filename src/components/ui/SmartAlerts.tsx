@@ -5,7 +5,7 @@ import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Student, DailySession } from '@/lib/types';
 import { Bot, Lightbulb } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, subDays, parseISO } from 'date-fns';
+import { format, startOfWeek, endOfWeek, subDays, parseISO, isValid } from 'date-fns';
 
 export const SmartAlerts = ({ students, sessions }: { students: Student[], sessions: Record<string, Record<string, DailySession>> }) => {
     const today = new Date();
@@ -17,7 +17,10 @@ export const SmartAlerts = ({ students, sessions }: { students: Student[], sessi
         (students ?? []).forEach(s => attendanceMap[s.id] = 0);
 
         Object.values(sessions ?? {}).flatMap(day => Object.values(day)).forEach(session => {
+            if (!session || !session.date) return; // Defensive check
             const sessionDate = parseISO(session.date);
+            if (!isValid(sessionDate)) return;
+
             if (sessionDate >= startOfCurrentWeek && sessionDate <= endOfCurrentWeek) {
                 (session.records ?? []).forEach(record => {
                     if ((record.attendance === 'حاضر' || record.attendance === 'متأخر') && attendanceMap[record.studentId] !== undefined) {
@@ -49,10 +52,13 @@ export const SmartAlerts = ({ students, sessions }: { students: Student[], sessi
             if(!daySessions) return;
 
             Object.values(daySessions).forEach(session => {
+                if (!session || !session.date) return; // Defensive check
+                 const currentDate = parseISO(dateStr);
+                 if (!isValid(currentDate)) return;
+
                 (session.records ?? []).forEach(record => {
                      if (lastSessionDates[record.studentId] === undefined) lastSessionDates[record.studentId] = null;
                      
-                     const currentDate = parseISO(dateStr);
                      const lastDate = lastSessionDates[record.studentId];
 
                      if(record.attendance === 'غائب') {
