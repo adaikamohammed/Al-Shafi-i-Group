@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, AlertTriangle, FileDown, FileText as FileTextIcon, MessageCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, FileDown, FileText as FileTextIcon, MessageCircle, ShieldAlert } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, getDaysInMonth, startOfMonth, endOfMonth, startOfYear, endOfYear, setMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { surahs as allSurahs } from '@/lib/surahs';
@@ -19,6 +19,7 @@ import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadius
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import html2canvas from 'html2canvas';
+import type { Covenant } from '@/lib/types';
 
 const calculateAge = (birthDate?: Date) => {
   if (!birthDate) return 'N/A';
@@ -135,7 +136,7 @@ export default function StudentReportPage() {
 
 
         const radarData = [
-            { subject: 'الحضور', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
+            { subject: 'الحاضر', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
             { subject: 'الحفظ', score: parseFloat(memorizationScore.toFixed(1)), fullMark: 10 },
             { subject: 'الانضباط', score: parseFloat(disciplineScore.toFixed(1)), fullMark: 10 },
             { subject: 'التجويد', score: tajweedScore, fullMark: 10 },
@@ -162,6 +163,8 @@ export default function StudentReportPage() {
 
         const studentSurahs = ((loading ? [] : (students ?? []).find(s => s.id === selectedStudentId)?.memorizedSurahsCount) || 0);
 
+        const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط' && c.card !== 'بدون');
+
         return {
             student,
             stats,
@@ -171,6 +174,7 @@ export default function StudentReportPage() {
             radarData,
             autoNote,
             totalSessionsHeld,
+            activeCovenant,
         };
 
     }, [selectedStudentId, reportPeriod, selectedMonth, selectedSeason, selectedYear, students, dailySessions, surahProgress, tajweedScore, akhlaqScore, loading]);
@@ -209,7 +213,7 @@ export default function StudentReportPage() {
     const handleCopyWhatsAppReport = () => {
         if (!reportData) return;
 
-        const { student, stats, autoNote } = reportData;
+        const { student, stats, autoNote, activeCovenant } = reportData;
         const groupName = user?.group || "المدرسة";
         const sheikhNote = teacherNote.trim() ? `\n\n*ملاحظة الشيخ:* ${teacherNote.trim()}` : (autoNote ? `\n\n*ملاحظة الشيخ:* ${autoNote}`: '');
         let message = '';
@@ -218,7 +222,9 @@ export default function StudentReportPage() {
         const undisciplinedThreshold = 2;
         const poorEvaluationThreshold = 2;
 
-        if (stats.absent >= absenceThreshold) {
+        if (activeCovenant) {
+            message = `إدارة ${groupName}: تم وضع الابن ${student.fullName} تحت ميثاق *${activeCovenant.type}* نظراً لـ ${activeCovenant.text.toLowerCase()}. نأمل منكم حثه على الالتزام بالعهد ومتابعة بطاقته في سجل الطالب.${sheikhNote}`;
+        } else if (stats.absent >= absenceThreshold) {
             message = `السلام عليكم ورحمة الله وبركاته،
 نود إفادتكم من إدارة (${groupName}) بأن ابننا ${student.fullName} قد تغيب عن الحلقات لـ ${stats.absent} أيام.
 استمرارية الحضور هي سر الإنجاز، نرجو التنسيق معنا لضمان عودته للمسار.${sheikhNote}`;
@@ -468,6 +474,29 @@ ${teacherNote.trim() || autoNote || "لا توجد ملاحظات إضافية."
                                 </CardContent>
                             </Card>
                         </section>
+
+                        {reportData.activeCovenant && (
+                             <section className="avoid-break">
+                                <Card className="bg-white shadow-none border-2 border-red-400">
+                                     <CardHeader>
+                                        <CardTitle className="text-lg text-red-700 flex items-center gap-2">
+                                            <ShieldAlert /> وثيقة ميثاق نشطة
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4 text-center">
+                                         <p className="text-gray-600">
+                                            يشهد الشيخ <span className="font-bold">{user?.displayName || "المسؤول"}</span>، أن الطالب:
+                                        </p>
+                                        <p className="text-xl font-bold text-gray-800">{reportData.student.fullName}</p>
+                                        <p>قد وضع تحت <span className="font-bold">"{reportData.activeCovenant.type}"</span> بتاريخ <span className="font-bold">{format(parseISO(reportData.activeCovenant.date), 'dd MMMM yyyy', { locale: ar })}</span>.</p>
+                                        <blockquote className="p-4 bg-gray-100 border-r-4 border-gray-300">
+                                            <p className="font-semibold italic">"{reportData.activeCovenant.text}"</p>
+                                        </blockquote>
+                                        <p className="text-sm text-gray-500">نأمل من ولي الأمر المتابعة وحث الابن على الالتزام بالعهد.</p>
+                                    </CardContent>
+                                </Card>
+                            </section>
+                        )}
                         
                          <section className="avoid-break">
                                 <Card className="bg-white shadow-none border border-gray-300">
@@ -518,3 +547,4 @@ ${teacherNote.trim() || autoNote || "لا توجد ملاحظات إضافية."
         </div>
     );
 }
+
