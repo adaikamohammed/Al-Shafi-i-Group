@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, DailySession } from '@/lib/types';
+import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, DailySession, Covenant } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, ArrowLeft, ArrowRight, Loader2, Download, MoreVertical, Trash2, PlusCircle, Copy, Dot } from 'lucide-react';
+import { Info, ArrowLeft, ArrowRight, Loader2, Download, MoreVertical, Trash2, PlusCircle, Copy, Dot, ShieldAlert } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -473,6 +473,11 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
   const isHoliday = sessionType === 'يوم عطلة';
   const isTeacherAbsentNoSub = sessionType === 'غياب الشيخ' && !hasSubstitute;
 
+  const getActiveCovenant = (student: Student): Covenant | null => {
+      if (!student.covenants || student.covenants.length === 0) return null;
+      return student.covenants.find(c => c.status === 'نشط' && c.card !== 'بدون') || null;
+  };
+
   return (
     <TooltipProvider>
       <div className="space-y-6">
@@ -531,7 +536,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
           <Table className="min-w-full">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[120px]">الطالب</TableHead>
+                <TableHead className="w-[150px]">الطالب</TableHead>
                 <TableHead className="w-[240px]">الحضُور</TableHead>
                 {!isActivitySession && <TableHead className="w-[150px]">التقييم</TableHead>}
                 {!isActivitySession && <TableHead className="w-[120px]">المراجعة</TableHead>}
@@ -545,10 +550,26 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
                 if (!record) return null;
                 const isAbsent = record.attendance === 'غائب';
                 const isRowDisabled = isAbsent || isActivitySession;
+                const activeCovenant = getActiveCovenant(student);
                 
                 return (
                   <TableRow key={student.id} className={cn(isAbsent && 'bg-muted/50')}>
-                    <TableCell className="font-medium">{student.fullName}</TableCell>
+                    <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                            <span>{student.fullName}</span>
+                            {activeCovenant && (
+                                <Tooltip>
+                                    <TooltipTrigger>
+                                        <ShieldAlert className={cn("h-5 w-5", activeCovenant.card === 'بطاقة صفراء' ? 'text-yellow-500' : 'text-red-500')} />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p className="font-bold">الطالب تحت التعهد:</p>
+                                        <p>{activeCovenant.text}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            )}
+                        </div>
+                    </TableCell>
                     <TableCell>
                       <RadioGroup dir="rtl" value={record.attendance} onValueChange={(value: AttendanceStatus) => handleRecordChange(student.id, 'attendance', value)} className="flex gap-2 flex-wrap" disabled={isSuperAdmin}>
                         {attendanceOptions.map(opt => (
@@ -627,5 +648,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
 
 
 
+
+    
 
     
