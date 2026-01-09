@@ -238,7 +238,7 @@ export default function StudentReportPage() {
         
         let finalNote = teacherNote.trim();
         if(autoNote) {
-            finalNote = finalNote ? `${autoNote}\n${finalNote}` : autoNote;
+            finalNote = finalNote ? `${autoNote}\n\n${finalNote}` : autoNote;
         }
         if(!finalNote) finalNote = "لا توجد ملاحظات إضافية.";
 
@@ -331,8 +331,8 @@ ${finalNote}
                                 <SelectContent>
                                     <SelectItem value="1">الموسم 1 (جانفي - مارس)</SelectItem>
                                     <SelectItem value="2">الموسم 2 (أفريل - جوان)</SelectItem>
-                                    <SelectItem value="3">الموسم 3 (جويلية - سبتمبر)</SelectItem>
-                                    <SelectItem value="4">الموسم 4 (أكتوبر - ديسمبر)</SelectItem>
+                                    <SelectItem value="3">جويلية - سبتمبر</SelectItem>
+                                    <SelectItem value="4">أكتوبر - ديسمبر</SelectItem>
                                 </SelectContent>
                             </Select>
                         )}
@@ -408,7 +408,7 @@ ${finalNote}
                                         <div><span className="font-semibold">الاسم الكامل:</span> {reportData.student.fullName}</div>
                                         <div><span className="font-semibold">اسم الولي:</span> {reportData.student.guardianName}</div>
                                         <div><span className="font-semibold">العمر:</span> {calculateAge(reportData.student.birthDate)} سنة</div>
-                                        <div><span className="font-semibold">رقم الهاتف:</span> {reportData.student.phone1}</div>
+                                        <div><span className="font-semibold">رقم هاتف الولي:</span> {reportData.student.phone1}</div>
                                         <div><span className="font-semibold">تاريخ التسجيل:</span> {format(reportData.student.registrationDate, 'yyyy/MM/dd')}</div>
                                         <div><span className="font-semibold">الفوج:</span> {user?.group || 'غير محدد'}</div>
                                     </div>
@@ -482,7 +482,7 @@ ${finalNote}
                                     <CardHeader><CardTitle className="text-lg text-gray-800">🖊️ ملاحظات وتوصيات الشيخ</CardTitle></CardHeader>
                                     <CardContent>
                                         {reportData.autoNote && <p className="whitespace-pre-wrap text-sm font-bold mb-2 p-2 bg-amber-100 text-amber-800 rounded-md">التوصية الآلية: {reportData.autoNote}</p>}
-                                        <p className="whitespace-pre-wrap text-sm">{teacherNote || 'لا توجد ملاحظات إضافية.'}</p>
+                                        <p className="whitespace-pre-wrap text-sm">{teacherNote ? teacherNote : (reportData.autoNote ? '' : 'لا توجد ملاحظات إضافية.')}</p>
                                     </CardContent>
                                 </Card>
                             </section>
@@ -541,4 +541,3 @@ ${finalNote}
         </div>
     );
 }
-
