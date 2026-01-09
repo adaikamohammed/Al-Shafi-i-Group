@@ -92,7 +92,7 @@ export default function DailySessionsPage() {
         dataForSheet = [{
             'التاريخ': readableDate, 'اليوم': dayName,
             'رقم الحصة': session.sessionNumber, 'نوع الحصة': session.sessionType,
-            'ملاحظات': session.sessionType === 'غياب الشيخ' ? `سبب الغياب: ${session.teacherAbsenceReason}` : 'يوم عطلة',
+            'ملاحظات': session.sessionType === 'غياب الشيخ' ? `سبب الغياب: ${session.teacherAbsenceReason || 'غير محدد'}` : 'يوم عطلة',
         }];
     } else {
         dataForSheet = (session.records ?? []).map(record => {
@@ -173,38 +173,38 @@ export default function DailySessionsPage() {
                             </Button>
                          </DropdownMenuTrigger>
                         <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
-                            {sessionsForDay.map((session, index) => (
-                            <React.Fragment key={session.id}>
-                                <DropdownMenuItem onClick={() => handleDayClick(day, session.sessionNumber)}>
-                                <Copy className="ml-2 h-4 w-4" />
-                                <span>تعديل حصة {session.sessionNumber}</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => handleExportSession(e, session.id)}>
-                                <Download className="ml-2 h-4 w-4" />
-                                <span>تحميل حصة {session.sessionNumber}</span>
-                                </DropdownMenuItem>
-                                <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                                    <Trash2 className="ml-2 h-4 w-4" />
-                                    <span>حذف حصة {session.sessionNumber}</span>
+                           {sessionsForDay.map((session, index) => (
+                                <React.Fragment key={session.id}>
+                                    <DropdownMenuItem onClick={() => handleDayClick(day, session.sessionNumber)}>
+                                        <Copy className="ml-2 h-4 w-4" />
+                                        <span>تعديل حصة {session.sessionNumber}</span>
                                     </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                    <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        سيؤدي هذا إلى حذف سجلات هذه الحصة نهائيًا.
-                                    </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                    <AlertDialogAction onClick={(e) => handleDeleteSession(e, session.id)}>نعم، قم بالحذف</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                                </AlertDialog>
-                                {index < sessionsForDay.length - 1 && <DropdownMenuSeparator />}
-                            </React.Fragment>
+                                    <DropdownMenuItem onClick={(e) => handleExportSession(e, session.id)}>
+                                        <Download className="ml-2 h-4 w-4" />
+                                        <span>تحميل حصة {session.sessionNumber}</span>
+                                    </DropdownMenuItem>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                                <Trash2 className="ml-2 h-4 w-4" />
+                                                <span>حذف حصة {session.sessionNumber}</span>
+                                            </DropdownMenuItem>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    سيؤدي هذا إلى حذف سجلات هذه الحصة نهائيًا.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                                <AlertDialogAction onClick={(e) => handleDeleteSession(e, session.id)}>نعم، قم بالحذف</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                    {index < sessionsForDay.length - 1 && <DropdownMenuSeparator />}
+                                </React.Fragment>
                             ))}
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -448,16 +448,22 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     
     setIsLoading(true);
     
-    const sessionToSave: DailySession = {
+    const sessionToSave: Omit<DailySession, 'teacherAbsenceReason' | 'substituteTeacher'> & Partial<Pick<DailySession, 'teacherAbsenceReason' | 'substituteTeacher'>> = {
         id: sessionId,
         date: formattedDate,
         sessionNumber,
         sessionType: sessionType,
         records: (sessionType === 'يوم عطلة' || (sessionType === 'غياب الشيخ' && !hasSubstitute)) ? [] : records,
-        teacherAbsenceReason: sessionType === 'غياب الشيخ' ? teacherAbsenceReason : undefined,
-        substituteTeacher: sessionType === 'غياب الشيخ' && hasSubstitute ? substituteTeacher : undefined,
     };
-    addDailySession(sessionToSave);
+    
+    if (sessionType === 'غياب الشيخ') {
+        sessionToSave.teacherAbsenceReason = teacherAbsenceReason;
+        if (hasSubstitute) {
+            sessionToSave.substituteTeacher = substituteTeacher;
+        }
+    }
+    
+    addDailySession(sessionToSave as DailySession);
     
     setIsLoading(false);
     onClose();
