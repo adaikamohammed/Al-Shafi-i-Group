@@ -11,7 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, DailySession, Covenant } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, ArrowLeft, ArrowRight, Loader2, Download, MoreVertical, Trash2, PlusCircle, Copy, Dot, ShieldAlert } from 'lucide-react';
+import { Info, ArrowLeft, ArrowRight, Loader2, Download, MoreVertical, Trash2, PlusCircle, Copy, Dot, ShieldAlert, FilePen } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -477,6 +477,15 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
       if (!student.covenants || student.covenants.length === 0) return null;
       return student.covenants.find(c => c.status === 'نشط' && c.card !== 'بدون') || null;
   };
+  
+  const CovenantIcon = ({ covenant }: { covenant: Covenant }) => {
+    const iconClass = cn("h-5 w-5", covenant.card === 'بطاقة صفراء' ? 'text-yellow-500' : 'text-red-500');
+    
+    if (covenant.type === 'ميثاق حفظ') {
+      return <FilePen className={iconClass} />;
+    }
+    return <ShieldAlert className={iconClass} />;
+  };
 
   return (
     <TooltipProvider>
@@ -560,10 +569,10 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
                             {activeCovenant && (
                                 <Tooltip>
                                     <TooltipTrigger>
-                                        <ShieldAlert className={cn("h-5 w-5", activeCovenant.card === 'بطاقة صفراء' ? 'text-yellow-500' : 'text-red-500')} />
+                                        <CovenantIcon covenant={activeCovenant} />
                                     </TooltipTrigger>
                                     <TooltipContent>
-                                        <p className="font-bold">الطالب تحت التعهد:</p>
+                                        <p className="font-bold">الطالب تحت "{activeCovenant.type}" ({activeCovenant.card}):</p>
                                         <p>{activeCovenant.text}</p>
                                     </TooltipContent>
                                 </Tooltip>
