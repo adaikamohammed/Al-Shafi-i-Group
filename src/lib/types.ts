@@ -61,8 +61,8 @@ export interface DailyReport {
 
 
 export interface SessionRecord extends Omit<DailyRecord, 'sessionId'> {
-  // SessionRecord is now the same as DailyRecord
-  // but we keep it for potential future differences
+  sessionType: string;
+  sessionNumber: 1 | 2;
 }
 
 export type SurahStatus = 
@@ -152,3 +152,5 @@ export interface AppSettings {
     rewards: Reward[];
     badges: BadgeConfig[];
 }
+
+    

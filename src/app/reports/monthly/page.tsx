@@ -80,9 +80,11 @@ export default function MonthlyStatisticsPage() {
              return paymentDate >= quarterStartDate && paymentDate <= quarterEndDate;
         });
         
+        const applicableSessions = sessionsInMonth.filter(s => s.sessionType !== 'يوم عطلة' && !(s.sessionType === 'غياب الشيخ' && !s.substituteTeacher));
+
         let recordsSource = selectedStudentId === 'all' 
-            ? sessionsInMonth.flatMap(s => s.records ?? [])
-            : sessionsInMonth.flatMap(s => (s.records ?? []).filter(r => r.studentId === selectedStudentId));
+            ? applicableSessions.flatMap(s => s.records ?? [])
+            : applicableSessions.flatMap(s => (s.records ?? []).filter(r => r.studentId === selectedStudentId));
 
         const stats = {
             totalRecords: recordsSource.length,
@@ -125,8 +127,8 @@ export default function MonthlyStatisticsPage() {
                  const record = (session.records ?? []).find(r => r.studentId === selectedStudentId);
                  if (record) {
                      studentSpecificRecords[session.date].push({...record, sessionType: session.sessionType, sessionNumber: session.sessionNumber});
-                 } else if (session.sessionType === 'يوم عطلة') {
-                     studentSpecificRecords[session.date].push({ studentId: selectedStudentId, attendance: 'يوم عطلة', behavior: null, memorization: null, review: null, notes: 'يوم عطلة', sessionType: 'يوم عطلة', sessionNumber: session.sessionNumber });
+                 } else if (session.sessionType === 'يوم عطلة' || (session.sessionType === 'غياب الشيخ' && !session.substituteTeacher)) {
+                     studentSpecificRecords[session.date].push({ studentId: selectedStudentId, attendance: 'يوم عطلة', behavior: null, memorization: null, review: null, notes: session.sessionType, sessionType: session.sessionType, sessionNumber: session.sessionNumber });
                  }
             });
         }
@@ -478,3 +480,6 @@ export default function MonthlyStatisticsPage() {
 
 
 
+
+
+    

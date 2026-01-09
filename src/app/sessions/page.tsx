@@ -137,7 +137,7 @@ export default function DailySessionsPage() {
         
         let dayStatusClass = '';
         if (sessionsForDay.length > 0) {
-            if (sessionsForDay.some(s => s.sessionType === 'يوم عطلة' || s.sessionType === 'غياب الشيخ')) {
+            if (sessionsForDay.some(s => s.sessionType === 'يوم عطلة' || (s.sessionType === 'غياب الشيخ' && !s.substituteTeacher))) {
                 dayStatusClass = 'bg-yellow-200 dark:bg-yellow-800';
             } else {
                 dayStatusClass = 'bg-green-200 dark:bg-green-800';
@@ -465,7 +465,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
 
   const isActivitySession = sessionType === 'حصة أنشطة';
   const isHoliday = sessionType === 'يوم عطلة';
-  const isTeacherAbsent = sessionType === 'غياب الشيخ';
+  const isTeacherAbsentNoSub = sessionType === 'غياب الشيخ' && !hasSubstitute;
 
   return (
     <TooltipProvider>
@@ -497,7 +497,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
           </div>
         </div>
 
-        {isTeacherAbsent && (
+        {sessionType === 'غياب الشيخ' && (
           <Card className="p-4 bg-amber-50 border-amber-200">
             <CardHeader className="p-2">
               <CardTitle>تسجيل غياب الشيخ</CardTitle>
@@ -521,7 +521,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
           </Card>
         )}
 
-       { !isHoliday && !(isTeacherAbsent && !hasSubstitute) && <div className="overflow-x-auto">
+       { !isHoliday && !isTeacherAbsentNoSub && <div className="overflow-x-auto">
           <Table className="min-w-full">
             <TableHeader>
               <TableRow>
@@ -538,7 +538,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
                 const record = (records ?? []).find(r => r.studentId === student.id);
                 if (!record) return null;
                 const isAbsent = record.attendance === 'غائب';
-                const isRowDisabled = isAbsent || (isActivitySession && !hasSubstitute);
+                const isRowDisabled = isAbsent || isActivitySession;
                 
                 return (
                   <TableRow key={student.id} className={cn(isAbsent && 'bg-muted/50')}>
@@ -593,7 +593,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
           </Table>
         </div>}
 
-         { (isHoliday || (isTeacherAbsent && !hasSubstitute)) && (
+         { (isHoliday || isTeacherAbsentNoSub) && (
             <div className="flex flex-col items-center justify-center text-center p-8 bg-muted rounded-md h-full">
                 <h3 className="text-xl font-bold">{isHoliday ? 'يوم عطلة' : 'غياب الشيخ (بدون بديل)'}</h3>
                 <p className="text-muted-foreground">لن يتم تسجيل أي بيانات للطلبة في هذه الحصة.</p>
@@ -620,3 +620,6 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
 
 
 
+
+
+    
