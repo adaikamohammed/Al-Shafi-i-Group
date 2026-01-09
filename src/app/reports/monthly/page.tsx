@@ -17,8 +17,8 @@ import { Tooltip as ShadTooltip, TooltipContent, TooltipProvider, TooltipTrigger
 import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
 
 
-const ATTENDANCE_COLORS: { [key: string]: string } = { 'حاضر': '#10B981', 'غائب': '#EF4444', 'متأخر': '#F59E0B', 'تعويض': '#3B82F6' };
-const BEHAVIOR_COLORS: { [key: string]: string } = { 'هادئ': '#3B82F6', 'متوسط': '#F59E0B', 'غير منضبط': '#EF4444' };
+const ATTENDANCE_COLORS: { [key: string]: string } = { 'حاضر': '#10B981', 'غائب': '#EF4444', 'متأخر': '#F59E0B', 'تعويض': '#3B82F6', 'لم يسجل': '#9CA3AF' };
+const BEHAVIOR_COLORS: { [key: string]: string } = { 'هادئ': '#3B82F6', 'متوسط': '#F59E0B', 'غير منضبط': '#EF4444', 'لم يسجل': '#9CA3AF' };
 const EVALUATION_COLORS: { [key: string]: string } = { 'ممتاز': '#10B981', 'جيد': '#34D399', 'متوسط': '#F59E0B', 'ضعيف': '#EF4444', 'لا يوجد': '#9CA3AF' };
 const REVENUE_COLORS = { 'الإيرادات الفعلية': '#10B981', 'الإيرادات المتوقعة': '#F59E0B' };
 
@@ -51,13 +51,17 @@ export default function MonthlyStatisticsPage() {
         const today = startOfToday();
         const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
         let monthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
+        let isCurrentMonth = false;
 
         // If the selected month/year is the current one, only calculate up to today.
         if (getMonth(monthStartDate) === getMonth(today) && getYear(monthStartDate) === getYear(today)) {
             monthEndDate = today;
+            isCurrentMonth = true;
         }
 
         const fullMonthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
+        const daysInCurrentMonthContext = isCurrentMonth ? getDate(today) : getDaysInMonth(monthStartDate);
+
 
         const quarterStartDate = startOfQuarter(monthStartDate);
         const quarterEndDate = endOfQuarter(monthStartDate);
@@ -116,11 +120,22 @@ export default function MonthlyStatisticsPage() {
             sessionTypes: { 'حصة أساسية': 0, 'حصة أنشطة': 0, 'حصة تعويضية': 0 }
         };
 
+        let totalDaysWithRecords = 0;
+        const recordedDays = new Set<string>();
+
         (recordsSource ?? []).forEach(record => {
+            const session = applicableSessions.find(s => s.id === record.sessionId);
+            if(session && !recordedDays.has(session.date)) {
+                recordedDays.add(session.date);
+                totalDaysWithRecords++;
+            }
+
             if (record.attendance) stats.attendance[record.attendance]++;
             if (record.behavior) stats.behavior[record.behavior]++;
             if (record.memorization) stats.evaluation[record.memorization]++;
         });
+
+        const unrecordedDays = daysInCurrentMonthContext - recordedDays.size;
 
         if (selectedStudentId === 'all') {
             sessionsInMonth.forEach(session => {
@@ -181,7 +196,7 @@ export default function MonthlyStatisticsPage() {
         const unpaidStudents = studentsDueForQuarter.filter(s => !studentsWhoPaidInQuarter.has(s.id));
         financialStats.unpaidStudentsCount = unpaidStudents.length;
 
-        return { ...stats, studentSpecificRecords, financialStats };
+        return { ...stats, unrecordedDays, studentSpecificRecords, financialStats };
 
     }, [dailySessions, dailyReports, payments, settings, selectedMonth, selectedYear, selectedStudentId, students]);
     
@@ -255,10 +270,14 @@ export default function MonthlyStatisticsPage() {
     const attendanceData: ChartData[] = Object.entries(monthlyData.attendance)
         .filter(([, value]) => value > 0)
         .map(([name, value]) => ({ name, value }));
+    if(monthlyData.unrecordedDays > 0) attendanceData.push({ name: 'لم يسجل', value: monthlyData.unrecordedDays });
+
 
     const behaviorData: ChartData[] = Object.entries(monthlyData.behavior)
         .filter(([, value]) => value > 0)
         .map(([name, value]) => ({ name, value }));
+    if(monthlyData.unrecordedDays > 0) behaviorData.push({ name: 'لم يسجل', value: monthlyData.unrecordedDays });
+
 
     const evaluationData = Object.entries(monthlyData.evaluation)
         .map(([name, value]) => ({ name, value }));
@@ -503,6 +522,8 @@ export default function MonthlyStatisticsPage() {
 
 
 
+
+    
 
     
 
