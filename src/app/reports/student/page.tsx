@@ -83,12 +83,14 @@ export default function StudentReportPage() {
                 break;
         }
 
-        const sessionsInRange = Object.values(dailySessions ?? {}).filter(session => {
+        const sessionsInRange = Object.values(dailySessions ?? {}).flatMap(day => Object.values(day)).filter(session => {
+            if(!session.date) return false;
             const sessionDate = parseISO(session.date);
             return sessionDate >= startDate && sessionDate <= endDate;
         });
 
         const stats = { present: 0, absent: 0, late: 0, makeup: 0, holidays: 0, calm: 0, mediumBehavior: 0, undisciplined: 0, totalBehavior: 0 };
+        let totalSessionsHeld = 0;
 
         sessionsInRange.forEach(session => {
             if (session.sessionType === 'يوم عطلة') {
@@ -96,6 +98,7 @@ export default function StudentReportPage() {
             } else {
                  const record = (session.records ?? []).find(r => r.studentId === selectedStudentId);
                  if (record) {
+                    totalSessionsHeld++;
                     switch (record.attendance) {
                         case 'حاضر': stats.present++; break;
                         case 'متأخر': stats.late++; break;
@@ -114,8 +117,7 @@ export default function StudentReportPage() {
             }
         });
 
-        const totalSessionDays = stats.present + stats.absent + stats.late + stats.makeup;
-        const attendanceScore = totalSessionDays > 0 ? ((stats.present + stats.late) / totalSessionDays) * 10 : 0;
+        const attendanceScore = totalSessionsHeld > 0 ? ((stats.present + stats.late) / totalSessionsHeld) * 10 : 0;
         const disciplineScore = stats.totalBehavior > 0 ? ((stats.calm * 2 + stats.mediumBehavior * 1) / (stats.totalBehavior * 2)) * 10 : 0;
         
         const studentMastery = surahProgress[selectedStudentId] || {};
@@ -158,7 +160,8 @@ export default function StudentReportPage() {
             reportTitle,
             statsPeriod,
             radarData,
-            autoNote
+            autoNote,
+            totalSessionsHeld,
         };
 
     }, [selectedStudentId, reportPeriod, selectedMonth, selectedSeason, selectedYear, students, dailySessions, surahProgress, tajweedScore, akhlaqScore, loading]);
@@ -227,10 +230,10 @@ export default function StudentReportPage() {
     const handleCopyWhatsAppReport = () => {
         if (!reportData) return;
 
-        const { student, stats, memorizedSurahsCount, reportTitle, statsPeriod, autoNote } = reportData;
-        const totalSessionDays = stats.present + stats.absent + stats.late + stats.makeup;
-        const attendanceRate = totalSessionDays > 0 
-            ? Math.round(((stats.present + stats.late) / totalSessionDays) * 100) + "%" 
+        const { student, stats, memorizedSurahsCount, reportTitle, statsPeriod, autoNote, totalSessionsHeld } = reportData;
+        
+        const attendanceRate = totalSessionsHeld > 0 
+            ? Math.round(((stats.present + stats.late) / totalSessionsHeld) * 100) + "%" 
             : "غير متاح";
         
         let finalNote = teacherNote.trim();
@@ -248,7 +251,7 @@ export default function StudentReportPage() {
 👨‍👦 *اسم الولي*: ${student.guardianName || 'غير محدد'}
 
 📖 *عدد السور المحفوظة*: ${memorizedSurahsCount}
-📊 *معدل الحضور*: ${attendanceRate} (حضر ${stats.present + stats.late} من ${totalSessionDays} حصة)
+📊 *معدل الحضور*: ${attendanceRate} (حضر ${stats.present + stats.late} من ${totalSessionsHeld} حصة)
 
 📝 *ملاحظات وتوصيات الشيخ*:
 ${finalNote}
@@ -438,7 +441,7 @@ ${finalNote}
                                         <thead>
                                             <tr className="border-b border-gray-300 bg-gray-50">
                                                 <th className="p-2 border border-gray-300">الحالة</th>
-                                                <th className="p-2 border border-gray-300">العدد (أيام)</th>
+                                                <th className="p-2 border border-gray-300">العدد (حصص)</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -448,8 +451,8 @@ ${finalNote}
                                         </tbody>
                                         <tfoot>
                                             <tr className="border-t border-gray-300 font-bold bg-gray-100">
-                                                <td className="p-2 border border-gray-300">إجمالي أيام الدراسة</td>
-                                                <td className="border border-gray-300">{reportData.stats.present + reportData.stats.absent + reportData.stats.late} يوم</td>
+                                                <td className="p-2 border border-gray-300">إجمالي الحصص الدراسية</td>
+                                                <td className="border border-gray-300">{reportData.totalSessionsHeld} حصة</td>
                                             </tr>
                                         </tfoot>
                                     </table>
@@ -538,3 +541,4 @@ ${finalNote}
         </div>
     );
 }
+

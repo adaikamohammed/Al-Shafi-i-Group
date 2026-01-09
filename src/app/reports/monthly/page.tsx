@@ -57,7 +57,7 @@ export default function MonthlyStatisticsPage() {
         
         const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(sessionsOnDate => 
             Object.values(sessionsOnDate).filter(session => {
-                if (!session || !session.date) return false;
+                if (!session?.date) return false;
                 try {
                     const sessionDate = parseISO(session.date);
                     return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
@@ -103,16 +103,16 @@ export default function MonthlyStatisticsPage() {
 
         if (selectedStudentId === 'all') {
             sessionsInMonth.forEach(session => {
-               if(session.sessionType !== 'يوم عطلة') {
+               if(session.sessionType !== 'يوم عطلة' && stats.sessionTypes[session.sessionType] !== undefined) {
                    stats.sessionTypes[session.sessionType]++;
                }
             });
         }
         
-        const studentSpecificRecords: { [key: string]: (SessionRecord & {sessionType: string})[] } = {};
+        const studentSpecificRecords: { [key: string]: (SessionRecord & {sessionType: string; sessionNumber: 1 | 2})[] } = {};
         if (selectedStudentId !== 'all') {
             const studentSessions = Object.values(dailySessions ?? {}).flatMap(Object.values).filter(session => {
-                if (!session || !session.date) return false;
+                if (!session?.date) return false;
                 try {
                     const sessionDate = parseISO(session.date);
                     return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
@@ -124,9 +124,9 @@ export default function MonthlyStatisticsPage() {
                  }
                  const record = (session.records ?? []).find(r => r.studentId === selectedStudentId);
                  if (record) {
-                     studentSpecificRecords[session.date].push({...record, sessionType: session.sessionType});
+                     studentSpecificRecords[session.date].push({...record, sessionType: session.sessionType, sessionNumber: session.sessionNumber});
                  } else if (session.sessionType === 'يوم عطلة') {
-                     studentSpecificRecords[session.date].push({ studentId: selectedStudentId, attendance: 'يوم عطلة', behavior: null, memorization: null, review: null, notes: 'يوم عطلة', sessionType: 'يوم عطلة' });
+                     studentSpecificRecords[session.date].push({ studentId: selectedStudentId, attendance: 'يوم عطلة', behavior: null, memorization: null, review: null, notes: 'يوم عطلة', sessionType: 'يوم عطلة', sessionNumber: session.sessionNumber });
                  }
             });
         }
@@ -190,10 +190,10 @@ export default function MonthlyStatisticsPage() {
             let mainStatus = 'لم يسجل';
 
             if (records && records.length > 0) {
-                const primaryRecord = records.find(r => r.sessionType === 'حصة أساسية') || records[0];
+                const primaryRecord = records.find(r => r.sessionNumber === 1) || records[0];
                 mainStatus = primaryRecord.attendance || mainStatus;
                 
-                tooltipText = records.map(r => `الحصة: ${r.sessionType}, الحضور: ${r.attendance}`).join('\n');
+                tooltipText = records.map(r => `الحصة ${r.sessionNumber}: ${r.sessionType}, الحضور: ${r.attendance}`).join('\n');
                 
                 if (records.some(r => r.attendance === 'يوم عطلة')) {
                     cellClass = 'bg-gray-400 dark:bg-gray-600 text-white';
@@ -211,7 +211,7 @@ export default function MonthlyStatisticsPage() {
                 <TooltipProvider key={day}>
                     <ShadTooltip>
                         <TooltipTrigger asChild>
-                            <div className={cn("h-16 rounded-md font-bold flex flex-col items-center justify-center p-1", cellClass)}>
+                            <div className={cn("h-16 rounded-md font-bold flex flex-col items-center justify-center p-1 relative", cellClass)}>
                                 <span>{day}</span>
                                 <span className="text-xs font-normal">{mainStatus}</span>
                                 {records && records.length > 1 && <div className="absolute top-1 right-1 h-2 w-2 bg-white rounded-full"></div>}
@@ -473,6 +473,7 @@ export default function MonthlyStatisticsPage() {
 }
 
     
+
 
 
 

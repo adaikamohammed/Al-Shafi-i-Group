@@ -44,7 +44,7 @@ export default function DailySessionsPage() {
   const [isSessionDialogOpen, setSessionDialogOpen] = useState(false);
   const { toast } = useToast();
   
-  const { students, dailySessions, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById } = useStudentContext();
+  const { students, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById } = useStudentContext();
   const { isSuperAdmin } = useAuth();
   const activeStudents = useMemo(() => 
     (students ?? []).filter(s => s.status === "نشط"), 
@@ -157,8 +157,8 @@ export default function DailySessionsPage() {
                  <div className="flex items-center">
                     <span className="font-bold">{day}</span>
                     <div className="flex mr-1">
-                        {sessionsForDay.includes(s => s.sessionNumber === 1) && <Dot className="h-4 w-4 text-primary" />}
-                        {sessionsForDay.includes(s => s.sessionNumber === 2) && <Dot className="h-4 w-4 text-accent" />}
+                        {sessionsForDay.some(s => s.sessionNumber === 1) && <Dot className="h-4 w-4 text-primary" />}
+                        {sessionsForDay.some(s => s.sessionNumber === 2) && <Dot className="h-4 w-4 text-accent" />}
                     </div>
                  </div>
                  {sessionsForDay.length > 0 && !isSuperAdmin && (
@@ -209,7 +209,7 @@ export default function DailySessionsPage() {
             </div>
              <div className="self-end text-right">
                 {sessionsForDay.length < 2 && !isSuperAdmin && (
-                     <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); handleDayClick(day, 2);}}>
+                     <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); handleDayClick(day, sessionsForDay.length === 0 ? 1 : 2);}}>
                         <PlusCircle className="h-4 w-4" />
                      </Button>
                 )}
@@ -328,14 +328,14 @@ function DailySessionManager({ day, initialSessionNumber, students, onClose, add
         <div className="space-y-4">
             <div className="flex border-b">
                 <Button 
-                    variant={selectedSession === 1 ? 'ghost' : 'ghost'}
+                    variant={'ghost'}
                     className={cn("flex-1 rounded-none", selectedSession === 1 && "border-b-2 border-primary font-bold bg-muted")}
                     onClick={() => setSelectedSession(1)}
                 >
                     الحصة الأولى (أساسية)
                 </Button>
                 <Button 
-                    variant={selectedSession === 2 ? 'ghost' : 'ghost'}
+                    variant={'ghost'}
                      className={cn("flex-1 rounded-none", selectedSession === 2 && "border-b-2 border-primary font-bold bg-muted")}
                     onClick={() => setSelectedSession(2)}
                 >
@@ -566,4 +566,5 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     </TooltipProvider>
   );
 }
+
 
