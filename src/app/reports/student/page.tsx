@@ -90,7 +90,7 @@ export default function StudentReportPage() {
             return sessionDate >= startDate && sessionDate <= endDate;
         });
 
-        const stats = { present: 0, absent: 0, late: 0, makeup: 0, holidays: 0, calm: 0, mediumBehavior: 0, undisciplined: 0, totalBehavior: 0, excellent: 0, good: 0, average: 0, poor: 0, totalEvaluations: 0 };
+        const stats = { present: 0, absent: 0, late: 0, makeup: 0, holidays: 0, calm: 0, mediumBehavior: 0, undisciplined: 0, totalBehavior: 0, excellent: 0, good: 0, average: 0, poor: 0, totalEvaluations: 0, compensationBalance: 0 };
         let totalSessionsHeld = 0;
 
         sessionsInRange.forEach(session => {
@@ -105,6 +105,9 @@ export default function StudentReportPage() {
                         case 'متأخر': stats.late++; break;
                         case 'تعويض': stats.makeup++; break;
                         case 'غائب': stats.absent++; break;
+                    }
+                    if(record.attendance !== 'غائب' && session.sessionType === 'حصة تعويضية') {
+                        stats.compensationBalance++;
                     }
                     if(record.behavior) {
                         stats.totalBehavior++;
@@ -136,7 +139,7 @@ export default function StudentReportPage() {
 
 
         const radarData = [
-            { subject: 'الحضور', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
+            { subject: 'الحاضر', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
             { subject: 'الحفظ', score: parseFloat(memorizationScore.toFixed(1)), fullMark: 10 },
             { subject: 'الانضباط', score: parseFloat(disciplineScore.toFixed(1)), fullMark: 10 },
             { subject: 'التجويد', score: tajweedScore, fullMark: 10 },
@@ -451,6 +454,38 @@ ${teacherNote.trim() || autoNote || "لا توجد ملاحظات إضافية."
                                             <tr className="border-t border-gray-300 font-bold bg-gray-100">
                                                 <td className="p-2 border border-gray-300">إجمالي الحصص الدراسية</td>
                                                 <td className="border border-gray-300">{reportData.totalSessionsHeld} حصة</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </CardContent>
+                            </Card>
+                        </section>
+                        
+                        <section className="avoid-break">
+                            <Card className="bg-white shadow-none border border-gray-300">
+                                <CardHeader><CardTitle className="text-lg text-gray-800">⚖️ ميزان الالتزام</CardTitle></CardHeader>
+                                <CardContent>
+                                     <table className="w-full text-sm text-center border-collapse border border-gray-300">
+                                        <thead>
+                                            <tr className="border-b border-gray-300 bg-gray-50">
+                                                <th className="p-2 border border-gray-300">البيان</th>
+                                                <th className="p-2 border border-gray-300">الرصيد</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr><td className="p-2 border border-gray-300 font-medium">رصيد الغياب</td><td className="border border-gray-300">{reportData.stats.absent}</td></tr>
+                                            <tr><td className="p-2 border border-gray-300 font-medium">رصيد التعويض</td><td className="border border-gray-300">{reportData.stats.compensationBalance}</td></tr>
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="border-t border-gray-300 font-bold bg-gray-100">
+                                                <td className="p-2 border border-gray-300">صافي الرصيد</td>
+                                                <td className="border border-gray-300">
+                                                    {(reportData.stats.absent - reportData.stats.compensationBalance) > 0 ? (
+                                                        <Badge variant="destructive">مطلوب تعويض {reportData.stats.absent - reportData.stats.compensationBalance} حصص</Badge>
+                                                    ) : (
+                                                        <Badge className="bg-green-600 text-white">تم استيفاء جميع الحصص</Badge>
+                                                    )}
+                                                </td>
                                             </tr>
                                         </tfoot>
                                     </table>

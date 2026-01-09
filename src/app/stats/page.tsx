@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, ArrowLeft, ArrowRight, Star, Info, ShieldAlert } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, ArrowRight, Star, Info, ShieldAlert, AlertCircle } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addDays, subDays, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -149,6 +149,34 @@ export default function WeeklyFollowUpPage() {
         return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
     }, [currentDate]);
 
+    const weeklyStats = useMemo(() => {
+        const stats: Record<string, {absent: number, compensation: number}> = {};
+        activeStudents.forEach(student => {
+            stats[student.id] = {absent: 0, compensation: 0};
+        });
+
+        const start = weekDates[0];
+        const end = weekDates[6];
+
+        Object.values(dailySessions).flatMap(day => Object.values(day)).forEach(session => {
+            if (!session.date) return;
+            const sessionDate = parseISO(session.date);
+            if (sessionDate >= start && sessionDate <= end) {
+                (session.records || []).forEach(record => {
+                    if (stats[record.studentId]) {
+                        if (record.attendance === 'غائب') {
+                            stats[record.studentId].absent++;
+                        }
+                        if (session.sessionType === 'حصة تعويضية' && record.attendance !== 'غائب') {
+                            stats[record.studentId].compensation++;
+                        }
+                    }
+                });
+            }
+        });
+        return stats;
+    }, [dailySessions, weekDates, activeStudents]);
+
     const handlePreviousWeek = () => {
         setCurrentDate(subDays(currentDate, 7));
     };
@@ -217,9 +245,24 @@ export default function WeeklyFollowUpPage() {
                                  </div>
                              ))}
 
-                             {activeStudents.map(student => (
+                             {activeStudents.map(student => {
+                                 const studentStats = weeklyStats[student.id];
+                                 const hasDebt = studentStats && (studentStats.absent - studentStats.compensation > 0);
+                                 return (
                                  <React.Fragment key={student.id}>
-                                    <div className="font-semibold self-center text-center p-2 bg-muted rounded-md">{student.fullName}</div>
+                                    <div className="font-semibold self-center text-center p-2 bg-muted rounded-md flex items-center justify-center gap-2">
+                                        <span>{student.fullName}</span>
+                                        {hasDebt && (
+                                            <Tooltip>
+                                                <TooltipTrigger>
+                                                     <AlertCircle className="h-4 w-4 text-orange-500" />
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>الطالب مطلوب منه تعويض حصص غياب.</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        )}
+                                    </div>
                                     {weekDates.map(date => {
                                          const dateString = format(date, 'yyyy-MM-dd');
                                          const sessions = dailySessions[dateString] ? Object.values(dailySessions[dateString]) : undefined;
@@ -228,7 +271,7 @@ export default function WeeklyFollowUpPage() {
                                          )
                                     })}
                                  </React.Fragment>
-                             ))}
+                             )})}
                         </div>
                     </CardContent>
                 </Card>
@@ -282,6 +325,7 @@ export default function WeeklyFollowUpPage() {
                             <h4 className="font-semibold mb-2">دلالات أخرى</h4>
                              <ul className="space-y-1 text-sm">
                                 <li className="flex items-center gap-2"><div className="h-2 w-2 bg-slate-800 rounded-full"></div> توجد حصة ثانية مسجلة</li>
+                                <li className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-orange-500" /> مطلوب منه تعويض حصص</li>
                             </ul>
                         </div>
                     </CardContent>
@@ -290,3 +334,4 @@ export default function WeeklyFollowUpPage() {
         </TooltipProvider>
     );
 }
+
