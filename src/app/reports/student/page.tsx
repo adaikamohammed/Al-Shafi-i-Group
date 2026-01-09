@@ -89,7 +89,7 @@ export default function StudentReportPage() {
             return sessionDate >= startDate && sessionDate <= endDate;
         });
 
-        const stats = { present: 0, absent: 0, late: 0, makeup: 0, holidays: 0, calm: 0, mediumBehavior: 0, undisciplined: 0, totalBehavior: 0 };
+        const stats = { present: 0, absent: 0, late: 0, makeup: 0, holidays: 0, calm: 0, mediumBehavior: 0, undisciplined: 0, totalBehavior: 0, excellent: 0, good: 0, average: 0, poor: 0, totalEvaluations: 0 };
         let totalSessionsHeld = 0;
 
         sessionsInRange.forEach(session => {
@@ -111,6 +111,15 @@ export default function StudentReportPage() {
                             case 'هادئ': stats.calm++; break;
                             case 'متوسط': stats.mediumBehavior++; break;
                             case 'غير منضبط': stats.undisciplined++; break;
+                        }
+                    }
+                    if(record.memorization) {
+                        stats.totalEvaluations++;
+                         switch(record.memorization){
+                            case 'ممتاز': stats.excellent++; break;
+                            case 'جيد': stats.good++; break;
+                            case 'متوسط': stats.average++; break;
+                            case 'ضعيف': stats.poor++; break;
                         }
                     }
                 }
@@ -230,35 +239,51 @@ export default function StudentReportPage() {
     const handleCopyWhatsAppReport = () => {
         if (!reportData) return;
 
-        const { student, stats, memorizedSurahsCount, reportTitle, statsPeriod, autoNote, totalSessionsHeld } = reportData;
+        const { student, stats, autoNote } = reportData;
+        const groupName = user?.group || "المدرسة";
+        let finalNote = teacherNote.trim() ? `ملاحظة الشيخ: ${teacherNote.trim()}` : (autoNote ? `ملاحظة الشيخ: ${autoNote}` : '');
+        let message = '';
         
-        const attendanceRate = totalSessionsHeld > 0 
-            ? Math.round(((stats.present + stats.late) / totalSessionsHeld) * 100) + "%" 
-            : "غير متاح";
-        
-        let finalNote = teacherNote.trim();
-        if(autoNote) {
-            finalNote = finalNote ? `${autoNote}\n\n${finalNote}` : autoNote;
-        }
-        if(!finalNote) finalNote = "لا توجد ملاحظات إضافية.";
+        const absenceThreshold = 3;
+        const undisciplinedThreshold = 2;
+        const poorEvaluationThreshold = 2;
 
-        const sheikhName = user?.displayName || "الشيخ";
-
-        const message = `📢 *تقرير ${reportTitle} شامل لأداء الطالب: ${student.fullName}*
-
-📆 *الفترة*: ${statsPeriod}
-👨‍🏫 *الشيخ المسؤول*: ${sheikhName}
-👨‍👦 *اسم الولي*: ${student.guardianName || 'غير محدد'}
-
-📖 *عدد السور المحفوظة*: ${memorizedSurahsCount}
-📊 *معدل الحضور*: ${attendanceRate} (حضر ${stats.present + stats.late} من ${totalSessionsHeld} حصة)
-
+        if (stats.absent >= absenceThreshold) {
+            message = `السلام عليكم ورحمة الله وبركاته،
+نود إفادتكم من إدارة (${groupName}) بأن ابننا ${student.fullName} قد تغيب عن الحلقات لـ ${stats.absent} أيام خلال الفترة الأخيرة.
+استمرارية الحضور هي سر الإنجاز، نرجو التنسيق معنا لضمان عودته للمسار.
+${finalNote}`;
+        } else if (stats.undisciplined >= undisciplinedThreshold) {
+            message = `عناية ولي أمر الطالب ${student.fullName} المحترم،
+نود إشراككم في متابعة سلوك الابن خلال الحلقة، حيث تم رصد سلوك غير منضبط ${stats.undisciplined} مرات.
+نؤمن بأن تكامل البيت والمسجد هو أساس التربية.
+${finalNote}`;
+        } else if (stats.poor >= poorEvaluationThreshold) {
+             const lastEvaluation = stats.poor > 0 ? "ضعيف" : "متوسط";
+            message = `تحية طيبة من إدارة (${groupName})،
+نود إحاطتكم علماً بأن مستوى ${student.fullName} شهد تراجعاً طفيفاً في التقييم الأخير (من ممتاز إلى ${lastEvaluation}).
+حرصاً منا على تميزه، نرجو منكم حثه على المراجعة بالمنزل.
+${finalNote}`;
+        } else {
+             const attendanceRate = reportData.totalSessionsHeld > 0 
+                ? Math.round(((stats.present + stats.late) / reportData.totalSessionsHeld) * 100) + "%" 
+                : "غير متاح";
+            message = `📢 *تقرير شامل لأداء الطالب: ${student.fullName}*
+    
+📆 *الفترة*: ${reportData.statsPeriod}
+👨‍🏫 *الشيخ المسؤول*: ${user?.displayName || "الشيخ"}
+    
+📖 *عدد السور المحفوظة*: ${reportData.memorizedSurahsCount}
+📊 *معدل الحضور*: ${attendanceRate}
+    
 📝 *ملاحظات وتوصيات الشيخ*:
-${finalNote}
-
+${teacherNote.trim() || autoNote || "لا توجد ملاحظات إضافية."}
+    
 📤 هذا التقرير تم إعداده تلقائيًا من قبل نظام إدارة مدرسة الإمام الشافعي.`;
+        }
 
-        navigator.clipboard.writeText(message).then(() => {
+
+        navigator.clipboard.writeText(message.trim()).then(() => {
             toast({
                 title: "✅ تم النسخ بنجاح!",
                 description: "الرسالة جاهزة للصق في واتساب.",
@@ -382,7 +407,7 @@ ${finalNote}
                         </div>
                    </div>
                     <Textarea 
-                        placeholder="أضف ملاحظاتك الكتابية هنا..."
+                        placeholder="أضف ملاحظاتك الكتابية هنا لتظهر في رسالة الواتساب والتقرير..."
                         value={teacherNote}
                         onChange={e => setTeacherNote(e.target.value)}
                         rows={4}
