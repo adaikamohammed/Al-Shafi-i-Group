@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, ArrowLeft, ArrowRight, Star } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, ArrowRight, Star, Info } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addDays, subDays, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -34,12 +34,13 @@ const getBehaviorClass = (behavior?: string | null) => {
     }
 }
 
-const getEvaluationIcon = (evaluation?: PerformanceLevel | null) => {
+const getEvaluationSymbol = (evaluation?: PerformanceLevel | null) => {
     switch(evaluation) {
-        case 'ممتاز': return <Star className="h-3 w-3 text-green-500 fill-green-500" />;
-        case 'جيد': return <Star className="h-3 w-3 text-blue-500 fill-blue-500" />;
-        case 'متوسط': return <Star className="h-3 w-3 text-orange-500 fill-orange-500" />;
-        case 'ضعيف': return <Star className="h-3 w-3 text-red-500 fill-red-500" />;
+        case 'ممتاز': return <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />;
+        case 'جيد جداً': return 'جج';
+        case 'جيد': return 'ج';
+        case 'مقبول': return 'ق';
+        case 'ضعيف': return 'ض';
         default: return null;
     }
 }
@@ -54,20 +55,19 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
 
     const isHoliday = session1?.sessionType === 'يوم عطلة' || session2?.sessionType === 'يوم عطلة';
     
-    let primaryStatus = isHoliday ? 'عطلة' : record1?.attendance || record2?.attendance;
+    // Prioritize session 1 for display status
+    const primaryRecord = record1 || record2;
+    let primaryStatus = isHoliday ? 'عطلة' : primaryRecord?.attendance;
     
     const attendanceColor = getAttendanceColor(primaryStatus);
+    const isAbsent = primaryStatus === 'غائب';
 
     let behaviorClass = 'border-transparent';
-    let evaluationIcon = null;
+    let evaluationSymbol = null;
 
-    if (primaryStatus && ['حاضر', 'متأخر', 'تعويض'].includes(primaryStatus)) {
-        // Prioritize session 1 for display, fallback to session 2
-        const primaryRecord = record1 || record2;
-        if(primaryRecord){
-            behaviorClass = getBehaviorClass(primaryRecord.behavior);
-            evaluationIcon = getEvaluationIcon(primaryRecord.memorization);
-        }
+    if (primaryRecord && !isAbsent && !isHoliday) {
+        behaviorClass = getBehaviorClass(primaryRecord.behavior);
+        evaluationSymbol = getEvaluationSymbol(primaryRecord.memorization);
     }
     
     const renderRecordDetails = (record: DailyRecord, session?: DailySession) => (
@@ -103,10 +103,9 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <div className={cn("h-16 w-full rounded-md p-1 border-2 transition-all relative flex items-center justify-center text-xs font-bold", attendanceColor, behaviorClass)}>
-                    {primaryStatus || 'لم يسجل'}
+                <div className={cn("h-16 w-full rounded-md p-1 border-2 transition-all relative flex items-center justify-center text-lg font-bold", attendanceColor, isAbsent ? 'border-transparent' : behaviorClass)}>
+                    {evaluationSymbol}
                     {record2 && <div className="absolute top-1 right-1 h-2 w-2 bg-slate-800 rounded-full" title="توجد حصة ثانية"></div>}
-                    {evaluationIcon && <div className="absolute bottom-1 right-1" title="مستوى التقييم">{evaluationIcon}</div>}
                 </div>
             </TooltipTrigger>
             <TooltipContent>
@@ -219,21 +218,33 @@ export default function WeeklyFollowUpPage() {
                 </Card>
 
                 <Card>
-                    <CardHeader><CardTitle>مفتاح الدلالات</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                           مفتاح الدلالات
+                           <Tooltip>
+                                <TooltipTrigger>
+                                    <Info className="h-4 w-4 text-muted-foreground"/>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>لون الخلفية = حضور | لون الإطار = سلوك | الرمز الداخلي = تقييم</p>
+                                </TooltipContent>
+                           </Tooltip>
+                        </CardTitle>
+                    </CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div>
-                            <h4 className="font-semibold mb-2">🟩 الحضور (لون الخلفية)</h4>
+                            <h4 className="font-semibold mb-2">الحضُور (لون الخلفية)</h4>
                             <ul className="space-y-1 text-sm">
-                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-green-300"></div> حاضر</li>
-                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-red-400"></div> غائب</li>
-                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-yellow-400"></div> متأخر</li>
-                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-blue-300"></div> تعويض</li>
-                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-gray-300"></div> يوم عطلة</li>
-                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-gray-100"></div> لم يسجل</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-green-300"></div> حاضر</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-red-400"></div> غائب</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-yellow-400"></div> متأخر</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-blue-300"></div> تعويض</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-gray-300"></div> يوم عطلة</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-gray-100"></div> لم يسجل</li>
                             </ul>
                         </div>
                         <div>
-                            <h4 className="font-semibold mb-2">📏 السلوك (لون الإطار)</h4>
+                            <h4 className="font-semibold mb-2">السلوك (لون الإطار)</h4>
                              <ul className="space-y-1 text-sm">
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-blue-500"></div> هادئ</li>
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-yellow-500"></div> متوسط</li>
@@ -241,17 +252,18 @@ export default function WeeklyFollowUpPage() {
                             </ul>
                         </div>
                          <div>
-                            <h4 className="font-semibold mb-2">⭐ التقييم (أيقونة النجمة)</h4>
+                            <h4 className="font-semibold mb-2">التقييم (رمز الخلية)</h4>
                              <ul className="space-y-1 text-sm">
-                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-green-500 fill-green-500" /> ممتاز</li>
-                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-blue-500 fill-blue-500" /> جيد</li>
-                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-orange-500 fill-orange-500" /> متوسط</li>
-                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-red-500 fill-red-500" /> ضعيف</li>
-                                <li className="flex items-center gap-2">لا توجد نجمة: لم يقيم</li>
+                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500 fill-yellow-500" /> ممتاز</li>
+                                <li className="flex items-center gap-2"><span className="font-bold w-4 text-center">جج</span> جيد جداً</li>
+                                <li className="flex items-center gap-2"><span className="font-bold w-4 text-center">ج</span> جيد</li>
+                                <li className="flex items-center gap-2"><span className="font-bold w-4 text-center">ق</span> مقبول</li>
+                                <li className="flex items-center gap-2"><span className="font-bold w-4 text-center">ض</span> ضعيف</li>
+                                <li className="flex items-center gap-2">لا يوجد رمز: لم يقيم</li>
                             </ul>
                         </div>
                          <div>
-                            <h4 className="font-semibold mb-2">🏷️ دلالات أخرى</h4>
+                            <h4 className="font-semibold mb-2">دلالات أخرى</h4>
                              <ul className="space-y-1 text-sm">
                                 <li className="flex items-center gap-2"><div className="h-2 w-2 bg-slate-800 rounded-full"></div> توجد حصة ثانية مسجلة</li>
                             </ul>
@@ -262,5 +274,3 @@ export default function WeeklyFollowUpPage() {
         </TooltipProvider>
     );
 }
-
-    
