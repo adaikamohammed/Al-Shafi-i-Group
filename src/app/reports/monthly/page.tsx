@@ -57,6 +57,7 @@ export default function MonthlyStatisticsPage() {
         
         const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(sessionsOnDate => 
             Object.values(sessionsOnDate).filter(session => {
+                if (!session || !session.date) return false;
                 const sessionDate = parseISO(session.date);
                 return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
             })
@@ -465,3 +466,4 @@ export default function MonthlyStatisticsPage() {
 }
 
     
+
