@@ -22,7 +22,7 @@ import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
@@ -170,36 +170,39 @@ export default function DailySessionsPage() {
                             </Button>
                          </DropdownMenuTrigger>
                          <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
-                            {sessionsForDay.map(session => ([
-                                <DropdownMenuItem key={`edit-${session.id}`} onClick={() => handleDayClick(day, session.sessionNumber)}>
-                                    <Copy className="ml-2 h-4 w-4" />
-                                    <span>تعديل حصة {session.sessionNumber}</span>
-                                </DropdownMenuItem>,
-                                <DropdownMenuItem key={`export-${session.id}`} onClick={(e) => handleExportSession(e, session.id)}>
-                                    <Download className="ml-2 h-4 w-4" />
-                                    <span>تحميل حصة {session.sessionNumber}</span>
-                                </DropdownMenuItem>,
-                                 <AlertDialog key={`delete-dialog-${session.id}`}>
-                                    <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                                            <Trash2 className="ml-2 h-4 w-4" />
-                                            <span>حذف حصة {session.sessionNumber}</span>
-                                        </DropdownMenuItem>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                        <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            سيؤدي هذا إلى حذف سجلات هذه الحصة نهائيًا.
-                                        </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                        <AlertDialogAction onClick={(e) => handleDeleteSession(e, session.id)}>نعم، قم بالحذف</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            ]))}
+                            {sessionsForDay.map((session, index) => (
+                                <React.Fragment key={session.id}>
+                                    <DropdownMenuItem onClick={() => handleDayClick(day, session.sessionNumber)}>
+                                        <Copy className="ml-2 h-4 w-4" />
+                                        <span>تعديل حصة {session.sessionNumber}</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={(e) => handleExportSession(e, session.id)}>
+                                        <Download className="ml-2 h-4 w-4" />
+                                        <span>تحميل حصة {session.sessionNumber}</span>
+                                    </DropdownMenuItem>
+                                     <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                                <Trash2 className="ml-2 h-4 w-4" />
+                                                <span>حذف حصة {session.sessionNumber}</span>
+                                            </DropdownMenuItem>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                            <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                سيؤدي هذا إلى حذف سجلات هذه الحصة نهائيًا.
+                                            </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                            <AlertDialogAction onClick={(e) => handleDeleteSession(e, session.id)}>نعم، قم بالحذف</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                     {index < sessionsForDay.length - 1 && <DropdownMenuSeparator />}
+                                </React.Fragment>
+                            ))}
                          </DropdownMenuContent>
                     </DropdownMenu>
                     </div>
@@ -564,6 +567,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     </TooltipProvider>
   );
 }
+
 
 
 
