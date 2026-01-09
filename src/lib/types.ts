@@ -26,7 +26,7 @@ export interface Student {
 export type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "تعويض";
 export type PerformanceLevel = "ممتاز" | "جيد" | "متوسط" | "ضعيف" | "لا يوجد";
 export type BehaviorLevel = "هادئ" | "متوسط" | "غير منضبط";
-export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة" | "حصة تعويضية";
+export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة" | "حصة تعويضية" | "غياب الشيخ";
 
 export interface DailyRecord {
   sessionId: string; // To link record to a specific session on a given date
@@ -45,6 +45,8 @@ export interface DailySession {
     sessionNumber: 1 | 2;
     sessionType: SessionType;
     records: DailyRecord[];
+    teacherAbsenceReason?: string;
+    substituteTeacher?: string;
 }
 
 export interface DailyReport {

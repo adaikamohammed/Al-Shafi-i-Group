@@ -22,19 +22,21 @@ import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
 
 
 const sessionTypeDescriptions: { [key in SessionType]: string } = {
   'حصة أساسية': 'الحصة العادية لحفظ ومراجعة القرآن.',
   'حصة أنشطة': 'حصة مخصصة للأنشطة والترفيه، لا تتضمن حفظاً أو مراجعة.',
   'يوم عطلة': 'يوم لا توجد فيه حصص دراسية لجميع الطلبة.',
-  'حصة تعويضية': 'حصة لتعويض طالب أو أكثر عن يوم غابوا فيه.'
+  'حصة تعويضية': 'حصة لتعويض طالب أو أكثر عن يوم غابوا فيه.',
+  'غياب الشيخ': 'لتسجيل غياب الشيخ وتحديد ما إذا كان هناك من ينوب عنه.',
 };
 
 const attendanceOptions: AttendanceStatus[] = ["حاضر", "غائب", "متأخر", "تعويض"];
-const sessionTypeOptions: SessionType[] = ["حصة أساسية", "حصة أنشطة", "يوم عطلة", "حصة تعويضية"];
+const sessionTypeOptions: SessionType[] = ["حصة أساسية", "حصة أنشطة", "يوم عطلة", "حصة تعويضية", "غياب الشيخ"];
 
 
 export default function DailySessionsPage() {
@@ -86,10 +88,11 @@ export default function DailySessionsPage() {
     
     let dataForSheet;
     
-    if (session.sessionType === 'يوم عطلة') {
+    if (session.sessionType === 'يوم عطلة' || (session.sessionType === 'غياب الشيخ' && !session.substituteTeacher)) {
         dataForSheet = [{
             'التاريخ': readableDate, 'اليوم': dayName,
-            'رقم الحصة': session.sessionNumber, 'نوع الحصة': 'يوم عطلة',
+            'رقم الحصة': session.sessionNumber, 'نوع الحصة': session.sessionType,
+            'ملاحظات': session.sessionType === 'غياب الشيخ' ? `سبب الغياب: ${session.teacherAbsenceReason}` : 'يوم عطلة',
         }];
     } else {
         dataForSheet = (session.records ?? []).map(record => {
@@ -134,7 +137,7 @@ export default function DailySessionsPage() {
         
         let dayStatusClass = '';
         if (sessionsForDay.length > 0) {
-            if (sessionsForDay.some(s => s.sessionType === 'يوم عطلة')) {
+            if (sessionsForDay.some(s => s.sessionType === 'يوم عطلة' || s.sessionType === 'غياب الشيخ')) {
                 dayStatusClass = 'bg-yellow-200 dark:bg-yellow-800';
             } else {
                 dayStatusClass = 'bg-green-200 dark:bg-green-800';
@@ -169,41 +172,41 @@ export default function DailySessionsPage() {
                                 <MoreVertical className="h-4 w-4" />
                             </Button>
                          </DropdownMenuTrigger>
-                         <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
                             {sessionsForDay.map((session, index) => (
-                                <React.Fragment key={session.id}>
-                                    <DropdownMenuItem onClick={() => handleDayClick(day, session.sessionNumber)}>
-                                        <Copy className="ml-2 h-4 w-4" />
-                                        <span>تعديل حصة {session.sessionNumber}</span>
+                            <React.Fragment key={session.id}>
+                                <DropdownMenuItem onClick={() => handleDayClick(day, session.sessionNumber)}>
+                                <Copy className="ml-2 h-4 w-4" />
+                                <span>تعديل حصة {session.sessionNumber}</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={(e) => handleExportSession(e, session.id)}>
+                                <Download className="ml-2 h-4 w-4" />
+                                <span>تحميل حصة {session.sessionNumber}</span>
+                                </DropdownMenuItem>
+                                <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                    <Trash2 className="ml-2 h-4 w-4" />
+                                    <span>حذف حصة {session.sessionNumber}</span>
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={(e) => handleExportSession(e, session.id)}>
-                                        <Download className="ml-2 h-4 w-4" />
-                                        <span>تحميل حصة {session.sessionNumber}</span>
-                                    </DropdownMenuItem>
-                                     <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                                                <Trash2 className="ml-2 h-4 w-4" />
-                                                <span>حذف حصة {session.sessionNumber}</span>
-                                            </DropdownMenuItem>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                            <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                سيؤدي هذا إلى حذف سجلات هذه الحصة نهائيًا.
-                                            </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                            <AlertDialogAction onClick={(e) => handleDeleteSession(e, session.id)}>نعم، قم بالحذف</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                     {index < sessionsForDay.length - 1 && <DropdownMenuSeparator />}
-                                </React.Fragment>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                    <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        سيؤدي هذا إلى حذف سجلات هذه الحصة نهائيًا.
+                                    </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                    <AlertDialogAction onClick={(e) => handleDeleteSession(e, session.id)}>نعم، قم بالحذف</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                                </AlertDialog>
+                                {index < sessionsForDay.length - 1 && <DropdownMenuSeparator />}
+                            </React.Fragment>
                             ))}
-                         </DropdownMenuContent>
+                        </DropdownMenuContent>
                     </DropdownMenu>
                     </div>
                  )}
@@ -275,7 +278,7 @@ export default function DailySessionsPage() {
             </div>
              <div className="mt-6 flex flex-wrap justify-center gap-4 text-sm">
                 <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-green-200 border"></div><span>يوم مسجل</span></div>
-                <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-yellow-200 border"></div><span>يوم عطلة</span></div>
+                <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-yellow-200 border"></div><span>يوم عطلة/غياب</span></div>
                 <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-red-200 border"></div><span>يوم فائت</span></div>
                 <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-background border"></div><span>يوم قادم</span></div>
             </div>
@@ -373,6 +376,11 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
   const [sessionType, setSessionType] = useState<SessionType>('حصة أساسية');
   const [records, setRecords] = useState<DailyRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [teacherAbsenceReason, setTeacherAbsenceReason] = useState('');
+  const [hasSubstitute, setHasSubstitute] = useState(false);
+  const [substituteTeacher, setSubstituteTeacher] = useState('');
+  const { toast } = useToast();
+
   const formattedDate = format(day, 'yyyy-MM-dd');
   const sessionId = `${formattedDate}-${sessionNumber}`;
 
@@ -381,7 +389,13 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
 
     if (existingSession) {
         setSessionType(existingSession.sessionType);
-        if (existingSession.sessionType === 'يوم عطلة') {
+        if (existingSession.sessionType === 'غياب الشيخ') {
+          setTeacherAbsenceReason(existingSession.teacherAbsenceReason || '');
+          setSubstituteTeacher(existingSession.substituteTeacher || '');
+          setHasSubstitute(!!existingSession.substituteTeacher);
+        }
+
+        if (existingSession.sessionType === 'يوم عطلة' || (existingSession.sessionType === 'غياب الشيخ' && !existingSession.substituteTeacher)) {
             setRecords([]);
         } else {
              const updatedRecords = (students ?? []).map(s => {
@@ -427,6 +441,11 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
   };
 
   const handleSave = () => {
+    if (sessionType === 'غياب الشيخ' && !teacherAbsenceReason) {
+      toast({ title: 'خطأ', description: 'سبب غياب الشيخ حقل إلزامي.', variant: 'destructive' });
+      return;
+    }
+    
     setIsLoading(true);
     
     const sessionToSave: DailySession = {
@@ -434,7 +453,9 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
         date: formattedDate,
         sessionNumber,
         sessionType: sessionType,
-        records: sessionType === 'يوم عطلة' ? [] : records,
+        records: (sessionType === 'يوم عطلة' || (sessionType === 'غياب الشيخ' && !hasSubstitute)) ? [] : records,
+        teacherAbsenceReason: sessionType === 'غياب الشيخ' ? teacherAbsenceReason : undefined,
+        substituteTeacher: sessionType === 'غياب الشيخ' && hasSubstitute ? substituteTeacher : undefined,
     };
     addDailySession(sessionToSave);
     
@@ -444,7 +465,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
 
   const isActivitySession = sessionType === 'حصة أنشطة';
   const isHoliday = sessionType === 'يوم عطلة';
-  const isMakeupSession = sessionType === 'حصة تعويضية';
+  const isTeacherAbsent = sessionType === 'غياب الشيخ';
 
   return (
     <TooltipProvider>
@@ -476,7 +497,31 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
           </div>
         </div>
 
-       { !isHoliday && <div className="overflow-x-auto">
+        {isTeacherAbsent && (
+          <Card className="p-4 bg-amber-50 border-amber-200">
+            <CardHeader className="p-2">
+              <CardTitle>تسجيل غياب الشيخ</CardTitle>
+            </CardHeader>
+            <CardContent className="p-2 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="absence-reason">سبب غياب الشيخ (إلزامي)</Label>
+                <Textarea id="absence-reason" value={teacherAbsenceReason} onChange={e => setTeacherAbsenceReason(e.target.value)} placeholder="مثال: ظرف طارئ، إجازة مرضية..." />
+              </div>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <Switch id="substitute-toggle" checked={hasSubstitute} onCheckedChange={setHasSubstitute} />
+                <Label htmlFor="substitute-toggle">هل يوجد شيخ بديل؟</Label>
+              </div>
+              {hasSubstitute && (
+                <div className="space-y-2">
+                  <Label htmlFor="substitute-name">اسم الشيخ البديل (اختياري)</Label>
+                  <Input id="substitute-name" value={substituteTeacher} onChange={e => setSubstituteTeacher(e.target.value)} placeholder="اكتب اسم الشيخ الذي سينوب عنك" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+       { !isHoliday && !(isTeacherAbsent && !hasSubstitute) && <div className="overflow-x-auto">
           <Table className="min-w-full">
             <TableHeader>
               <TableRow>
@@ -493,7 +538,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
                 const record = (records ?? []).find(r => r.studentId === student.id);
                 if (!record) return null;
                 const isAbsent = record.attendance === 'غائب';
-                const isRowDisabled = isAbsent || (isActivitySession && !isMakeupSession);
+                const isRowDisabled = isAbsent || (isActivitySession && !hasSubstitute);
                 
                 return (
                   <TableRow key={student.id} className={cn(isAbsent && 'bg-muted/50')}>
@@ -548,10 +593,10 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
           </Table>
         </div>}
 
-         {isHoliday && (
+         { (isHoliday || (isTeacherAbsent && !hasSubstitute)) && (
             <div className="flex flex-col items-center justify-center text-center p-8 bg-muted rounded-md h-full">
-                <h3 className="text-xl font-bold">يوم عطلة</h3>
-                <p className="text-muted-foreground">لن يتم تسجيل أي بيانات للطلبة في هذا اليوم.</p>
+                <h3 className="text-xl font-bold">{isHoliday ? 'يوم عطلة' : 'غياب الشيخ (بدون بديل)'}</h3>
+                <p className="text-muted-foreground">لن يتم تسجيل أي بيانات للطلبة في هذه الحصة.</p>
             </div>
         )}
 
@@ -568,6 +613,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     </TooltipProvider>
   );
 }
+
 
 
 
