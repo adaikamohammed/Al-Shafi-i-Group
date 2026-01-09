@@ -15,7 +15,7 @@ import type { Student, DailySession, SessionRecord, DailyReport, Payment } from 
 import { cn } from '@/lib/utils';
 import { Tooltip as ShadTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
-import { SmartAlerts } from '@/components/ui/SmartAlerts';
+
 
 
 const ATTENDANCE_COLORS: { [key: string]: string } = { 'حاضر': '#10B981', 'غائب': '#EF4444', 'متأخر': '#F59E0B', 'تعويض': '#3B82F6', 'لم يسجل': '#9CA3AF' };
@@ -390,7 +390,7 @@ export default function MonthlyStatisticsPage() {
             </div>
             
              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                 <SmartAlerts students={activeStudents} sessions={dailySessions} />
+                 
 
                  {selectedStudentId === 'all' ? (
                     <GroupEvaluationCard

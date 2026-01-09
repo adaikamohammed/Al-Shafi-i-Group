@@ -15,6 +15,7 @@ import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { DailyChecklist } from '@/components/ui/DailyChecklist';
 import { AttendanceChart } from '@/components/ui/AttendanceChart';
+import { SmartAlerts } from '@/components/ui/SmartAlerts';
 
 
 export default function OverviewPage() {
@@ -158,6 +159,8 @@ export default function OverviewPage() {
             </div>
             
             {!isSuperAdmin && <DailyChecklist />}
+            
+             <SmartAlerts students={activeStudents} sessions={dailySessions} />
 
              <GroupEvaluationCard 
                 students={students ?? []} 

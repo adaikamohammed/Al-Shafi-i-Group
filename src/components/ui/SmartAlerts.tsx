@@ -4,7 +4,7 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Student, DailySession } from '@/lib/types';
-import { Bot, Lightbulb } from 'lucide-react';
+import { Bot, Lightbulb, AlertTriangle, UserCheck } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, subDays, parseISO, isValid } from 'date-fns';
 
 export const SmartAlerts = ({ students, sessions }: { students: Student[], sessions: Record<string, Record<string, DailySession>> }) => {
@@ -83,35 +83,47 @@ export const SmartAlerts = ({ students, sessions }: { students: Student[], sessi
 
     const isEndOfMonth = today.getDate() > 20;
 
+    const hasAlerts = weeklyAttendance.length > 0 && weeklyAttendance[0].count > 0 || consecutiveAbsences.length > 0 || isEndOfMonth;
+
+    if (!hasAlerts) {
+        return null;
+    }
+
     return (
-      <Card className="col-span-1 lg:col-span-3">
+      <Card className="col-span-1 lg:col-span-4 border-blue-200 bg-blue-50/50 dark:bg-blue-900/20 dark:border-blue-800">
         <CardHeader>
            <div className="flex items-center gap-2">
                 <Bot className="h-6 w-6 text-primary" />
-                <CardTitle>التنبيهات والاقتراحات الذكية</CardTitle>
+                <CardTitle>رادار الإنذار المبكر والتوصيات</CardTitle>
             </div>
         </CardHeader>
         <CardContent className="space-y-3">
              {weeklyAttendance.length > 0 && weeklyAttendance[0].count > 0 && (
-                <div className="p-3 bg-blue-50 text-blue-800 rounded-lg dark:bg-blue-900/50 dark:text-blue-200">
-                    <p className="font-bold">🌟 نجوم الأسبوع (الأكثر حضورًا):</p>
-                    <p className="text-sm">{weeklyAttendance.map(s => s.name).join('، ')}</p>
+                <div className="p-3 bg-green-50 text-green-800 rounded-lg dark:bg-green-900/50 dark:text-green-200 flex items-start gap-3">
+                    <UserCheck className="h-5 w-5 mt-0.5"/>
+                    <div>
+                        <p className="font-bold">🌟 نجوم الأسبوع (الأكثر حضورًا):</p>
+                        <p className="text-sm">{weeklyAttendance.map(s => s.name).join('، ')}</p>
+                    </div>
                 </div>
             )}
              {consecutiveAbsences.length > 0 && (
-                 <div className="p-3 bg-red-50 text-red-800 rounded-lg dark:bg-red-900/50 dark:text-red-200">
-                    <p className="font-bold">⚠️ غياب متكرر:</p>
-                    <p className="text-sm">الطلاب: {consecutiveAbsences.join('، ')} قد تغيبوا 3 مرات متتالية أو أكثر.</p>
+                 <div className="p-3 bg-red-50 text-red-800 rounded-lg dark:bg-red-900/50 dark:text-red-200 flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 mt-0.5"/>
+                    <div>
+                        <p className="font-bold">⚠️ غياب متكرر:</p>
+                        <p className="text-sm">الطلاب: {consecutiveAbsences.join('، ')} قد تغيبوا 3 مرات متتالية أو أكثر. ينصح بمتابعة الحالة.</p>
+                    </div>
                 </div>
             )}
             {isEndOfMonth && (
-                 <div className="p-3 bg-yellow-50 text-yellow-800 rounded-lg dark:bg-yellow-900/50 dark:text-yellow-200">
-                    <p className="font-bold">💰 تذكير مالي:</p>
-                    <p className="text-sm">اقتربت نهاية الشهر، لا تنس مراجعة صفحة "المستحقات المالية".</p>
+                 <div className="p-3 bg-yellow-50 text-yellow-800 rounded-lg dark:bg-yellow-900/50 dark:text-yellow-200 flex items-start gap-3">
+                    <Lightbulb className="h-5 w-5 mt-0.5"/>
+                    <div>
+                        <p className="font-bold">💰 تذكير مالي:</p>
+                        <p className="text-sm">اقتربت نهاية الشهر، لا تنس مراجعة صفحة "المستحقات المالية".</p>
+                    </div>
                 </div>
-            )}
-            {weeklyAttendance.length === 0 && consecutiveAbsences.length === 0 && !isEndOfMonth && (
-                <p className="text-muted-foreground text-center p-4">لا توجد تنبيهات هامة حاليًا. أداء الفوج مستقر.</p>
             )}
         </CardContent>
       </Card>
