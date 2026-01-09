@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, Swords, User, Calendar, Cake } from 'lucide-react';
-import { format, getMonth, getYear, setMonth, startOfYear, endOfYear } from 'date-fns';
+import { Loader2, AlertTriangle, Swords, User, Calendar, Cake, Crown, ShieldCheck, CheckCircle, XCircle } from 'lucide-react';
+import { format, getMonth, getYear, setMonth, startOfYear, endOfYear, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import type { Student } from '@/lib/types';
+import type { Student, DailySession } from '@/lib/types';
+import { Progress } from '@/components/ui/progress';
 
 const calculateAge = (birthDate?: Date) => {
   if (!birthDate) return 'N/A';
@@ -45,7 +46,7 @@ const StudentCard = ({ student, onSelectStudent, studentList, disabledStudentId 
                             <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <h3 className="text-xl font-bold">{student.fullName}</h3>
-                        <div className="flex gap-4 text-sm text-muted-foreground mt-2">
+                        <div className="flex flex-wrap justify-center gap-4 text-sm text-muted-foreground mt-2">
                              <div className="flex items-center gap-1">
                                 <Cake className="h-4 w-4"/>
                                 <span>{calculateAge(student.birthDate)} سنة</span>
@@ -67,9 +68,34 @@ const StudentCard = ({ student, onSelectStudent, studentList, disabledStudentId 
     );
 };
 
+const ComparisonStat = ({ title, value1, value2, suffix = '' }: { title: string, value1: number, value2: number, suffix?: string }) => {
+    const total = value1 + value2;
+    const percentage1 = total > 0 ? (value1 / total) * 100 : 50;
+    const isWinner1 = value1 > value2;
+    const isWinner2 = value2 > value1;
+    const isDraw = value1 === value2;
+
+    return (
+        <div className="space-y-2">
+            <h4 className="text-center font-semibold text-muted-foreground">{title}</h4>
+            <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 w-1/4 justify-start">
+                    {isWinner1 && !isDraw && <Crown className="h-4 w-4 text-yellow-500" />}
+                    <span className="font-bold">{value1} {suffix}</span>
+                </div>
+                <Progress value={percentage1} className="flex-1 h-3" />
+                <div className="flex items-center gap-1 w-1/4 justify-end">
+                    <span className="font-bold">{value2} {suffix}</span>
+                    {isWinner2 && !isDraw && <Crown className="h-4 w-4 text-yellow-500" />}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 export default function ComparisonPage() {
-    const { students, loading } = useStudentContext();
+    const { students, dailySessions, loading } = useStudentContext();
     const [periodType, setPeriodType] = useState<'month' | 'season' | 'year'>('month');
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedSeason, setSelectedSeason] = useState<number>(1);
@@ -82,6 +108,60 @@ export default function ComparisonPage() {
 
     const student1 = useMemo(() => activeStudents.find(s => s.id === student1Id) || null, [activeStudents, student1Id]);
     const student2 = useMemo(() => activeStudents.find(s => s.id === student2Id) || null, [activeStudents, student2Id]);
+
+    const comparisonData = useMemo(() => {
+        if (!student1 || !student2) return null;
+
+        let startDate: Date;
+        let endDate: Date;
+
+        switch (periodType) {
+            case 'season':
+                const seasonStartMonth = (selectedSeason - 1) * 3;
+                startDate = startOfMonth(setMonth(new Date(selectedYear, 0), seasonStartMonth));
+                endDate = endOfMonth(setMonth(new Date(selectedYear, 0), seasonStartMonth + 2));
+                break;
+            case 'year':
+                startDate = startOfYear(new Date(selectedYear, 0));
+                endDate = endOfYear(new Date(selectedYear, 0));
+                break;
+            case 'month':
+            default:
+                startDate = startOfMonth(new Date(selectedYear, selectedMonth));
+                endDate = endOfMonth(new Date(selectedYear, selectedMonth));
+                break;
+        }
+
+        const sessionsInRange = Object.values(dailySessions ?? {}).flatMap(day => Object.values(day)).filter(session => {
+            if(!session.date) return false;
+            const sessionDate = parseISO(session.date);
+            return sessionDate >= startDate && sessionDate <= endDate;
+        });
+        
+        const getStatsForStudent = (studentId: string) => {
+            const stats = { present: 0, absent: 0, late: 0, makeup: 0, excellent: 0, good: 0, calm: 0 };
+            sessionsInRange.forEach(session => {
+                const record = (session.records ?? []).find(r => r.studentId === studentId);
+                if (record) {
+                    if (record.attendance === 'حاضر') stats.present++;
+                    if (record.attendance === 'غائب') stats.absent++;
+                    if (record.attendance === 'متأخر') stats.late++;
+                    if (record.attendance === 'تعويض') stats.makeup++;
+                    if (record.memorization === 'ممتاز') stats.excellent++;
+                    if (record.memorization === 'جيد') stats.good++;
+                    if (record.behavior === 'هادئ') stats.calm++;
+                }
+            });
+            return stats;
+        }
+
+        return {
+            student1: getStatsForStudent(student1.id),
+            student2: getStatsForStudent(student2.id),
+        };
+
+    }, [student1, student2, periodType, selectedMonth, selectedSeason, selectedYear, dailySessions]);
+
 
     if (loading) {
         return (
@@ -178,17 +258,27 @@ export default function ComparisonPage() {
                 />
             </div>
             
-             {/* Placeholder for comparison results */}
-            {student1 && student2 && (
+            {student1 && student2 && comparisonData && (
                  <Card>
                     <CardHeader>
                         <CardTitle>نتائج المقارنة</CardTitle>
+                         <CardDescription>
+                            مقارنة شاملة بين الطالبين خلال الفترة المحددة. {<Crown className="inline-block h-4 w-4 text-yellow-500" />} تشير إلى الأداء الأفضل.
+                        </CardDescription>
                     </CardHeader>
-                    <CardContent className="text-center text-muted-foreground p-12">
-                        <p>سيتم عرض تفاصيل المقارنة هنا قريبًا...</p>
+                    <CardContent className="space-y-6 p-6">
+                        <ComparisonStat title="الحضور" value1={comparisonData.student1.present} value2={comparisonData.student2.present} suffix="يوم" />
+                        <ComparisonStat title="الغياب" value1={comparisonData.student2.absent} value2={comparisonData.student1.absent} suffix="يوم" />
+                        <ComparisonStat title="التأخر" value1={comparisonData.student2.late} value2={comparisonData.student1.late} suffix="مرة" />
+                        <ComparisonStat title="حصص التعويض" value1={comparisonData.student1.makeup} value2={comparisonData.student2.makeup} suffix="حصص" />
+                        <ComparisonStat title="تقييم 'ممتاز'" value1={comparisonData.student1.excellent} value2={comparisonData.student2.excellent} suffix="مرة" />
+                        <ComparisonStat title="السلوك الهادئ" value1={comparisonData.student1.calm} value2={comparisonData.student2.calm} suffix="مرة" />
+                         <ComparisonStat title="السور المتقنة" value1={student1.memorizedSurahsCount || 0} value2={student2.memorizedSurahsCount || 0} suffix="سورة" />
                     </CardContent>
                 </Card>
             )}
         </div>
     );
 }
+
+    
