@@ -415,8 +415,9 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
         if (rec.studentId === studentId) {
           const updatedRec = { ...rec, [field]: value };
           if (field === 'attendance' && value === 'غائب') {
-            updatedRec.memorization = null; updatedRec.review = false;
-            updatedRec.behavior = 'هادئ';
+            updatedRec.memorization = null; 
+            updatedRec.review = false;
+            updatedRec.behavior = null;
           }
           return updatedRec;
         }
@@ -567,6 +568,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     </TooltipProvider>
   );
 }
+
 
 
 
