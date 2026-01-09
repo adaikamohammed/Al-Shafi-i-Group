@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, ArrowRight, Star } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addDays, subDays, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -16,15 +16,16 @@ import type { Student, DailySession, DailyRecord } from '@/lib/types';
 
 const getAttendanceColor = (status?: string) => {
   switch (status) {
-    case "حاضر": return "bg-green-300";
-    case "غائب": return "bg-red-400";
-    case "متأخر": return "bg-yellow-400";
-    case "تعويض": return "bg-blue-300";
-    default: return "bg-gray-100";
+    case "حاضر": return "bg-green-300 dark:bg-green-800";
+    case "غائب": return "bg-red-400 dark:bg-red-800";
+    case "متأخر": return "bg-yellow-400 dark:bg-yellow-700";
+    case "تعويض": return "bg-blue-300 dark:bg-blue-700";
+    case "عطلة": return "bg-gray-300 dark:bg-gray-600";
+    default: return "bg-gray-100 dark:bg-gray-700/50";
   }
 };
 
-const getBehaviorClass = (behavior?: string) => {
+const getBehaviorClass = (behavior?: string | null) => {
     switch(behavior) {
         case 'هادئ': return 'border-blue-500';
         case 'متوسط': return 'border-yellow-500';
@@ -32,6 +33,16 @@ const getBehaviorClass = (behavior?: string) => {
         default: return 'border-transparent';
     }
 }
+
+const getEvaluationIcon = (evaluation?: string | null) => {
+    switch(evaluation) {
+        case 'ممتاز': return <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />;
+        case 'جيد': return <Star className="h-3 w-3 text-yellow-500" />;
+        case 'متوسط': return <Star className="h-3 w-3 text-gray-400" />;
+        default: return null;
+    }
+}
+
 
 const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], student: Student, date: Date }) => {
     const session1 = sessions?.find(s => s.sessionNumber === 1);
@@ -43,9 +54,8 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
     const isHoliday = session1?.sessionType === 'يوم عطلة' || session2?.sessionType === 'يوم عطلة';
     
     // Determine primary status for background color
-    let primaryStatus = record1?.attendance || (isHoliday ? 'عطلة' : undefined);
-    if (!primaryStatus && record2) primaryStatus = record2.attendance;
-
+    let primaryStatus = record1?.attendance || (record2?.attendance ? record2.attendance : (isHoliday ? 'عطلة' : undefined));
+    
     const attendanceColor = getAttendanceColor(primaryStatus);
 
     // Determine behavior for border color, only if present
@@ -54,6 +64,8 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
         const primaryBehavior = record1?.behavior || record2?.behavior;
         behaviorClass = getBehaviorClass(primaryBehavior);
     }
+    
+    const evaluationIcon = getEvaluationIcon(record1?.memorization || record2?.memorization);
     
     let tooltipContent = (
          <div className="text-right">
@@ -71,13 +83,13 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
                  {record1 && <div>
                     <p className="font-semibold">الحصة 1 ({session1?.sessionType})</p>
                     <p className="text-xs"><span className="font-bold">الحضور:</span> {record1.attendance}</p>
-                    <p className="text-xs"><span className="font-bold">السلوك:</span> {record1.behavior}</p>
+                    <p className="text-xs"><span className="font-bold">السلوك:</span> {record1.behavior || 'لم يسجل'}</p>
                     <p className="text-xs"><span className="font-bold">التقييم:</span> {record1.memorization || 'لم يقيم'}</p>
                  </div>}
                  {record2 && <div>
                     <p className="font-semibold">الحصة 2 ({session2?.sessionType})</p>
                     <p className="text-xs"><span className="font-bold">الحضور:</span> {record2.attendance}</p>
-                    <p className="text-xs"><span className="font-bold">السلوك:</span> {record2.behavior}</p>
+                    <p className="text-xs"><span className="font-bold">السلوك:</span> {record2.behavior || 'لم يسجل'}</p>
                     <p className="text-xs"><span className="font-bold">التقييم:</span> {record2.memorization || 'لم يقيم'}</p>
                  </div>}
             </div>
@@ -87,11 +99,10 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <div className={cn("h-16 w-full rounded-md p-1 border-2 transition-all relative", attendanceColor, behaviorClass)}>
-                    <div className="flex items-center justify-center h-full">
-                         <span className="text-xs font-bold">{primaryStatus}</span>
-                    </div>
+                <div className={cn("h-16 w-full rounded-md p-1 border-2 transition-all relative flex items-center justify-center text-xs font-bold", attendanceColor, behaviorClass)}>
+                    {primaryStatus || 'لم يسجل'}
                     {record2 && <div className="absolute top-1 right-1 h-2 w-2 bg-slate-800 rounded-full" title="توجد حصة ثانية"></div>}
+                    {evaluationIcon && <div className="absolute bottom-1 right-1" title="مستوى التقييم">{evaluationIcon}</div>}
                 </div>
             </TooltipTrigger>
             <TooltipContent>
@@ -111,7 +122,7 @@ export default function WeeklyFollowUpPage() {
         if (selectedStudentId !== 'all') {
             return filtered.filter(s => s.id === selectedStudentId);
         }
-        return filtered;
+        return filtered.sort((a,b) => a.fullName.localeCompare(b.fullName));
     }, [students, selectedStudentId]);
     
     const weekDates = useMemo(() => {
@@ -205,7 +216,7 @@ export default function WeeklyFollowUpPage() {
 
                 <Card>
                     <CardHeader><CardTitle>مفتاح الدلالات</CardTitle></CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div>
                             <h4 className="font-semibold mb-2">🟩 الحضور (لون الخلفية)</h4>
                             <ul className="space-y-1 text-sm">
@@ -213,7 +224,8 @@ export default function WeeklyFollowUpPage() {
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-red-400"></div> غائب</li>
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-yellow-400"></div> متأخر</li>
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-blue-300"></div> تعويض</li>
-                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-gray-100"></div> يوم عطلة / لم يسجل</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-gray-300"></div> يوم عطلة</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-gray-100"></div> لم يسجل</li>
                             </ul>
                         </div>
                         <div>
@@ -222,6 +234,15 @@ export default function WeeklyFollowUpPage() {
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-blue-500"></div> هادئ</li>
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-yellow-500"></div> متوسط</li>
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-red-500"></div> غير منضبط</li>
+                            </ul>
+                        </div>
+                         <div>
+                            <h4 className="font-semibold mb-2">⭐ التقييم (أيقونة النجمة)</h4>
+                             <ul className="space-y-1 text-sm">
+                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500 fill-yellow-500" /> ممتاز</li>
+                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500" /> جيد</li>
+                                <li className="flex items-center gap-2"><Star className="h-4 w-4 text-gray-400" /> متوسط</li>
+                                <li className="flex items-center gap-2">لا توجد نجمة: ضعيف أو لم يقيم</li>
                             </ul>
                         </div>
                          <div>
