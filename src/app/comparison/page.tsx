@@ -72,15 +72,9 @@ const ComparisonStat = ({ title, value1, value2, suffix = '', higherIsBetter = t
     const total = value1 + value2;
     const percentage1 = total > 0 ? (value1 / total) * 100 : 50;
     
-    let isWinner1 = higherIsBetter ? value1 > value2 : value1 < value2;
-    let isWinner2 = higherIsBetter ? value2 > value1 : value2 < value1;
     const isDraw = value1 === value2;
-    
-    // In a draw, no one is a winner
-    if (isDraw) {
-        isWinner1 = false;
-        isWinner2 = false;
-    }
+    const isWinner1 = !isDraw && (higherIsBetter ? value1 > value2 : value1 < value2);
+    const isWinner2 = !isDraw && (higherIsBetter ? value2 > value1 : value2 < value1);
 
     return (
         <div className="space-y-2">
