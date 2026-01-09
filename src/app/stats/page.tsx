@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -12,7 +11,7 @@ import { Loader2, AlertTriangle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addDays, subDays, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import type { Student, DailySession, SessionRecord } from '@/lib/types';
+import type { Student, DailySession, DailyRecord } from '@/lib/types';
 
 
 const getAttendanceColor = (status?: string) => {
@@ -34,52 +33,65 @@ const getBehaviorClass = (behavior?: string) => {
     }
 }
 
-const DayCell = ({ session, record, date }: { session?: DailySession, record?: SessionRecord, date: Date }) => {
-    const status = session?.sessionType === 'يوم عطلة' ? 'عطلة' : record?.attendance;
-    const behavior = record?.behavior;
-    const sessionType = session?.sessionType;
+const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], student: Student, date: Date }) => {
+    const session1 = sessions?.find(s => s.sessionNumber === 1);
+    const session2 = sessions?.find(s => s.sessionNumber === 2);
     
-    const attendanceColor = getAttendanceColor(status);
-    const behaviorClass = getBehaviorClass(behavior);
+    const record1 = session1?.records?.find(r => r.studentId === student.id);
+    const record2 = session2?.records?.find(r => r.studentId === student.id);
 
-    let content;
-    if (session?.sessionType === 'يوم عطلة') {
-        content = (
-            <div className="flex items-center justify-center h-full">
-                <span className="text-xs text-gray-500">عطلة</span>
-            </div>
-        );
-    } else if (record) {
-        content = (
-             <div className="text-center">
-                 <span className="text-xs font-bold">{status}</span>
-             </div>
-        );
-    } else {
-         content = <div className="h-full"></div>;
+    const isHoliday = session1?.sessionType === 'يوم عطلة' || session2?.sessionType === 'يوم عطلة';
+    
+    // Determine primary status for background color
+    let primaryStatus = record1?.attendance || (isHoliday ? 'عطلة' : undefined);
+    if (!primaryStatus && record2) primaryStatus = record2.attendance;
+
+    const attendanceColor = getAttendanceColor(primaryStatus);
+
+    // Determine behavior for border color, only if present
+    let behaviorClass = 'border-transparent';
+    if (primaryStatus === 'حاضر' || primaryStatus === 'متأخر' || primaryStatus === 'تعويض') {
+        const primaryBehavior = record1?.behavior || record2?.behavior;
+        behaviorClass = getBehaviorClass(primaryBehavior);
     }
-
-    const tooltipContent = (
+    
+    let tooltipContent = (
          <div className="text-right">
             <p><span className="font-bold">التاريخ:</span> {format(date, 'd MMMM yyyy', { locale: ar })}</p>
-            <p><span className="font-bold">نوع الحصة:</span> {sessionType || 'غير مسجلة'}</p>
-            {session?.sessionType !== 'يوم عطلة' && record && (
-                <>
-                    <p><span className="font-bold">الحضور:</span> {record.attendance}</p>
-                    <p><span className="font-bold">السلوك:</span> {record.behavior}</p>
-                    <p><span className="font-bold">التقييم:</span> {record.memorization || 'لم يقيم'}</p>
-                    <p><span className="font-bold">المراجعة:</span> {record.review ? 'نعم ✅' : 'لا ❌'}</p>
-                    {record.notes && <p><span className="font-bold">ملاحظات:</span> {record.notes}</p>}
-                </>
-            )}
+            <p>لا يوجد تسجيل لهذا اليوم.</p>
         </div>
     );
+
+    if (isHoliday) {
+         tooltipContent = <p>يوم عطلة</p>;
+    } else if (record1 || record2) {
+        tooltipContent = (
+            <div className="text-right space-y-2">
+                 <p className="font-bold border-b pb-1 mb-1">{format(date, 'd MMMM yyyy', { locale: ar })}</p>
+                 {record1 && <div>
+                    <p className="font-semibold">الحصة 1 ({session1?.sessionType})</p>
+                    <p className="text-xs"><span className="font-bold">الحضور:</span> {record1.attendance}</p>
+                    <p className="text-xs"><span className="font-bold">السلوك:</span> {record1.behavior}</p>
+                    <p className="text-xs"><span className="font-bold">التقييم:</span> {record1.memorization || 'لم يقيم'}</p>
+                 </div>}
+                 {record2 && <div>
+                    <p className="font-semibold">الحصة 2 ({session2?.sessionType})</p>
+                    <p className="text-xs"><span className="font-bold">الحضور:</span> {record2.attendance}</p>
+                    <p className="text-xs"><span className="font-bold">السلوك:</span> {record2.behavior}</p>
+                    <p className="text-xs"><span className="font-bold">التقييم:</span> {record2.memorization || 'لم يقيم'}</p>
+                 </div>}
+            </div>
+        );
+    }
 
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <div className={cn("h-16 w-full rounded-md p-1 border-2 transition-all", attendanceColor, behaviorClass)}>
-                    {content}
+                <div className={cn("h-16 w-full rounded-md p-1 border-2 transition-all relative", attendanceColor, behaviorClass)}>
+                    <div className="flex items-center justify-center h-full">
+                         <span className="text-xs font-bold">{primaryStatus}</span>
+                    </div>
+                    {record2 && <div className="absolute top-1 right-1 h-2 w-2 bg-slate-800 rounded-full" title="توجد حصة ثانية"></div>}
                 </div>
             </TooltipTrigger>
             <TooltipContent>
@@ -180,10 +192,9 @@ export default function WeeklyFollowUpPage() {
                                     <div className="font-semibold self-center text-center p-2 bg-muted rounded-md">{student.fullName}</div>
                                     {weekDates.map(date => {
                                          const dateString = format(date, 'yyyy-MM-dd');
-                                         const session = dailySessions ? dailySessions[dateString] : undefined;
-                                         const record = session?.records?.find(r => r.studentId === student.id);
+                                         const sessions = dailySessions[dateString] ? Object.values(dailySessions[dateString]) : undefined;
                                          return (
-                                            <DayCell key={date.toISOString()} session={session} record={record} date={date}/>
+                                            <DayCell key={date.toISOString()} sessions={sessions} student={student} date={date}/>
                                          )
                                     })}
                                  </React.Fragment>
@@ -213,13 +224,10 @@ export default function WeeklyFollowUpPage() {
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-red-500"></div> غير منضبط</li>
                             </ul>
                         </div>
-                        <div>
-                            <h4 className="font-semibold mb-2">🏷️ نوع الحصة</h4>
+                         <div>
+                            <h4 className="font-semibold mb-2">🏷️ دلالات أخرى</h4>
                              <ul className="space-y-1 text-sm">
-                                <li>حصة أساسية</li>
-                                <li>حصة أنشطة</li>
-                                <li>حصة تعويضية</li>
-                                <li>يوم عطلة</li>
+                                <li className="flex items-center gap-2"><div className="h-2 w-2 bg-slate-800 rounded-full"></div> توجد حصة ثانية مسجلة</li>
                             </ul>
                         </div>
                     </CardContent>
