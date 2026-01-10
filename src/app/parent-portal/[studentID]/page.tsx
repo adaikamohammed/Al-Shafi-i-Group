@@ -2,9 +2,8 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useStudentContext } from '@/context/StudentContext';
-import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, AlertTriangle, Star, Award, ShieldAlert, BookOpen, UserCheck, Wallet, ChevronsUpDown, Check, Users, Lock, KeyRound } from 'lucide-react';
@@ -31,17 +30,16 @@ const calculateAge = (birthDate?: Date) => {
   return Math.abs(ageDate.getUTCFullYear() - 1970);
 };
 
-const ParentPortalContent = ({ studentID, onVerificationSuccess }: { studentID: string, onVerificationSuccess?: () => void }) => {
+const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Student | null, onVerificationSuccess?: () => void }) => {
     const { students, dailySessions, surahProgress, settings, loading } = useStudentContext();
     const { toast } = useToast();
     const [phoneInput, setPhoneInput] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
     const [isVerified, setIsVerified] = useState(false);
-    const verificationKey = `parent-portal-verified-${studentID}`;
-
-    const student = useMemo(() => students.find(s => s.id === studentID), [students, studentID]);
+    const verificationKey = student ? `parent-portal-verified-${student.id}` : '';
 
     useEffect(() => {
+        if (!student) return;
         const storedVerification = localStorage.getItem(verificationKey);
         if(storedVerification) {
             const { timestamp } = JSON.parse(storedVerification);
@@ -53,7 +51,7 @@ const ParentPortalContent = ({ studentID, onVerificationSuccess }: { studentID: 
                 localStorage.removeItem(verificationKey);
             }
         }
-    }, [studentID, verificationKey, onVerificationSuccess]);
+    }, [student, verificationKey, onVerificationSuccess]);
 
 
     const handleVerification = () => {
@@ -80,7 +78,7 @@ const ParentPortalContent = ({ studentID, onVerificationSuccess }: { studentID: 
     };
 
     const studentData = useMemo(() => {
-        if (loading || !studentID || !student) return null;
+        if (loading || !student) return null;
         
         const pointsConfig = settings.points;
         const currentMonth = new Date().getMonth();
@@ -139,7 +137,7 @@ const ParentPortalContent = ({ studentID, onVerificationSuccess }: { studentID: 
         const studentMastery = surahProgress[student.id] || {};
         const masteredCount = Object.values(studentMastery).filter(s => s === 2).length;
         
-        const studentRecordsInMonth = sessionsInMonth.flatMap(s => s.records ?? []).filter(r => r.studentId === studentID);
+        const studentRecordsInMonth = sessionsInMonth.flatMap(s => s.records ?? []).filter(r => r.studentId === student.id);
         const attendanceScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length) / studentRecordsInMonth.length) * 10 : 0;
         const disciplineScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.behavior === 'هادئ').length * 2 + studentRecordsInMonth.filter(r => r.behavior === 'متوسط').length * 1) / (studentRecordsInMonth.length * 2)) * 10 : 0;
         const memorizationScore = (masteredCount / allSurahs.length) * 10;
@@ -153,22 +151,24 @@ const ParentPortalContent = ({ studentID, onVerificationSuccess }: { studentID: 
         const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط' && c.card !== 'بدون');
         const latestBadge = settings.badges.find(b => b.id === 'mastery_king' && currentPoints >= b.threshold);
 
-        return { student, rank, medal, radarData, uncompensatedAbsences, activeCovenant, currentPoints, latestBadge };
+        return { rank, medal, radarData, uncompensatedAbsences, activeCovenant, currentPoints, latestBadge };
 
-    }, [studentID, students, dailySessions, surahProgress, settings, loading, student]);
+    }, [student, students, dailySessions, surahProgress, settings, loading]);
 
-    if (loading || !student) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-50">
-                <Loader2 className="h-16 w-16 animate-spin text-primary" />
+    if (!student) {
+         return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-center p-4">
+                <Users className="h-16 w-16 text-muted-foreground mb-4" />
+                <h1 className="text-2xl font-bold">بوابة ولي الأمر</h1>
+                <p className="text-muted-foreground mt-2">الرجاء اختيار اسم ابنك من القائمة أعلاه لعرض بياناته.</p>
             </div>
-        );
+        )
     }
     
     if(!isVerified) {
         return (
              <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-                 <Card className="w-full max-w-md">
+                 <Card className="w-full max-w-md mt-8">
                      <CardHeader className="text-center">
                          <div className="mx-auto bg-primary text-primary-foreground rounded-full p-3 w-fit mb-4">
                            <KeyRound className="h-8 w-8" />
@@ -201,12 +201,20 @@ const ParentPortalContent = ({ studentID, onVerificationSuccess }: { studentID: 
         )
     }
     
-    if (!studentData?.student) {
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-50">
+                <Loader2 className="h-16 w-16 animate-spin text-primary" />
+            </div>
+        );
+    }
+    
+    if (!studentData) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-center p-4">
                  <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
-                <h1 className="text-3xl font-bold text-destructive">عذراً، هذا الرابط غير صحيح</h1>
-                <p className="text-muted-foreground mt-2">لا يمكن العثور على بيانات الطالب. الرجاء التأكد من صحة الرابط الذي تلقيته من الإدارة.</p>
+                <h1 className="text-3xl font-bold text-destructive">عذراً، حدث خطأ</h1>
+                <p className="text-muted-foreground mt-2">لا يمكن تحميل بيانات الطالب. الرجاء المحاولة مرة أخرى.</p>
             </div>
         )
     }
@@ -319,49 +327,21 @@ const ParentPortalContent = ({ studentID, onVerificationSuccess }: { studentID: 
 
 export default function ParentPortalPreviewPage() {
     const params = useParams();
-    const router = useRouter();
     const { students, loading: contextLoading } = useStudentContext();
-    const { user, loading: authLoading } = useAuth();
     
     const [open, setOpen] = useState(false);
-    // studentID from URL can be 'all' or a specific ID
-    const studentIDFromUrl = params.studentID as string;
-    const [selectedStudentId, setSelectedStudentId] = useState(studentIDFromUrl);
-    const [showVerificationGate, setShowVerificationGate] = useState(false);
+    const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
-    const isLoading = authLoading || contextLoading;
-
-    useEffect(() => {
-        if (!isLoading && !user) {
-            // This is a public user (parent)
-            setShowVerificationGate(true);
-        } else {
-            setShowVerificationGate(false);
-        }
-    }, [isLoading, user]);
-
-    
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
     
-    // For Sheikh: auto-select first student if none is selected
-    useEffect(() => {
-        if (!isLoading && user && activeStudents.length > 0 && (!selectedStudentId || selectedStudentId === 'all')) {
-            setSelectedStudentId(activeStudents[0].id);
-        }
-    }, [activeStudents, selectedStudentId, isLoading, user]);
-
     const handleStudentSelect = (studentId: string) => {
         setSelectedStudentId(studentId);
         setOpen(false);
-        // Optional: Update URL without reloading, for shareable links. Only for Sheikh.
-        if(user) {
-            router.push(`/parent-portal/${studentId}`, { scroll: false });
-        }
     };
 
-    const selectedStudent = useMemo(() => students.find(s => s.id === selectedStudentId), [students, selectedStudentId]);
+    const selectedStudent = useMemo(() => activeStudents.find(s => s.id === selectedStudentId), [activeStudents, selectedStudentId]);
 
-    if (isLoading) {
+    if (contextLoading) {
       return (
         <div className="flex items-center justify-center min-h-screen">
           <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -369,26 +349,12 @@ export default function ParentPortalPreviewPage() {
       );
     }
     
-    if (showVerificationGate) {
-        if (!selectedStudentId || selectedStudentId === 'all') {
-            return (
-                 <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-center p-4">
-                    <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
-                    <h1 className="text-3xl font-bold text-destructive">رابط غير صحيح</h1>
-                    <p className="text-muted-foreground mt-2">هذا الرابط لا يشير إلى طالب معين.</p>
-                </div>
-            )
-        }
-        return <ParentPortalContent studentID={selectedStudentId} />;
-    }
-
-    // Sheikh's View
     return (
         <div className="p-4 md:p-8">
             <Card className="mb-8">
                 <CardHeader>
-                    <CardTitle>معاينة بوابة ولي الأمر</CardTitle>
-                    <CardDescription>اختر طالبًا من القائمة أدناه لعرض صفحته كما ستظهر لولي الأمر.</CardDescription>
+                    <CardTitle>بوابة ولي الأمر</CardTitle>
+                    <CardDescription>اختر طالبًا من القائمة أدناه لعرض صفحته كما ستظهر لولي الأمر بعد التحقق.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Popover open={open} onOpenChange={setOpen}>
@@ -401,7 +367,7 @@ export default function ParentPortalPreviewPage() {
                             >
                                 {selectedStudent
                                     ? selectedStudent.fullName
-                                    : "اختر طالبًا..."}
+                                    : "ابحث عن اسم ابنك..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                         </PopoverTrigger>
@@ -432,15 +398,7 @@ export default function ParentPortalPreviewPage() {
                 </CardContent>
             </Card>
 
-            {selectedStudentId && selectedStudentId !== 'all' ? (
-                <ParentPortalContent studentID={selectedStudentId} />
-            ) : (
-                <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg">
-                    <Users className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h2 className="text-xl font-bold">الرجاء اختيار طالب</h2>
-                    <p className="text-muted-foreground">اختر طالبًا من القائمة أعلاه لبدء المعاينة.</p>
-                </div>
-            )}
+            <ParentPortalContent student={selectedStudent} />
         </div>
     )
 }

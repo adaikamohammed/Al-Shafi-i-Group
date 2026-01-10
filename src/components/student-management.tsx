@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban, Link as LinkIcon, ExternalLink } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -275,7 +275,6 @@ const StudentProfileCard = ({ student, user, rankingData }: { student: Student, 
 export default function StudentManagementPage() {
   const { students, updateStudent, deleteStudent, loading, deleteAllStudents, dailySessions, settings } = useStudentContext();
   const { user, isSuperAdmin } = useAuth();
-  const { toast } = useToast();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -605,30 +604,6 @@ export default function StudentManagementPage() {
 function StudentActions({ student, onStatusChange }: { student: Student, onStatusChange: (student: Student, status: StudentStatus, reason?: string) => void }) {
   const [isEditOpen, setEditOpen] = useState(false);
   const [actionReason, setActionReason] = useState('');
-  const { toast } = useToast();
-  const productionUrl = 'https://al-shafi-i-quran-school.web.app';
-
-  const handleCopyLink = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const url = `${productionUrl}/parent-portal/${student.id}`;
-    navigator.clipboard.writeText(url).then(() => {
-      toast({
-        title: "✅ تم نسخ الرابط",
-        description: "يمكنك الآن مشاركة الرابط مع ولي الأمر.",
-      });
-    }).catch(err => {
-      toast({
-        title: "❌ فشل النسخ",
-        description: "لم نتمكن من نسخ الرابط.",
-        variant: "destructive",
-      });
-    });
-  };
-
-  const handleOpenPortal = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    window.open(`${productionUrl}/parent-portal/${student.id}`, '_blank');
-  };
 
   return (
     <DropdownMenu>
@@ -640,15 +615,6 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
         <DropdownMenuLabel>إجراءات الطالب</DropdownMenuLabel>
-        <DropdownMenuItem onSelect={handleOpenPortal}>
-          <ExternalLink className="ml-2 h-4 w-4" />
-          فتح بوابة ولي الأمر
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={handleCopyLink}>
-          <LinkIcon className="ml-2 h-4 w-4" />
-          نسخ رابط المشاركة
-        </DropdownMenuItem>
-        <DropdownMenuLabel>إجراءات إدارية</DropdownMenuLabel>
         <Dialog open={isEditOpen} onOpenChange={setEditOpen}>
           <DialogTrigger asChild>
             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
@@ -1042,4 +1008,5 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     
 
     
+
 
