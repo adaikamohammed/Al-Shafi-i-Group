@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -47,6 +46,93 @@ const calculateAge = (birthDate?: Date) => {
 };
 
 const StudentProfileCard = ({ student, user, rankingData }: { student: Student, user: any, rankingData: any }) => {
+    const { students, dailySessions, settings } = useStudentContext();
+    
+    const medalHistory = useMemo(() => {
+        const history: (string | null)[] = Array(12).fill(null);
+        let consecutiveGold = 0;
+        let grandMaster = false;
+        let goldCount = 0;
+
+        const currentYear = getYear(new Date());
+
+        for (let month = 0; month < 12; month++) {
+            const monthStartDate = startOfMonth(new Date(currentYear, month));
+            const monthEndDate = endOfMonth(new Date(currentYear, month));
+            if (isAfter(monthStartDate, new Date())) continue;
+
+            const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(sessionsOnDate =>
+                Object.values(sessionsOnDate).filter(session => {
+                    if (!session?.date) return false;
+                    try {
+                        const sessionDate = parseISO(session.date);
+                        return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
+                    } catch (e) { return false; }
+                })
+            );
+
+            const studentScores: any = {};
+            (students ?? []).filter(s => s.status === 'نشط').forEach(s => {
+                studentScores[s.id] = {
+                    id: s.id,
+                    points: 0,
+                    stats: { absent: 0, makeup: 0, calm: 0, medium: 0, undisciplined: 0 }
+                };
+            });
+
+            sessionsInMonth.forEach(session => {
+                (session.records ?? []).forEach(record => {
+                    if (studentScores[record.studentId]) {
+                         if (record.attendance) {
+                            if (record.attendance === 'غائب') studentScores[record.studentId].stats.absent++;
+                            if (record.attendance === 'تعويض') studentScores[record.studentId].stats.makeup++;
+                        }
+                         if (record.behavior) {
+                            if (record.behavior === 'هادئ') studentScores[record.studentId].stats.calm++;
+                            if (record.behavior === 'متوسط') studentScores[record.studentId].stats.medium++;
+                            if (record.behavior === 'غير منضبط') studentScores[record.studentId].stats.undisciplined++;
+                        }
+                        // Simplified point calculation for history
+                        studentScores[record.studentId].points += (settings.points.attendance[record.attendance as keyof typeof settings.points.attendance] || 0);
+                        studentScores[record.studentId].points += (settings.points.evaluation[record.memorization as keyof typeof settings.points.evaluation] || 0);
+                        studentScores[record.studentId].points += (settings.points.behavior[record.behavior as keyof typeof settings.points.behavior] || 0);
+                    }
+                });
+            });
+
+            const rankedStudents = Object.values(studentScores).sort((a: any, b: any) => b.points - a.points);
+            const studentRankIndex = rankedStudents.findIndex(s => s.id === student.id);
+
+            if (studentRankIndex !== -1 && studentRankIndex < 3) {
+                const studentData = rankedStudents[studentRankIndex] as any;
+                const uncompensatedAbsences = studentData.stats.absent - studentData.stats.makeup;
+                
+                let medal: string | null = null;
+                if (studentRankIndex === 0 && uncompensatedAbsences <= 0 && studentData.stats.calm > (studentData.stats.medium + studentData.stats.undisciplined)) {
+                    medal = "gold";
+                    goldCount++;
+                    consecutiveGold++;
+                } else if (studentRankIndex === 1 && uncompensatedAbsences <= 1) {
+                    medal = "silver";
+                    consecutiveGold = 0;
+                } else if (studentRankIndex === 2 && uncompensatedAbsences <= 2) {
+                    medal = "bronze";
+                    consecutiveGold = 0;
+                } else {
+                    consecutiveGold = 0;
+                }
+                history[month] = medal;
+                 if (consecutiveGold >= 3) {
+                    grandMaster = true;
+                }
+            } else {
+                consecutiveGold = 0;
+            }
+        }
+        return { history, goldCount, grandMaster };
+    }, [student.id, students, dailySessions, settings.points]);
+
+
     const { rank, commitmentBalance } = useMemo(() => {
         const studentRankData = rankingData.find((r:any) => r.id === student.id);
         if (!studentRankData) return { rank: 'N/A', commitmentBalance: 0 };
@@ -59,7 +145,7 @@ const StudentProfileCard = ({ student, user, rankingData }: { student: Student, 
     const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط');
 
     return (
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-3xl">
             <DialogHeader>
                  <DialogTitle>بطاقة هوية الطالب</DialogTitle>
             </DialogHeader>
@@ -68,7 +154,21 @@ const StudentProfileCard = ({ student, user, rankingData }: { student: Student, 
                     <AvatarImage src={student.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${student.fullName}`} alt={student.fullName} />
                     <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
                 </Avatar>
-                <h2 className="text-2xl font-bold">{student.fullName}</h2>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                    {student.fullName}
+                    {medalHistory.grandMaster && (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger>
+                                    <Award className="h-6 w-6 text-amber-500" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>وسام "المتقن الكبير" (3 ميداليات ذهبية متتالية)</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
+                </h2>
                 <p className="text-muted-foreground">{student.status}</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4">
@@ -108,13 +208,13 @@ const StudentProfileCard = ({ student, user, rankingData }: { student: Student, 
                             <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md">
                                 <Award className="h-5 w-5 text-blue-600"/>
                                 <div>
-                                    <p className="text-xs text-blue-800">الترتيب الحالي</p>
-                                    <p className="font-bold">{rank !== 'N/A' && rank > 0 ? `المركز ${rank}`: 'لا يوجد ترتيب'}</p>
+                                    <p className="text-xs text-blue-800">الترتيب الشهري الحالي</p>
+                                     <p className="font-bold">{rank !== 'N/A' && rank > 0 ? `المركز ${rank}`: 'خارج الترتيب'}</p>
                                 </div>
                             </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                           <p>ترتيب مستحق بناءً على محرك النقاط - آخر تحديث: {format(new Date(), 'd MMMM yyyy', {locale: ar})}</p>
+                            <p>ترتيب مستحق بناءً على محرك النقاط - آخر تحديث: {format(new Date(), 'd MMMM yyyy', { locale: ar })}</p>
                         </TooltipContent>
                     </Tooltip>
                     </TooltipProvider>
@@ -135,6 +235,37 @@ const StudentProfileCard = ({ student, user, rankingData }: { student: Student, 
                     </div>
                 </CardContent>
             </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex justify-between items-center">
+                        <span>حصاد الأوسمة السنوي ({getYear(new Date())})</span>
+                         <div className="flex items-center gap-2 text-base">
+                            <span className="font-bold text-amber-500">{medalHistory.goldCount} 🥇</span>
+                        </div>
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-12 gap-2 text-center">
+                        {medalHistory.history.map((medal, index) => {
+                            const monthName = format(new Date(2024, index, 1), 'MMM', {locale: ar});
+                            return (
+                                <div key={index} className="flex flex-col items-center gap-1">
+                                    <span className="text-xs text-muted-foreground">{monthName}</span>
+                                    <div className={cn("h-8 w-8 rounded-full flex items-center justify-center text-lg",
+                                        medal === 'gold' ? 'bg-medal-gold' :
+                                        medal === 'silver' ? 'bg-medal-silver' :
+                                        medal === 'bronze' ? 'bg-medal-bronze' :
+                                        'bg-gray-200 dark:bg-gray-700'
+                                    )}>
+                                        {medal === 'gold' ? '🥇' : medal === 'silver' ? '🥈' : medal === 'bronze' ? '🥉' : ''}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </CardContent>
+            </Card>
         </DialogContent>
     );
 };
@@ -142,6 +273,7 @@ const StudentProfileCard = ({ student, user, rankingData }: { student: Student, 
 export default function StudentManagementPage() {
   const { students, updateStudent, deleteStudent, loading, deleteAllStudents, dailySessions, settings } = useStudentContext();
   const { user, isSuperAdmin } = useAuth();
+  const { toast } = useToast();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -857,8 +989,3 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 }
 
     
-
-
-
-
-
