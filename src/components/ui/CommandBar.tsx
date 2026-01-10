@@ -55,7 +55,7 @@ export function CommandBar({ students, isOpen, onOpenChange, router }: CommandBa
             <CommandItem
               key={student.id}
               value={student.fullName}
-              onSelect={() => handleSelect(() => router.push(`/reports/student?studentId=${student.id}`))}
+              onSelect={() => handleSelect(() => router.push(`/reports/student`))}
               className="flex justify-between items-center"
             >
               <div className="flex items-center">

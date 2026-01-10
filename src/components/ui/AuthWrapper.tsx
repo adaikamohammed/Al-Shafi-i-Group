@@ -27,7 +27,7 @@ const allNavItems = [
   { href: '/reports/student', label: 'تقرير الطالب', icon: FileText },
   { href: '/ranking', label: 'ترتيب الطلبة', icon: Award },
   { href: '/surahs', label: 'متابعة الحفظ', icon: BookCheck },
-  { href: '/parent-portal/preview', label: 'بوابة ولي الأمر', icon: Shield },
+  { href: '/parent-portal', label: 'بوابة ولي الأمر', icon: Shield },
   { href: '/points', label: 'نظام النقاط', icon: Gavel },
   { href: '/data', label: 'البيانات', icon: ArrowRightLeft },
   { href: '/guide', label: 'دليل الاستخدام', icon: HelpCircle },

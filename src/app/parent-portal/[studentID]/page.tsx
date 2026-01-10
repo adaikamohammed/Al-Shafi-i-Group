@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -15,7 +14,6 @@ import type { Student, DailySession } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { surahs as allSurahs } from '@/lib/surahs';
 import { cn } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
@@ -159,7 +157,7 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
 
     if (!student) {
          return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-center p-4">
+            <div className="flex flex-col items-center justify-center min-h-[300px] bg-gray-50 text-center p-4 rounded-lg border-2 border-dashed">
                 <Users className="h-16 w-16 text-muted-foreground mb-4" />
                 <h1 className="text-2xl font-bold">بوابة ولي الأمر</h1>
                 <p className="text-muted-foreground mt-2">الرجاء اختيار اسم ابنك من القائمة أعلاه لعرض بياناته.</p>
@@ -169,8 +167,8 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
     
     if(!isVerified) {
         return (
-             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-                 <Card className="w-full max-w-md mt-8">
+             <div className="flex flex-col items-center justify-center min-h-[300px] bg-gray-100 p-4 rounded-lg">
+                 <Card className="w-full max-w-md">
                      <CardHeader className="text-center">
                          <div className="mx-auto bg-primary text-primary-foreground rounded-full p-3 w-fit mb-4">
                            <KeyRound className="h-8 w-8" />
@@ -327,7 +325,7 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
     );
 };
 
-export default function ParentPortalPreviewPage() {
+export default function ParentPortalPage() {
     const { students, loading: contextLoading } = useStudentContext();
     const { user: authUser } = useAuth();
     
@@ -352,8 +350,8 @@ export default function ParentPortalPreviewPage() {
     }
     
     return (
-        <div className="p-4 md:p-8">
-             <Card className="mb-8">
+        <div className="space-y-8">
+             <Card>
                 <CardHeader>
                     <CardTitle>بوابة ولي الأمر</CardTitle>
                      <CardDescription>
