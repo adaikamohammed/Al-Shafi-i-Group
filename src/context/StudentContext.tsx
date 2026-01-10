@@ -12,12 +12,12 @@ import { ref, set, onValue, off, remove, DatabaseReference } from 'firebase/data
 import { useToast } from '@/hooks/use-toast';
 
 const DEFAULT_POINTS_CONFIG: PointsConfig = {
-    attendance: { 'حاضر': 3, 'متأخر': 1, 'تعويض': 1.5, 'غائب': -2 },
-    evaluation: { 'ممتاز': 3, 'جيد': 2, 'متوسط': 1, 'ضعيف': 0 },
-    behavior: { 'هادئ': 2, 'متوسط': 1, 'غير منضبط': -1 },
+    attendance: { 'حاضر': 5, 'متأخر': 2, 'تعويض': 1.5, 'غائب': -10 },
+    evaluation: { 'ممتاز': 10, 'جيد جداً': 7, 'جيد': 5, 'متوسط': 2, 'ضعيف': -5 },
+    behavior: { 'هادئ': 3, 'متوسط': 0, 'غير منضبط': -10 },
     review: { 'completed': 1 },
     surah: { 'memorized': 20, 'mastered': 50 },
-    covenantCompleted: 50,
+    covenantCompleted: 15,
 };
 
 const DEFAULT_REWARDS: Reward[] = [

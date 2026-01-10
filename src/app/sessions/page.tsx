@@ -611,8 +611,11 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
                           <Select dir="rtl" value={record.memorization ?? ''} onValueChange={(value: PerformanceLevel) => handleRecordChange(student.id, 'memorization', value)} disabled={isRowDisabled || isSuperAdmin}>
                             <SelectTrigger><SelectValue placeholder="التقييم" /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="ممتاز">ممتاز</SelectItem><SelectItem value="جيد">جيد</SelectItem>
-                              <SelectItem value="متوسط">متوسط</SelectItem><SelectItem value="ضعيف">ضعيف</SelectItem>
+                              <SelectItem value="ممتاز">ممتاز</SelectItem>
+                              <SelectItem value="جيد جداً">جيد جداً</SelectItem>
+                              <SelectItem value="جيد">جيد</SelectItem>
+                              <SelectItem value="متوسط">متوسط</SelectItem>
+                              <SelectItem value="ضعيف">ضعيف</SelectItem>
                               <SelectItem value="لا يوجد">لا يوجد</SelectItem>
                             </SelectContent>
                           </Select>
@@ -680,4 +683,3 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     
 
     
-

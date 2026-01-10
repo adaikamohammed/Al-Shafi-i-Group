@@ -202,9 +202,19 @@ export default function SettingsPage() {
                         onChange={e => handlePointsChange('evaluation', 'ممتاز', e.target.value)}
                     />
                      <PointInput 
+                        label="تقييم 'جيد جداً'" 
+                        value={localSettings.points.evaluation['جيد جداً']}
+                        onChange={e => handlePointsChange('evaluation', 'جيد جداً', e.target.value)}
+                    />
+                     <PointInput 
                         label="تقييم 'جيد'" 
                         value={localSettings.points.evaluation['جيد']}
                         onChange={e => handlePointsChange('evaluation', 'جيد', e.target.value)}
+                    />
+                     <PointInput 
+                        label="تقييم 'ضعيف' (خصم)" 
+                        value={localSettings.points.evaluation['ضعيف']}
+                        onChange={e => handlePointsChange('evaluation', 'ضعيف', e.target.value)}
                     />
                     <PointInput 
                         label="مراجعة الدرس السابق" 

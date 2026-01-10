@@ -39,7 +39,7 @@ export interface Student {
 }
 
 export type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "تعويض";
-export type PerformanceLevel = "ممتاز" | "جيد" | "متوسط" | "ضعيف" | "لا يوجد";
+export type PerformanceLevel = "ممتاز" | "جيد جداً" | "جيد" | "متوسط" | "ضعيف" | "لا يوجد";
 export type BehaviorLevel = "هادئ" | "متوسط" | "غير منضبط";
 export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة" | "حصة تعويضية" | "غياب الشيخ";
 
@@ -135,7 +135,7 @@ export interface Payment {
 
 export interface PointsConfig {
     attendance: { 'حاضر': number; 'متأخر': number; 'تعويض': number; 'غائب': number };
-    evaluation: { 'ممتاز': number; 'جيد': number; 'متوسط': number; 'ضعيف': number };
+    evaluation: { 'ممتاز': number; 'جيد جداً': number; 'جيد': number; 'متوسط': number; 'ضعيف': number };
     behavior: { 'هادئ': number; 'متوسط': number; 'غير منضبط': number };
     review: { 'completed': number };
     surah: { 'memorized': number; 'mastered': number };
