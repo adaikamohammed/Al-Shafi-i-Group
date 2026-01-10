@@ -1,8 +1,9 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -18,7 +19,6 @@ import type { Student, StudentStatus, MemorizationAmount, SubscriptionTier, Cove
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -28,6 +28,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 
 const statusVariant: { [key in StudentStatus]: "default" | "destructive" | "secondary" | "outline" } = {
@@ -45,11 +46,104 @@ const calculateAge = (birthDate?: Date) => {
   return Math.abs(ageDate.getUTCFullYear() - 1970);
 };
 
+const StudentProfileCard = ({ student, user, dailySessions }: { student: Student, user: any, dailySessions: any }) => {
+    const { ranking } = useMemo(() => {
+        // This is a simplified logic. A real implementation would fetch this from a shared state or context.
+        return { ranking: 'N/A' };
+    }, []);
+
+    const { commitmentBalance } = useMemo(() => {
+        let absent = 0;
+        let compensation = 0;
+         Object.values(dailySessions ?? {}).flatMap((day: any) => Object.values(day)).forEach((session: any) => {
+            const record = (session.records || []).find((r: any) => r.studentId === student.id);
+            if (record) {
+                if (record.attendance === 'غائب') absent++;
+                if (record.attendance === 'تعويض') compensation++;
+            }
+        });
+        return { commitmentBalance: absent - compensation };
+    }, [dailySessions, student.id]);
+    
+    const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط');
+
+    return (
+        <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+                 <DialogTitle>بطاقة هوية الطالب</DialogTitle>
+            </DialogHeader>
+             <div className="flex flex-col items-center pt-4">
+                <Avatar className="w-24 h-24 mb-4 border-4 border-primary">
+                    <AvatarImage src={student.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${student.fullName}`} alt={student.fullName} />
+                    <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <h2 className="text-2xl font-bold">{student.fullName}</h2>
+                <p className="text-muted-foreground">{student.status}</p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4">
+                <div className="p-3 bg-muted rounded-lg">
+                    <dt className="text-sm font-medium text-muted-foreground">العمر</dt>
+                    <dd className="font-semibold">{calculateAge(student.birthDate)} سنة</dd>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                    <dt className="text-sm font-medium text-muted-foreground">تاريخ التسجيل</dt>
+                    <dd className="font-semibold">{format(student.registrationDate, 'd MMM yyyy', {locale: ar})}</dd>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                    <dt className="text-sm font-medium text-muted-foreground">هاتف الولي</dt>
+                    <dd className="font-semibold">{student.phone1}</dd>
+                </div>
+                 <div className="p-3 bg-muted rounded-lg">
+                    <dt className="text-sm font-medium text-muted-foreground">الفوج</dt>
+                    <dd className="font-semibold">{(student as any).groupName || 'غير محدد'}</dd>
+                </div>
+                 <div className="p-3 bg-muted rounded-lg">
+                    <dt className="text-sm font-medium text-muted-foreground">الشيخ المشرف</dt>
+                    <dd className="font-semibold">{user?.displayName}</dd>
+                </div>
+                 <div className="p-3 bg-muted rounded-lg">
+                    <dt className="text-sm font-medium text-muted-foreground">المستوى الحالي</dt>
+                    <dd className="font-semibold">{student.subscriptionTier}</dd>
+                </div>
+            </div>
+             <Card>
+                <CardHeader>
+                    <CardTitle>المؤشرات الذكية</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md">
+                        <Award className="h-5 w-5 text-blue-600"/>
+                        <div>
+                            <p className="text-xs text-blue-800">الترتيب الحالي</p>
+                            <p className="font-bold">{ranking}</p>
+                        </div>
+                    </div>
+                     <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-md">
+                        <FolderKanban className="h-5 w-5 text-orange-600"/>
+                        <div>
+                            <p className="text-xs text-orange-800">ميزان الالتزام</p>
+                            <p className="font-bold">{commitmentBalance > 0 ? `مدين بـ ${commitmentBalance} حصص` : "لا يوجد دين"}</p>
+                        </div>
+                    </div>
+                     <div className="flex items-center gap-2 p-2 bg-yellow-50 rounded-md">
+                        <ShieldAlert className="h-5 w-5 text-yellow-600"/>
+                        <div>
+                            <p className="text-xs text-yellow-800">المواثيق النشطة</p>
+                            <p className="font-bold">{activeCovenant ? activeCovenant.card : "لا يوجد"}</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </DialogContent>
+    );
+};
+
 export default function StudentManagementPage() {
-  const { students, updateStudent, deleteStudent, loading, deleteAllStudents } = useStudentContext();
+  const { students, updateStudent, deleteStudent, loading, deleteAllStudents, dailySessions } = useStudentContext();
   const { user, isSuperAdmin } = useAuth();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   const handleStatusChange = (student: Student, status: StudentStatus, reason?: string) => {
     if (status === 'محذوف') {
@@ -223,10 +317,11 @@ export default function StudentManagementPage() {
                     const activeCovenant = getActiveCovenant(student);
                     return (
                         <TableRow key={student.id} className={cn(
+                            'cursor-pointer',
                             activeCovenant?.card === 'بطاقة صفراء' && 'bg-yellow-50 dark:bg-yellow-900/20',
                             activeCovenant?.card === 'بطاقة حمراء' && 'bg-red-50 dark:bg-red-900/20'
                         )}>
-                            <TableCell className="font-medium text-center">
+                            <TableCell className="font-medium text-center" onClick={() => setSelectedStudent(student)}>
                                 <div className="flex items-center justify-center gap-2">
                                      {activeCovenant && (
                                         <Tooltip>
@@ -243,15 +338,15 @@ export default function StudentManagementPage() {
                                 </div>
                             </TableCell>
                             {isSuperAdmin && <TableCell className="text-center"><Badge variant="outline">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
-                            <TableCell className="hidden md:table-cell text-center">{student.guardianName}</TableCell>
-                            <TableCell className="hidden lg:table-cell text-center">{calculateAge(student.birthDate)}</TableCell>
-                            <TableCell className="text-center">
+                            <TableCell className="hidden md:table-cell text-center" onClick={() => setSelectedStudent(student)}>{student.guardianName}</TableCell>
+                            <TableCell className="hidden lg:table-cell text-center" onClick={() => setSelectedStudent(student)}>{calculateAge(student.birthDate)}</TableCell>
+                            <TableCell className="text-center" onClick={() => setSelectedStudent(student)}>
                                 <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
                             </TableCell>
-                            <TableCell className="text-center">
+                            <TableCell className="text-center" onClick={() => setSelectedStudent(student)}>
                                 <Badge variant="outline">{student.subscriptionTier}</Badge>
                             </TableCell>
-                            <TableCell className="hidden md:table-cell text-center">{student.memorizedSurahsCount || 0}</TableCell>
+                            <TableCell className="hidden md:table-cell text-center" onClick={() => setSelectedStudent(student)}>{student.memorizedSurahsCount || 0}</TableCell>
                             {!isSuperAdmin && <TableCell className="text-center">
                                 <StudentActions student={student} onStatusChange={handleStatusChange} />
                             </TableCell>}
@@ -269,93 +364,100 @@ export default function StudentManagementPage() {
           </Table>
         </CardContent>
       </Card>
+      
+       {selectedStudent && (
+        <Dialog open={!!selectedStudent} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}>
+            <StudentProfileCard student={selectedStudent} user={user} dailySessions={dailySessions} />
+        </Dialog>
+      )}
     </div>
     </TooltipProvider>
   );
 }
 
 function StudentActions({ student, onStatusChange }: { student: Student, onStatusChange: (student: Student, status: StudentStatus, reason?: string) => void }) {
-    const [isEditOpen, setEditOpen] = useState(false);
-    const [actionReason, setActionReason] = useState('');
+  const [isEditOpen, setEditOpen] = useState(false);
+  const [actionReason, setActionReason] = useState('');
 
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button aria-haspopup="true" size="icon" variant="ghost">
-                    <MoreHorizontal className="h-4 w-4" />
-                    <span className="sr-only">قائمة الإجراءات</span>
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuLabel>إجراءات</DropdownMenuLabel>
-                <Dialog open={isEditOpen} onOpenChange={setEditOpen}>
-                    <DialogTrigger asChild>
-                         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                            <FilePen className="ml-2 h-4 w-4" />
-                            تعديل
-                        </DropdownMenuItem>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px]">
-                         <StudentForm 
-                            student={student} 
-                            onSuccess={() => setEditOpen(false)} 
-                            onCancel={() => setEditOpen(false)}
-                         />
-                    </DialogContent>
-                </Dialog>
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => {e.preventDefault(); setActionReason('')}}>
-                            <Trash2 className="ml-2 h-4 w-4" />
-                            حذف
-                        </DropdownMenuItem>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>هل أنت متأكد من حذف الطالب {student.fullName}؟</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                سيؤدي هذا إلى حذف بيانات الطالب نهائيًا. هذا الإجراء لا يمكن التراجع عنه.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => onStatusChange(student, 'محذوف')}>تأكيد الحذف</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-                <AlertDialog>
-                     <AlertDialogTrigger asChild>
-                         <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => {e.preventDefault(); setActionReason('')}}>
-                            <UserX className="ml-2 h-4 w-4" />
-                            طرد
-                        </DropdownMenuItem>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>طرد الطالب {student.fullName}</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                سيؤدي هذا إلى تغيير حالة الطالب إلى "مطرود". الرجاء إدخال سبب الطرد.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <div className="py-4">
-                            <Label htmlFor="expel-reason">سبب الطرد</Label>
-                            <Textarea 
-                                id="expel-reason" 
-                                placeholder="مثال: غياب متكرر بدون عذر..." 
-                                value={actionReason}
-                                onChange={(e) => setActionReason(e.target.value)}
-                            />
-                        </div>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel onClick={() => setActionReason('')}>إلغاء</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => onStatusChange(student, 'مطرود', actionReason)}>تأكيد الطرد</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button aria-haspopup="true" size="icon" variant="ghost" onClick={(e) => e.stopPropagation()}>
+          <MoreHorizontal className="h-4 w-4" />
+          <span className="sr-only">قائمة الإجراءات</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuLabel>إجراءات</DropdownMenuLabel>
+        <Dialog open={isEditOpen} onOpenChange={setEditOpen}>
+          <DialogTrigger asChild>
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <FilePen className="ml-2 h-4 w-4" />
+              تعديل
+            </DropdownMenuItem>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px]">
+            <StudentForm 
+              student={student} 
+              onSuccess={() => setEditOpen(false)} 
+              onCancel={() => setEditOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => { e.preventDefault(); setActionReason('') }}>
+              <Trash2 className="ml-2 h-4 w-4" />
+              حذف
+            </DropdownMenuItem>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>هل أنت متأكد من حذف الطالب {student.fullName}؟</AlertDialogTitle>
+              <AlertDialogDescription>
+                سيؤدي هذا إلى حذف بيانات الطالب نهائيًا. هذا الإجراء لا يمكن التراجع عنه.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction onClick={() => onStatusChange(student, 'محذوف')}>تأكيد الحذف</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => { e.preventDefault(); setActionReason('') }}>
+              <UserX className="ml-2 h-4 w-4" />
+              طرد
+            </DropdownMenuItem>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>طرد الطالب {student.fullName}</AlertDialogTitle>
+              <AlertDialogDescription>
+                سيؤدي هذا إلى تغيير حالة الطالب إلى "مطرود". الرجاء إدخال سبب الطرد.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+              <Label htmlFor="expel-reason">سبب الطرد</Label>
+              <Textarea 
+                id="expel-reason" 
+                placeholder="مثال: غياب متكرر بدون عذر..." 
+                value={actionReason}
+                onChange={(e) => setActionReason(e.target.value)}
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setActionReason('')}>إلغاء</AlertDialogCancel>
+              <AlertDialogAction onClick={() => onStatusChange(student, 'مطرود', actionReason)}>تأكيد الطرد</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
+
 
 function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSuccess: () => void, onCancel: () => void }) {
   const { addStudent, updateStudent, settings } = useStudentContext();
@@ -646,4 +748,5 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 }
 
     
+
 

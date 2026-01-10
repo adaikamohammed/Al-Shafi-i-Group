@@ -25,6 +25,7 @@ export interface Student {
   guardianName: string;
   phone1: string;
   phone2?: string;
+  photoURL?: string;
   birthDate: Date;
   registrationDate: Date;
   status: StudentStatus;
