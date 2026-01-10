@@ -45,6 +45,7 @@ export default function RankingPage() {
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
 
     const rankingData: StudentScore[] = useMemo(() => {
+        if (!pointsConfig) return [];
         const seasonStartDate = settings.seasonStartDate ? parseISO(settings.seasonStartDate) : null;
         
         const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
@@ -74,42 +75,45 @@ export default function RankingPage() {
             // Add bonus points for fulfilled covenants in the selected month
             (student.covenants || []).forEach(covenant => {
                 if (covenant.status === 'تم الوفاء به') {
-                     const covenantDate = parseISO(covenant.date);
-                     if(getMonth(covenantDate) === selectedMonth && getYear(covenantDate) === selectedYear) {
-                        studentScores[student.id].points += pointsConfig.covenantCompleted;
-                     }
+                     try {
+                        const covenantDate = parseISO(covenant.date);
+                        if(getMonth(covenantDate) === selectedMonth && getYear(covenantDate) === selectedYear) {
+                           studentScores[student.id].points += pointsConfig.covenantCompleted;
+                        }
+                     } catch(e) { console.error("Invalid covenant date", covenant.date); }
                 }
             })
         });
 
         sessionsInMonth.forEach(session => {
             (session.records ?? []).forEach(record => {
-                if (studentScores[record.studentId]) {
+                const studentId = record.studentId;
+                if (studentScores[studentId]) {
                     let points = 0;
-                    if (record.attendance) {
+                    if (record.attendance && pointsConfig.attendance) {
                         points += pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] ?? 0;
-                        if(record.attendance === 'حاضر') studentScores[record.studentId].stats.present++;
-                        if(record.attendance === 'غائب') studentScores[record.studentId].stats.absent++;
-                        if(record.attendance === 'متأخر') studentScores[record.studentId].stats.late++;
-                        if(record.attendance === 'تعويض') studentScores[record.studentId].stats.makeup++;
+                        if(record.attendance === 'حاضر') studentScores[studentId].stats.present++;
+                        if(record.attendance === 'غائب') studentScores[studentId].stats.absent++;
+                        if(record.attendance === 'متأخر') studentScores[studentId].stats.late++;
+                        if(record.attendance === 'تعويض') studentScores[studentId].stats.makeup++;
                     }
-                    if (record.memorization) {
+                    if (record.memorization && pointsConfig.evaluation) {
                         points += pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] ?? 0;
-                        if(record.memorization === 'ممتاز') studentScores[record.studentId].stats.excellent++;
-                        if(record.memorization === 'جيد') studentScores[record.studentId].stats.good++;
-                        if(record.memorization === 'متوسط') studentScores[record.studentId].stats.average++;
+                        if(record.memorization === 'ممتاز') studentScores[studentId].stats.excellent++;
+                        if(record.memorization === 'جيد') studentScores[studentId].stats.good++;
+                        if(record.memorization === 'متوسط') studentScores[studentId].stats.average++;
                     }
-                    if (record.behavior) {
+                    if (record.behavior && pointsConfig.behavior) {
                         points += pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] ?? 0;
-                         if(record.behavior === 'هادئ') studentScores[record.studentId].stats.calm++;
-                         if(record.behavior === 'متوسط') studentScores[record.studentId].stats.medium++;
-                         if(record.behavior === 'غير منضبط') studentScores[record.studentId].stats.undisciplined++;
+                         if(record.behavior === 'هادئ') studentScores[studentId].stats.calm++;
+                         if(record.behavior === 'متوسط') studentScores[studentId].stats.medium++;
+                         if(record.behavior === 'غير منضبط') studentScores[studentId].stats.undisciplined++;
                     }
-                    if (record.review) {
+                    if (record.review && pointsConfig.review) {
                         points += pointsConfig.review.completed;
-                        studentScores[record.studentId].stats.reviewed++;
+                        studentScores[studentId].stats.reviewed++;
                     }
-                    studentScores[student.id].points += points;
+                    studentScores[studentId].points += points;
                 }
             });
         });
