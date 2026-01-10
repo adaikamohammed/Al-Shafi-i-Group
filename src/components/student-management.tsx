@@ -136,8 +136,10 @@ const StudentProfileCard = ({ student, user, rankingData }: { student: Student, 
     const { rank, commitmentBalance } = useMemo(() => {
         const studentRankData = rankingData.find((r:any) => r.id === student.id);
         if (!studentRankData) return { rank: 'N/A', commitmentBalance: 0 };
+        const rankIndex = rankingData.findIndex((r:any) => r.id === student.id);
+        const rankToShow = rankIndex !== -1 ? rankIndex + 1 : 'N/A';
         return {
-            rank: rankingData.findIndex((r:any) => r.id === student.id) + 1,
+            rank: rankToShow,
             commitmentBalance: studentRankData.stats.commitmentBalance,
         }
     }, [rankingData, student.id]);
@@ -209,7 +211,7 @@ const StudentProfileCard = ({ student, user, rankingData }: { student: Student, 
                                 <Award className="h-5 w-5 text-blue-600"/>
                                 <div>
                                     <p className="text-xs text-blue-800">الترتيب الشهري الحالي</p>
-                                     <p className="font-bold">{rank !== 'N/A' && rank > 0 ? `المركز ${rank}`: 'خارج الترتيب'}</p>
+                                     <p className="font-bold">{rank !== 'N/A' ? `المركز ${rank}`: 'خارج الترتيب'}</p>
                                 </div>
                             </div>
                         </TooltipTrigger>
@@ -308,12 +310,17 @@ export default function StudentManagementPage() {
             (session.records ?? []).forEach(record => {
                 const studentId = record.studentId;
                 if (studentScores[studentId]) {
-                    if (record.attendance && pointsConfig.attendance) {
+                     if (record.attendance && pointsConfig.attendance) {
+                        studentScores[studentId].points += (pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] || 0);
                         if(record.attendance === 'حاضر') studentScores[studentId].stats.present++;
                         if(record.attendance === 'غائب') studentScores[studentId].stats.absent++;
                         if(record.attendance === 'تعويض') studentScores[studentId].stats.makeup++;
                     }
+                    if (record.memorization && pointsConfig.evaluation) {
+                        studentScores[studentId].points += (pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] || 0);
+                    }
                     if (record.behavior && pointsConfig.behavior) {
+                         studentScores[studentId].points += (pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] || 0);
                          if(record.behavior === 'هادئ') studentScores[studentId].stats.calm++;
                          if(record.behavior === 'متوسط') studentScores[studentId].stats.medium++;
                          if(record.behavior === 'غير منضبط') studentScores[studentId].stats.undisciplined++;
@@ -323,7 +330,7 @@ export default function StudentManagementPage() {
         });
         
         Object.values(studentScores).forEach((score: any) => {
-            score.stats.commitmentBalance = (score.stats.present + score.stats.makeup) - score.stats.absent;
+            score.stats.commitmentBalance = score.stats.absent - score.stats.makeup;
         });
 
         return Object.values(studentScores).sort((a: any, b: any) => b.points - a.points);
@@ -361,7 +368,7 @@ export default function StudentManagementPage() {
   };
 
   const getMedalStatus = (studentId: string, index: number) => {
-      const studentData = rankingData.find(r => r.id === studentId);
+      const studentData = rankingData.find((r: any) => r.id === studentId);
       if (!studentData) return 'none';
       
       const uncompensatedAbsences = studentData.stats.absent - studentData.stats.makeup;
@@ -383,11 +390,22 @@ export default function StudentManagementPage() {
         "مطرود": 3,
         "محذوف": 4,
     };
-
-    return (students ?? [])
+    
+    const rankedStudents = (students ?? [])
         .filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()))
-        .sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
-  }, [students, searchTerm]);
+        .map(student => {
+            const rankIndex = rankingData.findIndex((r: any) => r.id === student.id);
+            return { ...student, rank: rankIndex === -1 ? Infinity : rankIndex };
+        });
+
+
+    return rankedStudents.sort((a, b) => {
+        if (statusOrder[a.status] !== statusOrder[b.status]) {
+            return statusOrder[a.status] - statusOrder[b.status];
+        }
+        return a.rank - b.rank;
+    });
+  }, [students, searchTerm, rankingData]);
   
   const getActiveCovenant = (student: Student): Covenant | null => {
       if (!student.covenants || student.covenants.length === 0) return null;
@@ -515,7 +533,7 @@ export default function StudentManagementPage() {
              {filteredStudents.length > 0 ? (
                 filteredStudents.map((student, index) => {
                     const activeCovenant = getActiveCovenant(student);
-                     const medal = getMedalStatus(student.id, index);
+                     const medal = getMedalStatus(student.id, student.rank);
                       const medalClass = {
                           gold: 'bg-medal-gold/30',
                           silver: 'bg-medal-silver/30',
