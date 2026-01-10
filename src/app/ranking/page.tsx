@@ -13,6 +13,7 @@ import { ar } from 'date-fns/locale';
 import type { Student, DailySession } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface StudentScore {
     id: string;
@@ -108,7 +109,7 @@ export default function RankingPage() {
                         points += pointsConfig.review.completed;
                         studentScores[record.studentId].stats.reviewed++;
                     }
-                    studentScores[record.studentId].points += points;
+                    studentScores[student.id].points += points;
                 }
             });
         });
@@ -122,6 +123,17 @@ export default function RankingPage() {
 
 
     const topStudents = rankingData.slice(0, 3);
+
+    const getMedalStatus = (student: StudentScore, rank: number) => {
+        const uncompensatedAbsences = student.stats.absent - student.stats.makeup;
+        if (rank === 1) {
+            const isExcellentBehavior = student.stats.calm > (student.stats.medium + student.stats.undisciplined);
+            if (uncompensatedAbsences <= 0 && isExcellentBehavior) return 'gold';
+        }
+        if (rank === 2 && uncompensatedAbsences <= 1) return 'silver';
+        if (rank === 3 && uncompensatedAbsences <= 2) return 'bronze';
+        return 'none';
+    };
     
     const specialBadges = useMemo(() => {
         if(rankingData.length === 0) return {};
@@ -185,29 +197,29 @@ export default function RankingPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="flex justify-center items-end gap-4 md:gap-8 h-48">
-                                {topStudents[1] && (
+                                {topStudents[1] && getMedalStatus(topStudents[1], 2) !== 'none' && (
                                     <div className="flex flex-col items-center w-1/3">
                                         <div className="text-4xl">🥈</div>
                                         <div className="font-bold text-lg text-center">{topStudents[1].name}</div>
-                                        <div className="h-24 w-full bg-blue-100 dark:bg-blue-900/30 rounded-t-lg flex items-center justify-center font-bold text-xl text-blue-800 dark:text-blue-200 p-2">
+                                        <div className="h-24 w-full bg-medal-silver rounded-t-lg flex items-center justify-center font-bold text-xl text-medal-silver-foreground p-2">
                                             {topStudents[1].points.toFixed(1)} نقطة
                                         </div>
                                     </div>
                                 )}
-                                {topStudents[0] && (
+                                {topStudents[0] && getMedalStatus(topStudents[0], 1) !== 'none' && (
                                     <div className="flex flex-col items-center w-1/3">
                                          <div className="text-4xl">🥇</div>
                                         <div className="font-bold text-lg text-center">{topStudents[0].name}</div>
-                                        <div className="h-36 w-full bg-yellow-100 dark:bg-yellow-900/30 rounded-t-lg flex items-center justify-center font-bold text-2xl text-yellow-800 dark:text-yellow-200 p-2">
+                                        <div className="h-36 w-full bg-medal-gold rounded-t-lg flex items-center justify-center font-bold text-2xl text-medal-gold-foreground p-2">
                                            {topStudents[0].points.toFixed(1)} نقطة
                                         </div>
                                     </div>
                                 )}
-                                 {topStudents[2] && (
+                                 {topStudents[2] && getMedalStatus(topStudents[2], 3) !== 'none' && (
                                     <div className="flex flex-col items-center w-1/3">
                                         <div className="text-4xl">🥉</div>
                                         <div className="font-bold text-lg text-center">{topStudents[2].name}</div>
-                                        <div className="h-20 w-full bg-orange-100 dark:bg-orange-900/30 rounded-t-lg flex items-center justify-center font-bold text-lg text-orange-800 dark:text-orange-200 p-2">
+                                        <div className="h-20 w-full bg-medal-bronze rounded-t-lg flex items-center justify-center font-bold text-lg text-medal-bronze-foreground p-2">
                                            {topStudents[2].points.toFixed(1)} نقطة
                                         </div>
                                     </div>
@@ -272,8 +284,18 @@ export default function RankingPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {rankingData.map((student, index) => (
-                                        <TableRow key={student.id}>
+                                    {rankingData.map((student, index) => {
+                                        const rank = index + 1;
+                                        const medal = getMedalStatus(student, rank);
+                                        const medalClass = {
+                                            gold: 'bg-medal-gold/30',
+                                            silver: 'bg-medal-silver/30',
+                                            bronze: 'bg-medal-bronze/30',
+                                            none: ''
+                                        }[medal];
+
+                                        return (
+                                        <TableRow key={student.id} className={cn(medalClass)}>
                                             <TableCell className="font-bold text-lg">{index + 1}</TableCell>
                                             <TableCell className="font-medium">{student.name}</TableCell>
                                             <TableCell className="text-center">{student.stats.present}</TableCell>
@@ -296,7 +318,7 @@ export default function RankingPage() {
                                             </TableCell>
                                             <TableCell className="text-center"><Badge variant="default" className="text-base">{student.points.toFixed(1)}</Badge></TableCell>
                                         </TableRow>
-                                    ))}
+                                    )})}
                                 </TableBody>
                             </Table>
                         </CardContent>

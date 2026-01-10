@@ -66,6 +66,20 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        medal: {
+            gold: {
+              DEFAULT: 'hsl(var(--medal-gold))',
+              foreground: 'hsl(var(--medal-gold-foreground))',
+            },
+            silver: {
+              DEFAULT: 'hsl(var(--medal-silver))',
+              foreground: 'hsl(var(--medal-silver-foreground))',
+            },
+            bronze: {
+              DEFAULT: 'hsl(var(--medal-bronze))',
+              foreground: 'hsl(var(--medal-bronze-foreground))',
+            },
+        }
       },
       borderRadius: {
         lg: 'var(--radius)',
