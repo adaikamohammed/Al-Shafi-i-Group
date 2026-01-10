@@ -409,7 +409,7 @@ export default function StudentManagementPage() {
   
   const getActiveCovenant = (student: Student): Covenant | null => {
       if (!student.covenants || student.covenants.length === 0) return null;
-      return student.covenants.find(c => c.status === 'نشط' && c.card !== 'بدون') || null;
+      return student.covenants.find(c => c.status === 'نشط') || null;
   };
 
 
@@ -1005,5 +1005,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
+    
 
     
