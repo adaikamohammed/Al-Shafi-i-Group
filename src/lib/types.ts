@@ -1,5 +1,4 @@
 
-
 export type StudentStatus = "نشط" | "مطرود" | "غائب طويل" | "محذوف";
 export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "أكثر";
 export type SubscriptionTier = "فئة الأكابر" | "فئة الأصاغر";
@@ -148,6 +147,7 @@ export interface Reward {
     cost: number;
     icon: string; // Storing icon name as string
     description: string;
+    requiredRank?: number; // Rank needed to unlock
 }
 
 export interface BadgeConfig {
@@ -168,5 +168,3 @@ export interface AppSettings {
     rewards: Reward[];
     badges: BadgeConfig[];
 }
-
-    

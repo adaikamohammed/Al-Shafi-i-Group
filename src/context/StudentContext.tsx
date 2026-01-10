@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
@@ -21,9 +20,9 @@ const DEFAULT_POINTS_CONFIG: PointsConfig = {
 };
 
 const DEFAULT_REWARDS: Reward[] = [
-    { id: 'weekly_reader', name: 'لقب قارئ الأسبوع', cost: 500, icon: "Star", description: 'تعزيز الثقة بالنفس أمام الزملاء.' },
-    { id: 'review_exempt', name: 'إعفاء من تسميع مراجعة', cost: 1000, icon: "Medal", description: 'مكافأة على الحفظ المتقن السابق.' },
-    { id: 'leader_for_day', name: 'قائد الفوج لليوم', cost: 800, icon: "UserCheck", description: 'تنمية المهارات القيادية لدى الطالب.' },
+    { id: 'weekly_reader', name: 'لقب قارئ الأسبوع', cost: 500, icon: "Star", description: 'تعزيز الثقة بالنفس أمام الزملاء.', requiredRank: 5 },
+    { id: 'review_exempt', name: 'إعفاء من تسميع مراجعة', cost: 1000, icon: "Medal", description: 'مكافأة على الحفظ المتقن السابق.', requiredRank: 3 },
+    { id: 'leader_for_day', name: 'قائد الفوج لليوم', cost: 800, icon: "UserCheck", description: 'تنمية المهارات القيادية لدى الطالب.', requiredRank: 2 },
     { id: 'physical_gift', name: 'هدية عينية (مصحف/قلم)', cost: 3000, icon: "Gift", description: 'تشجيع مادي ملموس.' },
 ];
 
@@ -379,7 +378,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const surahProgressRef = ref(db, `users/${authContextUser.uid}/surahProgress/${studentId}`);
-    set(surahProgressRef, studentProgressMap);
+    set(surahProgressRef, surahProgressMap);
     
     const memorizedCount = Object.values(studentProgressMap).filter(status => status > 0).length;
     updateStudent(studentId, { memorizedSurahsCount: memorizedCount }, authContextUser.uid);

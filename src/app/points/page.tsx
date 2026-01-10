@@ -6,12 +6,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, Medal, Star, Gift, ShoppingCart, History, Coins } from 'lucide-react';
-import { format, parseISO, startOfMonth, endOfMonth, isAfter } from 'date-fns';
+import { Loader2, AlertTriangle, Medal, Star, Gift, ShoppingCart, History, Coins, Lock } from 'lucide-react';
+import { format, parseISO, isAfter } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
+import type { Student, DailySession, BadgeConfig } from '@/lib/types';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
 
 interface Redemption {
     id: string;
@@ -34,6 +37,8 @@ export default function PointsSystemPage() {
     const rewards = settings.rewards;
 
     const studentTotalPoints = useMemo(() => {
+        if (!pointsConfig) return {};
+
         const studentScores: Record<string, number> = {};
         const seasonStartDate = settings.seasonStartDate ? parseISO(settings.seasonStartDate) : null;
 
@@ -68,11 +73,24 @@ export default function PointsSystemPage() {
                 if (status === 1) totalPoints += pointsConfig.surah.memorized;
                 if (status === 2) totalPoints += pointsConfig.surah.mastered;
             });
+            
+             // Add bonus points for fulfilled covenants
+            (student.covenants || []).forEach(covenant => {
+                if (covenant.status === 'تم الوفاء به') {
+                     try {
+                        const covenantDate = parseISO(covenant.date);
+                        if(!seasonStartDate || isAfter(covenantDate, seasonStartDate)) {
+                           totalPoints += pointsConfig.covenantCompleted;
+                        }
+                     } catch(e) { console.error("Invalid covenant date", covenant.date); }
+                }
+            });
+
             studentScores[student.id] = totalPoints;
         });
         
         return studentScores;
-    }, [activeStudents, dailySessions, surahProgress, pointsConfig, settings.seasonStartDate]);
+    }, [activeStudents, dailySessions, surahProgress, pointsConfig, settings.seasonStartDate, students]);
 
 
     const studentCurrentBalance = useMemo(() => {
@@ -81,6 +99,14 @@ export default function PointsSystemPage() {
         const totalSpent = spentPoints[selectedStudentId] || 0;
         return totalEarned - totalSpent;
     }, [selectedStudentId, studentTotalPoints, spentPoints]);
+
+    const studentRank = useMemo(() => {
+        if (!selectedStudentId) return null;
+        const sortedStudents = Object.keys(studentTotalPoints)
+                                .sort((a,b) => studentTotalPoints[b] - studentTotalPoints[a]);
+        const rank = sortedStudents.indexOf(selectedStudentId) + 1;
+        return rank > 0 ? rank : null;
+    }, [selectedStudentId, studentTotalPoints]);
     
     const handleRedeem = (prize: typeof rewards[0]) => {
         if (!selectedStudentId) {
@@ -145,108 +171,128 @@ export default function PointsSystemPage() {
 
 
     return (
-        <div className="space-y-8">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-3xl font-headline font-bold flex items-center gap-2"><ShoppingCart /> سوق الجوائز</CardTitle>
-                    <CardDescription>
-                        استخدم نقاط الطلاب التي اكتسبوها من خلال الحضور والأداء لاستبدالها بجوائز قيمة. اختر طالبًا لعرض رصيده ثم اختر الجائزة المناسبة.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex flex-col md:flex-row gap-4 items-center p-4 border rounded-lg bg-background">
-                         <div className="w-full md:w-1/3">
-                            <Label htmlFor="student-select">اختر الطالب</Label>
-                            <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                                <SelectTrigger id="student-select">
-                                    <SelectValue placeholder="اختر طالبًا..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {activeStudents.map(student => (
-                                        <SelectItem key={student.id} value={student.id}>
-                                            {student.fullName}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {selectedStudentId && (
-                             <div className="w-full md:w-2/3 flex items-center justify-center bg-primary/5 p-4 rounded-lg">
-                                <Coins className="h-8 w-8 text-yellow-500 ml-4"/>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">الرصيد الحالي للطالب</p>
-                                    <p className="text-2xl font-bold">{studentCurrentBalance.toFixed(0)} نقطة</p>
-                                </div>
+        <TooltipProvider>
+            <div className="space-y-8">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-3xl font-headline font-bold flex items-center gap-2"><ShoppingCart /> سوق الجوائز</CardTitle>
+                        <CardDescription>
+                            استخدم نقاط الطلاب التي اكتسبوها من خلال الحضور والأداء لاستبدالها بجوائز قيمة. اختر طالبًا لعرض رصيده ثم اختر الجائزة المناسبة.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex flex-col md:flex-row gap-4 items-center p-4 border rounded-lg bg-background">
+                            <div className="w-full md:w-1/3">
+                                <Label htmlFor="student-select">اختر الطالب</Label>
+                                <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                                    <SelectTrigger id="student-select">
+                                        <SelectValue placeholder="اختر طالبًا..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {activeStudents.map(student => (
+                                            <SelectItem key={student.id} value={student.id}>
+                                                {student.fullName}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                        )}
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {rewards.map(prize => (
-                            <Card key={prize.id} className="flex flex-col">
-                                <CardHeader className="flex-row items-center gap-4 space-y-0">
-                                    <div className="bg-primary/10 p-3 rounded-full">
-                                        {getIcon(prize.icon)}
+                            {selectedStudentId && (
+                                <div className="w-full md:w-2/3 flex items-center justify-center bg-primary/5 p-4 rounded-lg">
+                                    <Coins className="h-8 w-8 text-yellow-500 ml-4"/>
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">الرصيد الحالي للطالب</p>
+                                        <p className="text-2xl font-bold">{studentCurrentBalance.toFixed(0)} نقطة</p>
                                     </div>
-                                    <CardTitle>{prize.name}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="flex-grow">
-                                    <p className="text-sm text-muted-foreground">{prize.description}</p>
-                                </CardContent>
-                                <div className="p-4 border-t">
-                                     <div className="flex justify-between items-center mb-4">
-                                        <span className="font-semibold">التكلفة:</span>
-                                        <span className="text-lg font-bold text-primary">{prize.cost} نقطة</span>
-                                    </div>
-                                    <Button 
-                                        className="w-full"
-                                        disabled={!selectedStudentId || studentCurrentBalance < prize.cost}
-                                        onClick={() => handleRedeem(prize)}
-                                    >
-                                        استبدال
-                                    </Button>
+                                    {studentRank && (
+                                         <div className="mr-8">
+                                            <p className="text-sm text-muted-foreground">الترتيب الحالي</p>
+                                            <p className="text-2xl font-bold">المركز {studentRank}</p>
+                                        </div>
+                                    )}
                                 </div>
-                            </Card>
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><History /> سجل الاستبدالات</CardTitle>
-                    <CardDescription>آخر عمليات استبدال النقاط التي تمت.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>اسم الطالب</TableHead>
-                                <TableHead>الجائزة</TableHead>
-                                <TableHead>التكلفة</TableHead>
-                                <TableHead>تاريخ الاستبدال</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {redemptionHistory.length > 0 ? redemptionHistory.map(item => (
-                                <TableRow key={item.id}>
-                                    <TableCell>{item.studentName}</TableCell>
-                                    <TableCell>{item.prizeName}</TableCell>
-                                    <TableCell>{item.cost} نقطة</TableCell>
-                                    <TableCell>{format(item.date, 'd MMMM yyyy, h:mm a', { locale: ar })}</TableCell>
-                                </TableRow>
-                            )) : (
-                                <TableRow>
-                                    <TableCell colSpan={4} className="text-center h-24">
-                                        لم تتم أي عملية استبدال بعد.
-                                    </TableCell>
-                                </TableRow>
                             )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {rewards.map(prize => {
+                                const isLocked = prize.requiredRank && (!studentRank || studentRank > prize.requiredRank);
+                                const canAfford = studentCurrentBalance >= prize.cost;
+                                return (
+                                <Card key={prize.id} className="flex flex-col">
+                                    <CardHeader className="flex-row items-center gap-4 space-y-0">
+                                        <div className="bg-primary/10 p-3 rounded-full">
+                                            {getIcon(prize.icon)}
+                                        </div>
+                                        <CardTitle>{prize.name}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="flex-grow">
+                                        <p className="text-sm text-muted-foreground">{prize.description}</p>
+                                    </CardContent>
+                                    <div className="p-4 border-t">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <span className="font-semibold">التكلفة:</span>
+                                            <span className="text-lg font-bold text-primary">{prize.cost} نقطة</span>
+                                        </div>
+                                         <Tooltip>
+                                            <TooltipTrigger className="w-full">
+                                                <Button 
+                                                    className="w-full"
+                                                    disabled={!selectedStudentId || !canAfford || isLocked}
+                                                    onClick={() => handleRedeem(prize)}
+                                                >
+                                                    {isLocked && <Lock className="ml-2 h-4 w-4" />}
+                                                    استبدال
+                                                </Button>
+                                            </TooltipTrigger>
+                                            {isLocked && (
+                                                <TooltipContent>
+                                                    <p>جائزة حصرية لمن هم في المركز {prize.requiredRank} أو أعلى.</p>
+                                                </TooltipContent>
+                                            )}
+                                        </Tooltip>
+                                    </div>
+                                </Card>
+                            )})}
+                        </div>
+                    </CardContent>
+                </Card>
 
-        </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><History /> سجل الاستبدالات</CardTitle>
+                        <CardDescription>آخر عمليات استبدال النقاط التي تمت.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>اسم الطالب</TableHead>
+                                    <TableHead>الجائزة</TableHead>
+                                    <TableHead>التكلفة</TableHead>
+                                    <TableHead>تاريخ الاستبدال</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {redemptionHistory.length > 0 ? redemptionHistory.map(item => (
+                                    <TableRow key={item.id}>
+                                        <TableCell>{item.studentName}</TableCell>
+                                        <TableCell>{item.prizeName}</TableCell>
+                                        <TableCell>{item.cost} نقطة</TableCell>
+                                        <TableCell>{format(item.date, 'd MMMM yyyy, h:mm a', { locale: ar })}</TableCell>
+                                    </TableRow>
+                                )) : (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="text-center h-24">
+                                            لم تتم أي عملية استبدال بعد.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </div>
+        </TooltipProvider>
     );
 }
