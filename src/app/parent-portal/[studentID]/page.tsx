@@ -4,9 +4,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useStudentContext } from '@/context/StudentContext';
+import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, AlertTriangle, Star, Award, ShieldAlert, BookOpen, UserCheck, Wallet, ChevronsUpDown, Check, Users } from 'lucide-react';
+import { Loader2, AlertTriangle, Star, Award, ShieldAlert, BookOpen, UserCheck, Wallet, ChevronsUpDown, Check, Users, Lock, KeyRound } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, getYear, getMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
@@ -18,6 +19,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 
 const calculateAge = (birthDate?: Date) => {
@@ -27,14 +31,56 @@ const calculateAge = (birthDate?: Date) => {
   return Math.abs(ageDate.getUTCFullYear() - 1970);
 };
 
-const ParentPortalContent = ({ studentID }: { studentID: string }) => {
+const ParentPortalContent = ({ studentID, onVerificationSuccess }: { studentID: string, onVerificationSuccess?: () => void }) => {
     const { students, dailySessions, surahProgress, settings, loading } = useStudentContext();
+    const { toast } = useToast();
+    const [phoneInput, setPhoneInput] = useState('');
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [isVerified, setIsVerified] = useState(false);
+    const verificationKey = `parent-portal-verified-${studentID}`;
+
+    const student = useMemo(() => students.find(s => s.id === studentID), [students, studentID]);
+
+    useEffect(() => {
+        const storedVerification = localStorage.getItem(verificationKey);
+        if(storedVerification) {
+            const { timestamp } = JSON.parse(storedVerification);
+            const isStillValid = (new Date().getTime() - timestamp) < (30 * 24 * 60 * 60 * 1000); // 30 days
+            if(isStillValid) {
+                setIsVerified(true);
+                 if(onVerificationSuccess) onVerificationSuccess();
+            } else {
+                localStorage.removeItem(verificationKey);
+            }
+        }
+    }, [studentID, verificationKey, onVerificationSuccess]);
+
+
+    const handleVerification = () => {
+        setIsVerifying(true);
+        if (!student || !phoneInput) {
+            toast({ title: "خطأ", description: "الرجاء إدخال رقم الهاتف.", variant: "destructive"});
+            setIsVerifying(false);
+            return;
+        }
+
+        const formattedInput = phoneInput.replace(/\s+/g, '');
+        const phone1 = student.phone1?.replace(/\s+/g, '');
+        const phone2 = student.phone2?.replace(/\s+/g, '');
+
+        if (formattedInput === phone1 || formattedInput === phone2) {
+            localStorage.setItem(verificationKey, JSON.stringify({ verified: true, timestamp: new Date().getTime() }));
+            setIsVerified(true);
+            if(onVerificationSuccess) onVerificationSuccess();
+            toast({ title: "✅ تم التحقق بنجاح", description: "أهلاً بك ولي أمر الطالب."});
+        } else {
+            toast({ title: "رقم هاتف غير صحيح", description: "الرقم المدخل لا يتطابق مع سجلاتنا. يرجى المحاولة مرة أخرى.", variant: "destructive"});
+        }
+        setIsVerifying(false);
+    };
 
     const studentData = useMemo(() => {
-        if (loading || !studentID) return null;
-        
-        const student = students.find(s => s.id === studentID);
-        if (!student) return { student: null, error: "Student not found" };
+        if (loading || !studentID || !student) return null;
         
         const pointsConfig = settings.points;
         const currentMonth = new Date().getMonth();
@@ -93,6 +139,7 @@ const ParentPortalContent = ({ studentID }: { studentID: string }) => {
         const studentMastery = surahProgress[student.id] || {};
         const masteredCount = Object.values(studentMastery).filter(s => s === 2).length;
         
+        const studentRecordsInMonth = sessionsInMonth.flatMap(s => s.records ?? []).filter(r => r.studentId === studentID);
         const attendanceScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length) / studentRecordsInMonth.length) * 10 : 0;
         const disciplineScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.behavior === 'هادئ').length * 2 + studentRecordsInMonth.filter(r => r.behavior === 'متوسط').length * 1) / (studentRecordsInMonth.length * 2)) * 10 : 0;
         const memorizationScore = (masteredCount / allSurahs.length) * 10;
@@ -108,14 +155,50 @@ const ParentPortalContent = ({ studentID }: { studentID: string }) => {
 
         return { student, rank, medal, radarData, uncompensatedAbsences, activeCovenant, currentPoints, latestBadge };
 
-    }, [studentID, students, dailySessions, surahProgress, settings, loading]);
+    }, [studentID, students, dailySessions, surahProgress, settings, loading, student]);
 
-    if (loading) {
+    if (loading || !student) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-50">
                 <Loader2 className="h-16 w-16 animate-spin text-primary" />
             </div>
         );
+    }
+    
+    if(!isVerified) {
+        return (
+             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+                 <Card className="w-full max-w-md">
+                     <CardHeader className="text-center">
+                         <div className="mx-auto bg-primary text-primary-foreground rounded-full p-3 w-fit mb-4">
+                           <KeyRound className="h-8 w-8" />
+                         </div>
+                        <CardTitle>بوابة التحقق لولي الأمر</CardTitle>
+                        <CardDescription>
+                            للوصول إلى بيانات الطالب <span className="font-bold">{student.fullName}</span>، يرجى إدخال أحد أرقام هواتف ولي الأمر المسجلة لدينا.
+                        </CardDescription>
+                     </CardHeader>
+                     <CardContent className="space-y-4">
+                         <div className="space-y-2">
+                            <Label htmlFor="phone-input">رقم هاتف ولي الأمر</Label>
+                            <Input
+                                id="phone-input"
+                                type="tel"
+                                dir="ltr"
+                                placeholder="05XXXXXXXX"
+                                value={phoneInput}
+                                onChange={(e) => setPhoneInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleVerification()}
+                            />
+                         </div>
+                         <Button onClick={handleVerification} disabled={isVerifying} className="w-full">
+                            {isVerifying && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+                            تحقق من الهوية والمتابعة
+                         </Button>
+                     </CardContent>
+                 </Card>
+             </div>
+        )
     }
     
     if (!studentData?.student) {
@@ -128,7 +211,7 @@ const ParentPortalContent = ({ studentID }: { studentID: string }) => {
         )
     }
     
-    const { student, rank, medal, radarData, uncompensatedAbsences, activeCovenant, currentPoints, latestBadge } = studentData;
+    const { rank, medal, radarData, uncompensatedAbsences, activeCovenant, currentPoints, latestBadge } = studentData;
     const medalClasses = {
         gold: 'border-yellow-400',
         silver: 'border-gray-400',
@@ -237,27 +320,69 @@ const ParentPortalContent = ({ studentID }: { studentID: string }) => {
 export default function ParentPortalPreviewPage() {
     const params = useParams();
     const router = useRouter();
-    const { students } = useStudentContext();
+    const { students, loading: contextLoading } = useStudentContext();
+    const { user, loading: authLoading } = useAuth();
+    
     const [open, setOpen] = useState(false);
-    const [selectedStudentId, setSelectedStudentId] = useState((params.studentID as string) || '');
-    
-    const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
-    
+    // studentID from URL can be 'all' or a specific ID
+    const studentIDFromUrl = params.studentID as string;
+    const [selectedStudentId, setSelectedStudentId] = useState(studentIDFromUrl);
+    const [showVerificationGate, setShowVerificationGate] = useState(false);
+
+    const isLoading = authLoading || contextLoading;
+
     useEffect(() => {
-        if (!selectedStudentId && activeStudents.length > 0) {
+        if (!isLoading && !user) {
+            // This is a public user (parent)
+            setShowVerificationGate(true);
+        } else {
+            setShowVerificationGate(false);
+        }
+    }, [isLoading, user]);
+
+    
+    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
+    
+    // For Sheikh: auto-select first student if none is selected
+    useEffect(() => {
+        if (!isLoading && user && activeStudents.length > 0 && (!selectedStudentId || selectedStudentId === 'all')) {
             setSelectedStudentId(activeStudents[0].id);
         }
-    }, [activeStudents, selectedStudentId]);
+    }, [activeStudents, selectedStudentId, isLoading, user]);
 
     const handleStudentSelect = (studentId: string) => {
         setSelectedStudentId(studentId);
         setOpen(false);
-        // Optional: Update URL without reloading, for shareable links
-        // router.push(`/parent-portal/${studentId}`, { scroll: false });
+        // Optional: Update URL without reloading, for shareable links. Only for Sheikh.
+        if(user) {
+            router.push(`/parent-portal/${studentId}`, { scroll: false });
+        }
     };
 
     const selectedStudent = useMemo(() => students.find(s => s.id === selectedStudentId), [students, selectedStudentId]);
 
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        </div>
+      );
+    }
+    
+    if (showVerificationGate) {
+        if (!selectedStudentId || selectedStudentId === 'all') {
+            return (
+                 <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-center p-4">
+                    <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+                    <h1 className="text-3xl font-bold text-destructive">رابط غير صحيح</h1>
+                    <p className="text-muted-foreground mt-2">هذا الرابط لا يشير إلى طالب معين.</p>
+                </div>
+            )
+        }
+        return <ParentPortalContent studentID={selectedStudentId} />;
+    }
+
+    // Sheikh's View
     return (
         <div className="p-4 md:p-8">
             <Card className="mb-8">
@@ -307,7 +432,7 @@ export default function ParentPortalPreviewPage() {
                 </CardContent>
             </Card>
 
-            {selectedStudentId ? (
+            {selectedStudentId && selectedStudentId !== 'all' ? (
                 <ParentPortalContent studentID={selectedStudentId} />
             ) : (
                 <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg">
@@ -319,5 +444,3 @@ export default function ParentPortalPreviewPage() {
         </div>
     )
 }
-
-  
