@@ -606,10 +606,11 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
   const [isEditOpen, setEditOpen] = useState(false);
   const [actionReason, setActionReason] = useState('');
   const { toast } = useToast();
+  const productionUrl = 'https://al-shafi-i-quran-school.web.app';
 
   const handleCopyLink = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = `${window.location.origin}/parent-portal/${student.id}`;
+    const url = `${productionUrl}/parent-portal/${student.id}`;
     navigator.clipboard.writeText(url).then(() => {
       toast({
         title: "✅ تم نسخ الرابط",
@@ -626,7 +627,7 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
 
   const handleOpenPortal = (e: React.MouseEvent) => {
     e.stopPropagation();
-    window.open(`/parent-portal/${student.id}`, '_blank');
+    window.open(`${productionUrl}/parent-portal/${student.id}`, '_blank');
   };
 
   return (
@@ -1041,3 +1042,4 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     
 
     
+
