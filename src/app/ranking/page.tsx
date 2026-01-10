@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useStudentContext } from '@/context/StudentContext';
 import { Loader2, AlertTriangle, Medal, BookOpenCheck, ShieldCheck, UserCheck, CheckCircle, XCircle, Crown } from 'lucide-react';
-import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, isAfter } from 'date-fns';
+import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Student, DailySession, BadgeConfig } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
@@ -54,19 +54,16 @@ export default function RankingPage() {
 
     const rankingData: StudentScore[] = useMemo(() => {
         if (!pointsConfig || !students) return [];
-        const seasonStartDate = settings.seasonStartDate ? parseISO(settings.seasonStartDate) : null;
         
         const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
         const monthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
-
-        const calculationStartDate = seasonStartDate && isAfter(seasonStartDate, monthStartDate) ? seasonStartDate : monthStartDate;
 
         const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(sessionsOnDate => 
             Object.values(sessionsOnDate).filter(session => {
                 if(!session?.date) return false;
                 try {
                     const sessionDate = parseISO(session.date);
-                    return sessionDate >= calculationStartDate && sessionDate <= monthEndDate;
+                    return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
                 } catch(e) { return false; }
             })
         );
@@ -136,7 +133,7 @@ export default function RankingPage() {
         });
 
         return Object.values(studentScores).sort((a, b) => b.points - a.points);
-    }, [activeStudents, dailySessions, selectedMonth, selectedYear, pointsConfig, settings.seasonStartDate, students]);
+    }, [activeStudents, dailySessions, selectedMonth, selectedYear, pointsConfig, students]);
 
 
     const topStudents = rankingData.slice(0, 3);
@@ -403,3 +400,6 @@ export default function RankingPage() {
 
     
 
+
+
+    
