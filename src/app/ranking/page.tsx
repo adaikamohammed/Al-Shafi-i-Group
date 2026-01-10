@@ -7,18 +7,26 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, Medal, BookOpenCheck, ShieldCheck, UserCheck, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, Medal, BookOpenCheck, ShieldCheck, UserCheck, CheckCircle, XCircle, Crown } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, isAfter } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import type { Student, DailySession } from '@/lib/types';
+import type { Student, DailySession, BadgeConfig } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
 
 interface StudentScore {
     id: string;
     name: string;
+    photoURL?: string;
     points: number;
+    pointsBreakdown: {
+        hifz: number;
+        attendance: number;
+        behavior: number;
+    };
     stats: {
         present: number;
         absent: number;
@@ -45,7 +53,7 @@ export default function RankingPage() {
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
 
     const rankingData: StudentScore[] = useMemo(() => {
-        if (!pointsConfig) return [];
+        if (!pointsConfig || !students) return [];
         const seasonStartDate = settings.seasonStartDate ? parseISO(settings.seasonStartDate) : null;
         
         const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
@@ -69,16 +77,19 @@ export default function RankingPage() {
             studentScores[student.id] = {
                 id: student.id,
                 name: student.fullName,
+                photoURL: student.photoURL,
                 points: 0,
+                pointsBreakdown: { hifz: 0, attendance: 0, behavior: 0 },
                 stats: { present: 0, absent: 0, late: 0, makeup: 0, excellent: 0, good: 0, average: 0, calm: 0, medium: 0, undisciplined: 0, reviewed: 0, commitmentBalance: 0 }
             };
+            
             // Add bonus points for fulfilled covenants in the selected month
             (student.covenants || []).forEach(covenant => {
                 if (covenant.status === 'تم الوفاء به') {
                      try {
                         const covenantDate = parseISO(covenant.date);
                         if(getMonth(covenantDate) === selectedMonth && getYear(covenantDate) === selectedYear) {
-                           studentScores[student.id].points += pointsConfig.covenantCompleted;
+                           studentScores[student.id].pointsBreakdown.hifz += pointsConfig.covenantCompleted;
                         }
                      } catch(e) { console.error("Invalid covenant date", covenant.date); }
                 }
@@ -89,44 +100,47 @@ export default function RankingPage() {
             (session.records ?? []).forEach(record => {
                 const studentId = record.studentId;
                 if (studentScores[studentId]) {
-                    let points = 0;
                     if (record.attendance && pointsConfig.attendance) {
-                        points += pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] ?? 0;
+                        const attendancePoints = pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] ?? 0;
+                        studentScores[studentId].pointsBreakdown.attendance += attendancePoints;
                         if(record.attendance === 'حاضر') studentScores[studentId].stats.present++;
                         if(record.attendance === 'غائب') studentScores[studentId].stats.absent++;
                         if(record.attendance === 'متأخر') studentScores[studentId].stats.late++;
                         if(record.attendance === 'تعويض') studentScores[studentId].stats.makeup++;
                     }
                     if (record.memorization && pointsConfig.evaluation) {
-                        points += pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] ?? 0;
+                        const hifzPoints = pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] ?? 0;
+                        studentScores[studentId].pointsBreakdown.hifz += hifzPoints;
                         if(record.memorization === 'ممتاز') studentScores[studentId].stats.excellent++;
                         if(record.memorization === 'جيد') studentScores[studentId].stats.good++;
                         if(record.memorization === 'متوسط') studentScores[studentId].stats.average++;
                     }
                     if (record.behavior && pointsConfig.behavior) {
-                        points += pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] ?? 0;
+                        const behaviorPoints = pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] ?? 0;
+                        studentScores[studentId].pointsBreakdown.behavior += behaviorPoints;
                          if(record.behavior === 'هادئ') studentScores[studentId].stats.calm++;
                          if(record.behavior === 'متوسط') studentScores[studentId].stats.medium++;
                          if(record.behavior === 'غير منضبط') studentScores[studentId].stats.undisciplined++;
                     }
                     if (record.review && pointsConfig.review) {
-                        points += pointsConfig.review.completed;
+                        studentScores[studentId].pointsBreakdown.hifz += pointsConfig.review.completed;
                         studentScores[studentId].stats.reviewed++;
                     }
-                    studentScores[studentId].points += points;
                 }
             });
         });
         
         Object.values(studentScores).forEach(score => {
             score.stats.commitmentBalance = (score.stats.present + score.stats.makeup) - score.stats.absent;
+            score.points = score.pointsBreakdown.hifz + score.pointsBreakdown.attendance + score.pointsBreakdown.behavior;
         });
 
         return Object.values(studentScores).sort((a, b) => b.points - a.points);
-    }, [activeStudents, dailySessions, selectedMonth, selectedYear, pointsConfig, settings.seasonStartDate]);
+    }, [activeStudents, dailySessions, selectedMonth, selectedYear, pointsConfig, settings.seasonStartDate, students]);
 
 
     const topStudents = rankingData.slice(0, 3);
+    const masteryKingBadge = settings.badges.find(b => b.id === 'mastery_king');
 
     const getMedalStatus = (student: StudentScore, rank: number) => {
         const uncompensatedAbsences = student.stats.absent - student.stats.makeup;
@@ -199,36 +213,81 @@ export default function RankingPage() {
                         <CardHeader className="text-center">
                             <CardTitle className="text-2xl font-headline">منصة التتويج لشهر {format(new Date(selectedYear, selectedMonth), 'MMMM yyyy', {locale: ar})}</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                            <div className="flex justify-center items-end gap-4 md:gap-8 h-48">
-                                {topStudents[1] && getMedalStatus(topStudents[1], 2) !== 'none' && (
-                                    <div className="flex flex-col items-center w-1/3">
-                                        <div className="text-4xl">🥈</div>
-                                        <div className="font-bold text-lg text-center">{topStudents[1].name}</div>
-                                        <div className="h-24 w-full bg-medal-silver rounded-t-lg flex items-center justify-center font-bold text-xl text-medal-silver-foreground p-2">
-                                            {topStudents[1].points.toFixed(1)} نقطة
-                                        </div>
+                        <CardContent className="flex justify-center items-end gap-4 md:gap-8 h-64 md:h-80">
+                            {/* Silver - 2nd Place */}
+                            {topStudents[1] && getMedalStatus(topStudents[1], 2) !== 'none' && (
+                                <div className="flex flex-col items-center w-1/4">
+                                    <div className="text-4xl">🥈</div>
+                                    <Avatar className="w-16 h-16 mb-2 border-4 border-medal-silver">
+                                        <AvatarImage src={topStudents[1].photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${topStudents[1].name}`} />
+                                        <AvatarFallback>{topStudents[1].name.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="font-bold text-md text-center">{topStudents[1].name}</div>
+                                    <div className="h-28 w-full bg-medal-silver rounded-t-lg flex items-center justify-center font-bold text-xl text-medal-silver-foreground p-2 flex-col">
+                                        <span>{topStudents[1].points.toFixed(1)}</span>
+                                        <Tooltip>
+                                            <TooltipTrigger className="text-xs font-normal mt-1 cursor-default">(تـفـاصـيـل)</TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>التحصيل: {topStudents[1].pointsBreakdown.hifz.toFixed(1)}</p>
+                                                <p>المواظبة: {topStudents[1].pointsBreakdown.attendance.toFixed(1)}</p>
+                                                <p>السلوك: {topStudents[1].pointsBreakdown.behavior.toFixed(1)}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
                                     </div>
-                                )}
-                                {topStudents[0] && getMedalStatus(topStudents[0], 1) !== 'none' && (
-                                    <div className="flex flex-col items-center w-1/3">
-                                         <div className="text-4xl">🥇</div>
-                                        <div className="font-bold text-lg text-center">{topStudents[0].name}</div>
-                                        <div className="h-36 w-full bg-medal-gold rounded-t-lg flex items-center justify-center font-bold text-2xl text-medal-gold-foreground p-2">
-                                           {topStudents[0].points.toFixed(1)} نقطة
-                                        </div>
+                                </div>
+                            )}
+                             {/* Gold - 1st Place */}
+                            {topStudents[0] && getMedalStatus(topStudents[0], 1) !== 'none' && (
+                                <div className="flex flex-col items-center w-1/3">
+                                     <div className="text-4xl">🥇</div>
+                                     <Avatar className="w-20 h-20 mb-2 border-4 border-medal-gold">
+                                        <AvatarImage src={topStudents[0].photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${topStudents[0].name}`} />
+                                        <AvatarFallback>{topStudents[0].name.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="font-bold text-lg text-center flex items-center gap-1">
+                                        {topStudents[0].name}
+                                        {masteryKingBadge && topStudents[0].points >= masteryKingBadge.threshold && 
+                                            <Tooltip>
+                                                <TooltipTrigger><Crown className="h-5 w-5 text-yellow-500"/></TooltipTrigger>
+                                                <TooltipContent><p>{masteryKingBadge.name}</p></TooltipContent>
+                                            </Tooltip>
+                                        }
                                     </div>
-                                )}
-                                 {topStudents[2] && getMedalStatus(topStudents[2], 3) !== 'none' && (
-                                    <div className="flex flex-col items-center w-1/3">
-                                        <div className="text-4xl">🥉</div>
-                                        <div className="font-bold text-lg text-center">{topStudents[2].name}</div>
-                                        <div className="h-20 w-full bg-medal-bronze rounded-t-lg flex items-center justify-center font-bold text-lg text-medal-bronze-foreground p-2">
-                                           {topStudents[2].points.toFixed(1)} نقطة
-                                        </div>
+                                    <div className="h-40 w-full bg-medal-gold rounded-t-lg flex items-center justify-center font-bold text-2xl text-medal-gold-foreground p-2 flex-col">
+                                       <span>{topStudents[0].points.toFixed(1)}</span>
+                                       <Tooltip>
+                                            <TooltipTrigger className="text-sm font-normal mt-1 cursor-default">(تـفـاصـيـل)</TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>التحصيل: {topStudents[0].pointsBreakdown.hifz.toFixed(1)}</p>
+                                                <p>المواظبة: {topStudents[0].pointsBreakdown.attendance.toFixed(1)}</p>
+                                                <p>السلوك: {topStudents[0].pointsBreakdown.behavior.toFixed(1)}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
+                            {/* Bronze - 3rd Place */}
+                             {topStudents[2] && getMedalStatus(topStudents[2], 3) !== 'none' && (
+                                <div className="flex flex-col items-center w-1/4">
+                                    <div className="text-4xl">🥉</div>
+                                     <Avatar className="w-16 h-16 mb-2 border-4 border-medal-bronze">
+                                        <AvatarImage src={topStudents[2].photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${topStudents[2].name}`} />
+                                        <AvatarFallback>{topStudents[2].name.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="font-bold text-md text-center">{topStudents[2].name}</div>
+                                    <div className="h-24 w-full bg-medal-bronze rounded-t-lg flex items-center justify-center font-bold text-lg text-medal-bronze-foreground p-2 flex-col">
+                                       <span>{topStudents[2].points.toFixed(1)}</span>
+                                       <Tooltip>
+                                            <TooltipTrigger className="text-xs font-normal mt-1 cursor-default">(تـفـاصـيـل)</TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>التحصيل: {topStudents[2].pointsBreakdown.hifz.toFixed(1)}</p>
+                                                <p>المواظبة: {topStudents[2].pointsBreakdown.attendance.toFixed(1)}</p>
+                                                <p>السلوك: {topStudents[2].pointsBreakdown.behavior.toFixed(1)}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
