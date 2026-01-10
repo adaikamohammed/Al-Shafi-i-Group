@@ -61,7 +61,8 @@ function AppContent({ children }: { children: React.ReactNode }) {
     }, []);
 
     useEffect(() => {
-        if (!authLoading && !user && pathname !== '/login') {
+        const isParentPortal = pathname.startsWith('/parent-portal');
+        if (!authLoading && !user && pathname !== '/login' && !isParentPortal) {
             router.push('/login');
         }
          if (!authLoading && user && pathname === '/login') {
@@ -80,7 +81,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
         return () => document.removeEventListener("keydown", down)
     }, [])
 
-    if (authLoading) {
+    if (authLoading && !pathname.startsWith('/parent-portal')) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -88,6 +89,10 @@ function AppContent({ children }: { children: React.ReactNode }) {
         );
     }
     
+    if (pathname.startsWith('/parent-portal')) {
+      return <>{children}</>;
+    }
+
     if (!user && pathname !== '/login') {
         return null;
     }
