@@ -466,6 +466,29 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
   const [registrationDate, setRegistrationDate] = useState<Date | undefined>(student?.registrationDate ? new Date(student.registrationDate) : new Date());
   const [covenants, setCovenants] = useState<Covenant[]>(student?.covenants || []);
   const [originalCovenants, setOriginalCovenants] = useState<Covenant[]>(student?.covenants || []);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(student?.photoURL || null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 500 * 1024) { // 500KB
+        toast({ title: 'خطأ', description: 'حجم الصورة كبير جدًا. الحد الأقصى هو 500 كيلوبايت.', variant: 'destructive' });
+        return;
+    }
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+        toast({ title: 'خطأ', description: 'صيغة الملف غير مدعومة. الرجاء رفع صورة بصيغة JPG أو PNG.', variant: 'destructive' });
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (loadEvent) => {
+        setPhotoPreview(loadEvent.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -473,7 +496,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     const data = Object.fromEntries(formData.entries()) as any;
 
     if (!birthDate || !registrationDate) {
-      // Handle error - dates are required
+      toast({ title: 'خطأ', description: 'تاريخ الميلاد وتاريخ التسجيل حقول إلزامية.', variant: 'destructive' });
       return;
     }
     
@@ -500,6 +523,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         dailyMemorizationAmount: data.memorizationAmount,
         notes: data.notes,
         covenants: covenants,
+        photoURL: photoPreview,
     };
 
     if (student) {
@@ -555,6 +579,14 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-2">
+        <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
+        <div className="flex flex-col items-center gap-4">
+             <Avatar className="w-24 h-24 mb-2 border-4 border-muted">
+                <AvatarImage src={photoPreview || `https://api.dicebear.com/7.x/initials/svg?seed=${student?.fullName || ''}`} alt={student?.fullName} />
+                <AvatarFallback>{student?.fullName.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>تغيير الصورة</Button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">الاسم الكامل</Label>
@@ -748,6 +780,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 }
 
     
+
 
 
 
