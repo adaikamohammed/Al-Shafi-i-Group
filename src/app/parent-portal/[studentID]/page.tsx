@@ -4,6 +4,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useStudentContext } from '@/context/StudentContext';
+import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, AlertTriangle, Star, Award, ShieldAlert, BookOpen, UserCheck, Wallet, ChevronsUpDown, Check, Users, Lock, KeyRound } from 'lucide-react';
@@ -32,14 +33,15 @@ const calculateAge = (birthDate?: Date) => {
 
 const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Student | null, onVerificationSuccess?: () => void }) => {
     const { students, dailySessions, surahProgress, settings, loading } = useStudentContext();
+    const { user: authUser } = useAuth();
     const { toast } = useToast();
     const [phoneInput, setPhoneInput] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
-    const [isVerified, setIsVerified] = useState(false);
+    const [isVerified, setIsVerified] = useState(!!authUser); // Sheikh is always verified
     const verificationKey = student ? `parent-portal-verified-${student.id}` : '';
 
     useEffect(() => {
-        if (!student) return;
+        if (!student || authUser) return; // Skip if Sheikh is logged in
         const storedVerification = localStorage.getItem(verificationKey);
         if(storedVerification) {
             const { timestamp } = JSON.parse(storedVerification);
@@ -51,7 +53,7 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
                 localStorage.removeItem(verificationKey);
             }
         }
-    }, [student, verificationKey, onVerificationSuccess]);
+    }, [student, verificationKey, onVerificationSuccess, authUser]);
 
 
     const handleVerification = () => {
@@ -98,7 +100,7 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
         );
         
         const studentScores: Record<string, any> = {};
-        students.filter(s => s.status === 'نشط').forEach(s => {
+        (students ?? []).filter(s => s.status === 'نشط').forEach(s => {
             studentScores[s.id] = { id: s.id, points: 0, stats: { absent: 0, makeup: 0, calm: 0, medium: 0, undisciplined: 0 } };
         });
 
@@ -326,8 +328,8 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
 };
 
 export default function ParentPortalPreviewPage() {
-    const params = useParams();
     const { students, loading: contextLoading } = useStudentContext();
+    const { user: authUser } = useAuth();
     
     const [open, setOpen] = useState(false);
     const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -351,10 +353,15 @@ export default function ParentPortalPreviewPage() {
     
     return (
         <div className="p-4 md:p-8">
-            <Card className="mb-8">
+             <Card className="mb-8">
                 <CardHeader>
                     <CardTitle>بوابة ولي الأمر</CardTitle>
-                    <CardDescription>اختر طالبًا من القائمة أدناه لعرض صفحته كما ستظهر لولي الأمر بعد التحقق.</CardDescription>
+                     <CardDescription>
+                         {authUser 
+                            ? "اختر طالبًا من القائمة أدناه لمعاينة صفحته كما ستظهر لولي الأمر."
+                            : "ابحث عن اسم ابنك في القائمة، ثم قم بالتحقق من هويتك باستخدام رقم الهاتف المسجل."
+                         }
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Popover open={open} onOpenChange={setOpen}>
@@ -367,7 +374,7 @@ export default function ParentPortalPreviewPage() {
                             >
                                 {selectedStudent
                                     ? selectedStudent.fullName
-                                    : "ابحث عن اسم ابنك..."}
+                                    : "ابحث عن اسم الطالب..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                         </PopoverTrigger>

@@ -4,7 +4,7 @@
 import '../../app/globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
-import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords } from 'lucide-react';
+import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ const allNavItems = [
   { href: '/reports/student', label: 'تقرير الطالب', icon: FileText },
   { href: '/ranking', label: 'ترتيب الطلبة', icon: Award },
   { href: '/surahs', label: 'متابعة الحفظ', icon: BookCheck },
+  { href: '/parent-portal/preview', label: 'بوابة ولي الأمر', icon: Shield },
   { href: '/points', label: 'نظام النقاط', icon: Gavel },
   { href: '/data', label: 'البيانات', icon: ArrowRightLeft },
   { href: '/guide', label: 'دليل الاستخدام', icon: HelpCircle },
@@ -89,7 +90,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
         );
     }
     
-    if (pathname.startsWith('/parent-portal')) {
+    if (pathname.startsWith('/parent-portal') && !user) {
       return <>{children}</>;
     }
 
@@ -155,7 +156,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
                           </Button>
                         </SheetTrigger>
                         <h1 className="font-headline text-lg font-semibold text-primary">
-                          {navItems.find(item => item.href === pathname)?.label || 'مدرسة الشافعي'}
+                          {navItems.find(item => pathname.startsWith(item.href))?.label || 'مدرسة الشافعي'}
                         </h1>
                     </div>
                     <Button
