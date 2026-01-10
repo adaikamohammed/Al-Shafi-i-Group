@@ -15,13 +15,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { Student, StudentStatus, MemorizationAmount, SubscriptionTier, Covenant, CovenantCard, CovenantStatus, CovenantType } from '@/lib/types';
+import type { Student, StudentStatus, MemorizationAmount, SubscriptionTier, Covenant, CovenantCard, CovenantStatus, CovenantType, DailySession } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, isAfter } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
@@ -46,24 +46,15 @@ const calculateAge = (birthDate?: Date) => {
   return Math.abs(ageDate.getUTCFullYear() - 1970);
 };
 
-const StudentProfileCard = ({ student, user, dailySessions }: { student: Student, user: any, dailySessions: any }) => {
-    const { ranking } = useMemo(() => {
-        // This is a simplified logic. A real implementation would fetch this from a shared state or context.
-        return { ranking: 'N/A' };
-    }, []);
-
-    const { commitmentBalance } = useMemo(() => {
-        let absent = 0;
-        let compensation = 0;
-         Object.values(dailySessions ?? {}).flatMap((day: any) => Object.values(day)).forEach((session: any) => {
-            const record = (session.records || []).find((r: any) => r.studentId === student.id);
-            if (record) {
-                if (record.attendance === 'غائب') absent++;
-                if (record.attendance === 'تعويض') compensation++;
-            }
-        });
-        return { commitmentBalance: absent - compensation };
-    }, [dailySessions, student.id]);
+const StudentProfileCard = ({ student, user, rankingData }: { student: Student, user: any, rankingData: any }) => {
+    const { rank, commitmentBalance } = useMemo(() => {
+        const studentRankData = rankingData.find((r:any) => r.id === student.id);
+        if (!studentRankData) return { rank: 'N/A', commitmentBalance: 0 };
+        return {
+            rank: rankingData.findIndex((r:any) => r.id === student.id) + 1,
+            commitmentBalance: studentRankData.stats.commitmentBalance,
+        }
+    }, [rankingData, student.id]);
     
     const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط');
 
@@ -111,13 +102,23 @@ const StudentProfileCard = ({ student, user, dailySessions }: { student: Student
                     <CardTitle>المؤشرات الذكية</CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md">
-                        <Award className="h-5 w-5 text-blue-600"/>
-                        <div>
-                            <p className="text-xs text-blue-800">الترتيب الحالي</p>
-                            <p className="font-bold">{ranking}</p>
-                        </div>
-                    </div>
+                     <TooltipProvider>
+                     <Tooltip>
+                        <TooltipTrigger>
+                            <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md">
+                                <Award className="h-5 w-5 text-blue-600"/>
+                                <div>
+                                    <p className="text-xs text-blue-800">الترتيب الحالي</p>
+                                    <p className="font-bold">{rank !== 'N/A' && rank > 0 ? `المركز ${rank}`: 'لا يوجد ترتيب'}</p>
+                                </div>
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                           <p>ترتيب مستحق بناءً على محرك النقاط - آخر تحديث: {format(new Date(), 'd MMMM yyyy', {locale: ar})}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    </TooltipProvider>
+
                      <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-md">
                         <FolderKanban className="h-5 w-5 text-orange-600"/>
                         <div>
@@ -139,11 +140,62 @@ const StudentProfileCard = ({ student, user, dailySessions }: { student: Student
 };
 
 export default function StudentManagementPage() {
-  const { students, updateStudent, deleteStudent, loading, deleteAllStudents, dailySessions } = useStudentContext();
+  const { students, updateStudent, deleteStudent, loading, deleteAllStudents, dailySessions, settings } = useStudentContext();
   const { user, isSuperAdmin } = useAuth();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+    const rankingData = useMemo(() => {
+        const pointsConfig = settings.points;
+        if (!pointsConfig || !students) return [];
+        
+        const monthStartDate = startOfMonth(new Date());
+        const monthEndDate = endOfMonth(new Date());
+
+        const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(sessionsOnDate => 
+            Object.values(sessionsOnDate).filter(session => {
+                if(!session?.date) return false;
+                try {
+                    const sessionDate = parseISO(session.date);
+                    return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
+                } catch(e) { return false; }
+            })
+        );
+
+        const studentScores: any = {};
+        (students ?? []).forEach(student => {
+             studentScores[student.id] = {
+                id: student.id,
+                points: 0,
+                stats: { present: 0, absent: 0, makeup: 0, calm: 0, medium: 0, undisciplined: 0, commitmentBalance: 0 }
+            };
+        });
+
+        sessionsInMonth.forEach(session => {
+            (session.records ?? []).forEach(record => {
+                const studentId = record.studentId;
+                if (studentScores[studentId]) {
+                    if (record.attendance && pointsConfig.attendance) {
+                        if(record.attendance === 'حاضر') studentScores[studentId].stats.present++;
+                        if(record.attendance === 'غائب') studentScores[studentId].stats.absent++;
+                        if(record.attendance === 'تعويض') studentScores[studentId].stats.makeup++;
+                    }
+                    if (record.behavior && pointsConfig.behavior) {
+                         if(record.behavior === 'هادئ') studentScores[studentId].stats.calm++;
+                         if(record.behavior === 'متوسط') studentScores[studentId].stats.medium++;
+                         if(record.behavior === 'غير منضبط') studentScores[studentId].stats.undisciplined++;
+                    }
+                }
+            });
+        });
+        
+        Object.values(studentScores).forEach((score: any) => {
+            score.stats.commitmentBalance = (score.stats.present + score.stats.makeup) - score.stats.absent;
+        });
+
+        return Object.values(studentScores).sort((a: any, b: any) => b.points - a.points);
+    }, [students, dailySessions, settings.points]);
 
   const handleStatusChange = (student: Student, status: StudentStatus, reason?: string) => {
     if (status === 'محذوف') {
@@ -174,6 +226,22 @@ export default function StudentManagementPage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "قائمة الطلبة");
     XLSX.writeFile(wb, "قائمة_الطلبة_الحالية.xlsx");
+  };
+
+  const getMedalStatus = (studentId: string, index: number) => {
+      const studentData = rankingData.find(r => r.id === studentId);
+      if (!studentData) return 'none';
+      
+      const uncompensatedAbsences = studentData.stats.absent - studentData.stats.makeup;
+      const rank = index + 1;
+      
+      if (rank === 1) {
+          const isExcellentBehavior = studentData.stats.calm > (studentData.stats.medium + studentData.stats.undisciplined);
+          if (uncompensatedAbsences <= 0 && isExcellentBehavior) return 'gold';
+      }
+      if (rank === 2 && uncompensatedAbsences <= 1) return 'silver';
+      if (rank === 3 && uncompensatedAbsences <= 2) return 'bronze';
+      return 'none';
   };
 
   const filteredStudents = useMemo(() => {
@@ -313,15 +381,24 @@ export default function StudentManagementPage() {
             </TableHeader>
             <TableBody>
              {filteredStudents.length > 0 ? (
-                filteredStudents.map((student) => {
+                filteredStudents.map((student, index) => {
                     const activeCovenant = getActiveCovenant(student);
+                     const medal = getMedalStatus(student.id, index);
+                      const medalClass = {
+                          gold: 'bg-medal-gold/30',
+                          silver: 'bg-medal-silver/30',
+                          bronze: 'bg-medal-bronze/30',
+                          none: ''
+                      }[medal];
+
                     return (
                         <TableRow key={student.id} className={cn(
                             'cursor-pointer',
+                            medalClass,
                             activeCovenant?.card === 'بطاقة صفراء' && 'bg-yellow-50 dark:bg-yellow-900/20',
                             activeCovenant?.card === 'بطاقة حمراء' && 'bg-red-50 dark:bg-red-900/20'
-                        )}>
-                            <TableCell className="font-medium text-center" onClick={() => setSelectedStudent(student)}>
+                        )} onClick={() => setSelectedStudent(student)}>
+                            <TableCell className="font-medium text-center">
                                 <div className="flex items-center justify-center gap-2">
                                      {activeCovenant && (
                                         <Tooltip>
@@ -337,16 +414,16 @@ export default function StudentManagementPage() {
                                      <span>{student.fullName}</span>
                                 </div>
                             </TableCell>
-                            {isSuperAdmin && <TableCell className="text-center" onClick={() => setSelectedStudent(student)}><Badge variant="outline">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
-                            <TableCell className="hidden md:table-cell text-center" onClick={() => setSelectedStudent(student)}>{student.guardianName}</TableCell>
-                            <TableCell className="hidden lg:table-cell text-center" onClick={() => setSelectedStudent(student)}>{calculateAge(student.birthDate)}</TableCell>
-                            <TableCell className="text-center" onClick={() => setSelectedStudent(student)}>
+                            {isSuperAdmin && <TableCell className="text-center"><Badge variant="outline">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
+                            <TableCell className="hidden md:table-cell text-center">{student.guardianName}</TableCell>
+                            <TableCell className="hidden lg:table-cell text-center">{calculateAge(student.birthDate)}</TableCell>
+                            <TableCell className="text-center">
                                 <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
                             </TableCell>
-                            <TableCell className="text-center" onClick={() => setSelectedStudent(student)}>
+                            <TableCell className="text-center">
                                 <Badge variant="outline">{student.subscriptionTier}</Badge>
                             </TableCell>
-                            <TableCell className="hidden md:table-cell text-center" onClick={() => setSelectedStudent(student)}>{student.memorizedSurahsCount || 0}</TableCell>
+                            <TableCell className="hidden md:table-cell text-center">{student.memorizedSurahsCount || 0}</TableCell>
                             {!isSuperAdmin && <TableCell className="text-center">
                                 <StudentActions student={student} onStatusChange={handleStatusChange} />
                             </TableCell>}
@@ -367,7 +444,7 @@ export default function StudentManagementPage() {
       
        {selectedStudent && (
         <Dialog open={!!selectedStudent} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}>
-            <StudentProfileCard student={selectedStudent} user={user} dailySessions={dailySessions} />
+            <StudentProfileCard student={selectedStudent} user={user} rankingData={rankingData} />
         </Dialog>
       )}
     </div>
@@ -780,6 +857,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 }
 
     
+
 
 
 
