@@ -337,7 +337,7 @@ export default function StudentManagementPage() {
                                      <span>{student.fullName}</span>
                                 </div>
                             </TableCell>
-                            {isSuperAdmin && <TableCell className="text-center"><Badge variant="outline">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
+                            {isSuperAdmin && <TableCell className="text-center" onClick={() => setSelectedStudent(student)}><Badge variant="outline">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
                             <TableCell className="hidden md:table-cell text-center" onClick={() => setSelectedStudent(student)}>{student.guardianName}</TableCell>
                             <TableCell className="hidden lg:table-cell text-center" onClick={() => setSelectedStudent(student)}>{calculateAge(student.birthDate)}</TableCell>
                             <TableCell className="text-center" onClick={() => setSelectedStudent(student)}>
@@ -748,5 +748,6 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 }
 
     
+
 
 
