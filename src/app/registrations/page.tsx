@@ -10,9 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User, UserRound } from 'lucide-react';
+import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, Home, GraduationCap, GripVertical } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +33,15 @@ const statusColors: Record<PreRegistrationStatus, string> = {
     "إنضم لمدرسة أخرى": "bg-blue-100 dark:bg-blue-900/30",
     "مرشح": "bg-orange-100 dark:bg-orange-900/30",
 };
+
+const statusHeaderColors: Record<PreRegistrationStatus, string> = {
+    "تم الإنضمام": "bg-green-500",
+    "مرفوض": "bg-red-500",
+    "مؤجل": "bg-yellow-500",
+    "إنضم لمدرسة أخرى": "bg-blue-500",
+    "مرشح": "bg-orange-500",
+};
+
 
 const statusBadgeColors: Record<PreRegistrationStatus, string> = {
     "تم الإنضمام": "bg-green-100 text-green-800 border-green-300",
@@ -56,6 +65,71 @@ const ALL_COLUMNS = {
     address: { label: "مقر السكن", visible: false },
     status: { label: "الحالة", visible: true },
     notes: { label: "ملاحظات", visible: true },
+};
+
+const calculateAge = (birthDate?: Date | string) => {
+    if (!birthDate) return 'غير محدد';
+    try {
+        const date = typeof birthDate === 'string' ? parseISO(birthDate) : birthDate;
+        if (!isValid(date)) return 'تاريخ غير صالح';
+        return differenceInYears(new Date(), date);
+    } catch {
+        return 'تاريخ غير صالح';
+    }
+};
+
+const StudentProfileCard = ({ student }: { student: PreRegistration }) => {
+    const headerColor = statusHeaderColors[student.status] || 'bg-gray-500';
+
+    return (
+        <DialogContent className="sm:max-w-2xl p-0">
+             <div className={cn("p-6 rounded-t-lg text-white", headerColor)}>
+                <div className="flex items-center gap-4">
+                     <Avatar className="w-20 h-20 border-4 border-white/50">
+                        <AvatarImage src={student.photoURL} />
+                        <AvatarFallback className={cn(student.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
+                            {student.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
+                        </AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <h2 className="text-2xl font-bold">{student.fullName}</h2>
+                        <div className="flex items-center gap-4 text-sm opacity-90">
+                           <span>رقم الصفحة: {student.pageNumber || 'N/A'}</span>
+                            <Badge variant="secondary">{student.status}</Badge>
+                        </div>
+                    </div>
+                </div>
+             </div>
+             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 className="font-semibold mb-2 border-b pb-1">المعلومات الشخصية والتعليمية</h3>
+                    <div className="space-y-2 text-sm">
+                        <p><strong className="min-w-[100px] inline-block">تاريخ الميلاد:</strong> {student.birthDate instanceof Date && isValid(student.birthDate) ? format(student.birthDate, 'yyyy/MM/dd') : student.birthDate.toString()}</p>
+                        <p><strong className="min-w-[100px] inline-block">العمر:</strong> {calculateAge(student.birthDate)} سنة</p>
+                        <p><strong className="min-w-[100px] inline-block">الجنس:</strong> {student.gender || 'غير محدد'}</p>
+                        <p><strong className="min-w-[100px] inline-block">المستوى الدراسي:</strong> {student.educationalLevel || 'غير محدد'}</p>
+                    </div>
+                </div>
+                <div>
+                     <h3 className="font-semibold mb-2 border-b pb-1">معلومات الاتصال</h3>
+                    <div className="space-y-2 text-sm">
+                         <p><strong className="min-w-[100px] inline-block">اسم الولي:</strong> {student.guardianName || 'غير محدد'}</p>
+                         <p><strong className="min-w-[100px] inline-block">رقم الهاتف 1:</strong> {student.phone1}</p>
+                         <p><strong className="min-w-[100px] inline-block">رقم الهاتف 2:</strong> {student.phone2 || 'لا يوجد'}</p>
+                         <p><strong className="min-w-[100px] inline-block">مقر السكن:</strong> {student.address || 'غير محدد'}</p>
+                    </div>
+                </div>
+                {(student.status === 'مرفوض' || student.notes) && (
+                    <div className="md:col-span-2">
+                        <h3 className="font-semibold mb-2 border-b pb-1">سبب الحالة / ملاحظات</h3>
+                        <div className="p-3 bg-muted rounded-md text-sm">
+                            <p>{student.notes || 'لا توجد ملاحظات مسجلة.'}</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </DialogContent>
+    );
 };
 
 
@@ -191,6 +265,7 @@ export default function PreRegistrationPage() {
     const { addStudent, preRegistrations, loading, importPreRegistrations } = useStudentContext();
     const [isFormOpen, setFormOpen] = useState(false);
     const [editingRegistration, setEditingRegistration] = useState<PreRegistration | null>(null);
+    const [selectedStudent, setSelectedStudent] = useState<PreRegistration | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [levelFilter, setLevelFilter] = useState<string[]>([]);
     const [statusFilter, setStatusFilter] = useState('all');
@@ -483,6 +558,12 @@ export default function PreRegistrationPage() {
                     <RegistrationForm onSave={handleSaveRegistration} onCancel={() => setFormOpen(false)} existingRegistration={editingRegistration}/>
                 </DialogContent>
             </Dialog>
+            
+            {selectedStudent && (
+                 <Dialog open={!!selectedStudent} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}>
+                    <StudentProfileCard student={selectedStudent} />
+                </Dialog>
+            )}
 
             <Card>
                 <CardHeader>
@@ -514,12 +595,13 @@ export default function PreRegistrationPage() {
                         </TableHeader>
                         <TableBody>
                             {filteredRegistrations.length > 0 ? filteredRegistrations.map(reg => (
-                                <TableRow key={reg.id} className={statusColors[reg.status]}>
+                                <TableRow key={reg.id} className={cn("cursor-pointer", statusColors[reg.status])} onClick={() => setSelectedStudent(reg)}>
                                     <TableCell>
                                         <div className="flex flex-col items-center gap-1">
                                             <Avatar className="w-10 h-10">
+                                                <AvatarImage src={reg.photoURL} />
                                                 <AvatarFallback className={cn(reg.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
-                                                    {reg.gender === 'أنثى' ? <UserRound /> : <User />}
+                                                    {reg.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
                                                 </AvatarFallback>
                                             </Avatar>
                                             <Badge variant="secondary" className="px-1.5 py-0.5 text-xs">{reg.pageNumber || 'N/A'}</Badge>
@@ -540,7 +622,7 @@ export default function PreRegistrationPage() {
                                         </Badge>
                                     </TableCell>}
                                     {columnVisibility.notes.visible && <TableCell className="max-w-[200px] truncate">{reg.notes}</TableCell>}
-                                     <TableCell>
+                                     <TableCell onClick={(e) => e.stopPropagation()}>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -611,6 +693,3 @@ export default function PreRegistrationPage() {
 }
 
     
-
-
-
