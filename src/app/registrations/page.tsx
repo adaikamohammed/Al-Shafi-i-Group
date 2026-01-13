@@ -87,7 +87,7 @@ const StudentProfileCard = ({ student, onPromote, onEdit }: { student: PreRegist
     return (
         <DialogContent className="sm:max-w-2xl p-0">
              <DialogHeader>
-                <DialogTitle className="sr-only">بطاقة الطالب: {student.fullName}</DialogTitle>
+                 <DialogTitle className="sr-only">بطاقة الطالب: {student.fullName}</DialogTitle>
              </DialogHeader>
              <div className={cn("p-6 rounded-t-lg text-white", headerColor)}>
                 <div className="flex items-center gap-4">
@@ -205,11 +205,11 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
     return (
         <form onSubmit={handleSubmit}>
             <div className="space-y-4 max-h-[70vh] overflow-y-auto p-4">
-                 <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
                  <div className="flex flex-col items-center gap-4">
+                    <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
                      <Avatar className="w-24 h-24 mb-2 border-4 border-muted">
                         <AvatarImage src={photoPreview} />
-                        <AvatarFallback>
+                        <AvatarFallback className={cn(existingRegistration?.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
                              {existingRegistration?.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
                         </AvatarFallback>
                     </Avatar>
@@ -748,5 +748,6 @@ export default function PreRegistrationPage() {
 }
 
     
+
 
 

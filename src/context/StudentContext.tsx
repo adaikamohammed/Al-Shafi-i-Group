@@ -253,7 +253,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const { photoFile, ...restOfStudentData } = studentData;
 
     const newStudent: Omit<Student, 'id'> & {id: string} = {
-      ...restOfStudentData,
+      ...(restOfStudentData as any),
       id: studentId,
       ownerId: authContextUser.uid,
       memorizedSurahsCount: 0,
@@ -283,24 +283,25 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const updatePreRegistration = async (regId: string, data: Partial<PreRegistration> & { photoFile?: File | null }, isEditing: boolean) => {
     if (!authContextUser) return;
     
-    let photoURL = data.photoURL;
+    let finalPhotoURL = data.photoURL;
 
     if (data.photoFile) {
         const imageRef = storageRef(storage, `pre_reg_photos/${regId}`);
         await uploadBytes(imageRef, data.photoFile);
-        photoURL = await getDownloadURL(imageRef);
+        finalPhotoURL = await getDownloadURL(imageRef);
     }
     
     const { photoFile, ...restOfData } = data;
     
-    const finalData = {
+    const finalData: Partial<PreRegistration> = {
         ...restOfData,
-        photoURL,
+        photoURL: finalPhotoURL,
         birthDate: data.birthDate instanceof Date ? data.birthDate.toISOString() : data.birthDate,
-        requestedAt: data.requestedAt instanceof Date ? data.requestedAt.toISOString() : data.requestedAt,
     };
     
-    if (!isEditing) {
+    if (isEditing) {
+        finalData.requestedAt = data.requestedAt instanceof Date ? data.requestedAt.toISOString() : data.requestedAt;
+    } else {
         finalData.requestedAt = new Date().toISOString();
         finalData.status = 'مرشح';
     }
@@ -343,18 +344,18 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const originalStudent = (students ?? []).find(s => s.id === studentId);
     if (!originalStudent) return;
     
-    let photoURL = originalStudent.photoURL;
+    let finalPhotoURL = originalStudent.photoURL;
 
     if (updatedData.photoFile) {
         const imageRef = storageRef(storage, `student_photos/${studentId}`);
         await uploadBytes(imageRef, updatedData.photoFile);
-        photoURL = await getDownloadURL(imageRef);
+        finalPhotoURL = await getDownloadURL(imageRef);
     }
     
     const { photoFile, ...restOfUpdatedData } = updatedData;
 
     const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
-    const finalData = { ...originalStudent, ...restOfUpdatedData, photoURL, updatedAt: new Date() };
+    const finalData = { ...originalStudent, ...restOfUpdatedData, photoURL: finalPhotoURL, updatedAt: new Date() };
 
     const covenantsObject = (finalData.covenants || []).reduce((acc, cov) => {
       acc[cov.id] = cov;
@@ -545,4 +546,5 @@ export const useStudentContext = () => {
 };
 
   
+
 

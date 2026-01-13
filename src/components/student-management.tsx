@@ -154,7 +154,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
              </DialogHeader>
              <div className="flex flex-col items-center pt-4">
                 <Avatar className="w-24 h-24 mb-4 border-4 border-primary">
-                    <AvatarImage src={student.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${student.fullName}`} alt={student.fullName} />
+                    <AvatarImage src={student.photoURL} alt={student.fullName} />
                     <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -833,7 +833,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         <div className="flex flex-col items-center gap-4">
             <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
              <Avatar className="w-24 h-24 mb-2 border-4 border-muted">
-                <AvatarImage src={photoPreview || `https://api.dicebear.com/7.x/initials/svg?seed=${student?.fullName || ''}`} alt={student?.fullName} />
+                <AvatarImage src={photoPreview} />
                 <AvatarFallback>{student?.fullName?.charAt(0) || '?'}</AvatarFallback>
             </Avatar>
             <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>تغيير الصورة</Button>
@@ -1029,3 +1029,4 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
