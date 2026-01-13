@@ -14,6 +14,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { StudentProvider, useStudentContext } from '@/context/StudentContext';
 import { CommandBar } from '@/components/ui/CommandBar';
+import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 
 const allNavItems = [
   { href: '/overview', label: 'نظرة عامة', icon: LayoutDashboard },
@@ -31,6 +32,7 @@ const allNavItems = [
   { href: '/points', label: 'نظام النقاط', icon: Gavel },
   { href: '/data', label: 'البيانات', icon: ArrowRightLeft },
   { href: '/guide', label: 'دليل الاستخدام', icon: HelpCircle },
+  { href: '/profile', label: 'الملف الشخصي', icon: UserCog, separator: true },
   { href: '/settings', label: 'الإعدادات', icon: Settings },
 ];
 
@@ -107,11 +109,15 @@ function AppContent({ children }: { children: React.ReactNode }) {
       <SidebarHeader className="p-0">
          <Link href="/profile" className="block p-4 hover:bg-sidebar-accent transition-colors">
              <div className="flex items-center gap-3">
+                 <Avatar>
+                    <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || ''} />
+                    <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
+                </Avatar>
                  <div>
                     <h1 className="font-headline text-lg font-bold text-primary">
-                        {user?.group ? `إدارة ${user.group}` : 'إدارة فوج - الإمام الشافعي'}
+                        {user?.group ? `${user.group}` : 'مدرسة الإمام الشافعي'}
                     </h1>
-                    <p className="text-xs text-muted-foreground">{user?.email}</p>
+                    <p className="text-xs text-muted-foreground">{user?.displayName}</p>
                  </div>
              </div>
          </Link>
@@ -119,18 +125,21 @@ function AppContent({ children }: { children: React.ReactNode }) {
       <SidebarContent>
         <SidebarMenu>
           {navItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-               <SidebarMenuButton
-                asChild
-                isActive={pathname.startsWith(item.href) && (item.href !== '/' || pathname === '/')}
-                tooltip={{ children: item.label, side: 'right', align: 'center' }}
-              >
-                <Link href={item.href}>
-                  <item.icon />
-                  <span>{item.label}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <React.Fragment key={item.href}>
+                {item.separator && <div className="my-2 border-t border-sidebar-border" />}
+                <SidebarMenuItem>
+                   <SidebarMenuButton
+                    asChild
+                    isActive={pathname.startsWith(item.href) && (item.href !== '/' || pathname === '/')}
+                    tooltip={{ children: item.label, side: 'right', align: 'center' }}
+                  >
+                    <Link href={item.href}>
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+            </React.Fragment>
           ))}
             <SidebarMenuItem>
                  <SidebarMenuButton onClick={logout} tooltip={{ children: "تسجيل الخروج", side: 'right', align: 'center' }}>
