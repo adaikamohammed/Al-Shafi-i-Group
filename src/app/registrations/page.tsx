@@ -374,28 +374,28 @@ export default function PreRegistrationPage() {
                      <Button onClick={() => { setEditingRegistration(null); setFormOpen(true); }}>
                         <PlusCircle className="ml-2 h-4 w-4" /> إضافة طلب تسجيل يدوي
                      </Button>
-                      <div className="relative w-full md:max-w-sm">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            placeholder="بحث شامل بالاسم، الولي، الهاتف، أو الملاحظات..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-9"
-                        />
-                    </div>
                 </CardContent>
             </Card>
 
              <Card>
                 <CardHeader>
-                    <CardTitle>أدوات البحث المتقدم</CardTitle>
+                    <CardTitle>أدوات البحث المتقدم والفلترة</CardTitle>
                     <CardContent className="pt-4 flex flex-wrap gap-2">
                         {Object.entries(statusBadgeColors).map(([status, className]) => (
-                            <Badge key={status} className={cn("border", className)}>{status}</Badge>
+                             <Badge key={status} className={cn("border cursor-pointer", className)} onClick={() => setStatusFilter(status as PreRegistrationStatus)}>{status}</Badge>
                         ))}
                     </CardContent>
                 </CardHeader>
                  <CardContent className="flex flex-wrap items-center gap-2">
+                    <div className="relative w-full sm:max-w-xs">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                            placeholder="بحث شامل..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-9"
+                        />
+                    </div>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline"><Filter className="ml-2 h-4 w-4"/>المستوى الدراسي {levelFilter.length > 0 && `(${levelFilter.length})`}</Button>
@@ -611,5 +611,6 @@ export default function PreRegistrationPage() {
 }
 
     
+
 
 
