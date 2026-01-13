@@ -1,11 +1,12 @@
 
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useStudentContext } from '@/context/StudentContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, User, KeyRound, Edit, Save } from 'lucide-react';
+import { Loader2, User, KeyRound, Edit, Save, Users, CheckCircle, BookCopy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -13,9 +14,11 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 
 export default function ProfilePage() {
     const { user, loading: authLoading, isSuperAdmin, updateUserProfile } = useAuth();
+    const { students, dailySessions } = useStudentContext();
     const { toast } = useToast();
     
     const [isSaving, setIsSaving] = useState(false);
@@ -34,6 +37,48 @@ export default function ProfilePage() {
         joinDate: '',
     });
 
+    const performanceStats = useMemo(() => {
+        if (!user?.group || !students || !dailySessions) {
+            return { studentCount: 0, attendanceRate: 0, masteredSurahs: 0 };
+        }
+
+        const groupStudents = students.filter(s => s.groupName === user.group && s.status === 'نشط');
+        const studentCount = groupStudents.length;
+
+        const totalMasteredSurahs = groupStudents.reduce((sum, student) => sum + (student.memorizedSurahsCount || 0), 0);
+
+        const currentMonthStart = startOfMonth(new Date());
+        const currentMonthEnd = endOfMonth(new Date());
+
+        const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(day => Object.values(day)).filter(session => {
+            if(!session.date) return false;
+            const sessionDate = parseISO(session.date);
+            return sessionDate >= currentMonthStart && sessionDate <= currentMonthEnd;
+        });
+
+        let totalPresent = 0;
+        let totalHeld = 0;
+
+        groupStudents.forEach(student => {
+            sessionsInMonth.forEach(session => {
+                if(session.sessionType === 'حصة أساسية' || session.sessionType === 'حصة تعويضية') {
+                    const record = (session.records ?? []).find(r => r.studentId === student.id);
+                    if (record) {
+                        totalHeld++;
+                        if (record.attendance === 'حاضر' || record.attendance === 'متأخر') {
+                            totalPresent++;
+                        }
+                    }
+                }
+            });
+        });
+        
+        const attendanceRate = totalHeld > 0 ? (totalPresent / totalHeld) * 100 : 0;
+
+        return { studentCount, attendanceRate, masteredSurahs: totalMasteredSurahs };
+
+    }, [user, students, dailySessions]);
+
     useEffect(() => {
         if (user) {
             setFormData({
@@ -44,7 +89,7 @@ export default function ProfilePage() {
                 secondaryPhone: user.secondaryPhone || '',
                 certifications: user.certifications || '',
                 bio: user.bio || '',
-                joinDate: user.joinDate || '',
+                joinDate: user.joinDate ? format(parseISO(user.joinDate), 'yyyy-MM-dd') : '',
             });
             setPhotoPreview(user.photoURL || null);
         }
@@ -108,6 +153,37 @@ export default function ProfilePage() {
     return (
         <div className="space-y-6">
              <h1 className="text-3xl font-headline font-bold">{pageTitle}</h1>
+            
+             <Card>
+                <CardHeader>
+                    <CardTitle>بطاقات إحصائية سريعة</CardTitle>
+                    <CardDescription>نظرة عامة على أداء فوجك هذا الشهر.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-center p-4 bg-blue-50 rounded-lg">
+                        <Users className="h-8 w-8 text-blue-500 mr-4" />
+                        <div>
+                            <p className="text-sm text-blue-700">عدد الطلبة النشطين</p>
+                            <p className="text-2xl font-bold">{performanceStats.studentCount}</p>
+                        </div>
+                    </div>
+                     <div className="flex items-center p-4 bg-green-50 rounded-lg">
+                        <CheckCircle className="h-8 w-8 text-green-500 mr-4" />
+                        <div>
+                            <p className="text-sm text-green-700">متوسط الحضور الشهري</p>
+                            <p className="text-2xl font-bold">{performanceStats.attendanceRate.toFixed(1)}%</p>
+                        </div>
+                    </div>
+                     <div className="flex items-center p-4 bg-yellow-50 rounded-lg">
+                        <BookCopy className="h-8 w-8 text-yellow-500 mr-4" />
+                        <div>
+                            <p className="text-sm text-yellow-700">إجمالي السور المتقنة</p>
+                            <p className="text-2xl font-bold">{performanceStats.masteredSurahs}</p>
+                        </div>
+                    </div>
+                </CardContent>
+             </Card>
+
             <Tabs defaultValue="public" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="public">بياناتي العامة</TabsTrigger>
