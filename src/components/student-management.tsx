@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -861,6 +862,7 @@ function StudentActions({ student, onStatusChange, onEdit }: { student: Student,
 
 function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSuccess: () => void, onCancel: () => void }) {
   const { addStudent, updateStudent, settings } = useStudentContext();
+  const { user, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const [birthDate, setBirthDate] = useState<Date | undefined>(student?.birthDate ? new Date(student.birthDate) : undefined);
   const [registrationDate, setRegistrationDate] = useState<Date | undefined>(student?.registrationDate ? new Date(student.registrationDate) : new Date());
@@ -918,6 +920,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         gender: data.gender,
         pageNumber: data.pageNumber,
         educationalLevel: data.educationalLevel,
+        groupName: isSuperAdmin ? data.groupName : user?.group,
         guardianName: data.guardianName,
         phone1: data.phone1,
         phone2: data.phone2,
@@ -1024,6 +1027,26 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
             <Label htmlFor="pageNumber">رقم الصفحة</Label>
             <Input name="pageNumber" id="pageNumber" defaultValue={student?.pageNumber} />
           </div>
+           {isSuperAdmin && (
+            <div className="space-y-2">
+              <Label htmlFor="groupName">الفوج</Label>
+              <Select dir="rtl" name="groupName" defaultValue={student?.groupName || user?.group}>
+                <SelectTrigger id="groupName"><SelectValue placeholder="اختر الفوج" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="فوج 1">فوج 1</SelectItem>
+                  <SelectItem value="فوج 2">فوج 2</SelectItem>
+                  <SelectItem value="فوج 3">فوج 3</SelectItem>
+                  <SelectItem value="فوج 4">فوج 4</SelectItem>
+                  <SelectItem value="فوج 5">فوج 5</SelectItem>
+                  <SelectItem value="فوج 6">فوج 6</SelectItem>
+                  <SelectItem value="فوج 7">فوج 7</SelectItem>
+                  <SelectItem value="فوج 8">فوج 8</SelectItem>
+                  <SelectItem value="فوج 9">فوج 9</SelectItem>
+                  <SelectItem value="فوج 10">فوج 10</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -1206,6 +1229,8 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
+    
 
     
 
