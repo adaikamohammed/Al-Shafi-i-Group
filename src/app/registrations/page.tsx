@@ -27,6 +27,7 @@ import type { Student, StudentStatus, PreRegistration, PreRegistrationStatus } f
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 const statusColors: Record<PreRegistrationStatus, string> = {
@@ -222,8 +223,7 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
                     <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>تغيير الصورة</Button>
                 </div>
                 
-                 <Separator />
-                <h4 className="font-semibold text-lg">الأساسيات</h4>
+                <h4 className="font-semibold text-lg border-b pb-2">الأساسيات</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="fullName">الاسم الكامل *</Label>
@@ -259,8 +259,7 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
                     </div>
                 </div>
 
-                <Separator />
-                <h4 className="font-semibold text-lg">الحالة والقرار</h4>
+                <h4 className="font-semibold text-lg border-b pb-2 pt-4">الحالة والقرار</h4>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <div className="space-y-2">
                         <Label htmlFor="status">الحالة</Label>
@@ -283,8 +282,7 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
                      )}
                  </div>
 
-                 <Separator />
-                <h4 className="font-semibold text-lg">التواصل والدراسة</h4>
+                <h4 className="font-semibold text-lg border-b pb-2 pt-4">التواصل والدراسة</h4>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="educationalLevel">المستوى الدراسي</Label>
@@ -339,6 +337,7 @@ export default function PreRegistrationPage() {
     const [levelFilter, setLevelFilter] = useState<string[]>([]);
     const [statusFilter, setStatusFilter] = useState('all');
     const [genderFilter, setGenderFilter] = useState('all');
+    const [selectedRows, setSelectedRows] = useState<string[]>([]);
     const router = useRouter();
     
     const [sortConfig, setSortConfig] = useState<{ key: keyof PreRegistration; direction: 'ascending' | 'descending' }>({ key: 'pageNumber', direction: 'ascending' });
@@ -511,16 +510,13 @@ export default function PreRegistrationPage() {
             </Card>
 
              <Card>
-                <CardHeader>
-                    <CardTitle>أدوات البحث المتقدم والفلترة</CardTitle>
-                </CardHeader>
-                 <CardContent className="flex flex-col gap-4">
-                    <div className="flex flex-wrap items-center gap-2">
+                 <CardContent className="flex flex-col gap-4 p-4">
+                     <div className="flex flex-wrap items-center gap-2">
                          {Object.entries(statusBadgeColors).map(([status, className]) => (
                              <Badge key={status} className={cn("border cursor-pointer", className)} onClick={() => setStatusFilter(status as PreRegistrationStatus)}>{status}</Badge>
                         ))}
                     </div>
-                     <div className="flex flex-wrap items-center gap-2">
+                     <div className="flex flex-col md:flex-row items-center gap-2">
                         <div className="relative w-full sm:max-w-xs">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input 
@@ -632,6 +628,19 @@ export default function PreRegistrationPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-[50px] px-2">
+                                         <Checkbox
+                                            checked={selectedRows.length > 0 && selectedRows.length === filteredRegistrations.length}
+                                            onCheckedChange={(checked) => {
+                                                if (checked) {
+                                                    setSelectedRows(filteredRegistrations.map(r => r.id));
+                                                } else {
+                                                    setSelectedRows([]);
+                                                }
+                                            }}
+                                            aria-label="Select all"
+                                        />
+                                    </TableHead>
                                     <TableHead className="w-[80px]">
                                         <Button variant="ghost" onClick={() => requestSort('pageNumber')} className="px-2">
                                             الهوية
@@ -654,7 +663,25 @@ export default function PreRegistrationPage() {
                             </TableHeader>
                             <TableBody>
                                 {filteredRegistrations.length > 0 ? filteredRegistrations.map(reg => (
-                                    <TableRow key={reg.id} className={cn("cursor-pointer", statusColors[reg.status])} onClick={() => setSelectedStudent(reg)}>
+                                    <TableRow 
+                                        key={reg.id} 
+                                        className={cn("cursor-pointer", statusColors[reg.status])} 
+                                        onClick={() => setSelectedStudent(reg)}
+                                        data-state={selectedRows.includes(reg.id) && "selected"}
+                                    >
+                                        <TableCell className="px-2" onClick={(e) => e.stopPropagation()}>
+                                            <Checkbox
+                                                checked={selectedRows.includes(reg.id)}
+                                                onCheckedChange={(checked) => {
+                                                    if (checked) {
+                                                        setSelectedRows(prev => [...prev, reg.id]);
+                                                    } else {
+                                                        setSelectedRows(prev => prev.filter(id => id !== reg.id));
+                                                    }
+                                                }}
+                                                aria-label="Select row"
+                                            />
+                                        </TableCell>
                                         <TableCell>
                                             <div className="flex flex-col items-center gap-1">
                                                 <Avatar className="w-10 h-10">
@@ -735,7 +762,7 @@ export default function PreRegistrationPage() {
                                     </TableRow>
                                 )) : (
                                     <TableRow>
-                                        <TableCell colSpan={Object.values(columnVisibility).filter(c => c.visible).length + 2} className="text-center h-24">
+                                        <TableCell colSpan={Object.values(columnVisibility).filter(c => c.visible).length + 3} className="text-center h-24">
                                             {searchTerm || levelFilter.length > 0 || statusFilter !== 'all' || genderFilter !== 'all'
                                                 ? 'لم يتم العثور على نتائج مطابقة للبحث.'
                                                 : 'لا توجد طلبات تسجيل جديدة في الوقت الحالي.'
@@ -748,11 +775,25 @@ export default function PreRegistrationPage() {
                     </div>
                 </CardContent>
             </Card>
+            
+            {selectedRows.length > 0 && (
+                <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 border-t shadow-lg z-50">
+                    <div className="container mx-auto flex justify-between items-center">
+                        <p className="font-semibold">{selectedRows.length} طلاب محددون</p>
+                        <div className="flex gap-2">
+                             <Button variant="outline" onClick={() => setSelectedRows([])}>إلغاء التحديد</Button>
+                             <Button>تعديل جماعي</Button>
+                             <Button variant="destructive">حذف المحدد</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
     
+
 
 
 

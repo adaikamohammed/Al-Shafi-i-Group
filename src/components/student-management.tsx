@@ -29,6 +29,7 @@ import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 const statusVariant: { [key in StudentStatus]: "default" | "destructive" | "secondary" | "outline" } = {
@@ -284,6 +285,7 @@ export default function StudentManagementPage() {
   const [isEditStudentDialogOpen, setEditStudentDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
     const rankingData = useMemo(() => {
         const pointsConfig = settings.points;
@@ -522,6 +524,19 @@ export default function StudentManagementPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px] px-2">
+                    <Checkbox
+                        checked={selectedRows.length > 0 && selectedRows.length === filteredStudents.length}
+                        onCheckedChange={(checked) => {
+                            if (checked) {
+                                setSelectedRows(filteredStudents.map(s => s.id));
+                            } else {
+                                setSelectedRows([]);
+                            }
+                        }}
+                        aria-label="Select all rows"
+                    />
+                </TableHead>
                 <TableHead className="w-[65px] p-2">الهوية</TableHead>
                 <TableHead>الاسم الكامل</TableHead>
                 {isSuperAdmin && <TableHead className="text-center">الفوج</TableHead>}
@@ -548,12 +563,28 @@ export default function StudentManagementPage() {
                       }[medal];
 
                     return (
-                        <TableRow key={student.id} className={cn(
-                            'cursor-pointer',
-                            medalClass,
-                            activeCovenant?.card === 'بطاقة صفراء' && 'bg-yellow-50 dark:bg-yellow-900/20',
-                            activeCovenant?.card === 'بطاقة حمراء' && 'bg-red-50 dark:bg-red-900/20'
-                        )} onClick={() => setSelectedStudent(student)}>
+                        <TableRow 
+                            key={student.id} 
+                            data-state={selectedRows.includes(student.id) && "selected"}
+                            className={cn(
+                                'cursor-pointer',
+                                medalClass,
+                                activeCovenant?.card === 'بطاقة صفراء' && 'bg-yellow-50 dark:bg-yellow-900/20',
+                                activeCovenant?.card === 'بطاقة حمراء' && 'bg-red-50 dark:bg-red-900/20'
+                            )} onClick={() => setSelectedStudent(student)}>
+                            <TableCell className="px-2" onClick={(e) => e.stopPropagation()}>
+                                <Checkbox
+                                    checked={selectedRows.includes(student.id)}
+                                    onCheckedChange={(checked) => {
+                                        if (checked) {
+                                            setSelectedRows(prev => [...prev, student.id]);
+                                        } else {
+                                            setSelectedRows(prev => prev.filter(id => id !== student.id));
+                                        }
+                                    }}
+                                    aria-label="Select row"
+                                />
+                            </TableCell>
                             <TableCell className="p-2">
                                 <Avatar className="w-10 h-10">
                                     <AvatarImage src={student.photoURL} />
@@ -596,7 +627,7 @@ export default function StudentManagementPage() {
                 })
              ) : (
                 <TableRow>
-                    <TableCell colSpan={isSuperAdmin ? 8 : 7} className="h-24 text-center">
+                    <TableCell colSpan={isSuperAdmin ? 9 : 8} className="h-24 text-center">
                        {searchTerm ? "لم يتم العثور على طلاب مطابقين للبحث." : "لا يوجد طلبة حاليًا. قم بإضافة طالب جديد."}
                     </TableCell>
                 </TableRow>
@@ -639,6 +670,18 @@ export default function StudentManagementPage() {
               </DialogContent>
           </Dialog>
       )}
+       {selectedRows.length > 0 && (
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 border-t shadow-lg z-50">
+                <div className="container mx-auto flex justify-between items-center">
+                    <p className="font-semibold">{selectedRows.length} طلاب محددون</p>
+                    <div className="flex gap-2">
+                            <Button variant="outline" onClick={() => setSelectedRows([])}>إلغاء التحديد</Button>
+                            <Button>تعديل جماعي</Button>
+                            <Button variant="destructive">حذف المحدد</Button>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
     </TooltipProvider>
   );
@@ -1049,6 +1092,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
 
 
 
