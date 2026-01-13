@@ -156,7 +156,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
                           </Button>
                         </SheetTrigger>
                         <h1 className="font-headline text-lg font-semibold text-primary">
-                          {navItems.find(item => pathname.startsWith(item.href))?.label || 'مدرسة الشافعي'}
+                          {user?.group || 'مدرسة الشافعي'}
                         </h1>
                     </div>
                     <Button

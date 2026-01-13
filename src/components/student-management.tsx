@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -1033,16 +1032,15 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
               <Select dir="rtl" name="groupName" defaultValue={student?.groupName || user?.group}>
                 <SelectTrigger id="groupName"><SelectValue placeholder="اختر الفوج" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="فوج 1">فوج 1</SelectItem>
-                  <SelectItem value="فوج 2">فوج 2</SelectItem>
-                  <SelectItem value="فوج 3">فوج 3</SelectItem>
-                  <SelectItem value="فوج 4">فوج 4</SelectItem>
-                  <SelectItem value="فوج 5">فوج 5</SelectItem>
-                  <SelectItem value="فوج 6">فوج 6</SelectItem>
-                  <SelectItem value="فوج 7">فوج 7</SelectItem>
-                  <SelectItem value="فوج 8">فوج 8</SelectItem>
-                  <SelectItem value="فوج 9">فوج 9</SelectItem>
-                  <SelectItem value="فوج 10">فوج 10</SelectItem>
+                  <SelectItem value="فوج الشيخ زياد درويش">فوج الشيخ زياد درويش</SelectItem>
+                  <SelectItem value="فوج الشيخ عبد الحميد">فوج الشيخ عبد الحميد</SelectItem>
+                  <SelectItem value="فوج الشيخ فؤاد بن عمر">فوج الشيخ فؤاد بن عمر</SelectItem>
+                  <SelectItem value="فوج الشيخ أحمد بن عمر">فوج الشيخ أحمد بن عمر</SelectItem>
+                  <SelectItem value="فوج الشيخ إبراهيم مراد">فوج الشيخ إبراهيم مراد</SelectItem>
+                  <SelectItem value="فوج الشيخ سفيان نصيرة">فوج الشيخ سفيان نصيرة</SelectItem>
+                  <SelectItem value="فوج الشيخ محمد منصور">فوج الشيخ محمد منصور</SelectItem>
+                  <SelectItem value="فوج الشيخ عبد الحق نصيرة">فوج الشيخ عبد الحق نصيرة</SelectItem>
+                  <SelectItem value="فوج الشيخ صهيب نصيب">فوج الشيخ صهيب نصيب</SelectItem>
                 </SelectContent>
               </Select>
             </div>
