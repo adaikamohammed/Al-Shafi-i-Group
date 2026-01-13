@@ -181,6 +181,8 @@ export default function DataExchangePage() {
     
     const reader = new FileReader();
     reader.onload = (e) => {
+        let newRegsCount = 0;
+        let skippedCount = 0;
         try {
             const data = new Uint8Array(e.target?.result as ArrayBuffer);
             const workbook = XLSX.read(data, { type: 'array', cellDates: true });
@@ -192,7 +194,10 @@ export default function DataExchangePage() {
 
             json.forEach((row, index) => {
                 const fullName = (row['الإسم الكامل'] || '').trim();
-                if (!fullName) return; // Skip rows without a full name
+                if (!fullName) {
+                    skippedCount++;
+                    return; 
+                }
 
                 const birthDateValue = parseDate(row['تاريخ الميلاد']);
                 let finalBirthDate: Date | string = new Date(); // Default if invalid
@@ -200,7 +205,6 @@ export default function DataExchangePage() {
                 if (birthDateValue instanceof Date && isValid(birthDateValue)) {
                     finalBirthDate = birthDateValue;
                 } else if (typeof birthDateValue === 'string') {
-                    // If parseDate returned a string (e.g., just a year), keep it as a string
                     finalBirthDate = birthDateValue;
                 }
                 
@@ -223,11 +227,12 @@ export default function DataExchangePage() {
 
             if (newPreRegs.length > 0) {
                 importPreRegistrations(newPreRegs);
+                newRegsCount = newPreRegs.length;
             }
             
             toast({
               title: "✅ اكتمل رفع التسجيلات",
-              description: `تم رفع ${newPreRegs.length} طالب جديد إلى قائمة التسجيلات.`,
+              description: `تم رفع ${newRegsCount} طالب جديد إلى قائمة التسجيلات، وتم تخطي ${skippedCount} سجل فارغ.`,
               action: <Button onClick={() => router.push('/registrations')}>الانتقال للقائمة</Button>
             });
             
@@ -589,7 +594,7 @@ export default function DataExchangePage() {
           <CardHeader>
             <CardTitle>📥 بيانات الطلبة</CardTitle>
             <CardDescription>
-              رفع ملف Excel يحتوي على بيانات الطلبة لبدء العام الدراسي أو إضافة طلبة جدد.
+              رفع ملف Excel يحتوي على بيانات الطلبة لبدء العام الدراسي أو إضافة طلبة جدد إلى فوجك الرسمي.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -610,14 +615,14 @@ export default function DataExchangePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>📥 بيانات التسجيلات الأولية</CardTitle>
+            <CardTitle>📥 استيراد التسجيلات الأولية</CardTitle>
             <CardDescription>
-              رفع ملف Excel يحتوي على طلبات التسجيل الجديدة لتسجيلها في النظام بشكل دائم.
+              رفع ملف Excel يحتوي على طلبات التسجيل الجديدة لتظهر في صفحة "التسجيلات الجديدة" لمراجعتها.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              سيتم رفع كل الصفوف في الملف إلى قائمة التسجيلات الأولية لمراجعتها.
+             <p className="text-sm text-muted-foreground">
+              سيتم رفع كل الصفوف في الملف إلى قائمة التسجيلات الأولية المشتركة بين جميع المشايخ.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button className="flex-grow" onClick={() => preRegFileInputRef.current?.click()} disabled={isImportingPreRegs}>
@@ -714,6 +719,8 @@ export default function DataExchangePage() {
     </div>
   );
 }
+
+    
 
     
 
