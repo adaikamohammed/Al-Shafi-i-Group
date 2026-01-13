@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -430,6 +430,7 @@ export default function PreRegistrationPage() {
     const [sortConfig, setSortConfig] = useState<{ key: keyof PreRegistration; direction: 'ascending' | 'descending' }>({ key: 'pageNumber', direction: 'ascending' });
     
     const [pendingDeletion, setPendingDeletion] = useState<string[]>([]);
+    const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const [columnVisibility, setColumnVisibility] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -444,6 +445,14 @@ export default function PreRegistrationPage() {
             localStorage.setItem('preRegColumnVisibility', JSON.stringify(columnVisibility));
         }
     }, [columnVisibility]);
+
+    useEffect(() => {
+        return () => {
+            if (undoTimeoutRef.current) {
+                clearTimeout(undoTimeoutRef.current);
+            }
+        };
+    }, []);
 
     const handleUnlock = () => {
         if (adminCode === 'admin8888') {
@@ -572,6 +581,10 @@ export default function PreRegistrationPage() {
     }
     
     const handleInitiateBulkDelete = () => {
+        if (undoTimeoutRef.current) {
+            clearTimeout(undoTimeoutRef.current);
+        }
+
         const itemsToDelete = [...selectedRows];
         setPendingDeletion(prev => [...prev, ...itemsToDelete]);
         setSelectedRows([]);
@@ -582,20 +595,27 @@ export default function PreRegistrationPage() {
             action: (
                 <Button variant="secondary" onClick={() => {
                     setPendingDeletion(prev => prev.filter(id => !itemsToDelete.includes(id)));
+                    if (undoTimeoutRef.current) {
+                        clearTimeout(undoTimeoutRef.current);
+                        undoTimeoutRef.current = null;
+                    }
                     toast({title: '✅ تم التراجع عن الحذف'});
                 }}>
                     تراجع
                 </Button>
             ),
+            duration: 10000,
         });
 
-        setTimeout(() => {
-            // This checks if the user has undone the action
-            // by checking if the items are still in a new "pending" state
-            // This part requires context modification to see the `pendingDeletion` state
-            // For now, we will assume if the timeout completes, we delete.
-            // A more robust solution would involve passing a cancel signal.
-            deleteMultiplePreRegistrations(itemsToDelete);
+        undoTimeoutRef.current = setTimeout(() => {
+            setPendingDeletion(prev => {
+                const finalToDelete = prev.filter(id => itemsToDelete.includes(id));
+                if (finalToDelete.length > 0) {
+                    deleteMultiplePreRegistrations(finalToDelete);
+                }
+                return prev.filter(id => !itemsToDelete.includes(id));
+            });
+            undoTimeoutRef.current = null;
         }, 10000);
     };
     
@@ -1043,6 +1063,8 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
+    
 
     
 
