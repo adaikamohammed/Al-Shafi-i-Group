@@ -16,6 +16,7 @@ import type { AppUser } from '@/lib/types';
 import { ref, set, get, update } from 'firebase/database';
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 const sheikhInitialData: { [email: string]: { name: string; group: string; role: 'sheikh' | 'super_admin' } } = {
   "admin0@gmail.com": { name: "المدير العام", group: "كل الأفواج", role: "super_admin" },
@@ -76,6 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 displayName: displayName,
                 group: sheikhInfo.group,
                 role: sheikhInfo.role,
+                joinDate: format(new Date(), 'yyyy-MM-dd'),
             };
             const newProfileRef = ref(db, `users/${currentUser.uid}/profile`);
             await set(newProfileRef, { 
@@ -83,6 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 displayName: appUser.displayName,
                 group: appUser.group,
                 role: appUser.role,
+                joinDate: appUser.joinDate,
             });
             if (currentUser.displayName !== appUser.displayName) {
                 await updateProfile(currentUser, { displayName: appUser.displayName });
@@ -112,6 +115,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         displayName: sheikhInfo.name,
         group: sheikhInfo.group,
         role: sheikhInfo.role,
+        joinDate: format(new Date(), 'yyyy-MM-dd'),
     };
     const userRef = ref(db, `users/${newUser.uid}/profile`);
     await set(userRef, profileData);
@@ -128,26 +132,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!auth.currentUser) throw new Error("User not authenticated.");
 
     const { photoFile, ...profileData } = data;
-    const updates: any = {};
+    const updates: { [key: string]: any } = {};
     let newPhotoURL = user?.photoURL || null;
 
     if (photoFile) {
         const imageRef = storageRef(storage, `sheikh_profiles/${auth.currentUser.uid}`);
         await uploadBytes(imageRef, photoFile);
         newPhotoURL = await getDownloadURL(imageRef);
-        updates[`/users/${auth.currentUser.uid}/profile/photoURL`] = newPhotoURL;
+        updates[`users/${auth.currentUser.uid}/profile/photoURL`] = newPhotoURL;
     }
 
-    if (profileData.displayName && profileData.displayName !== user?.displayName) {
-        updates[`/users/${auth.currentUser.uid}/profile/displayName`] = profileData.displayName;
-    }
-
-    // Add other fields to updates object
-    Object.keys(profileData).forEach(key => {
-        if (key !== 'displayName' && key !== 'photoURL') {
-             updates[`/users/${auth.currentUser.uid}/profile/${key}`] = (profileData as any)[key];
+    // Prepare updates for all provided data
+    for (const key in profileData) {
+        if (Object.prototype.hasOwnProperty.call(profileData, key)) {
+            updates[`users/${auth.currentUser.uid}/profile/${key}`] = (profileData as any)[key];
         }
-    });
+    }
 
     if (Object.keys(updates).length > 0) {
         await update(ref(db), updates);

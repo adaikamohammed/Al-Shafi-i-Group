@@ -31,6 +31,7 @@ export default function ProfilePage() {
         secondaryPhone: '',
         certifications: '',
         bio: '',
+        joinDate: '',
     });
 
     useEffect(() => {
@@ -43,6 +44,7 @@ export default function ProfilePage() {
                 secondaryPhone: user.secondaryPhone || '',
                 certifications: user.certifications || '',
                 bio: user.bio || '',
+                joinDate: user.joinDate || '',
             });
             setPhotoPreview(user.photoURL || null);
         }
@@ -137,7 +139,7 @@ export default function ProfilePage() {
                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                  <div className="space-y-2">
                                      <Label htmlFor="displayName">الإسم الكامل</Label>
-                                     <Input id="displayName" name="displayName" value={formData.displayName} onChange={handleInputChange} />
+                                     <Input id="displayName" name="displayName" value={formData.displayName} onChange={(e) => handleInputChange(e, 'displayName')} />
                                  </div>
                                  <div className="space-y-2">
                                     <Label htmlFor="maritalStatus">الحالة الاجتماعية</Label>
@@ -151,23 +153,27 @@ export default function ProfilePage() {
                                  </div>
                                  <div className="space-y-2">
                                      <Label htmlFor="phone">رقم الهاتف الشخصي</Label>
-                                     <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange}/>
+                                     <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={(e) => handleInputChange(e, 'phone')}/>
                                  </div>
                                   <div className="space-y-2">
                                      <Label htmlFor="secondaryPhone">رقم احتياطي</Label>
-                                     <Input id="secondaryPhone" name="secondaryPhone" type="tel" value={formData.secondaryPhone} onChange={handleInputChange}/>
+                                     <Input id="secondaryPhone" name="secondaryPhone" type="tel" value={formData.secondaryPhone} onChange={(e) => handleInputChange(e, 'secondaryPhone')}/>
                                  </div>
-                                 <div className="space-y-2 md:col-span-2">
+                                 <div className="space-y-2">
                                      <Label htmlFor="address">مقر السكن</Label>
-                                     <Input id="address" name="address" value={formData.address} onChange={handleInputChange}/>
+                                     <Input id="address" name="address" value={formData.address} onChange={(e) => handleInputChange(e, 'address')}/>
+                                 </div>
+                                  <div className="space-y-2">
+                                     <Label htmlFor="joinDate">تاريخ الانضمام</Label>
+                                     <Input id="joinDate" name="joinDate" value={formData.joinDate} disabled />
                                  </div>
                                 <div className="space-y-2 md:col-span-2">
                                     <Label htmlFor="certifications">الإجازات والروايات</Label>
-                                    <Textarea id="certifications" name="certifications" placeholder="مثال: إجازة في رواية ورش عن نافع..." value={formData.certifications} onChange={handleInputChange} />
+                                    <Textarea id="certifications" name="certifications" placeholder="مثال: إجازة في رواية ورش عن نافع..." value={formData.certifications} onChange={(e) => handleInputChange(e, 'certifications')} />
                                 </div>
                                 <div className="space-y-2 md:col-span-2">
                                     <Label htmlFor="bio">نبذة قصيرة</Label>
-                                    <Textarea id="bio" name="bio" placeholder="اكتب نبذة تعريفية مختصرة عنك..." value={formData.bio} onChange={handleInputChange} />
+                                    <Textarea id="bio" name="bio" placeholder="اكتب نبذة تعريفية مختصرة عنك..." value={formData.bio} onChange={(e) => handleInputChange(e, 'bio')} />
                                 </div>
                                </div>
                             </div>
