@@ -21,14 +21,30 @@ service firebase.storage {
 {
   "rules": {
     "users": {
+      // يسمح لأي شيخ مسجل بقراءة قائمة المستخدمين للتأكد من الصلاحيات
+      ".read": "auth != null && root.child('users').child(auth.uid).child('profile').child('role').val() === 'sheikh'",
       "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid"
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
       }
     },
+    
     "pre_registrations": {
-        ".read": "auth != null",
-        ".write": "auth != null"
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["status", "full_name", "phone_1"]
+    },
+
+    "students": {
+      ".read": "auth != null", 
+      // السماح بالكتابة إذا كان المستخدم مسجلاً ولديه دور شيخ في قاعدة البيانات
+      ".write": "auth != null && root.child('users').child(auth.uid).child('profile').child('role').val() === 'sheikh'"
+    },
+
+    "dailyReports": {
+      ".read": "auth != null", 
+      ".write": "auth != null && root.child('users').child(auth.uid).child('profile').child('role').val() === 'sheikh'",
+      ".indexOn": ["studentId"] 
     }
   }
 }

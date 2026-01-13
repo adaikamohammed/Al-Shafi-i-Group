@@ -23,7 +23,6 @@ const sheikhInitialData: { [email: string]: { name: string; group: string; role:
   "admin4@gmail.com": { name: "الشيخ أحمد بن عمر", group: "فوج 4", role: "sheikh" },
   "admin5@gmail.com": { name: "الشيخ إبراهيم مراد", group: "فوج 5", role: "sheikh" },
   "admin6@gmail.com": { name: "الشيخ سفيان نصيرة", group: "فوج 6", role: "sheikh" },
-  "admin7@gmail.com": { name: "الشيخ سفيان نصيرة", group: "فوج 7", role: "sheikh" },
   "admin8@gmail.com": { name: "الشيخ عبد الحق نصيرة", group: "فوج 8", role: "sheikh" },
   "admin9@gmail.com": { name: "الشيخ صهيب نصيب", group: "فوج 9", role: "sheikh" },
   "admin10@gmail.com": { name: "الشيخ محمد منصور", group: "فوج 10", role: "sheikh" },
