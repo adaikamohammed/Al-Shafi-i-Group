@@ -829,7 +829,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
           {student ? 'قم بتحديث معلومات الطالب هنا.' : 'املأ الحقول أدناه لإضافة طالب جديد إلى الفوج.'}
         </DialogDescription>
       </DialogHeader>
-      <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-2">
+      <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-2">
         <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
         <div className="flex flex-col items-center gap-4">
              <Avatar className="w-24 h-24 mb-2 border-4 border-muted">
@@ -1029,13 +1029,3 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
-
-    
-
-    
-
-
-
-
-
-
