@@ -204,6 +204,12 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
 
     return (
         <form onSubmit={handleSubmit}>
+             <DialogHeader>
+                <DialogTitle>{existingRegistration ? `تعديل طلب: ${existingRegistration.fullName}`: 'استمارة تسجيل أولي جديدة'}</DialogTitle>
+                <DialogDescription>
+                    {existingRegistration ? 'قم بتحديث بيانات الطالب هنا.' : 'املأ بيانات الطالب الجديد. الحقول المعلمة بـ * إلزامية.'}
+                </DialogDescription>
+            </DialogHeader>
             <div className="space-y-4 max-h-[70vh] overflow-y-auto p-4">
                  <div className="flex flex-col items-center gap-4">
                     <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
@@ -600,12 +606,6 @@ export default function PreRegistrationPage() {
                 if (!open) setEditingRegistration(null);
             }}>
                 <DialogContent className="sm:max-w-2xl">
-                     <DialogHeader>
-                        <DialogTitle>{editingRegistration ? `تعديل طلب: ${editingRegistration.fullName}`: 'استمارة تسجيل أولي جديدة'}</DialogTitle>
-                        <DialogDescription>
-                            املأ بيانات الطالب الجديد. الحقول المعلمة بـ * إلزامية.
-                        </DialogDescription>
-                    </DialogHeader>
                     <RegistrationForm onSave={handleSaveRegistration} onCancel={() => setFormOpen(false)} existingRegistration={editingRegistration}/>
                 </DialogContent>
             </Dialog>
@@ -634,18 +634,18 @@ export default function PreRegistrationPage() {
                                         <ArrowUpDown className="mr-2 h-4 w-4" />
                                     </Button>
                                 </TableHead>
-                                {columnVisibility.requestedAt.visible && <TableHead>تاريخ التسجيل</TableHead>}
-                                {columnVisibility.fullName.visible && <TableHead>الإسم الكامل</TableHead>}
-                                {columnVisibility.gender.visible && <TableHead>الجنس</TableHead>}
-                                {columnVisibility.birthDate.visible && <TableHead>تاريخ الميلاد</TableHead>}
-                                {columnVisibility.educationalLevel.visible && <TableHead>المستوى الدراسي</TableHead>}
-                                {columnVisibility.guardianName.visible && <TableHead>إسم الولي</TableHead>}
-                                {columnVisibility.phone1.visible && <TableHead>رقم الهاتف 1</TableHead>}
-                                {columnVisibility.phone2.visible && <TableHead>رقم الهاتف 2</TableHead>}
-                                {columnVisibility.address.visible && <TableHead>مقر السكن</TableHead>}
-                                {columnVisibility.status.visible && <TableHead>الحالة</TableHead>}
-                                {columnVisibility.notes.visible && <TableHead>ملاحظات</TableHead>}
-                                <TableHead>إجراءات</TableHead>
+                                {columnVisibility.requestedAt.visible && <TableHead className="text-center">تاريخ التسجيل</TableHead>}
+                                {columnVisibility.fullName.visible && <TableHead className="text-center">الإسم الكامل</TableHead>}
+                                {columnVisibility.gender.visible && <TableHead className="text-center">الجنس</TableHead>}
+                                {columnVisibility.birthDate.visible && <TableHead className="text-center">تاريخ الميلاد</TableHead>}
+                                {columnVisibility.educationalLevel.visible && <TableHead className="text-center">المستوى الدراسي</TableHead>}
+                                {columnVisibility.guardianName.visible && <TableHead className="text-center">إسم الولي</TableHead>}
+                                {columnVisibility.phone1.visible && <TableHead className="text-center">رقم الهاتف 1</TableHead>}
+                                {columnVisibility.phone2.visible && <TableHead className="text-center">رقم الهاتف 2</TableHead>}
+                                {columnVisibility.address.visible && <TableHead className="text-center">مقر السكن</TableHead>}
+                                {columnVisibility.status.visible && <TableHead className="text-center">الحالة</TableHead>}
+                                {columnVisibility.notes.visible && <TableHead className="text-center">ملاحظات</TableHead>}
+                                <TableHead className="text-center">إجراءات</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -662,22 +662,22 @@ export default function PreRegistrationPage() {
                                             <Badge variant="secondary" className="px-1.5 py-0.5 text-xs">{reg.pageNumber || 'N/A'}</Badge>
                                         </div>
                                     </TableCell>
-                                    {columnVisibility.requestedAt.visible && <TableCell>{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt ? reg.requestedAt.toString() : '-')}</TableCell>}
-                                    {columnVisibility.fullName.visible && <TableCell className="font-medium">{reg.fullName}</TableCell>}
-                                    {columnVisibility.gender.visible && <TableCell>{reg.gender}</TableCell>}
-                                    {columnVisibility.birthDate.visible && <TableCell>{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : (reg.birthDate ? reg.birthDate.toString() : 'غير محدد')}</TableCell>}
-                                    {columnVisibility.educationalLevel.visible && <TableCell>{reg.educationalLevel}</TableCell>}
-                                    {columnVisibility.guardianName.visible && <TableCell>{reg.guardianName}</TableCell>}
-                                    {columnVisibility.phone1.visible && <TableCell>{reg.phone1}</TableCell>}
-                                    {columnVisibility.phone2.visible && <TableCell>{reg.phone2}</TableCell>}
-                                    {columnVisibility.address.visible && <TableCell>{reg.address}</TableCell>}
-                                    {columnVisibility.status.visible && <TableCell>
+                                    {columnVisibility.requestedAt.visible && <TableCell className="text-center">{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt ? reg.requestedAt.toString() : '-')}</TableCell>}
+                                    {columnVisibility.fullName.visible && <TableCell className="font-medium text-center">{reg.fullName}</TableCell>}
+                                    {columnVisibility.gender.visible && <TableCell className="text-center">{reg.gender}</TableCell>}
+                                    {columnVisibility.birthDate.visible && <TableCell className="text-center">{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : (reg.birthDate ? reg.birthDate.toString() : 'غير محدد')}</TableCell>}
+                                    {columnVisibility.educationalLevel.visible && <TableCell className="text-center">{reg.educationalLevel}</TableCell>}
+                                    {columnVisibility.guardianName.visible && <TableCell className="text-center">{reg.guardianName}</TableCell>}
+                                    {columnVisibility.phone1.visible && <TableCell className="text-center">{reg.phone1}</TableCell>}
+                                    {columnVisibility.phone2.visible && <TableCell className="text-center">{reg.phone2}</TableCell>}
+                                    {columnVisibility.address.visible && <TableCell className="text-center">{reg.address}</TableCell>}
+                                    {columnVisibility.status.visible && <TableCell className="text-center">
                                          <Badge variant="outline" className={cn("border", statusBadgeColors[reg.status])}>
                                             {reg.status}
                                         </Badge>
                                     </TableCell>}
-                                    {columnVisibility.notes.visible && <TableCell className="max-w-[200px] truncate">{reg.notes}</TableCell>}
-                                     <TableCell onClick={(e) => e.stopPropagation()}>
+                                    {columnVisibility.notes.visible && <TableCell className="max-w-[200px] truncate text-center">{reg.notes}</TableCell>}
+                                     <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -748,6 +748,7 @@ export default function PreRegistrationPage() {
 }
 
     
+
 
 
 
