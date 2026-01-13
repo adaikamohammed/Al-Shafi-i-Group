@@ -65,6 +65,7 @@ interface StudentContextType {
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession[]>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
   importPreRegistrations: (newPreRegs: Omit<PreRegistration, 'id'>[]) => void;
+  deleteAllPreRegistrations: () => void;
   saveDailyReport: (report: Omit<DailyReport, 'id'>, reportIdToUpdate?: string) => Promise<void>;
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
@@ -281,6 +282,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     update(dbRef, updates);
   }
 
+  const deleteAllPreRegistrations = () => {
+    const preRegsRef = ref(db, 'pre_registrations');
+    remove(preRegsRef);
+    toast({ title: "🗑️ تم الحذف", description: "تم مسح جميع التسجيلات الأولية بنجاح." });
+  };
+
   const updateStudent = (studentId: string, updatedData: Partial<Student>, ownerId: string) => {
     if (!authContextUser) return;
     
@@ -452,7 +459,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <StudentContext.Provider value={{ students, preRegistrations, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
+    <StudentContext.Provider value={{ students, preRegistrations, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, deleteAllPreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
       {children}
     </StudentContext.Provider>
   );
@@ -466,4 +473,4 @@ export const useStudentContext = () => {
   return context;
 };
 
-    
+  

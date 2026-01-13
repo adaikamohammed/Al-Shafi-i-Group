@@ -5,7 +5,7 @@ import React, { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, History, Loader2, CalendarClock, UserPlus } from 'lucide-react';
+import { Upload, Download, History, Loader2, CalendarClock, UserPlus, Trash2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Student, DailyRecord, SessionType, DailySession, PreRegistration, PreRegistrationStatus } from '@/lib/types';
@@ -14,6 +14,8 @@ import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth, isVa
 import { ar } from 'date-fns/locale';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/navigation';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Separator } from '@/components/ui/separator';
 
 
 export default function DataExchangePage() {
@@ -25,7 +27,7 @@ export default function DataExchangePage() {
   const preRegFileInputRef = useRef<HTMLInputElement>(null);
 
 
-  const { students, addDailySession, getRecordsForDateRange, importStudents, importPreRegistrations, preRegistrations } = useStudentContext();
+  const { students, addDailySession, getRecordsForDateRange, importStudents, importPreRegistrations, preRegistrations, deleteAllPreRegistrations } = useStudentContext();
   const activeStudents = (students ?? []).filter(s => s.status === 'نشط');
 
   // State for monthly export
@@ -182,23 +184,19 @@ export default function DataExchangePage() {
     const reader = new FileReader();
     reader.onload = (e) => {
         let newRegsCount = 0;
-        let skippedCount = 0;
         try {
             const data = new Uint8Array(e.target?.result as ArrayBuffer);
             const workbook = XLSX.read(data, { type: 'array', cellDates: true });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json<any>(worksheet, { raw: false });
+            const json = XLSX.utils.sheet_to_json<any>(worksheet, { raw: false, defval: "" });
 
             const newPreRegs: Omit<PreRegistration, 'id'>[] = [];
 
-            json.forEach((row, index) => {
+            json.forEach((row) => {
                 const fullName = (row['الإسم الكامل'] || '').trim();
-                if (!fullName) {
-                    skippedCount++;
-                    return; 
-                }
-
+                // Import every row, even if only the name is present or nothing at all
+                
                 const birthDateValue = parseDate(row['تاريخ الميلاد']);
                 let finalBirthDate: Date | string = new Date(); // Default if invalid
 
@@ -206,6 +204,8 @@ export default function DataExchangePage() {
                     finalBirthDate = birthDateValue;
                 } else if (typeof birthDateValue === 'string') {
                     finalBirthDate = birthDateValue;
+                } else if (!birthDateValue) {
+                    finalBirthDate = ''; // Store as empty if null
                 }
                 
                 const preRegData: Omit<PreRegistration, 'id'> = {
@@ -215,12 +215,12 @@ export default function DataExchangePage() {
                     birthDate: finalBirthDate,
                     educationalLevel: row['المستوى الدراسي'] || '',
                     guardianName: row['إسم الولي'] || '',
-                    phone1: (row['رقم الهاتف 1']?.toString() || '').replace('/', ''),
-                    phone2: (row['رقم الهاتف 2']?.toString() || '').replace('/', ''),
-                    address: (row['مقر السكن'] || '').replace('/', ''),
+                    phone1: (row['رقم الهاتف 1']?.toString() || ''),
+                    phone2: (row['رقم الهاتف 2']?.toString() || ''),
+                    address: (row['مقر السكن'] || ''),
                     status: (row['الحالة'] || 'قيد الانتظار') as PreRegistrationStatus,
-                    pageNumber: (row['رقم الصفحة']?.toString() || '').replace('/', ''),
-                    notes: (row['ملاحظات'] || '').replace('/', ''),
+                    pageNumber: (row['رقم الصفحة']?.toString() || ''),
+                    notes: (row['ملاحظات'] || ''),
                 };
                 newPreRegs.push(preRegData);
             });
@@ -232,7 +232,7 @@ export default function DataExchangePage() {
             
             toast({
               title: "✅ اكتمل رفع التسجيلات",
-              description: `تم رفع ${newRegsCount} طالب جديد إلى قائمة التسجيلات، وتم تخطي ${skippedCount} سجل فارغ.`,
+              description: `تم رفع ${newRegsCount} سجل جديد إلى قائمة التسجيلات الأولية.`,
               action: <Button onClick={() => router.push('/registrations')}>الانتقال للقائمة</Button>
             });
             
@@ -633,6 +633,35 @@ export default function DataExchangePage() {
                 <Download className="ml-2 h-4 w-4" /> تحميل نموذج التسجيلات
               </Button>
             </div>
+             <Separator className="my-4" />
+                <div className="space-y-2 p-4 border-l-4 border-destructive rounded-r-lg bg-destructive/10">
+                    <h4 className="font-bold text-destructive">منطقة الخطر</h4>
+                    <div className="flex justify-between items-center">
+                        <p className="text-sm text-destructive/80">
+                            سيؤدي هذا إلى حذف جميع التسجيلات الأولية نهائياً.
+                        </p>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm">
+                                    <Trash2 className="ml-2 h-4 w-4" />
+                                    مسح كل التسجيلات
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        سيتم حذف جميع طلبات التسجيل الأولية نهائياً. هذا الإجراء لا يمكن التراجع عنه.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                    <AlertDialogAction onClick={deleteAllPreRegistrations}>تأكيد الحذف</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
+                </div>
           </CardContent>
         </Card>
       </div>
@@ -720,8 +749,4 @@ export default function DataExchangePage() {
   );
 }
 
-    
-
-    
-
-    
+  
