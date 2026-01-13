@@ -3,12 +3,12 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban, UserRound } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban, UserRound, Filter, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
@@ -286,8 +286,11 @@ export default function StudentManagementPage() {
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setEditStudentDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [levelFilter, setLevelFilter] = useState<string[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Student | 'pageNumber'; direction: 'ascending' | 'descending' }>({ key: 'fullName', direction: 'ascending' });
 
     const rankingData = useMemo(() => {
         const pointsConfig = settings.points;
@@ -397,30 +400,53 @@ export default function StudentManagementPage() {
       if (rank === 3 && uncompensatedAbsences <= 2) return 'bronze';
       return 'none';
   };
+  
+    const requestSort = (key: keyof Student | 'pageNumber') => {
+        let direction: 'ascending' | 'descending' = 'ascending';
+        if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    }
 
   const filteredStudents = useMemo(() => {
-    const statusOrder: { [key in StudentStatus]: number } = {
-        "نشط": 1,
-        "غائب طويل": 2,
-        "مطرود": 3,
-        "محذوف": 4,
-    };
+    const statusOrder: { [key in StudentStatus]: number } = { "نشط": 1, "غائب طويل": 2, "مطرود": 3, "محذوف": 4, };
     
-    const rankedStudents = (students ?? [])
-        .filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()))
-        .map(student => {
-            const rankIndex = rankingData.findIndex((r: any) => r.id === student.id);
-            return { ...student, rank: rankIndex === -1 ? Infinity : rankIndex };
-        });
+    let sortableStudents = (students ?? [])
+        .filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
 
-
-    return rankedStudents.sort((a, b) => {
-        if (statusOrder[a.status] !== statusOrder[b.status]) {
+    if (statusFilter !== 'all') {
+        sortableStudents = sortableStudents.filter(s => s.status === statusFilter);
+    }
+    if (levelFilter.length > 0) {
+        sortableStudents = sortableStudents.filter(s => s.educationalLevel && levelFilter.includes(s.educationalLevel));
+    }
+        
+    sortableStudents.sort((a, b) => {
+        if (sortConfig.key === 'pageNumber') {
+             const pageNumA = a.pageNumber ? parseInt(a.pageNumber, 10) : Infinity;
+             const pageNumB = b.pageNumber ? parseInt(b.pageNumber, 10) : Infinity;
+             let comparison = 0;
+             if (!isNaN(pageNumA) && !isNaN(pageNumB)) { comparison = pageNumA - pageNumB; } 
+             else if (!isNaN(pageNumA)) { comparison = -1; } 
+             else if (!isNaN(pageNumB)) { comparison = 1; }
+             return sortConfig.direction === 'ascending' ? comparison : -comparison;
+        }
+        if (a.status !== b.status) {
             return statusOrder[a.status] - statusOrder[b.status];
         }
-        return a.rank - b.rank;
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
     });
-  }, [students, searchTerm, rankingData]);
+
+    return sortableStudents;
+
+  }, [students, searchTerm, statusFilter, levelFilter, sortConfig]);
   
   const getActiveCovenant = (student: Student): Covenant | null => {
       if (!student.covenants || student.covenants.length === 0) return null;
@@ -485,14 +511,45 @@ export default function StudentManagementPage() {
       </div>
 
        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-         <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-                placeholder="بحث باسم الطالب..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-            />
+         <div className="flex flex-wrap items-center gap-2">
+             <div className="relative flex-grow sm:flex-grow-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                    placeholder="بحث باسم الطالب..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 w-full sm:w-[250px]"
+                />
+             </div>
+             <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline"><Filter className="ml-2 h-4 w-4" />المستوى الدراسي {levelFilter.length > 0 && `(${levelFilter.length})`}</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56">
+                    <DropdownMenuLabel>اختر المستويات</DropdownMenuLabel>
+                    {educationalLevels.map(level => (
+                        <DropdownMenuCheckboxItem
+                            key={level}
+                            checked={levelFilter.includes(level)}
+                            onCheckedChange={(checked) => {
+                                if (checked) setLevelFilter(prev => [...prev, level]);
+                                else setLevelFilter(prev => prev.filter(l => l !== level));
+                            }}
+                        >{level}</DropdownMenuCheckboxItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+             <Select dir="rtl" value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full flex-grow sm:w-[180px]">
+                    <SelectValue placeholder="الحالة" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">كل الحالات</SelectItem>
+                    <SelectItem value="نشط">نشط</SelectItem>
+                    <SelectItem value="غائب طويل">غائب طويل</SelectItem>
+                    <SelectItem value="مطرود">مطرود</SelectItem>
+                </SelectContent>
+            </Select>
          </div>
          <div className="flex items-center gap-2">
             <Button variant="outline" onClick={handleExportStudents} disabled={(students ?? []).length === 0}>
@@ -546,7 +603,12 @@ export default function StudentManagementPage() {
                         aria-label="Select all rows"
                     />
                 </TableHead>
-                <TableHead className="w-[65px] p-2">الهوية</TableHead>
+                <TableHead className="w-[80px] p-2">
+                    <Button variant="ghost" onClick={() => requestSort('pageNumber')} className="px-2">
+                        الهوية
+                        <ArrowUpDown className="mr-2 h-4 w-4" />
+                    </Button>
+                </TableHead>
                 <TableHead>الاسم الكامل</TableHead>
                 {isSuperAdmin && <TableHead className="text-center">الفوج</TableHead>}
                 <TableHead className="hidden md:table-cell text-center">المستوى الدراسي</TableHead>
@@ -570,17 +632,19 @@ export default function StudentManagementPage() {
                           bronze: 'bg-medal-bronze/30',
                           none: ''
                       }[medal];
+                      
+                      let rowClass = medalClass;
+                      if (activeCovenant?.card === 'بطاقة حمراء') rowClass = 'bg-red-50 dark:bg-red-900/20';
+                      else if (activeCovenant?.card === 'بطاقة صفراء') rowClass = 'bg-yellow-50 dark:bg-yellow-900/20';
+                      else if (student.status === 'غائب طويل') rowClass = 'bg-gray-100 dark:bg-gray-800/20 opacity-70';
+                      else if (student.status === 'مطرود') rowClass = 'bg-red-100 dark:bg-red-900/30 line-through opacity-60';
 
                     return (
                         <TableRow 
                             key={student.id} 
                             data-state={selectedRows.includes(student.id) ? "selected" : ""}
-                            className={cn(
-                                'cursor-pointer',
-                                medalClass,
-                                activeCovenant?.card === 'بطاقة صفراء' && 'bg-yellow-50 dark:bg-yellow-900/20',
-                                activeCovenant?.card === 'بطاقة حمراء' && 'bg-red-50 dark:bg-red-900/20'
-                            )} onClick={() => setSelectedStudent(student)}>
+                            className={cn('cursor-pointer', rowClass)} 
+                            onClick={() => setSelectedStudent(student)}>
                             <TableCell className="px-2" onClick={(e) => e.stopPropagation()}>
                                 <Checkbox
                                     checked={selectedRows.includes(student.id)}
@@ -843,6 +907,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     const studentData: Partial<Student> & { photoFile?: File | null } = {
         fullName: data.fullName,
         gender: data.gender,
+        pageNumber: data.pageNumber,
         educationalLevel: data.educationalLevel,
         guardianName: data.guardianName,
         phone1: data.phone1,
@@ -945,6 +1010,10 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
                     {educationalLevels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
                 </SelectContent>
             </Select>
+          </div>
+           <div className="space-y-2">
+            <Label htmlFor="pageNumber">رقم الصفحة</Label>
+            <Input name="pageNumber" id="pageNumber" defaultValue={student?.pageNumber} />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1138,3 +1207,6 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 
     
 
+
+
+    
