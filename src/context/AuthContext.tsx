@@ -66,22 +66,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             };
         } else {
              const sheikhInfo = sheikhInitialData[currentUser.email || ''] || { name: currentUser.displayName || 'مستخدم جديد', group: 'فوج غير محدد', role: 'sheikh' };
+             
+             // Ensure displayName from initial data is used if available
+             const displayName = sheikhInfo.name || currentUser.displayName || 'مستخدم جديد';
+
              appUser = {
                 uid: currentUser.uid,
                 email: currentUser.email,
-                displayName: sheikhInfo.name,
+                displayName: displayName,
                 photoURL: currentUser.photoURL,
                 group: sheikhInfo.group,
                 role: sheikhInfo.role,
             };
-            if(currentUser.email && !snapshot.exists()) {
-                 const newProfileRef = ref(db, `users/${currentUser.uid}/profile`);
-                 await set(newProfileRef, { 
-                    email: appUser.email, 
-                    displayName: appUser.displayName,
-                    group: appUser.group,
-                    role: appUser.role,
-                 });
+            // If profile doesn't exist, create it. This is crucial for new sign-ups or first logins.
+            const newProfileRef = ref(db, `users/${currentUser.uid}/profile`);
+            await set(newProfileRef, { 
+                email: appUser.email, 
+                displayName: appUser.displayName,
+                group: appUser.group,
+                role: appUser.role,
+            });
+            // Also update the auth profile display name if it's different
+            if (currentUser.displayName !== appUser.displayName) {
+                await updateProfile(currentUser, { displayName: appUser.displayName });
             }
         }
         setUser(appUser);
