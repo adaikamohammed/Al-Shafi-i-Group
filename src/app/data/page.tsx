@@ -203,7 +203,7 @@ export default function DataExchangePage() {
                 }
                 
                 const preRegData: Omit<PreRegistration, 'id'> = {
-                    requestedAt: new Date(),
+                    requestedAt: parseDate(row['تاريخ التسجيل']) || new Date(),
                     fullName: fullName,
                     gender: row['الجنس'] || 'ذكر',
                     birthDate: birthDate,
@@ -318,7 +318,7 @@ export default function DataExchangePage() {
             
             recordsToSave.push({
                 studentId: student.id,
-                attendance: row['الحضور'],
+                attendance: row['الحاضر'],
                 behavior: row['السلوك'],
                 memorization: row['التقييم'],
                 review: row['مراجعة'] === 'نعم',
@@ -416,7 +416,7 @@ export default function DataExchangePage() {
                    }
                    recordsToSave.push({
                        studentId: student.id,
-                       attendance: row['الحضور'], behavior: row['السلوك'],
+                       attendance: row['الحاضر'], behavior: row['السلوك'],
                        memorization: row['التقييم'], review: row['مراجعة'] === 'نعم',
                        notes: row['ملاحظات'],
                    });
@@ -725,3 +725,5 @@ export default function DataExchangePage() {
     </div>
   );
 }
+
+    
