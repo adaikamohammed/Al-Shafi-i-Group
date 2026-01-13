@@ -41,6 +41,11 @@ export default function ProfilePage() {
         bio: '',
         joinDate: '',
     });
+    
+    // Admin-specific fields state
+    const [adminNotes, setAdminNotes] = useState('');
+    const [adminAwards, setAdminAwards] = useState('');
+
 
     const performanceStats = useMemo(() => {
         if (!user || !students || !dailySessions) {
@@ -148,7 +153,7 @@ export default function ProfilePage() {
         setIsSaving(true);
         try {
             await updateUserProfile({ ...formData, photoFile });
-            toast({ title: `✅ تم تحديث ملفك بنجاح يا شيخ ${formData.displayName}` });
+            toast({ title: `✅ تم تحديث ملفك الشخصي بنجاح يا شيخ ${formData.displayName}` });
             setPhotoFile(null); // Reset file input after save
         } catch (error) {
             toast({ title: '❌ خطأ', description: 'فشل تحديث الملف الشخصي.', variant: 'destructive'});
@@ -156,6 +161,22 @@ export default function ProfilePage() {
             setIsSaving(false);
         }
     }
+    
+    const handleSaveAdminChanges = async () => {
+        if (!user || !isAdminViewUnlocked) return;
+        setIsSaving(true);
+        try {
+             // In a real app, you'd save adminNotes and adminAwards to a separate, secure node
+             // For now, we only handle joinDate update
+            await updateUserProfile({ joinDate: formData.joinDate });
+            toast({ title: `✅ تم تحديث السجل الإداري للشيخ ${formData.displayName}` });
+        } catch (error) {
+            toast({ title: '❌ خطأ', description: 'فشل تحديث السجل الإداري.', variant: 'destructive'});
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
 
     const handleUnlock = () => {
         if (adminCode === 'admin8888') {
@@ -275,8 +296,8 @@ export default function ProfilePage() {
                                      <Input id="address" name="address" value={formData.address} onChange={(e) => handleInputChange(e, 'address')}/>
                                  </div>
                                   <div className="space-y-2">
-                                     <Label htmlFor="joinDate">تاريخ الانضمام</Label>
-                                     <Input id="joinDate" name="joinDate" type="date" value={formData.joinDate} onChange={(e) => handleInputChange(e, 'joinDate')} disabled={!isAdminViewUnlocked} />
+                                     <Label htmlFor="joinDate">عضو في المدرسة منذ</Label>
+                                     <Input id="joinDate" name="joinDate" type="date" value={formData.joinDate} onChange={(e) => handleInputChange(e, 'joinDate')} disabled />
                                  </div>
                                 <div className="space-y-2 md:col-span-2">
                                     <Label htmlFor="certifications">الإجازات والروايات</Label>
@@ -303,19 +324,29 @@ export default function ProfilePage() {
                      <Card>
                         <CardHeader>
                             <CardTitle>السجل الإداري</CardTitle>
+                             <CardDescription>
+                                هذا القسم مخصص للمدير العام فقط، ويحتوي على تقييمات وملاحظات سرية حول أداء الشيخ.
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             {isAdminViewUnlocked ? (
-                                 <div className="w-full text-left space-y-4">
+                                 <div className="w-full space-y-4">
                                    <div className="space-y-2">
-                                      <Label>تقييم الإدارة للشيخ</Label>
-                                       <p className="text-sm text-muted-foreground"> (سيتم إضافة مكون التقييم هنا)</p>
+                                      <Label htmlFor="admin-joinDate">تعديل تاريخ الانضمام</Label>
+                                      <Input id="admin-joinDate" name="joinDate" type="date" value={formData.joinDate} onChange={(e) => handleInputChange(e, 'joinDate')} />
                                    </div>
                                    <div className="space-y-2">
-                                      <Label>الجوائز والتكريمات</Label>
-                                      <Textarea placeholder="سجل هنا أي تكريمات أو جوائز تم منحها للشيخ..."/>
+                                      <Label htmlFor="admin-notes">تقييم الإدارة للشيخ</Label>
+                                      <Textarea id="admin-notes" value={adminNotes} onChange={(e) => setAdminNotes(e.target.value)} placeholder="أداء الشيخ التربوي، التزامه بالمنهجية..."/>
                                    </div>
-                                    <Button>حفظ التقييم الإداري</Button>
+                                   <div className="space-y-2">
+                                      <Label htmlFor="admin-awards">الجوائز والتكريمات</Label>
+                                      <Textarea id="admin-awards" value={adminAwards} onChange={(e) => setAdminAwards(e.target.value)} placeholder="سجل هنا أي تكريمات أو جوائز تم منحها للشيخ..."/>
+                                   </div>
+                                    <Button onClick={handleSaveAdminChanges} disabled={isSaving}>
+                                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
+                                        حفظ السجل الإداري
+                                    </Button>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center p-8 text-center bg-muted rounded-lg">
@@ -357,5 +388,3 @@ export default function ProfilePage() {
         </div>
     )
 }
-
-    
