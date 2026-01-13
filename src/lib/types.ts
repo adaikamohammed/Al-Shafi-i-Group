@@ -122,6 +122,13 @@ export interface AppUser {
     photoURL?: string | null;
     group?: string;
     role?: 'sheikh' | 'super_admin';
+    address?: string;
+    maritalStatus?: 'متزوج' | 'أعزب';
+    phone?: string;
+    secondaryPhone?: string;
+    certifications?: string;
+    bio?: string;
+    joinDate?: string;
 }
 
 export interface StudentStat extends Partial<SessionRecord> {
@@ -191,12 +198,4 @@ export interface PreRegistration {
     notes?: string;
     photoURL?: string;
 }
-
-
-
-
-
-
-
-
     

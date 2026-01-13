@@ -38,7 +38,7 @@ interface AuthContextType {
   role: 'sheikh' | 'super_admin' | null;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  updateUserProfile: (data: { photoFile?: File | null }) => Promise<void>;
+  updateUserProfile: (data: Partial<AppUser> & { photoFile?: File | null }) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -63,10 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             appUser = { 
                 uid: currentUser.uid,
                 email: currentUser.email,
-                displayName: profileData.displayName,
-                photoURL: profileData.photoURL,
-                group: profileData.group,
-                role: profileData.role 
+                ...profileData
             };
         } else {
              const sheikhInfo = sheikhInitialData[currentUser.email || ''] || { name: currentUser.displayName || 'مستخدم جديد', group: 'فوج غير محدد', role: 'sheikh' };
@@ -77,7 +74,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 uid: currentUser.uid,
                 email: currentUser.email,
                 displayName: displayName,
-                photoURL: currentUser.photoURL,
                 group: sheikhInfo.group,
                 role: sheikhInfo.role,
             };
@@ -128,23 +124,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await signInWithEmailAndPassword(auth, email, password);
   }
 
-  const updateUserProfile = async (data: { photoFile?: File | null }) => {
+  const updateUserProfile = async (data: Partial<AppUser> & { photoFile?: File | null }) => {
     if (!auth.currentUser) throw new Error("User not authenticated.");
 
-    let photoURL = auth.currentUser.photoURL;
+    const { photoFile, ...profileData } = data;
     const updates: any = {};
+    let newPhotoURL = user?.photoURL || null;
 
-    if (data.photoFile) {
+    if (photoFile) {
         const imageRef = storageRef(storage, `sheikh_profiles/${auth.currentUser.uid}`);
-        await uploadBytes(imageRef, data.photoFile);
-        photoURL = await getDownloadURL(imageRef);
-        updates[`/users/${auth.currentUser.uid}/profile/photoURL`] = photoURL;
-        await updateProfile(auth.currentUser, { photoURL });
+        await uploadBytes(imageRef, photoFile);
+        newPhotoURL = await getDownloadURL(imageRef);
+        updates[`/users/${auth.currentUser.uid}/profile/photoURL`] = newPhotoURL;
     }
-    
+
+    if (profileData.displayName && profileData.displayName !== user?.displayName) {
+        updates[`/users/${auth.currentUser.uid}/profile/displayName`] = profileData.displayName;
+    }
+
+    // Add other fields to updates object
+    Object.keys(profileData).forEach(key => {
+        if (key !== 'displayName' && key !== 'photoURL') {
+             updates[`/users/${auth.currentUser.uid}/profile/${key}`] = (profileData as any)[key];
+        }
+    });
+
     if (Object.keys(updates).length > 0) {
         await update(ref(db), updates);
-        setUser(prevUser => prevUser ? { ...prevUser, photoURL: photoURL } : null);
+        
+        // Update Firebase Auth profile if displayName changed
+        if (profileData.displayName && profileData.displayName !== auth.currentUser.displayName) {
+            await updateProfile(auth.currentUser, { displayName: profileData.displayName });
+        }
+        
+        setUser(prevUser => prevUser ? { ...prevUser, ...profileData, photoURL: newPhotoURL } : null);
     }
   };
 
