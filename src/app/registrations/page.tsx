@@ -10,15 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
-import { useStudentContext } from '@/context/StudentContext';
-import { useAuth } from '@/context/AuthContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -28,18 +27,18 @@ type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض"
 
 interface PreRegistration {
     id: string;
+    requestedAt: Date;
     fullName: string;
     gender?: "ذكر" | "أنثى";
+    birthDate: Date;
+    educationalLevel?: string;
     guardianName?: string;
     phone1: string;
     phone2?: string;
-    birthDate: Date;
-    educationalLevel?: string;
     address?: string;
     status: PreRegistrationStatus;
-    requestedAt: Date;
-    notes?: string;
     pageNumber?: string;
+    notes?: string;
 }
 
 const statusColors: Record<PreRegistrationStatus, string> = {
@@ -219,11 +218,6 @@ export default function PreRegistrationPage() {
         toast({ title: '🗑️ تم الحذف', description: `تم حذف طلب التسجيل.`, variant: 'destructive'});
     }
 
-    const handleStatusChange = (id: string, newStatus: PreRegistrationStatus) => {
-        setRegistrations(regs => regs.map(r => r.id === id ? {...r, status: newStatus} : r));
-    }
-
-
     return (
         <div className="space-y-6">
             <Card>
@@ -263,30 +257,40 @@ export default function PreRegistrationPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>الاسم الكامل</TableHead>
+                                <TableHead>تاريخ التسجيل</TableHead>
+                                <TableHead>الإسم الكامل</TableHead>
                                 <TableHead>الجنس</TableHead>
                                 <TableHead>تاريخ الميلاد</TableHead>
                                 <TableHead>المستوى الدراسي</TableHead>
-                                <TableHead>اسم الولي</TableHead>
-                                <TableHead>رقم الهاتف</TableHead>
+                                <TableHead>إسم الولي</TableHead>
+                                <TableHead>رقم الهاتف 1</TableHead>
+                                <TableHead>رقم الهاتف 2</TableHead>
+                                <TableHead>مقر السكن</TableHead>
                                 <TableHead>الحالة</TableHead>
+                                <TableHead>رقم الصفحة</TableHead>
+                                <TableHead>ملاحظات</TableHead>
                                 <TableHead>إجراءات</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {registrations.length > 0 ? registrations.map(reg => (
                                 <TableRow key={reg.id}>
+                                    <TableCell>{format(reg.requestedAt, 'yyyy/MM/dd')}</TableCell>
                                     <TableCell className="font-medium">{reg.fullName}</TableCell>
                                     <TableCell>{reg.gender}</TableCell>
                                     <TableCell>{isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : 'غير صالح'}</TableCell>
                                     <TableCell>{reg.educationalLevel}</TableCell>
                                     <TableCell>{reg.guardianName}</TableCell>
                                     <TableCell>{reg.phone1}</TableCell>
+                                    <TableCell>{reg.phone2}</TableCell>
+                                    <TableCell>{reg.address}</TableCell>
                                     <TableCell>
                                          <Badge variant="outline" className={cn("border", statusColors[reg.status])}>
                                             {reg.status}
                                         </Badge>
                                     </TableCell>
+                                    <TableCell>{reg.pageNumber}</TableCell>
+                                    <TableCell className="max-w-[200px] truncate">{reg.notes}</TableCell>
                                      <TableCell>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -321,7 +325,7 @@ export default function PreRegistrationPage() {
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="text-center h-24">
+                                    <TableCell colSpan={13} className="text-center h-24">
                                         لا توجد طلبات تسجيل جديدة في الوقت الحالي.
                                     </TableCell>
                                 </TableRow>
@@ -333,5 +337,3 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
-
-    
