@@ -133,7 +133,7 @@ export default function StudentReportPage() {
 
 
         const radarData = [
-            { subject: 'الحضور', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
+            { subject: 'الحضÙر', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
             { subject: 'الحفظ', score: parseFloat(memorizationScore.toFixed(1)), fullMark: 10 },
             { subject: 'الانضباط', score: parseFloat(disciplineScore.toFixed(1)), fullMark: 10 },
             { subject: 'التجويد', score: tajweedScore, fullMark: 10 },
@@ -150,7 +150,7 @@ export default function StudentReportPage() {
             if (minScoreItem.score < 5) {
                 switch(minScoreItem.subject) {
                     case 'الحفظ': autoNote = 'نوصي بتكثيف المراجعة والتركيز على تثبيت السور المحفوظة للوصول لمرحلة الإتقان.'; break;
-                    case 'الحضور': autoNote = 'نوصي بالتركيز على تحسين جانب الحضور والالتزام بمواعيد الحصص.'; break;
+                    case 'الحضÙر': autoNote = 'نوصي بالتركيز على تحسين جانب الحضور والالتزام بمواعيد الحصص.'; break;
                     case 'الانضباط': autoNote = 'نوصي بالعمل على تحسين السلوك والانضباط داخل الحلقة.'; break;
                     case 'التجويد': autoNote = 'نوصي بالتركيز على مخارج الحروف وأحكام التجويد.'; break;
                     case 'الأخلاق': autoNote = 'نوصي بتعزيز جانب الأخلاق والآداب الإسلامية العامة.'; break;
@@ -211,8 +211,8 @@ export default function StudentReportPage() {
         if (!reportData) return;
     
         const { student, stats, autoNote, activeCovenant } = reportData;
-        const groupName = user?.group || "المدرسة";
-        let message = `*📢 تقرير أداء الطالب: ${student.fullName}*\n\n*📆 الفترة:* ${reportData.statsPeriod}\n*👨‍🏫 الشيخ المسؤول:* ${user?.displayName || "الشيخ"}`;
+        const sheikhName = user?.displayName || "الشيخ";
+        let message = `*📢 تقرير أداء الطالب: ${student.fullName}*\n\n*📆 الفترة:* ${reportData.statsPeriod}\n*👨‍🏫 الشيخ المسؤول:* ${sheikhName}`;
     
         // Commitment Balance
         const attendanceBalance = stats.absent - stats.compensationBalance;
