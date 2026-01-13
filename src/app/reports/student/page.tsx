@@ -21,6 +21,7 @@ const ReportDisplay = dynamic(() => import('@/components/ui/ReportDisplay').then
     loading: () => <div className="flex items-center justify-center h-96"><Loader2 className="h-8 w-8 animate-spin" /></div>
 });
 
+type MessageTemplate = "tahdidi" | "tanbih" | "istidaa" | "tashjee" | "inqitaa";
 
 export default function StudentReportPage() {
     const { students, dailySessions, surahProgress, loading } = useStudentContext();
@@ -35,6 +36,7 @@ export default function StudentReportPage() {
     const [teacherNote, setTeacherNote] = useState('');
     const [tajweedScore, setTajweedScore] = useState(5);
     const [akhlaqScore, setAkhlaqScore] = useState(5);
+    const [messageTemplate, setMessageTemplate] = useState<MessageTemplate>('tahdidi');
 
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
 
@@ -133,7 +135,7 @@ export default function StudentReportPage() {
 
 
         const radarData = [
-            { subject: 'الحضÙر', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
+            { subject: 'الحضور', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
             { subject: 'الحفظ', score: parseFloat(memorizationScore.toFixed(1)), fullMark: 10 },
             { subject: 'الانضباط', score: parseFloat(disciplineScore.toFixed(1)), fullMark: 10 },
             { subject: 'التجويد', score: tajweedScore, fullMark: 10 },
@@ -150,7 +152,7 @@ export default function StudentReportPage() {
             if (minScoreItem.score < 5) {
                 switch(minScoreItem.subject) {
                     case 'الحفظ': autoNote = 'نوصي بتكثيف المراجعة والتركيز على تثبيت السور المحفوظة للوصول لمرحلة الإتقان.'; break;
-                    case 'الحضÙر': autoNote = 'نوصي بالتركيز على تحسين جانب الحضور والالتزام بمواعيد الحصص.'; break;
+                    case 'الحضور': autoNote = 'نوصي بالتركيز على تحسين جانب الحضور والالتزام بمواعيد الحصص.'; break;
                     case 'الانضباط': autoNote = 'نوصي بالعمل على تحسين السلوك والانضباط داخل الحلقة.'; break;
                     case 'التجويد': autoNote = 'نوصي بالتركيز على مخارج الحروف وأحكام التجويد.'; break;
                     case 'الأخلاق': autoNote = 'نوصي بتعزيز جانب الأخلاق والآداب الإسلامية العامة.'; break;
@@ -209,35 +211,33 @@ export default function StudentReportPage() {
     
     const handleCopyWhatsAppReport = () => {
         if (!reportData) return;
-    
-        const { student, stats, autoNote, activeCovenant } = reportData;
-        const sheikhName = user?.displayName || "الشيخ";
-        let message = `*📢 تقرير أداء الطالب: ${student.fullName}*\n\n*📆 الفترة:* ${reportData.statsPeriod}\n*👨‍🏫 الشيخ المسؤول:* ${sheikhName}`;
-    
-        // Commitment Balance
-        const attendanceBalance = stats.absent - stats.compensationBalance;
-        if (attendanceBalance > 0) {
-            message += `\n\n*ميزان الالتزام:*\n*رصيد حصص الغياب غير المعوضة:* ${attendanceBalance}`;
-        }
-    
-        // Empowerment Task
-        const empowermentTask = (student.covenants || []).find(c => c.type === 'ميثاق حفظ' && c.status === 'نشط');
-        if (empowermentTask) {
-            message += `\n*مهمة التمكين الحالية:* ${empowermentTask.text} - *حالة التسليم:* ${empowermentTask.status}`;
-        }
-    
-        // Teacher's Note
-        const sheikhNote = teacherNote.trim() ? `\n\n*ملاحظة الشيخ:* ${teacherNote.trim()}` : (autoNote ? `\n\n*ملاحظة الشيخ:* ${autoNote}` : '');
-        message += sheikhNote;
 
-        // Closing Note
-        if (attendanceBalance > 0 || empowermentTask) {
-            message += `\n\n*نرجو منكم حث الابن على تعويض الحصص الفائتة وتسليم المهمة في موعدها لضمان سير خطة الحفظ.*`;
+        const { student } = reportData;
+        const sheikhName = user?.displayName || "الشيخ";
+        const todayDate = format(new Date(), 'yyyy/MM/dd');
+        let message = '';
+
+        switch (messageTemplate) {
+            case 'tahdidi':
+                message = `*📝 رسالة تعهد لضبط الغياب*\n\nالسلام عليكم ولي أمر الطالب: ${student.fullName}\n\nنظراً لتكرار غياب ابنكم، نود إعلامكم بضرورة حضوره وتوقيع "تعهد الغياب" لضمان التزامه واستمراره في خطة الحفظ.\n\n*التاريخ:* ${todayDate}\n*الشيخ المسؤول:* ${sheikhName}`;
+                break;
+            case 'tanbih':
+                message = `*⚠️ تنبيه بشأن مستوى الحفظ*\n\nالسلام عليكم ولي أمر الطالب: ${student.fullName}\n\nلوحظ ضعف في مستوى الحفظ والمراجعة لدى ابنكم مؤخراً. نرجو منكم متابعته في المنزل وتشجيعه على التركيز أكثر في الحلقة.\n\n*التاريخ:* ${todayDate}\n*الشيخ المسؤول:* ${sheikhName}`;
+                break;
+            case 'istidaa':
+                message = `*📢 استدعاء ولي أمر*\n\nالسلام عليكم، نرجو من ولي أمر الطالب: ${student.fullName} الحضور إلى مقر المدرسة يوم [أدخل اليوم] على الساعة [أدخل الساعة] لأمر يهمه.\n\n*التاريخ:* ${todayDate}\n*الشيخ المسؤول:* ${sheikhName}`;
+                break;
+            case 'tashjee':
+                message = `*🎉 رسالة شكر وتشجيع*\n\nالسلام عليكم ولي أمر الطالب: ${student.fullName}\n\nنشكركم على جهودكم، ونود إعلامكم بأن ابنكم يُظهر أداءً متميزاً والتزاماً رائعاً في الحلقة. نتمنى له المزيد من التوفيق والنجاح.\n\n*التاريخ:* ${todayDate}\n*الشيخ المسؤول:* ${sheikhName}`;
+                break;
+            case 'inqitaa':
+                 message = `*❗ إشعار انقطاع عن الدراسة*\n\nالسلام عليكم ولي أمر الطالب: ${student.fullName}\n\nنحيطكم علماً بأن ابنكم قد تغيب لأكثر من 3 حصص متتالية دون عذر. نرجو منكم التواصل مع الإدارة لتوضيح سبب الانقطاع قبل اتخاذ أي إجراء.\n\n*التاريخ:* ${todayDate}\n*الشيخ المسؤول:* ${sheikhName}`;
+                break;
+            default:
+                message = `تقرير الطالب: ${student.fullName} - الشيخ: ${sheikhName}`;
         }
     
-        const finalMessage = `${message.trim()}\n\n---\n*تم الإرسال عبر نظام إدارة مدرسة الإمام الشافعي.*`;
-    
-        navigator.clipboard.writeText(finalMessage).then(() => {
+        navigator.clipboard.writeText(message).then(() => {
             toast({
                 title: "✅ تم النسخ بنجاح!",
                 description: "الرسالة جاهزة للصق في واتساب.",
@@ -334,10 +334,6 @@ export default function StudentReportPage() {
                             <FileTextIcon className="ml-2 h-4 w-4" />
                             حفظ بصيغة Word
                         </Button>
-                        <Button onClick={handleCopyWhatsAppReport} disabled={!selectedStudentId} variant="secondary">
-                            <MessageCircle className="ml-2 h-4 w-4" />
-                            تجهيز رسالة واتساب
-                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -366,6 +362,29 @@ export default function StudentReportPage() {
                         onChange={e => setTeacherNote(e.target.value)}
                         rows={4}
                     />
+                    <div className="grid md:grid-cols-2 gap-4 pt-4 border-t">
+                        <div className="space-y-2">
+                            <Label htmlFor="message-template">اختر قالب رسالة واتساب</Label>
+                             <Select dir="rtl" value={messageTemplate} onValueChange={(value: MessageTemplate) => setMessageTemplate(value)}>
+                                <SelectTrigger id="message-template">
+                                    <SelectValue placeholder="اختر نوع الرسالة" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="tahdidi">رسالة تعهد (لضبط الغياب)</SelectItem>
+                                    <SelectItem value="tanbih">رسالة تنبيه (لضعف الحفظ)</SelectItem>
+                                    <SelectItem value="istidaa">إستدعاء ولي أمر</SelectItem>
+                                    <SelectItem value="tashjee">رسالة تشجيع (للتميز)</SelectItem>
+                                    <SelectItem value="inqitaa">إشعار انقطاع (غياب 3+ حصص)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex items-end">
+                            <Button onClick={handleCopyWhatsAppReport} disabled={!selectedStudentId} className="w-full">
+                                <MessageCircle className="ml-2 h-4 w-4" />
+                                تجهيز ونسخ رسالة الواتساب
+                            </Button>
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
 
