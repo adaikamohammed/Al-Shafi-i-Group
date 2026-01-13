@@ -38,11 +38,17 @@ export default function ProfilePage() {
     });
 
     const performanceStats = useMemo(() => {
-        if (!user?.group || !students || !dailySessions) {
+        if (!user || !students || !dailySessions) {
             return { studentCount: 0, attendanceRate: 0, masteredSurahs: 0 };
         }
+        
+        const groupName = isSuperAdmin ? undefined : user.group;
 
-        const groupStudents = students.filter(s => s.groupName === user.group && s.status === 'نشط');
+        const groupStudents = students.filter(s => {
+            if (s.status !== 'نشط') return false;
+            return groupName ? s.groupName === groupName : true;
+        });
+        
         const studentCount = groupStudents.length;
 
         const totalMasteredSurahs = groupStudents.reduce((sum, student) => sum + (student.memorizedSurahsCount || 0), 0);
@@ -58,17 +64,16 @@ export default function ProfilePage() {
 
         let totalPresent = 0;
         let totalHeld = 0;
+        
+        const scheduledSessions = sessionsInMonth.filter(s => s.sessionType === 'حصة أساسية' || s.sessionType === 'حصة تعويضية' || (s.sessionType === 'غياب الشيخ' && s.substituteTeacher));
+        
+        totalHeld = groupStudents.length * scheduledSessions.length;
 
         groupStudents.forEach(student => {
-            sessionsInMonth.forEach(session => {
-                if(session.sessionType === 'حصة أساسية' || session.sessionType === 'حصة تعويضية') {
-                    const record = (session.records ?? []).find(r => r.studentId === student.id);
-                    if (record) {
-                        totalHeld++;
-                        if (record.attendance === 'حاضر' || record.attendance === 'متأخر') {
-                            totalPresent++;
-                        }
-                    }
+            scheduledSessions.forEach(session => {
+                const record = (session.records ?? []).find(r => r.studentId === student.id);
+                if (record && (record.attendance === 'حاضر' || record.attendance === 'متأخر')) {
+                    totalPresent++;
                 }
             });
         });
@@ -77,7 +82,7 @@ export default function ProfilePage() {
 
         return { studentCount, attendanceRate, masteredSurahs: totalMasteredSurahs };
 
-    }, [user, students, dailySessions]);
+    }, [user, students, dailySessions, isSuperAdmin]);
 
     useEffect(() => {
         if (user) {
