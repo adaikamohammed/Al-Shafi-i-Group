@@ -86,6 +86,9 @@ const StudentProfileCard = ({ student, onPromote, onEdit }: { student: PreRegist
 
     return (
         <DialogContent className="sm:max-w-2xl p-0">
+             <DialogHeader>
+                <DialogTitle className="sr-only">بطاقة الطالب: {student.fullName}</DialogTitle>
+             </DialogHeader>
              <div className={cn("p-6 rounded-t-lg text-white", headerColor)}>
                 <div className="flex items-center gap-4">
                      <Avatar className="w-20 h-20 border-4 border-white/50">
@@ -122,9 +125,9 @@ const StudentProfileCard = ({ student, onPromote, onEdit }: { student: PreRegist
                          <p><strong className="min-w-[100px] inline-block">مقر السكن:</strong> {student.address || 'غير محدد'}</p>
                     </div>
                 </div>
-                {(student.status === 'مرفوض' || student.status === 'مرشح' || student.notes) && (
+                {(student.status === 'مرفوض' || student.status === 'مؤجل' || student.notes) && (
                     <div className="md:col-span-2">
-                        <h3 className="font-semibold mb-2 border-b pb-1">{student.status === 'مرفوض' ? 'سبب الرفض' : student.status === 'مرشح' ? 'سبب الترشيح' : 'ملاحظات'}</h3>
+                        <h3 className="font-semibold mb-2 border-b pb-1">{student.status === 'مرفوض' ? 'سبب الرفض' : student.status === 'مؤجل' ? 'سبب التأجيل' : 'ملاحظات'}</h3>
                         <div className="p-3 bg-muted rounded-md text-sm">
                             <p>{student.notes || 'لا توجد ملاحظات مسجلة.'}</p>
                         </div>
@@ -745,4 +748,5 @@ export default function PreRegistrationPage() {
 }
 
     
+
 
