@@ -191,7 +191,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
                 </div>
                  <div className="p-3 bg-muted rounded-lg">
                     <dt className="text-sm font-medium text-muted-foreground">الفوج</dt>
-                    <dd className="font-semibold">{(student as any).groupName || 'غير محدد'}</dd>
+                    <dd className="font-semibold">{student.groupName || 'غير محدد'}</dd>
                 </div>
                  <div className="p-3 bg-muted rounded-lg">
                     <dt className="text-sm font-medium text-muted-foreground">الشيخ المشرف</dt>
@@ -364,7 +364,7 @@ export default function StudentManagementPage() {
   const handleExportStudents = () => {
     const dataToExport = (students ?? []).map(s => ({
         "الاسم الكامل": s.fullName,
-        "الفوج": (s as any).groupName || user?.group || 'غير محدد',
+        "الفوج": s.groupName || user?.group || 'غير محدد',
         "اسم الولي": s.guardianName,
         "رقم الهاتف 1": s.phone1,
         "رقم الهاتف 2": s.phone2 || '',
@@ -411,8 +411,13 @@ export default function StudentManagementPage() {
   const filteredStudents = useMemo(() => {
     const statusOrder: { [key in StudentStatus]: number } = { "نشط": 1, "غائب طويل": 2, "مطرود": 3, "محذوف": 4, };
     
-    let sortableStudents = (students ?? [])
-        .filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
+    let sortableStudents = (students ?? []);
+
+    if (!isSuperAdmin && user?.group) {
+        sortableStudents = sortableStudents.filter(student => student.groupName === user.group);
+    }
+        
+    sortableStudents = sortableStudents.filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
 
     if (statusFilter !== 'all') {
         sortableStudents = sortableStudents.filter(s => s.status === statusFilter);
@@ -445,7 +450,7 @@ export default function StudentManagementPage() {
 
     return sortableStudents;
 
-  }, [students, searchTerm, statusFilter, levelFilter, sortConfig]);
+  }, [students, searchTerm, statusFilter, levelFilter, sortConfig, isSuperAdmin, user]);
   
   const getActiveCovenant = (student: Student): Covenant | null => {
       if (!student.covenants || student.covenants.length === 0) return null;
@@ -608,7 +613,12 @@ export default function StudentManagementPage() {
                         <ArrowUpDown className="mr-2 h-4 w-4" />
                     </Button>
                 </TableHead>
-                <TableHead>الاسم الكامل</TableHead>
+                <TableHead>
+                    <Button variant="ghost" onClick={() => requestSort('fullName')}>
+                        الاسم الكامل
+                        <ArrowUpDown className="mr-2 h-4 w-4" />
+                    </Button>
+                </TableHead>
                 {isSuperAdmin && <TableHead className="text-center">الفوج</TableHead>}
                 <TableHead className="hidden md:table-cell text-center">المستوى الدراسي</TableHead>
                 <TableHead className="hidden lg:table-cell text-center">اسم الولي</TableHead>
@@ -657,7 +667,7 @@ export default function StudentManagementPage() {
                             </TableCell>
                             <TableCell className="p-2">
                                 <div className="flex flex-col items-center gap-1">
-                                    <Avatar className="w-10 h-10">
+                                    <Avatar className={cn("w-10 h-10 border-2", activeCovenant?.card === 'بطاقة حمراء' ? 'border-red-500' : activeCovenant?.card === 'بطاقة صفراء' ? 'border-yellow-500' : 'border-transparent')}>
                                         <AvatarImage src={student.photoURL} />
                                         <AvatarFallback className={cn(student.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
                                             {student.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
@@ -682,7 +692,7 @@ export default function StudentManagementPage() {
                                      <span>{student.fullName}</span>
                                 </div>
                             </TableCell>
-                            {isSuperAdmin && <TableCell className="text-center"><Badge variant="outline">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
+                            {isSuperAdmin && <TableCell className="text-center"><Badge variant="outline">{student.groupName || 'غير محدد'}</Badge></TableCell>}
                             <TableCell className="hidden md:table-cell text-center">{student.educationalLevel || 'غير محدد'}</TableCell>
                             <TableCell className="hidden lg:table-cell text-center">{student.guardianName}</TableCell>
                             <TableCell className="text-center">
@@ -1196,5 +1206,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
+    
 
     
