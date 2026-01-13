@@ -12,7 +12,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown } from 'lucide-react';
+import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User, UserRound } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useStudentContext } from '@/context/StudentContext';
 import type { Student, StudentStatus, PreRegistration, PreRegistrationStatus } from '@/lib/types';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 
 const statusColors: Record<PreRegistrationStatus, string> = {
@@ -44,7 +45,6 @@ const statusBadgeColors: Record<PreRegistrationStatus, string> = {
 const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
 
 const ALL_COLUMNS = {
-    pageNumber: { label: "رقم الصفحة", visible: true },
     requestedAt: { label: "تاريخ التسجيل", visible: true },
     fullName: { label: "الإسم الكامل", visible: true },
     gender: { label: "الجنس", visible: false },
@@ -220,7 +220,7 @@ export default function PreRegistrationPage() {
     };
 
     const setQuickView = () => {
-        const quickViewCols: (keyof typeof ALL_COLUMNS)[] = ['fullName', 'educationalLevel', 'pageNumber', 'status'];
+        const quickViewCols: (keyof typeof ALL_COLUMNS)[] = ['fullName', 'educationalLevel', 'status'];
         const newVisibility = { ...columnVisibility };
         Object.keys(newVisibility).forEach(key => {
             newVisibility[key as keyof typeof ALL_COLUMNS].visible = quickViewCols.includes(key as keyof typeof ALL_COLUMNS);
@@ -492,14 +492,12 @@ export default function PreRegistrationPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                {columnVisibility.pageNumber.visible && (
-                                    <TableHead>
-                                        <Button variant="ghost" onClick={() => requestSort('pageNumber')}>
-                                            رقم الصفحة
-                                            <ArrowUpDown className="mr-2 h-4 w-4" />
-                                        </Button>
-                                    </TableHead>
-                                )}
+                                <TableHead className="w-[80px]">
+                                    <Button variant="ghost" onClick={() => requestSort('pageNumber')} className="px-2">
+                                        الهوية
+                                        <ArrowUpDown className="mr-2 h-4 w-4" />
+                                    </Button>
+                                </TableHead>
                                 {columnVisibility.requestedAt.visible && <TableHead>تاريخ التسجيل</TableHead>}
                                 {columnVisibility.fullName.visible && <TableHead>الإسم الكامل</TableHead>}
                                 {columnVisibility.gender.visible && <TableHead>الجنس</TableHead>}
@@ -517,7 +515,16 @@ export default function PreRegistrationPage() {
                         <TableBody>
                             {filteredRegistrations.length > 0 ? filteredRegistrations.map(reg => (
                                 <TableRow key={reg.id} className={statusColors[reg.status]}>
-                                    {columnVisibility.pageNumber.visible && <TableCell>{reg.pageNumber}</TableCell>}
+                                    <TableCell>
+                                        <div className="flex flex-col items-center gap-1">
+                                            <Avatar className="w-10 h-10">
+                                                <AvatarFallback className={cn(reg.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
+                                                    {reg.gender === 'أنثى' ? <UserRound /> : <User />}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <Badge variant="secondary" className="px-1.5 py-0.5 text-xs">{reg.pageNumber || 'N/A'}</Badge>
+                                        </div>
+                                    </TableCell>
                                     {columnVisibility.requestedAt.visible && <TableCell>{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt || '-')}</TableCell>}
                                     {columnVisibility.fullName.visible && <TableCell className="font-medium">{reg.fullName}</TableCell>}
                                     {columnVisibility.gender.visible && <TableCell>{reg.gender}</TableCell>}
@@ -587,7 +594,7 @@ export default function PreRegistrationPage() {
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={Object.values(columnVisibility).filter(c => c.visible).length + 1} className="text-center h-24">
+                                    <TableCell colSpan={Object.values(columnVisibility).filter(c => c.visible).length + 2} className="text-center h-24">
                                         {searchTerm || levelFilter.length > 0 || statusFilter !== 'all' || genderFilter !== 'all'
                                             ? 'لم يتم العثور على نتائج مطابقة للبحث.'
                                             : 'لا توجد طلبات تسجيل جديدة في الوقت الحالي.'
@@ -604,4 +611,5 @@ export default function PreRegistrationPage() {
 }
 
     
+
 
