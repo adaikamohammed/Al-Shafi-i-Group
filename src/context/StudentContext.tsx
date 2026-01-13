@@ -59,6 +59,7 @@ interface StudentContextType {
   updateStudent: (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => void;
   deleteStudent: (studentId: string, ownerId: string) => void;
   deleteAllStudents: () => void;
+  deleteMultipleStudents: (studentsToDelete: { id: string, ownerId: string }[]) => void;
   addDailySession: (session: DailySession) => void;
   deleteDailySession: (sessionId: string) => void;
   getSessionsForDay: (date: string) => DailySession[];
@@ -68,6 +69,7 @@ interface StudentContextType {
   importPreRegistrations: (newPreRegs: Omit<PreRegistration, 'id'>[]) => void;
   updatePreRegistration: (regId: string, data: Partial<PreRegistration> & { photoFile?: File | null }, isEditing: boolean) => Promise<void>;
   deleteAllPreRegistrations: () => void;
+  deleteMultiplePreRegistrations: (ids: string[]) => void;
   saveDailyReport: (report: Omit<DailyReport, 'id'>, reportIdToUpdate?: string) => Promise<void>;
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
@@ -336,6 +338,16 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "🗑️ تم الحذف", description: "تم مسح جميع التسجيلات الأولية بنجاح." });
   };
 
+  const deleteMultiplePreRegistrations = (ids: string[]) => {
+    const updates: { [key: string]: null } = {};
+    ids.forEach(id => {
+      updates[`/pre_registrations/${id}`] = null;
+    });
+    const dbRef = ref(db);
+    update(dbRef, updates);
+    toast({ title: `🗑️ تم حذف ${ids.length} تسجيل`, description: "تم حذف التسجيلات المحددة بنجاح." });
+  };
+
   const updateStudent = async (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => {
     if (!authContextUser) return;
     
@@ -397,6 +409,21 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           }
       });
   }
+
+  const deleteMultipleStudents = (studentsToDelete: { id: string, ownerId: string }[]) => {
+    if (!authContextUser || isSuperAdmin) return;
+    const updates: { [key: string]: null } = {};
+    studentsToDelete.forEach(({ id, ownerId }) => {
+      if (ownerId === authContextUser.uid) {
+        updates[`/users/${ownerId}/students/${id}`] = null;
+        // Optionally delete other related data like surahProgress, payments, etc.
+        updates[`/users/${ownerId}/surahProgress/${id}`] = null;
+      }
+    });
+    const dbRef = ref(db);
+    update(dbRef, updates);
+    toast({ title: `🗑️ تم حذف ${studentsToDelete.length} طالب`, description: "تم حذف الطلاب المحددين بنجاح." });
+  };
 
   const addDailySession = (session: DailySession) => {
     if (!authContextUser || isSuperAdmin) return;
@@ -531,7 +558,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <StudentContext.Provider value={{ students, preRegistrations, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, updatePreRegistration, deleteAllPreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
+    <StudentContext.Provider value={{ students, preRegistrations, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, deleteMultipleStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, updatePreRegistration, deleteAllPreRegistrations, deleteMultiplePreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
       {children}
     </StudentContext.Provider>
   );
@@ -546,5 +573,6 @@ export const useStudentContext = () => {
 };
 
   
+
 
 

@@ -150,9 +150,9 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
 
     return (
         <DialogContent className="sm:max-w-3xl">
-             <DialogHeader>
+            <DialogHeader>
                 <DialogTitle className="sr-only">بطاقة هوية الطالب: {student.fullName}</DialogTitle>
-             </DialogHeader>
+            </DialogHeader>
              <div className="flex flex-col items-center pt-4">
                 <Avatar className="w-24 h-24 mb-4 border-4 border-primary">
                     <AvatarImage src={student.photoURL} alt={student.fullName} />
@@ -279,7 +279,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
 };
 
 export default function StudentManagementPage() {
-  const { students, updateStudent, deleteStudent, loading, deleteAllStudents, dailySessions, settings } = useStudentContext();
+  const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings } = useStudentContext();
   const { user, isSuperAdmin } = useAuth();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setEditStudentDialogOpen] = useState(false);
@@ -350,6 +350,12 @@ export default function StudentManagementPage() {
         updateStudent(student.id, { status, actionReason: reason }, student.ownerId);
     }
   };
+
+  const handleBulkDelete = () => {
+    const studentsToDelete = selectedRows.map(id => (students ?? []).find(s => s.id === id)).filter(Boolean) as Student[];
+    deleteMultipleStudents(studentsToDelete.map(s => ({ id: s.id, ownerId: s.ownerId })));
+    setSelectedRows([]);
+  }
   
   const handleExportStudents = () => {
     const dataToExport = (students ?? []).map(s => ({
@@ -422,7 +428,7 @@ export default function StudentManagementPage() {
 
   if (loading) {
     return (
-        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+        <div className="flex items-center justify-center h-full">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
     );
@@ -430,7 +436,7 @@ export default function StudentManagementPage() {
   
    if ((students ?? []).length === 0 && !loading) {
       return (
-        <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+        <div className="flex flex-col items-center justify-center h-full">
             <h1 className="text-2xl font-bold mb-4">لا يوجد طلاب بعد</h1>
             <p className="text-muted-foreground mb-6">ابدأ بإضافة طالب جديد أو استيراد قائمة الطلاب.</p>
             {!isSuperAdmin && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
@@ -521,6 +527,7 @@ export default function StudentManagementPage() {
           <CardDescription>{isSuperAdmin ? 'عرض شامل لجميع الطلبة في كل الأفواج' : (user?.group ? `طلبة ${user.group}` : 'فوج غير محدد')}</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="relative w-full overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -565,7 +572,7 @@ export default function StudentManagementPage() {
                     return (
                         <TableRow 
                             key={student.id} 
-                            data-state={selectedRows.includes(student.id) && "selected"}
+                            data-state={selectedRows.includes(student.id) ? "selected" : ""}
                             className={cn(
                                 'cursor-pointer',
                                 medalClass,
@@ -576,11 +583,9 @@ export default function StudentManagementPage() {
                                 <Checkbox
                                     checked={selectedRows.includes(student.id)}
                                     onCheckedChange={(checked) => {
-                                        if (checked) {
-                                            setSelectedRows(prev => [...prev, student.id]);
-                                        } else {
-                                            setSelectedRows(prev => prev.filter(id => id !== student.id));
-                                        }
+                                        setSelectedRows(prev => 
+                                            checked ? [...prev, student.id] : prev.filter(id => id !== student.id)
+                                        );
                                     }}
                                     aria-label="Select row"
                                 />
@@ -634,6 +639,7 @@ export default function StudentManagementPage() {
              )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
       
@@ -671,13 +677,29 @@ export default function StudentManagementPage() {
           </Dialog>
       )}
        {selectedRows.length > 0 && (
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 border-t shadow-lg z-50">
-                <div className="container mx-auto flex justify-between items-center">
-                    <p className="font-semibold">{selectedRows.length} طلاب محددون</p>
+            <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-auto p-2 bg-background/95 border-t shadow-lg z-50 rounded-t-lg">
+                <div className="container mx-auto flex justify-between items-center gap-4">
+                    <p className="font-semibold text-sm">{selectedRows.length} طلاب محددون</p>
                     <div className="flex gap-2">
-                            <Button variant="outline" onClick={() => setSelectedRows([])}>إلغاء التحديد</Button>
-                            <Button>تعديل جماعي</Button>
-                            <Button variant="destructive">حذف المحدد</Button>
+                            <Button variant="outline" size="sm" onClick={() => setSelectedRows([])}>إلغاء التحديد</Button>
+                            <Button size="sm">تعديل جماعي</Button>
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive" size="sm">حذف المحدد</Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            سيؤدي هذا إلى حذف {selectedRows.length} طالب(ة) نهائياً. لا يمكن التراجع عن هذا الإجراء.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleBulkDelete}>تأكيد الحذف</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                     </div>
                 </div>
             </div>
@@ -1092,6 +1114,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
 
 
 
