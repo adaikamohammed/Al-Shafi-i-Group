@@ -518,7 +518,7 @@ export default function PreRegistrationPage() {
                             {filteredRegistrations.length > 0 ? filteredRegistrations.map(reg => (
                                 <TableRow key={reg.id} className={statusColors[reg.status]}>
                                     {columnVisibility.pageNumber.visible && <TableCell>{reg.pageNumber}</TableCell>}
-                                    {columnVisibility.requestedAt.visible && <TableCell>{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : reg.requestedAt.toString()}</TableCell>}
+                                    {columnVisibility.requestedAt.visible && <TableCell>{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt || '-')}</TableCell>}
                                     {columnVisibility.fullName.visible && <TableCell className="font-medium">{reg.fullName}</TableCell>}
                                     {columnVisibility.gender.visible && <TableCell>{reg.gender}</TableCell>}
                                     {columnVisibility.birthDate.visible && <TableCell>{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : reg.birthDate.toString()}</TableCell>}
@@ -604,3 +604,4 @@ export default function PreRegistrationPage() {
 }
 
     
+

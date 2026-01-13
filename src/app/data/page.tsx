@@ -209,8 +209,16 @@ export default function DataExchangePage() {
                     finalBirthDate = ''; // Store as empty if null
                 }
                 
+                const requestedAtValue = parseDate(row['تاريخ التسجيل']);
+                let finalRequestedAt: Date | string = '';
+                if(requestedAtValue instanceof Date && isValid(requestedAtValue)) {
+                    finalRequestedAt = requestedAtValue;
+                } else if (typeof requestedAtValue === 'string') {
+                    finalRequestedAt = requestedAtValue;
+                }
+
                 const preRegData: Omit<PreRegistration, 'id'> = {
-                    requestedAt: parseDate(row['تاريخ التسجيل']) || new Date(),
+                    requestedAt: finalRequestedAt,
                     fullName: fullName,
                     gender: row['الجنس'] || 'ذكر',
                     birthDate: finalBirthDate,
@@ -219,7 +227,7 @@ export default function DataExchangePage() {
                     phone1: (row['رقم الهاتف 1']?.toString() || ''),
                     phone2: (row['رقم الهاتف 2']?.toString() || ''),
                     address: (row['مقر السكن'] || ''),
-                    status: (row['الحالة'] || 'قيد الانتظار') as PreRegistrationStatus,
+                    status: (row['الحالة'] || 'مرشح') as PreRegistrationStatus,
                     pageNumber: (row['رقم الصفحة']?.toString() || ''),
                     notes: (row['ملاحظات'] || ''),
                 };
@@ -233,7 +241,7 @@ export default function DataExchangePage() {
             
             toast({
               title: "✅ اكتمل رفع التسجيلات",
-              description: `تم رفع ${newRegsCount} سجل جديد بنجاح. وتم تخطي ${skippedCount} سجل مكرر.`,
+              description: `تم رفع ${newRegsCount} سجل جديد بنجاح.`,
               action: <Button onClick={() => router.push('/registrations')}>الانتقال للقائمة</Button>
             });
             
@@ -486,7 +494,7 @@ export default function DataExchangePage() {
         "رقم الهاتف 1": "0501234567",
         "رقم الهاتف 2": "",
         "مقر السكن": "حي النور",
-        "الحالة": "قيد الانتظار",
+        "الحالة": "مرشح",
         "رقم الصفحة": "",
         "ملاحظات": "طالب جديد"
     };
