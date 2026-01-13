@@ -4,11 +4,11 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration } from '@/lib/types';
-import { isWithinInterval, parseISO } from 'date-fns';
+import { isWithinInterval, parseISO, isValid } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/lib/firebase';
-import { ref, set, onValue, off, remove, DatabaseReference } from 'firebase/database';
+import { ref, set, onValue, off, remove, DatabaseReference, update } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
 
 const DEFAULT_POINTS_CONFIG: PointsConfig = {
@@ -123,12 +123,18 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         updatedAt: studentData.updatedAt ? parseISO(studentData.updatedAt) : new Date(),
         covenants: studentData.covenants ? Object.values(studentData.covenants) : [],
     });
+    
+    const processPreRegData = (preReg: any): PreRegistration => ({
+        ...preReg,
+        requestedAt: preReg.requestedAt && isValid(parseISO(preReg.requestedAt)) ? parseISO(preReg.requestedAt) : preReg.requestedAt,
+        birthDate: preReg.birthDate && isValid(parseISO(preReg.birthDate)) ? parseISO(preReg.birthDate) : preReg.birthDate,
+    });
 
     // Listener for pre_registrations
     preRegsRef = ref(db, 'pre_registrations');
     preRegsListener = onValue(preRegsRef, (snapshot) => {
         const data = snapshot.val();
-        const preRegsArray = data ? Object.entries(data).map(([id, r]) => ({ id, ...(r as any) })) : [];
+        const preRegsArray: PreRegistration[] = data ? Object.entries(data).map(([id, r]) => processPreRegData({ id, ...(r as any) })) : [];
         setPreRegistrations(preRegsArray);
     }, (error) => {
         console.error(`Firebase read failed for pre_registrations: ${error.message}`);
@@ -267,11 +273,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const regId = uuidv4();
       updates[`/pre_registrations/${regId}`] = {
         ...reg,
-        requestedAt: reg.requestedAt.toISOString(),
-        birthDate: reg.birthDate.toISOString(),
+        requestedAt: reg.requestedAt instanceof Date ? reg.requestedAt.toISOString() : reg.requestedAt,
+        birthDate: reg.birthDate instanceof Date ? reg.birthDate.toISOString() : reg.birthDate,
       };
     });
-    set(ref(db), { ...updates });
+    const dbRef = ref(db);
+    update(dbRef, updates);
   }
 
   const updateStudent = (studentId: string, updatedData: Partial<Student>, ownerId: string) => {

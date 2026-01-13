@@ -174,10 +174,10 @@ export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مر
 
 export interface PreRegistration {
     id: string;
-    requestedAt: Date;
+    requestedAt: Date | string;
     fullName: string;
     gender?: "ذكر" | "أنثى";
-    birthDate: Date;
+    birthDate: Date | string;
     educationalLevel?: string;
     guardianName?: string;
     phone1: string;

@@ -9,9 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Upload, Download, History, Loader2, CalendarClock, UserPlus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { Student, DailyRecord, SessionType, DailySession, PreRegistration } from '@/lib/types';
+import type { Student, DailyRecord, SessionType, DailySession, PreRegistration, PreRegistrationStatus } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
-import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth } from 'date-fns';
+import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth, isValid, startOfYear, setYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -42,33 +42,35 @@ export default function DataExchangePage() {
   const [isImportingPreRegs, setIsImportingPreRegs] = useState(false);
 
 
- const parseDate = (dateInput: any): Date | null => {
-    if (!dateInput) return null;
-    if (dateInput instanceof Date) return dateInput;
+ const parseDate = (dateInput: any): Date | string | null => {
+    if (!dateInput || (typeof dateInput === 'string' && dateInput.trim() === '/')) return null;
+    if (dateInput instanceof Date && isValid(dateInput)) return dateInput;
     if (typeof dateInput === 'string') {
-        // Handle DD/MM/YYYY or MM/DD/YYYY
-        if (dateInput.includes('/')) {
-            const parts = dateInput.split('/');
-            if (parts.length === 3) {
-                // Assuming DD/MM/YYYY as it's more common in the region
-                const day = parseInt(parts[0], 10);
-                const month = parseInt(parts[1], 10) - 1;
-                let year = parseInt(parts[2], 10);
-                if(year < 2000) year += 2000; // Handle YY format
-                return new Date(year, month, day);
-            }
+        // Handle DD/MM/YYYY or MM/DD/YYYY or YYYY
+        const parts = dateInput.split(/[/.-]/);
+        if (parts.length === 3) {
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            let year = parseInt(parts[2], 10);
+            if(year < 100) year += 2000;
+            const newDate = new Date(year, month, day);
+            if (isValid(newDate)) return newDate;
         }
+         if(parts.length === 1 && /^\d{4}$/.test(parts[0])) {
+             const year = parseInt(parts[0], 10);
+             return startOfYear(setYear(new Date(), year));
+         }
         // Handle ISO date string
         try {
             const parsed = parseISO(dateInput);
-            if(!isNaN(parsed.getTime())) return parsed;
+            if(isValid(parsed)) return parsed;
         } catch(e) { /* ignore parse error */ }
     }
     if (typeof dateInput === 'number') {
-         // Handle Excel serial date
-        return XLSX.SSF.parse_date_code(dateInput);
+        const parsedFromExcel = XLSX.SSF.parse_date_code(dateInput);
+        if(parsedFromExcel) return new Date(parsedFromExcel.y, parsedFromExcel.m - 1, parsedFromExcel.d);
     }
-    return null;
+    return dateInput.toString(); // Return raw string if parsing fails
  };
 
 
@@ -110,7 +112,7 @@ export default function DataExchangePage() {
            const birthDate = parseDate(row['تاريخ الميلاد']);
            const registrationDate = parseDate(row['تاريخ التسجيل']);
 
-           if (!birthDate || !registrationDate || isNaN(birthDate.getTime()) || isNaN(registrationDate.getTime())) {
+           if (!birthDate || typeof birthDate === 'string' || !registrationDate || typeof registrationDate === 'string') {
              throw new Error(`التواريخ غير صالحة في الصف رقم ${index + 2} للطالب ${fullName}. تأكد من أنها بصيغة DD/MM/YYYY.`);
            }
 
@@ -123,8 +125,8 @@ export default function DataExchangePage() {
               fullName: fullName,
               guardianName: row['اسم الولي'] || 'N/A',
               phone1: row['رقم الهاتف']?.toString() || 'N/A',
-              birthDate: birthDate,
-              registrationDate: registrationDate,
+              birthDate: birthDate as Date,
+              registrationDate: registrationDate as Date,
               status: status,
               dailyMemorizationAmount: 'صفحة',
               notes: row['ملاحظات'] || '',
@@ -185,25 +187,20 @@ export default function DataExchangePage() {
                     skippedCount++;
                     return;
                 }
-
-                const birthDate = parseDate(row['تاريخ الميلاد']);
-                if (!birthDate || isNaN(birthDate.getTime())) {
-                    throw new Error(`تاريخ الميلاد غير صالح في الصف رقم ${index + 2} للمسجل ${fullName}.`);
-                }
                 
                 const preRegData: Omit<PreRegistration, 'id'> = {
                     requestedAt: parseDate(row['تاريخ التسجيل']) || new Date(),
                     fullName: fullName,
                     gender: row['الجنس'] || 'ذكر',
-                    birthDate: birthDate,
+                    birthDate: parseDate(row['تاريخ الميلاد']) || new Date(),
                     educationalLevel: row['المستوى الدراسي'] || '',
                     guardianName: row['إسم الولي'] || '',
-                    phone1: row['رقم الهاتف 1']?.toString() || 'N/A',
-                    phone2: row['رقم الهاتف 2']?.toString() || '',
-                    address: row['مقر السكن'] || '',
-                    status: row['الحالة'] || 'قيد الانتظار',
-                    pageNumber: row['رقم الصفحة']?.toString() || '',
-                    notes: row['ملاحظات'] || '',
+                    phone1: (row['رقم الهاتف 1']?.toString() || '').replace('/', ''),
+                    phone2: (row['رقم الهاتف 2']?.toString() || '').replace('/', ''),
+                    address: (row['مقر السكن'] || '').replace('/', ''),
+                    status: (row['الحالة'] || 'قيد الانتظار') as PreRegistrationStatus,
+                    pageNumber: (row['رقم الصفحة']?.toString() || '').replace('/', ''),
+                    notes: (row['ملاحظات'] || '').replace('/', ''),
                 };
                 newPreRegs.push(preRegData);
                 existingNames.add(fullName.toLowerCase());
