@@ -13,10 +13,12 @@ import { useStudentContext } from '@/context/StudentContext';
 import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth, isValid, startOfYear, setYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { v4 as uuidv4 } from 'uuid';
+import { useRouter } from 'next/navigation';
 
 
 export default function DataExchangePage() {
   const { toast } = useToast();
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sessionFileInputRef = useRef<HTMLInputElement>(null);
   const monthlySessionFileInputRef = useRef<HTMLInputElement>(null);
@@ -57,7 +59,8 @@ export default function DataExchangePage() {
         }
          if(parts.length === 1 && /^\d{4}$/.test(parts[0])) {
              const year = parseInt(parts[0], 10);
-             return startOfYear(setYear(new Date(), year));
+             // Return just the year string to be handled later
+             return dateInput;
          }
         // Handle ISO date string
         try {
@@ -112,11 +115,11 @@ export default function DataExchangePage() {
            let birthDate = parseDate(row['تاريخ الميلاد']);
            let registrationDate = parseDate(row['تاريخ التسجيل']);
 
-           if (!birthDate || typeof birthDate === 'string' || !isValid(birthDate)) {
+           if (!birthDate || typeof birthDate === 'string' || !isValid(birthDate as Date)) {
                 birthDate = new Date();
                 invalidDateCount++;
            }
-           if (!registrationDate || typeof registrationDate === 'string' || !isValid(registrationDate)) {
+           if (!registrationDate || typeof registrationDate === 'string' || !isValid(registrationDate as Date)) {
                 registrationDate = new Date();
                 invalidDateCount++;
            }
@@ -185,24 +188,27 @@ export default function DataExchangePage() {
             const worksheet = workbook.Sheets[sheetName];
             const json = XLSX.utils.sheet_to_json<any>(worksheet, { raw: false });
 
-            const existingNames = new Set((preRegistrations ?? []).map(p => p.fullName.trim().toLowerCase()));
             const newPreRegs: Omit<PreRegistration, 'id'>[] = [];
-            let skippedCount = 0;
 
             json.forEach((row, index) => {
                 const fullName = (row['الإسم الكامل'] || '').trim();
-                if (!fullName) return;
+                if (!fullName) return; // Skip rows without a full name
 
-                if (existingNames.has(fullName.toLowerCase())) {
-                    skippedCount++;
-                    return;
+                const birthDateValue = parseDate(row['تاريخ الميلاد']);
+                let finalBirthDate: Date | string = new Date(); // Default if invalid
+
+                if (birthDateValue instanceof Date && isValid(birthDateValue)) {
+                    finalBirthDate = birthDateValue;
+                } else if (typeof birthDateValue === 'string') {
+                    // If parseDate returned a string (e.g., just a year), keep it as a string
+                    finalBirthDate = birthDateValue;
                 }
                 
                 const preRegData: Omit<PreRegistration, 'id'> = {
                     requestedAt: parseDate(row['تاريخ التسجيل']) || new Date(),
                     fullName: fullName,
                     gender: row['الجنس'] || 'ذكر',
-                    birthDate: parseDate(row['تاريخ الميلاد']) || new Date(),
+                    birthDate: finalBirthDate,
                     educationalLevel: row['المستوى الدراسي'] || '',
                     guardianName: row['إسم الولي'] || '',
                     phone1: (row['رقم الهاتف 1']?.toString() || '').replace('/', ''),
@@ -213,7 +219,6 @@ export default function DataExchangePage() {
                     notes: (row['ملاحظات'] || '').replace('/', ''),
                 };
                 newPreRegs.push(preRegData);
-                existingNames.add(fullName.toLowerCase());
             });
 
             if (newPreRegs.length > 0) {
@@ -221,8 +226,9 @@ export default function DataExchangePage() {
             }
             
             toast({
-              title: "✅ اكتمل استيراد التسجيلات",
-              description: `تم استيراد ${newPreRegs.length} تسجيل جديد بنجاح. وتم تخطي ${skippedCount} سجل مكرر.`,
+              title: "✅ اكتمل رفع التسجيلات",
+              description: `تم رفع ${newPreRegs.length} طالب جديد إلى قائمة التسجيلات.`,
+              action: <Button onClick={() => router.push('/registrations')}>الانتقال للقائمة</Button>
             });
             
         } catch (error) {
@@ -611,7 +617,7 @@ export default function DataExchangePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              لن يتم إضافة طلب تسجيل إذا كان الاسم موجودًا بالفعل. استخدم النموذج الرسمي.
+              سيتم رفع كل الصفوف في الملف إلى قائمة التسجيلات الأولية لمراجعتها.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button className="flex-grow" onClick={() => preRegFileInputRef.current?.click()} disabled={isImportingPreRegs}>
@@ -708,5 +714,7 @@ export default function DataExchangePage() {
     </div>
   );
 }
+
+    
 
     
