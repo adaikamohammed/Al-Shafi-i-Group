@@ -182,7 +182,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
                 <Sidebar side="right">
                   {sidebarContent}
                 </Sidebar>
-                <main className="md:pl-[var(--sidebar-width)] p-4 sm:p-6 lg:p-8">
+                <main className="md:pl-[var(--sidebar-width)] p-4 sm:p-5">
                     <div className="flex justify-end mb-4">
                         <Button
                             onClick={() => setCommandBarOpen(true)}
