@@ -37,14 +37,46 @@ export default function StudentReportPage() {
     const [tajweedScore, setTajweedScore] = useState(5);
     const [akhlaqScore, setAkhlaqScore] = useState(5);
     const [messageTemplate, setMessageTemplate] = useState<MessageTemplate>('tahdidi');
+    const [messageContent, setMessageContent] = useState('');
 
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
+    const selectedStudent = useMemo(() => activeStudents.find(s => s.id === selectedStudentId), [activeStudents, selectedStudentId]);
 
      useEffect(() => {
         if(activeStudents.length > 0 && !selectedStudentId) {
             setSelectedStudentId(activeStudents[0].id);
         }
     }, [activeStudents, selectedStudentId]);
+    
+     useEffect(() => {
+        if (!selectedStudent || !user) {
+            setMessageContent('');
+            return;
+        }
+
+        const studentName = selectedStudent.fullName;
+        const sheikhName = user.displayName || "الشيخ";
+        let generatedMessage = '';
+
+        switch (messageTemplate) {
+            case 'tahdidi':
+                generatedMessage = `ولي أمر الطالب ${studentName}، نلاحظ تكرار غياب الطالب. يرجى الحضور للمدرسة للتوقيع على تعهد بالالتزام لضمان استمراره. مع تحيات الشيخ ${sheikhName}`;
+                break;
+            case 'tanbih':
+                generatedMessage = `نحيطكم علماً بأن مستوى حفظ الطالب ${studentName} في تراجع ملحوظ مؤخراً. نرجو منكم المتابعة المنزلية المكثفة. الشيخ ${sheikhName}`;
+                break;
+            case 'istidaa':
+                generatedMessage = `يرجى من ولي أمر الطالب ${studentName} الحضور لمقر مدرسة الشافعي في أقرب وقت لمقابلة الشيخ ${sheikhName} لأمر ضروري يخص الطالب`;
+                break;
+            case 'tashjee':
+                generatedMessage = `ما شاء الله! نبارك لكم التميز الباهر للطالب ${studentName} في حصة اليوم. استمروا في دعمه. الشيخ ${sheikhName}`;
+                break;
+            case 'inqitaa':
+                 generatedMessage = `إشعار انقطاع: نحيطكم علماً بأن الطالب ${studentName} قد تغيب لأكثر من 3 حصص متتالية دون عذر. نرجو منكم التواصل مع الإدارة. الشيخ: ${sheikhName}`;
+                break;
+        }
+        setMessageContent(generatedMessage);
+    }, [messageTemplate, selectedStudent, user]);
 
     const reportData = useMemo(() => {
         if (!selectedStudentId) return null;
@@ -210,34 +242,8 @@ export default function StudentReportPage() {
     };
     
     const handleCopyWhatsAppReport = () => {
-        if (!reportData) return;
-
-        const { student } = reportData;
-        const sheikhName = user?.displayName || "الشيخ";
-        const todayDate = format(new Date(), 'yyyy/MM/dd');
-        let message = '';
-
-        switch (messageTemplate) {
-            case 'tahdidi':
-                message = `*📝 رسالة تعهد لضبط الغياب*\n\nالسلام عليكم ولي أمر الطالب: ${student.fullName}\n\nنظراً لتكرار غياب ابنكم، نود إعلامكم بضرورة حضوره وتوقيع "تعهد الغياب" لضمان التزامه واستمراره في خطة الحفظ.\n\n*التاريخ:* ${todayDate}\n*الشيخ المسؤول:* ${sheikhName}`;
-                break;
-            case 'tanbih':
-                message = `*⚠️ تنبيه بشأن مستوى الحفظ*\n\nالسلام عليكم ولي أمر الطالب: ${student.fullName}\n\nلوحظ ضعف في مستوى الحفظ والمراجعة لدى ابنكم مؤخراً. نرجو منكم متابعته في المنزل وتشجيعه على التركيز أكثر في الحلقة.\n\n*التاريخ:* ${todayDate}\n*الشيخ المسؤول:* ${sheikhName}`;
-                break;
-            case 'istidaa':
-                message = `*📢 استدعاء ولي أمر*\n\nالسلام عليكم، نرجو من ولي أمر الطالب: ${student.fullName} الحضور إلى مقر المدرسة يوم [أدخل اليوم] على الساعة [أدخل الساعة] لأمر يهمه.\n\n*التاريخ:* ${todayDate}\n*الشيخ المسؤول:* ${sheikhName}`;
-                break;
-            case 'tashjee':
-                message = `*🎉 رسالة شكر وتشجيع*\n\nالسلام عليكم ولي أمر الطالب: ${student.fullName}\n\nنشكركم على جهودكم، ونود إعلامكم بأن ابنكم يُظهر أداءً متميزاً والتزاماً رائعاً في الحلقة. نتمنى له المزيد من التوفيق والنجاح.\n\n*التاريخ:* ${todayDate}\n*الشيخ المسؤول:* ${sheikhName}`;
-                break;
-            case 'inqitaa':
-                 message = `*❗ إشعار انقطاع عن الدراسة*\n\nالسلام عليكم ولي أمر الطالب: ${student.fullName}\n\nنحيطكم علماً بأن ابنكم قد تغيب لأكثر من 3 حصص متتالية دون عذر. نرجو منكم التواصل مع الإدارة لتوضيح سبب الانقطاع قبل اتخاذ أي إجراء.\n\n*التاريخ:* ${todayDate}\n*الشيخ المسؤول:* ${sheikhName}`;
-                break;
-            default:
-                message = `تقرير الطالب: ${student.fullName} - الشيخ: ${sheikhName}`;
-        }
-    
-        navigator.clipboard.writeText(message).then(() => {
+        if (!messageContent) return;
+        navigator.clipboard.writeText(messageContent).then(() => {
             toast({
                 title: "✅ تم النسخ بنجاح!",
                 description: "الرسالة جاهزة للصق في واتساب.",
@@ -356,33 +362,47 @@ export default function StudentReportPage() {
                            <Slider id="akhlaq-slider" defaultValue={[akhlaqScore]} max={10} step={1} onValueChange={(val) => setAkhlaqScore(val[0])} />
                         </div>
                    </div>
-                    <Textarea 
-                        placeholder="أضف ملاحظاتك الكتابية هنا لتظهر في رسالة الواتساب والتقرير..."
-                        value={teacherNote}
-                        onChange={e => setTeacherNote(e.target.value)}
-                        rows={4}
-                    />
-                    <div className="grid md:grid-cols-2 gap-4 pt-4 border-t">
-                        <div className="space-y-2">
-                            <Label htmlFor="message-template">اختر قالب رسالة واتساب</Label>
-                             <Select dir="rtl" value={messageTemplate} onValueChange={(value: MessageTemplate) => setMessageTemplate(value)}>
-                                <SelectTrigger id="message-template">
-                                    <SelectValue placeholder="اختر نوع الرسالة" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="tahdidi">رسالة تعهد (لضبط الغياب)</SelectItem>
-                                    <SelectItem value="tanbih">رسالة تنبيه (لضعف الحفظ)</SelectItem>
-                                    <SelectItem value="istidaa">إستدعاء ولي أمر</SelectItem>
-                                    <SelectItem value="tashjee">رسالة تشجيع (للتميز)</SelectItem>
-                                    <SelectItem value="inqitaa">إشعار انقطاع (غياب 3+ حصص)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex items-end">
+                    <div className="space-y-2">
+                        <Label htmlFor="teacher-note">ملاحظات الشيخ الختامية للتقرير</Label>
+                        <Textarea 
+                            id="teacher-note"
+                            placeholder="هذه الملاحظات ستظهر في التقرير المطبوع فقط..."
+                            value={teacherNote}
+                            onChange={e => setTeacherNote(e.target.value)}
+                            rows={3}
+                        />
+                    </div>
+                    <div className="pt-4 border-t">
+                        <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-4 items-end">
+                            <div className="space-y-2">
+                                <Label htmlFor="message-template">اختر قالب رسالة واتساب</Label>
+                                 <Select dir="rtl" value={messageTemplate} onValueChange={(value: MessageTemplate) => setMessageTemplate(value)}>
+                                    <SelectTrigger id="message-template">
+                                        <SelectValue placeholder="اختر نوع الرسالة" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="tahdidi">رسالة تعهد (لضبط الغياب)</SelectItem>
+                                        <SelectItem value="tanbih">رسالة تنبيه (لضعف الحفظ)</SelectItem>
+                                        <SelectItem value="istidaa">إستدعاء ولي أمر</SelectItem>
+                                        <SelectItem value="tashjee">رسالة تشجيع (للتميز)</SelectItem>
+                                        <SelectItem value="inqitaa">إشعار انقطاع (غياب 3+ حصص)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                             <Button onClick={handleCopyWhatsAppReport} disabled={!selectedStudentId} className="w-full">
                                 <MessageCircle className="ml-2 h-4 w-4" />
-                                تجهيز ونسخ رسالة الواتساب
+                                نسخ رسالة الواتساب
                             </Button>
+                        </div>
+                        <div className="mt-2 space-y-2">
+                            <Label htmlFor="whatsapp-message">محتوى الرسالة (قابل للتعديل)</Label>
+                             <Textarea
+                                id="whatsapp-message"
+                                value={messageContent}
+                                onChange={(e) => setMessageContent(e.target.value)}
+                                rows={4}
+                                placeholder="اختر قالبًا ليظهر المحتوى هنا..."
+                            />
                         </div>
                     </div>
                 </CardContent>
@@ -398,3 +418,5 @@ export default function StudentReportPage() {
         </div>
     );
 }
+
+    
