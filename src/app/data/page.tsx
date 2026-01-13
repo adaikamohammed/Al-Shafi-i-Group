@@ -136,23 +136,12 @@ export default function DataExchangePage() {
         
         if (newStudents.length > 0) {
             importStudents(newStudents);
-            toast({
-              title: "نجاح ✅",
-              description: `تم استيراد ${newStudents.length} طالبًا جديدًا. تم تخطي ${skippedCount} طالبًا لوجودهم مسبقًا.`,
-            });
-        } else if (skippedCount > 0) {
-             toast({
-              title: "لم تتم إضافة طلاب جدد",
-              description: `تم تخطي ${skippedCount} طالبًا لوجودهم مسبقًا في النظام.`,
-            });
-        } else {
-             toast({
-                title: "لم يتم العثور على طلاب",
-                description: "الملف فارغ أو لا يحتوي على بيانات طلبة جدد.",
-                variant: 'destructive',
-            });
         }
-
+        
+        toast({
+          title: "✅ اكتمل استيراد الطلاب",
+          description: `تم استيراد ${newStudents.length} طالبًا جديدًا بنجاح. وتم تخطي ${skippedCount} طالبًا لوجودهم مسبقًا.`,
+        });
 
       } catch (error) {
         console.error("Error parsing Excel file:", error);
@@ -222,22 +211,13 @@ export default function DataExchangePage() {
 
             if (newPreRegs.length > 0) {
                 importPreRegistrations(newPreRegs);
-                toast({
-                  title: "نجاح ✅",
-                  description: `تم استيراد ${newPreRegs.length} طلب تسجيل جديد. تم تخطي ${skippedCount} طلبًا لوجودهم مسبقًا.`,
-                });
-            } else if (skippedCount > 0) {
-                 toast({
-                  title: "لم تتم إضافة طلبات جديدة",
-                  description: `تم تخطي ${skippedCount} طلبًا لوجودهم مسبقًا في قائمة الانتظار.`,
-                });
-            } else {
-                 toast({
-                    title: "ملف فارغ",
-                    description: "لم يتم العثور على طلبات تسجيل جديدة في الملف.",
-                    variant: 'destructive',
-                });
             }
+            
+            toast({
+              title: "✅ اكتمل استيراد التسجيلات",
+              description: `تم استيراد ${newPreRegs.length} تسجيل جديد بنجاح. وتم تخطي ${skippedCount} سجل مكرر.`,
+            });
+            
         } catch (error) {
             console.error("Error parsing pre-registration file:", error);
             const errorMessage = error instanceof Error ? error.message : "حدث خطأ أثناء قراءة الملف. يرجى التأكد من أن الملف بالصيغة الصحيحة.";

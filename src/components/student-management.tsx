@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -974,7 +975,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="نشط">نشطة</SelectItem>
-                                    <SelectItem value="تم الوفاء به">تم الوفاء بها</SelectItem>
+                                    <SelectItem value="تم الوفاء بها">تم الوفاء بها</SelectItem>
                                     <SelectItem value="نُقِض">نُقِضت</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -1008,6 +1009,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     
 
     
+
 
 
 
