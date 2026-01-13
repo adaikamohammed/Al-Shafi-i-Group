@@ -112,11 +112,11 @@ export default function DataExchangePage() {
            let birthDate = parseDate(row['تاريخ الميلاد']);
            let registrationDate = parseDate(row['تاريخ التسجيل']);
 
-           if (!birthDate || typeof birthDate === 'string') {
+           if (!birthDate || typeof birthDate === 'string' || !isValid(birthDate)) {
                 birthDate = new Date();
                 invalidDateCount++;
            }
-           if (!registrationDate || typeof registrationDate === 'string') {
+           if (!registrationDate || typeof registrationDate === 'string' || !isValid(registrationDate)) {
                 registrationDate = new Date();
                 invalidDateCount++;
            }
@@ -578,7 +578,7 @@ export default function DataExchangePage() {
       
       <h1 className="text-3xl font-headline font-bold">استيراد وتصدير البيانات</h1>
       
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>📥 بيانات الطلبة</CardTitle>
@@ -604,29 +604,6 @@ export default function DataExchangePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>🔄 بيانات الحصص اليومية</CardTitle>
-            <CardDescription>
-              تنزيل نموذج ليوم واحد أو رفع سجل حصة ليوم واحد تم تعبئته مسبقًا.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-             <p className="text-sm text-muted-foreground">
-              لتسجيل البيانات بشكل غير متصل. سيتم حفظ البيانات عند الرفع.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-2">
-               <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()} disabled={isImportingSessions}>
-                {isImportingSessions ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
-                {isImportingSessions ? 'جاري الاستيراد...' : 'رفع سجل حصة اليوم'}
-              </Button>
-              <Button variant="outline" onClick={handleDownloadSessionTemplate} disabled={activeStudents.length === 0}>
-                <Download className="ml-2 h-4 w-4" /> تحميل نموذج حصة اليوم
-              </Button>
-            </div>
-             {activeStudents.length === 0 && <p className="text-xs text-destructive text-center mt-2">يجب إضافة طلبة نشطين أولاً.</p>}
-          </CardContent>
-        </Card>
-         <Card>
-          <CardHeader>
             <CardTitle>📥 بيانات التسجيلات الأولية</CardTitle>
             <CardDescription>
               رفع ملف Excel يحتوي على طلبات التسجيل الجديدة لتسجيلها في النظام بشكل دائم.
@@ -651,68 +628,85 @@ export default function DataExchangePage() {
 
        <Card className="col-span-1 md:col-span-2 lg:col-span-3">
           <CardHeader>
-            <CardTitle>🗓️ بيانات شهر كامل</CardTitle>
+            <CardTitle>🗓️ بيانات الحصص</CardTitle>
             <CardDescription>
-              استيراد أو تصدير ملف Excel واحد يحتوي على بيانات شهر كامل، حيث تكون كل ورقة (sheet) حصة منفصلة.
+              استيراد أو تصدير بيانات الحصص ليوم واحد أو لشهر كامل.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-                <h4 className="font-semibold">استيراد بيانات شهر كامل</h4>
-                 <div className="flex gap-2">
-                    <Select dir="rtl" value={importMonth.toString()} onValueChange={(val) => setImportMonth(parseInt(val))}>
-                        <SelectTrigger><SelectValue placeholder="اختر الشهر" /></SelectTrigger>
-                        <SelectContent>
-                            {Array.from({length: 12}, (_, i) => (
-                                <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select dir="rtl" value={importYear.toString()} onValueChange={(val) => setImportYear(parseInt(val))}>
-                        <SelectTrigger><SelectValue placeholder="اختر السنة" /></SelectTrigger>
-                        <SelectContent>
-                            {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
-                                <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                 </div>
-                 <Button className="w-full" onClick={() => monthlySessionFileInputRef.current?.click()} disabled={isImportingMonthly}>
-                    {isImportingMonthly ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CalendarClock className="ml-2 h-4 w-4" />}
-                    {isImportingMonthly ? 'جاري الاستيراد...' : 'رفع ملف الشهر'}
-                 </Button>
-            </div>
-             <div className="space-y-4">
-                <h4 className="font-semibold">تصدير بيانات شهر كامل</h4>
-                <div className="flex gap-2">
-                    <Select dir="rtl" value={exportMonth.toString()} onValueChange={(val) => setExportMonth(parseInt(val))}>
-                        <SelectTrigger><SelectValue placeholder="اختر الشهر" /></SelectTrigger>
-                        <SelectContent>
-                            {Array.from({length: 12}, (_, i) => (
-                                <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select dir="rtl" value={exportYear.toString()} onValueChange={(val) => setExportYear(parseInt(val))}>
-                        <SelectTrigger><SelectValue placeholder="اختر السنة" /></SelectTrigger>
-                        <SelectContent>
-                            {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
-                                <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-4 md:col-span-1">
+                 <h4 className="font-semibold">بيانات حصة اليوم</h4>
+                 <p className="text-sm text-muted-foreground">
+                    تنزيل نموذج ليوم واحد أو رفع سجل حصة ليوم واحد تم تعبئته مسبقًا.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                   <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()} disabled={isImportingSessions}>
+                    {isImportingSessions ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
+                    {isImportingSessions ? 'جاري الاستيراد...' : 'رفع سجل اليوم'}
+                  </Button>
+                  <Button variant="outline" onClick={handleDownloadSessionTemplate} disabled={activeStudents.length === 0}>
+                    <Download className="ml-2 h-4 w-4" /> تحميل نموذج اليوم
+                  </Button>
                 </div>
-                <Button className="w-full" onClick={handleExportMonthlyReport}>
-                    <Download className="ml-2 h-4 w-4" />
-                    تصدير تقرير الشهر المحدد (Excel)
-                </Button>
+                 {activeStudents.length === 0 && <p className="text-xs text-destructive text-center mt-2">يجب إضافة طلبة نشطين أولاً.</p>}
+            </div>
+
+            <div className="space-y-4 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                    <h4 className="font-semibold">استيراد بيانات شهر كامل</h4>
+                     <div className="flex gap-2">
+                        <Select dir="rtl" value={importMonth.toString()} onValueChange={(val) => setImportMonth(parseInt(val))}>
+                            <SelectTrigger><SelectValue placeholder="اختر الشهر" /></SelectTrigger>
+                            <SelectContent>
+                                {Array.from({length: 12}, (_, i) => (
+                                    <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select dir="rtl" value={importYear.toString()} onValueChange={(val) => setImportYear(parseInt(val))}>
+                            <SelectTrigger><SelectValue placeholder="اختر السنة" /></SelectTrigger>
+                            <SelectContent>
+                                {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                     </div>
+                     <Button className="w-full" onClick={() => monthlySessionFileInputRef.current?.click()} disabled={isImportingMonthly}>
+                        {isImportingMonthly ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CalendarClock className="ml-2 h-4 w-4" />}
+                        {isImportingMonthly ? 'جاري الاستيراد...' : 'رفع ملف الشهر'}
+                     </Button>
+                </div>
+                 <div className="space-y-4">
+                    <h4 className="font-semibold">تصدير بيانات شهر كامل</h4>
+                    <div className="flex gap-2">
+                        <Select dir="rtl" value={exportMonth.toString()} onValueChange={(val) => setExportMonth(parseInt(val))}>
+                            <SelectTrigger><SelectValue placeholder="اختر الشهر" /></SelectTrigger>
+                            <SelectContent>
+                                {Array.from({length: 12}, (_, i) => (
+                                    <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select dir="rtl" value={exportYear.toString()} onValueChange={(val) => setExportYear(parseInt(val))}>
+                            <SelectTrigger><SelectValue placeholder="اختر السنة" /></SelectTrigger>
+                            <SelectContent>
+                                {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <Button className="w-full" onClick={handleExportMonthlyReport}>
+                        <Download className="ml-2 h-4 w-4" />
+                        تصدير تقرير الشهر المحدد (Excel)
+                    </Button>
+                </div>
             </div>
           </CardContent>
         </Card>
     </div>
   );
 }
-
-    
 
     
