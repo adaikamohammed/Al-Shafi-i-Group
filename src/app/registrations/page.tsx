@@ -104,7 +104,7 @@ const StudentProfileCard = ({ student }: { student: PreRegistration }) => {
                 <div>
                     <h3 className="font-semibold mb-2 border-b pb-1">المعلومات الشخصية والتعليمية</h3>
                     <div className="space-y-2 text-sm">
-                        <p><strong className="min-w-[100px] inline-block">تاريخ الميلاد:</strong> {student.birthDate instanceof Date && isValid(student.birthDate) ? format(student.birthDate, 'yyyy/MM/dd') : student.birthDate.toString()}</p>
+                        <p><strong className="min-w-[100px] inline-block">تاريخ الميلاد:</strong> {student.birthDate instanceof Date && isValid(student.birthDate) ? format(student.birthDate, 'yyyy/MM/dd') : (student.birthDate ? student.birthDate.toString() : 'غير محدد')}</p>
                         <p><strong className="min-w-[100px] inline-block">العمر:</strong> {calculateAge(student.birthDate)} سنة</p>
                         <p><strong className="min-w-[100px] inline-block">الجنس:</strong> {student.gender || 'غير محدد'}</p>
                         <p><strong className="min-w-[100px] inline-block">المستوى الدراسي:</strong> {student.educationalLevel || 'غير محدد'}</p>
@@ -136,6 +136,8 @@ const StudentProfileCard = ({ student }: { student: PreRegistration }) => {
 const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: (data: Partial<PreRegistration>) => void, onCancel: () => void, existingRegistration?: PreRegistration | null }) => {
     const [birthDate, setBirthDate] = useState<Date | undefined>(existingRegistration?.birthDate && isValid(new Date(existingRegistration.birthDate)) ? new Date(existingRegistration.birthDate) : undefined);
     const [age, setAge] = useState<number | string>(existingRegistration && existingRegistration.birthDate && isValid(new Date(existingRegistration.birthDate)) ? differenceInYears(new Date(), new Date(existingRegistration.birthDate)) : '');
+    const [status, setStatus] = useState<PreRegistrationStatus>(existingRegistration?.status || 'مرشح');
+    const [notes, setNotes] = useState(existingRegistration?.notes || '');
 
     useEffect(() => {
         if (birthDate) {
@@ -158,6 +160,12 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
         const data = Object.fromEntries(formData.entries());
         onSave({ ...data, birthDate, id: existingRegistration?.id });
     }
+
+    const showReasonField = status === 'مرفوض' || status === 'مؤجل' || status === 'مرشح';
+    let reasonLabel = "ملاحظات";
+    if (status === 'مرفوض') reasonLabel = "سبب الرفض (إلزامي)";
+    if (status === 'مؤجل') reasonLabel = "سبب التأجيل";
+    if (status === 'مرشح') reasonLabel = "سبب الترشيح / تفاصيل إضافية";
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -233,7 +241,7 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="status">الحالة</Label>
-                    <Select dir="rtl" name="status" defaultValue={existingRegistration?.status || "مرشح"}>
+                    <Select dir="rtl" name="status" value={status} onValueChange={(value) => setStatus(value as PreRegistrationStatus)}>
                         <SelectTrigger id="status"><SelectValue /></SelectTrigger>
                         <SelectContent>
                            <SelectItem value="مرشح">مرشح</SelectItem>
@@ -245,10 +253,12 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
                     </Select>
                 </div>
             </div>
-             <div className="space-y-2">
-                <Label htmlFor="notes">ملاحظات</Label>
-                <Textarea id="notes" name="notes" placeholder="أي تفاصيل إضافية..." defaultValue={existingRegistration?.notes}/>
-            </div>
+             {showReasonField && (
+                 <div className="space-y-2">
+                    <Label htmlFor="notes">{reasonLabel}</Label>
+                    <Textarea id="notes" name="notes" placeholder="اكتب السبب هنا..." value={notes} onChange={(e) => setNotes(e.target.value)} required={status === 'مرفوض'} />
+                </div>
+             )}
             <DialogFooter>
                 <Button type="button" variant="outline" onClick={onCancel}>إلغاء</Button>
                 <Button type="submit">
@@ -610,7 +620,7 @@ export default function PreRegistrationPage() {
                                     {columnVisibility.requestedAt.visible && <TableCell>{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt || '-')}</TableCell>}
                                     {columnVisibility.fullName.visible && <TableCell className="font-medium">{reg.fullName}</TableCell>}
                                     {columnVisibility.gender.visible && <TableCell>{reg.gender}</TableCell>}
-                                    {columnVisibility.birthDate.visible && <TableCell>{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : reg.birthDate.toString()}</TableCell>}
+                                    {columnVisibility.birthDate.visible && <TableCell>{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : (reg.birthDate ? reg.birthDate.toString() : 'غير محدد')}</TableCell>}
                                     {columnVisibility.educationalLevel.visible && <TableCell>{reg.educationalLevel}</TableCell>}
                                     {columnVisibility.guardianName.visible && <TableCell>{reg.guardianName}</TableCell>}
                                     {columnVisibility.phone1.visible && <TableCell>{reg.phone1}</TableCell>}
