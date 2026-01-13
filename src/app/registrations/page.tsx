@@ -1032,7 +1032,7 @@ export default function PreRegistrationPage() {
                 </Card>
             )}
             
-            {selectedRows.length > 0 && (
+            {isDataVisible && selectedRows.length > 0 && (
                 <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 border-t shadow-lg z-50">
                     <div className="container mx-auto flex justify-between items-center">
                         <p className="font-semibold">{selectedRows.length} طلاب محددون</p>
