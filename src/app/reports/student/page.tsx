@@ -8,20 +8,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, AlertTriangle, FileDown, FileText as FileTextIcon, MessageCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, FileDown, FileText as FileTextIcon, MessageCircle, Send } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, startOfYear, endOfYear, setMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import dynamic from 'next/dynamic';
+import { cn } from '@/lib/utils';
 
 const ReportDisplay = dynamic(() => import('@/components/ui/ReportDisplay').then(mod => mod.ReportDisplay), {
     ssr: false,
     loading: () => <div className="flex items-center justify-center h-96"><Loader2 className="h-8 w-8 animate-spin" /></div>
 });
 
-type MessageTemplate = "tahdidi" | "tanbih" | "istidaa" | "tashjee" | "inqitaa";
+type MessageTemplate = "tashjee" | "tanbih" | "tahdidi" | "istidaa" | "inqitaa";
 
 export default function StudentReportPage() {
     const { students, dailySessions, surahProgress, loading } = useStudentContext();
@@ -36,7 +37,7 @@ export default function StudentReportPage() {
     const [teacherNote, setTeacherNote] = useState('');
     const [tajweedScore, setTajweedScore] = useState(5);
     const [akhlaqScore, setAkhlaqScore] = useState(5);
-    const [messageTemplate, setMessageTemplate] = useState<MessageTemplate>('tahdidi');
+    const [messageTemplate, setMessageTemplate] = useState<MessageTemplate>('tashjee');
     const [messageContent, setMessageContent] = useState('');
 
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
@@ -48,36 +49,6 @@ export default function StudentReportPage() {
         }
     }, [activeStudents, selectedStudentId]);
     
-     useEffect(() => {
-        if (!selectedStudent || !user) {
-            setMessageContent('');
-            return;
-        }
-
-        const studentName = selectedStudent.fullName;
-        const sheikhName = user.displayName || "الشيخ";
-        let generatedMessage = '';
-
-        switch (messageTemplate) {
-            case 'tahdidi':
-                generatedMessage = `ولي أمر الطالب ${studentName}، نلاحظ تكرار غياب الطالب. يرجى الحضور للمدرسة للتوقيع على تعهد بالالتزام لضمان استمراره. مع تحيات الشيخ ${sheikhName}`;
-                break;
-            case 'tanbih':
-                generatedMessage = `نحيطكم علماً بأن مستوى حفظ الطالب ${studentName} في تراجع ملحوظ مؤخراً. نرجو منكم المتابعة المنزلية المكثفة. الشيخ ${sheikhName}`;
-                break;
-            case 'istidaa':
-                generatedMessage = `يرجى من ولي أمر الطالب ${studentName} الحضور لمقر مدرسة الشافعي في أقرب وقت لمقابلة الشيخ ${sheikhName} لأمر ضروري يخص الطالب`;
-                break;
-            case 'tashjee':
-                generatedMessage = `ما شاء الله! نبارك لكم التميز الباهر للطالب ${studentName} في حصة اليوم. استمروا في دعمه. الشيخ ${sheikhName}`;
-                break;
-            case 'inqitaa':
-                 generatedMessage = `إشعار انقطاع: نحيطكم علماً بأن الطالب ${studentName} قد تغيب لأكثر من 3 حصص متتالية دون عذر. نرجو منكم التواصل مع الإدارة. الشيخ: ${sheikhName}`;
-                break;
-        }
-        setMessageContent(generatedMessage);
-    }, [messageTemplate, selectedStudent, user]);
-
     const reportData = useMemo(() => {
         if (!selectedStudentId) return null;
         
@@ -210,6 +181,63 @@ export default function StudentReportPage() {
 
     }, [selectedStudentId, reportPeriod, selectedMonth, selectedSeason, selectedYear, students, dailySessions, surahProgress, tajweedScore, akhlaqScore, loading]);
     
+     useEffect(() => {
+        if (!selectedStudent || !user) {
+            setMessageContent('');
+            return;
+        }
+
+        const studentName = selectedStudent.fullName;
+        const sheikhName = user.displayName || "الشيخ";
+        
+        // Auto-suggestion logic
+        if (reportData) {
+            const { stats, radarData } = reportData;
+            const hifzScore = radarData.find(d => d.subject === 'الحفظ')?.score || 0;
+            
+            if (stats.absent > 2) {
+                setMessageTemplate('tahdidi');
+            } else if (hifzScore < 5) {
+                setMessageTemplate('tanbih');
+            } else {
+                setMessageTemplate('tashjee');
+            }
+        }
+
+    }, [selectedStudent, reportData, user]);
+
+    useEffect(() => {
+        if (!selectedStudent || !user) {
+            setMessageContent('');
+            return;
+        }
+
+        const studentName = selectedStudent.fullName;
+        const sheikhName = user.displayName || "الشيخ";
+        let generatedMessage = '';
+
+        const messageBase = `*📢 تقرير أداء الطالب: ${studentName}*\n*👨‍🏫 الشيخ المسؤول: ${sheikhName}*\n\n`;
+
+        switch (messageTemplate) {
+            case 'tahdidi':
+                generatedMessage = messageBase + `نلاحظ تكرار غياب ابنكم، وعليه نرجو منكم الحضور للمدرسة للتوقيع على تعهد بالالتزام لضمان استمراره.`;
+                break;
+            case 'tanbih':
+                generatedMessage = messageBase + `نحيطكم علماً بأن مستوى حفظ ابنكم في تراجع ملحوظ مؤخراً. نرجو منكم المتابعة المنزلية المكثفة.`;
+                break;
+            case 'istidaa':
+                generatedMessage = messageBase + `يرجى منكم الحضور لمقر مدرسة الشافعي في أقرب وقت لمقابلة الشيخ لأمر ضروري يخص ابنكم.`;
+                break;
+            case 'tashjee':
+                generatedMessage = messageBase + `ما شاء الله! نبارك لكم التميز الباهر لابنكم في حصص القرآن مؤخراً. استمروا في دعمه وتشجيعه.`;
+                break;
+            case 'inqitaa':
+                 generatedMessage = messageBase + `إشعار انقطاع: نحيطكم علماً بأن ابنكم قد تغيب لأكثر من 3 حصص متتالية دون عذر. نرجو منكم التواصل مع الإدارة بشكل عاجل.`;
+                break;
+        }
+        setMessageContent(generatedMessage);
+    }, [messageTemplate, selectedStudent, user]);
+
     const getReportFilename = (extension: string) => {
         if (!reportData) return `report.${extension}`;
         const studentName = reportData.student.fullName.replace(/\s/g, '_');
@@ -241,21 +269,19 @@ export default function StudentReportPage() {
         }
     };
     
-    const handleCopyWhatsAppReport = () => {
-        if (!messageContent) return;
-        navigator.clipboard.writeText(messageContent).then(() => {
+    const handleSendWhatsApp = () => {
+        if (!messageContent || !selectedStudent?.phone1) {
             toast({
-                title: "✅ تم النسخ بنجاح!",
-                description: "الرسالة جاهزة للصق في واتساب.",
-            });
-        }).catch(err => {
-            console.error('Failed to copy: ', err);
-            toast({
-                title: "❌ فشل النسخ",
-                description: "لم نتمكن من نسخ الرسالة. حاول مرة أخرى.",
+                title: "خطأ",
+                description: "الرجاء التأكد من وجود محتوى للرسالة ورقم هاتف لولي الأمر.",
                 variant: "destructive",
             });
-        });
+            return;
+        }
+        // Basic phone number cleaning
+        const phoneNumber = selectedStudent.phone1.replace(/\D/g, '');
+        const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(messageContent)}`;
+        window.open(whatsappUrl, '_blank');
     };
 
 
@@ -377,21 +403,24 @@ export default function StudentReportPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="message-template">اختر قالب رسالة واتساب</Label>
                                  <Select dir="rtl" value={messageTemplate} onValueChange={(value: MessageTemplate) => setMessageTemplate(value)}>
-                                    <SelectTrigger id="message-template">
+                                    <SelectTrigger id="message-template" className={cn(
+                                        messageTemplate === 'tahdidi' || messageTemplate === 'tanbih' || messageTemplate === 'inqitaa' ? 'ring-2 ring-destructive' : '',
+                                        messageTemplate === 'tashjee' ? 'ring-2 ring-green-500' : ''
+                                    )}>
                                         <SelectValue placeholder="اختر نوع الرسالة" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="tahdidi">رسالة تعهد (لضبط الغياب)</SelectItem>
-                                        <SelectItem value="tanbih">رسالة تنبيه (لضعف الحفظ)</SelectItem>
-                                        <SelectItem value="istidaa">إستدعاء ولي أمر</SelectItem>
                                         <SelectItem value="tashjee">رسالة تشجيع (للتميز)</SelectItem>
+                                        <SelectItem value="tanbih">رسالة تنبيه (لضعف الحفظ)</SelectItem>
+                                        <SelectItem value="tahdidi">رسالة تعهد (لضبط الغياب)</SelectItem>
                                         <SelectItem value="inqitaa">إشعار انقطاع (غياب 3+ حصص)</SelectItem>
+                                        <SelectItem value="istidaa">استدعاء ولي أمر</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <Button onClick={handleCopyWhatsAppReport} disabled={!selectedStudentId} className="w-full">
-                                <MessageCircle className="ml-2 h-4 w-4" />
-                                نسخ رسالة الواتساب
+                             <Button onClick={handleSendWhatsApp} disabled={!selectedStudentId} className="w-full">
+                                <Send className="ml-2 h-4 w-4" />
+                                إرسال عبر واتساب
                             </Button>
                         </div>
                         <div className="mt-2 space-y-2">
@@ -418,5 +447,7 @@ export default function StudentReportPage() {
         </div>
     );
 }
+
+    
 
     
