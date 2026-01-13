@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useStudentContext } from '@/context/StudentContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, User, KeyRound, Edit, Save, Users, CheckCircle, BookCopy, BookHeart } from 'lucide-react';
+import { Loader2, User, KeyRound, Edit, Save, Users, CheckCircle, BookCopy, BookHeart, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 
 export default function ProfilePage() {
     const { user, loading: authLoading, isSuperAdmin, updateUserProfile } = useAuth();
@@ -25,6 +26,10 @@ export default function ProfilePage() {
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [photoPreview, setPhotoPreview] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [isUnlockModalOpen, setUnlockModalOpen] = useState(false);
+    const [adminCode, setAdminCode] = useState('');
+    const [isAdminViewUnlocked, setIsAdminViewUnlocked] = useState(false);
 
     const [formData, setFormData] = useState({
         displayName: '',
@@ -56,7 +61,6 @@ export default function ProfilePage() {
              const studentProgress = surahProgress ? (surahProgress[student.id] || {}) : {};
              const masteredCount = Object.values(studentProgress).filter(status => status === 2).length;
              totalMasteredSurahs += masteredCount;
-             // Consider a student has completed the Quran if they have mastered all 114 surahs.
              return (student.memorizedSurahsCount || 0) >= 114;
         }).length;
 
@@ -104,8 +108,9 @@ export default function ProfilePage() {
                 joinDate: user.joinDate || '',
             });
             setPhotoPreview(user.photoURL || null);
+            if(isSuperAdmin) setIsAdminViewUnlocked(true); // Auto-unlock for super admin
         }
-    }, [user]);
+    }, [user, isSuperAdmin]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string, field: keyof typeof formData) => {
         if(typeof e === 'string') {
@@ -151,6 +156,17 @@ export default function ProfilePage() {
             setIsSaving(false);
         }
     }
+
+    const handleUnlock = () => {
+        if (adminCode === 'admin8888') {
+            setIsAdminViewUnlocked(true);
+            setUnlockModalOpen(false);
+            setAdminCode('');
+            toast({ title: '✅ تم فتح الوصول', description: 'يمكنك الآن عرض وتعديل السجل الإداري.' });
+        } else {
+            toast({ title: '❌ خطأ', description: 'كود الإدارة غير صحيح.', variant: 'destructive' });
+        }
+    };
     
     if (authLoading || !user) {
         return (
@@ -206,7 +222,7 @@ export default function ProfilePage() {
             <Tabs defaultValue="public" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="public">بياناتي العامة</TabsTrigger>
-                    <TabsTrigger value="admin" disabled={!isSuperAdmin}>السجل الإداري</TabsTrigger>
+                    <TabsTrigger value="admin" onClick={(e) => {if(!isAdminViewUnlocked){ e.preventDefault(); setUnlockModalOpen(true); }}}>السجل الإداري</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="public">
@@ -260,7 +276,7 @@ export default function ProfilePage() {
                                  </div>
                                   <div className="space-y-2">
                                      <Label htmlFor="joinDate">تاريخ الانضمام</Label>
-                                     <Input id="joinDate" name="joinDate" type="date" value={formData.joinDate} onChange={(e) => handleInputChange(e, 'joinDate')} disabled={!isSuperAdmin} />
+                                     <Input id="joinDate" name="joinDate" type="date" value={formData.joinDate} onChange={(e) => handleInputChange(e, 'joinDate')} disabled={!isAdminViewUnlocked} />
                                  </div>
                                 <div className="space-y-2 md:col-span-2">
                                     <Label htmlFor="certifications">الإجازات والروايات</Label>
@@ -284,27 +300,60 @@ export default function ProfilePage() {
                 </TabsContent>
 
                 <TabsContent value="admin">
-                     <Card className="flex flex-col items-center justify-center p-8 text-center">
-                        <KeyRound className="h-12 w-12 text-destructive mb-4" />
-                        <CardTitle>وصول مقيد</CardTitle>
-                        <CardDescription className="mb-4">هذا الجزء مخصص للمدير العام فقط.</CardDescription>
-                         {isSuperAdmin && (
-                            <div className="w-full text-left space-y-4">
-                               <div className="space-y-2">
-                                  <Label>تقييم الإدارة للشيخ</Label>
-                                  {/* Star rating component would go here */}
-                                   <p className="text-sm text-muted-foreground"> (سيتم إضافة مكون التقييم هنا)</p>
-                               </div>
-                               <div className="space-y-2">
-                                  <Label>الجوائز والتكريمات</Label>
-                                  <Textarea placeholder="سجل هنا أي تكريمات أو جوائز تم منحها للشيخ..."/>
-                               </div>
-                                <Button>حفظ التقييم الإداري</Button>
-                            </div>
-                         )}
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>السجل الإداري</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {isAdminViewUnlocked ? (
+                                 <div className="w-full text-left space-y-4">
+                                   <div className="space-y-2">
+                                      <Label>تقييم الإدارة للشيخ</Label>
+                                       <p className="text-sm text-muted-foreground"> (سيتم إضافة مكون التقييم هنا)</p>
+                                   </div>
+                                   <div className="space-y-2">
+                                      <Label>الجوائز والتكريمات</Label>
+                                      <Textarea placeholder="سجل هنا أي تكريمات أو جوائز تم منحها للشيخ..."/>
+                                   </div>
+                                    <Button>حفظ التقييم الإداري</Button>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center p-8 text-center bg-muted rounded-lg">
+                                    <Lock className="h-12 w-12 text-muted-foreground mb-4" />
+                                    <h3 className="text-xl font-bold">قسم خاص بالإدارة</h3>
+                                    <p className="text-muted-foreground">هذا القسم مقفل. يرجى إدخال كود الوصول لعرض المحتوى.</p>
+                                    <Button className="mt-4" onClick={() => setUnlockModalOpen(true)}>فتح القفل</Button>
+                                </div>
+                            )}
+                        </CardContent>
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            <Dialog open={isUnlockModalOpen} onOpenChange={setUnlockModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>فتح السجل الإداري</DialogTitle>
+                        <DialogDescription>
+                            للوصول إلى هذا القسم، يرجى إدخال كود الإدارة.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 py-4">
+                        <Label htmlFor="admin-code">كود الإدارة</Label>
+                        <Input 
+                            id="admin-code" 
+                            type="password"
+                            value={adminCode}
+                            onChange={(e) => setAdminCode(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setUnlockModalOpen(false)}>إلغاء</Button>
+                        <Button onClick={handleUnlock}>تأكيد</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
