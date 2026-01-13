@@ -13,7 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, GraduationCap, GripVertical } from 'lucide-react';
+import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, GraduationCap, GripVertical, Settings2 } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -327,9 +327,88 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
     );
 }
 
+const BulkEditModal = ({ open, onOpenChange, selectedCount, onSave }: { open: boolean, onOpenChange: (open: boolean) => void, selectedCount: number, onSave: (updateData: Partial<PreRegistration>) => void }) => {
+    const [fieldsToUpdate, setFieldsToUpdate] = useState<Record<string, boolean>>({});
+    const [updateData, setUpdateData] = useState<Partial<PreRegistration>>({});
+
+    const handleFieldToggle = (field: keyof PreRegistration) => {
+        setFieldsToUpdate(prev => ({ ...prev, [field]: !prev[field] }));
+    };
+
+    const handleInputChange = (field: keyof PreRegistration, value: any) => {
+        setUpdateData(prev => ({ ...prev, [field]: value }));
+    };
+    
+    const handleSave = () => {
+        const finalUpdateData: Partial<PreRegistration> = {};
+        for (const field in fieldsToUpdate) {
+            if (fieldsToUpdate[field] && updateData[field as keyof PreRegistration] !== undefined) {
+                finalUpdateData[field as keyof PreRegistration] = updateData[field as keyof PreRegistration];
+            }
+        }
+        if (Object.keys(finalUpdateData).length > 0) {
+            onSave(finalUpdateData);
+        }
+        onOpenChange(false);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>تعديل جماعي لـ {selectedCount} طلاب</DialogTitle>
+                    <DialogDescription>
+                        حدد الحقول التي تريد تحديثها وأدخل القيمة الجديدة. سيتم تطبيق التغييرات على جميع الطلاب المحددين.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="flex items-center gap-4">
+                        <Checkbox id="update-status" checked={!!fieldsToUpdate.status} onCheckedChange={() => handleFieldToggle('status')} />
+                        <div className="grid gap-1.5 leading-none w-full">
+                            <Label htmlFor="status-select" className={cn(!fieldsToUpdate.status && "text-muted-foreground")}>الحالة</Label>
+                            <Select dir="rtl" name="status" disabled={!fieldsToUpdate.status} onValueChange={(val) => handleInputChange('status', val)}>
+                                <SelectTrigger id="status-select"><SelectValue placeholder="اختر الحالة الجديدة" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="مرشح">مرشح</SelectItem>
+                                    <SelectItem value="مرفوض">مرفوض</SelectItem>
+                                    <SelectItem value="مؤجل">مؤجل</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <Checkbox id="update-level" checked={!!fieldsToUpdate.educationalLevel} onCheckedChange={() => handleFieldToggle('educationalLevel')} />
+                        <div className="grid gap-1.5 leading-none w-full">
+                             <Label htmlFor="level-select" className={cn(!fieldsToUpdate.educationalLevel && "text-muted-foreground")}>المستوى الدراسي</Label>
+                             <Select dir="rtl" name="educationalLevel" disabled={!fieldsToUpdate.educationalLevel} onValueChange={(val) => handleInputChange('educationalLevel', val)}>
+                                <SelectTrigger id="level-select"><SelectValue placeholder="اختر المستوى الجديد" /></SelectTrigger>
+                                <SelectContent>
+                                    {educationalLevels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                     <div className="flex items-center gap-4">
+                        <Checkbox id="update-notes" checked={!!fieldsToUpdate.notes} onCheckedChange={() => handleFieldToggle('notes')} />
+                        <div className="grid gap-1.5 leading-none w-full">
+                             <Label htmlFor="notes-input" className={cn(!fieldsToUpdate.notes && "text-muted-foreground")}>سبب/ملاحظات</Label>
+                            <Input id="notes-input" disabled={!fieldsToUpdate.notes} onChange={(e) => handleInputChange('notes', e.target.value)} placeholder="سبب الرفض أو التأجيل..." />
+                        </div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+                    <Button onClick={handleSave}>تطبيق التغييرات</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+
 export default function PreRegistrationPage() {
     const { toast } = useToast();
-    const { addStudent, preRegistrations, loading, importPreRegistrations, updatePreRegistration } = useStudentContext();
+    const { addStudent, preRegistrations, loading, updatePreRegistration, deleteMultiplePreRegistrations, bulkUpdatePreRegistrations } = useStudentContext();
     const [isFormOpen, setFormOpen] = useState(false);
     const [editingRegistration, setEditingRegistration] = useState<PreRegistration | null>(null);
     const [selectedStudent, setSelectedStudent] = useState<PreRegistration | null>(null);
@@ -338,6 +417,7 @@ export default function PreRegistrationPage() {
     const [statusFilter, setStatusFilter] = useState('all');
     const [genderFilter, setGenderFilter] = useState('all');
     const [selectedRows, setSelectedRows] = useState<string[]>([]);
+    const [isBulkEditOpen, setBulkEditOpen] = useState(false);
     const router = useRouter();
     
     const [sortConfig, setSortConfig] = useState<{ key: keyof PreRegistration; direction: 'ascending' | 'descending' }>({ key: 'pageNumber', direction: 'ascending' });
@@ -453,9 +533,15 @@ export default function PreRegistrationPage() {
         setFormOpen(true);
     }
     
-    const handleDelete = (id: string) => {
-        // This should be handled by the context now
-    }
+    const handleBulkDelete = () => {
+        deleteMultiplePreRegistrations(selectedRows);
+        setSelectedRows([]);
+    };
+    
+    const handleBulkEditSave = (updateData: Partial<PreRegistration>) => {
+        bulkUpdatePreRegistrations(selectedRows, updateData);
+        setSelectedRows([]);
+    };
 
     const handlePromoteStudent = (reg: PreRegistration) => {
         const newStudentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> = {
@@ -510,16 +596,16 @@ export default function PreRegistrationPage() {
             </Card>
 
              <Card>
-                 <CardContent className="flex flex-col gap-4 p-4">
-                     <div className="flex flex-wrap items-center gap-2">
-                         {Object.entries(statusBadgeColors).map(([status, className]) => (
-                             <Badge key={status} className={cn("border cursor-pointer", className)} onClick={() => setStatusFilter(status as PreRegistrationStatus)}>{status}</Badge>
+                <CardContent className="p-4 space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {Object.entries(statusBadgeColors).map(([status, className]) => (
+                            <Badge key={status} className={cn("border cursor-pointer", className, statusFilter === status && "ring-2 ring-ring")} onClick={() => setStatusFilter(prev => prev === status ? 'all' : status as PreRegistrationStatus)}>{status}</Badge>
                         ))}
                     </div>
-                     <div className="flex flex-col md:flex-row items-center gap-2">
+                    <div className="flex flex-col md:flex-row items-center gap-2">
                         <div className="relative w-full sm:max-w-xs">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input 
+                            <Input
                                 placeholder="بحث شامل..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -528,7 +614,7 @@ export default function PreRegistrationPage() {
                         </div>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline"><Filter className="ml-2 h-4 w-4"/>المستوى الدراسي {levelFilter.length > 0 && `(${levelFilter.length})`}</Button>
+                                <Button variant="outline"><Filter className="ml-2 h-4 w-4" />المستوى الدراسي {levelFilter.length > 0 && `(${levelFilter.length})`}</Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-56">
                                 <DropdownMenuLabel>اختر المستويات</DropdownMenuLabel>
@@ -618,6 +704,13 @@ export default function PreRegistrationPage() {
                     />
                 </Dialog>
             )}
+            
+            <BulkEditModal 
+                open={isBulkEditOpen}
+                onOpenChange={setBulkEditOpen}
+                selectedCount={selectedRows.length}
+                onSave={handleBulkEditSave}
+            />
 
             <Card>
                 <CardHeader>
@@ -630,7 +723,7 @@ export default function PreRegistrationPage() {
                                 <TableRow>
                                     <TableHead className="w-[50px] px-2">
                                          <Checkbox
-                                            checked={selectedRows.length > 0 && selectedRows.length === filteredRegistrations.length}
+                                            checked={selectedRows.length > 0 && selectedRows.length === filteredRegistrations.length && filteredRegistrations.length > 0}
                                             onCheckedChange={(checked) => {
                                                 if (checked) {
                                                     setSelectedRows(filteredRegistrations.map(r => r.id));
@@ -648,7 +741,7 @@ export default function PreRegistrationPage() {
                                         </Button>
                                     </TableHead>
                                     {columnVisibility.requestedAt.visible && <TableHead className="text-center">تاريخ التسجيل</TableHead>}
-                                    {columnVisibility.fullName.visible && <TableHead className="text-center">الإسم الكامل</TableHead>}
+                                    {columnVisibility.fullName.visible && <TableHead className="flex-1 text-center">الإسم الكامل</TableHead>}
                                     {columnVisibility.gender.visible && <TableHead className="text-center">الجنس</TableHead>}
                                     {columnVisibility.birthDate.visible && <TableHead className="text-center">تاريخ الميلاد</TableHead>}
                                     {columnVisibility.educationalLevel.visible && <TableHead className="text-center">المستوى الدراسي</TableHead>}
@@ -737,25 +830,6 @@ export default function PreRegistrationPage() {
                                                     <DropdownMenuItem onClick={() => handleEdit(reg)}>
                                                         <Edit className="ml-2 h-4 w-4" /> تعديل
                                                     </DropdownMenuItem>
-                                                    <AlertDialog>
-                                                        <AlertDialogTrigger asChild>
-                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                                                                <Trash2 className="ml-2 h-4 w-4" /> حذف
-                                                            </DropdownMenuItem>
-                                                        </AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader>
-                                                                <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
-                                                                <AlertDialogDescription>
-                                                                    سيتم حذف طلب التسجيل هذا نهائياً.
-                                                                </AlertDialogDescription>
-                                                            </AlertDialogHeader>
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                                                <AlertDialogAction onClick={() => handleDelete(reg.id)}>تأكيد الحذف</AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
@@ -782,8 +856,24 @@ export default function PreRegistrationPage() {
                         <p className="font-semibold">{selectedRows.length} طلاب محددون</p>
                         <div className="flex gap-2">
                              <Button variant="outline" onClick={() => setSelectedRows([])}>إلغاء التحديد</Button>
-                             <Button>تعديل جماعي</Button>
-                             <Button variant="destructive">حذف المحدد</Button>
+                             <Button onClick={() => setBulkEditOpen(true)}><Settings2 className="ml-2 h-4 w-4" /> تعديل جماعي</Button>
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive"><Trash2 className="ml-2 h-4 w-4" /> حذف المحدد</Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            سيؤدي هذا إلى حذف {selectedRows.length} تسجيل(ات) نهائياً.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleBulkDelete}>تأكيد الحذف</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         </div>
                     </div>
                 </div>
@@ -793,6 +883,7 @@ export default function PreRegistrationPage() {
 }
 
     
+
 
 
 

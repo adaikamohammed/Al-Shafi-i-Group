@@ -68,6 +68,7 @@ interface StudentContextType {
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
   importPreRegistrations: (newPreRegs: Omit<PreRegistration, 'id'>[]) => void;
   updatePreRegistration: (regId: string, data: Partial<PreRegistration> & { photoFile?: File | null }, isEditing: boolean) => Promise<void>;
+  bulkUpdatePreRegistrations: (ids: string[], data: Partial<PreRegistration>) => void;
   deleteAllPreRegistrations: () => void;
   deleteMultiplePreRegistrations: (ids: string[]) => void;
   saveDailyReport: (report: Omit<DailyReport, 'id'>, reportIdToUpdate?: string) => Promise<void>;
@@ -316,6 +317,22 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         description: `تم تحديث بيانات ${data.fullName} بنجاح.`
     });
 };
+
+const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration>) => {
+    const updates: { [key: string]: any } = {};
+    ids.forEach(id => {
+      updates[`/pre_registrations/${id}`] = {
+        ...preRegistrations.find(p => p.id === id),
+        ...data,
+      };
+    });
+    const dbRef = ref(db);
+    update(dbRef, updates);
+    toast({
+      title: `✅ تم التعديل الجماعي`,
+      description: `تم تحديث بيانات ${ids.length} طلاب بنجاح.`,
+    });
+  };
   
   const importPreRegistrations = (newPreRegs: Omit<PreRegistration, 'id'>[]) => {
     if (!authContextUser) return;
@@ -558,7 +575,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <StudentContext.Provider value={{ students, preRegistrations, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, deleteMultipleStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, updatePreRegistration, deleteAllPreRegistrations, deleteMultiplePreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
+    <StudentContext.Provider value={{ students, preRegistrations, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, deleteMultipleStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, updatePreRegistration, bulkUpdatePreRegistrations, deleteAllPreRegistrations, deleteMultiplePreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
       {children}
     </StudentContext.Provider>
   );
@@ -573,6 +590,7 @@ export const useStudentContext = () => {
 };
 
   
+
 
 
 
