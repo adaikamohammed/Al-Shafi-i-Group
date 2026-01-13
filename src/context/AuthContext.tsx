@@ -17,15 +17,15 @@ import { ref, set, get } from 'firebase/database';
 
 const sheikhInitialData: { [email: string]: { name: string; group: string; role: 'sheikh' | 'super_admin' } } = {
   "admin0@gmail.com": { name: "المدير العام", group: "كل الأفواج", role: "super_admin" },
-  "admin1@gmail.com": { name: "الشيخ صهيب نصيب", group: "فوج 1", role: "sheikh" },
-  "admin2@gmail.com": { name: "الشيخ زياد درويش", group: "فوج 2", role: "sheikh" },
+  "admin1@gmail.com": { name: "الشيخ زياد درويش", group: "فوج 1", role: "sheikh" },
+  "admin2@gmail.com": { name: "الشيخ عبد الحميد", group: "فوج 2", role: "sheikh" },
   "admin3@gmail.com": { name: "الشيخ فؤاد بن عمر", group: "فوج 3", role: "sheikh" },
   "admin4@gmail.com": { name: "الشيخ أحمد بن عمر", group: "فوج 4", role: "sheikh" },
   "admin5@gmail.com": { name: "الشيخ إبراهيم مراد", group: "فوج 5", role: "sheikh" },
-  "admin6@gmail.com": { name: "الشيخ عبد الحميد", group: "فوج 6", role: "sheikh" },
+  "admin6@gmail.com": { name: "الشيخ سفيان نصيرة", group: "فوج 6", role: "sheikh" },
   "admin7@gmail.com": { name: "الشيخ سفيان نصيرة", group: "فوج 7", role: "sheikh" },
   "admin8@gmail.com": { name: "الشيخ عبد الحق نصيرة", group: "فوج 8", role: "sheikh" },
-  "admin9@gmail.com": { name: "الشيخ عبد القادر", group: "فوج 9", role: "sheikh" },
+  "admin9@gmail.com": { name: "الشيخ صهيب نصيب", group: "فوج 9", role: "sheikh" },
   "admin10@gmail.com": { name: "الشيخ محمد منصور", group: "فوج 10", role: "sheikh" },
 };
 
