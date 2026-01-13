@@ -13,7 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter } from 'lucide-react';
+import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -43,6 +43,21 @@ const statusBadgeColors: Record<PreRegistrationStatus, string> = {
 };
 
 const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
+
+const ALL_COLUMNS = {
+    pageNumber: { label: "رقم الصفحة", visible: true },
+    requestedAt: { label: "تاريخ التسجيل", visible: true },
+    fullName: { label: "الإسم الكامل", visible: true },
+    gender: { label: "الجنس", visible: false },
+    birthDate: { label: "تاريخ الميلاد", visible: true },
+    educationalLevel: { label: "المستوى الدراسي", visible: true },
+    guardianName: { label: "إسم الولي", visible: false },
+    phone1: { label: "رقم الهاتف 1", visible: true },
+    phone2: { label: "رقم الهاتف 2", visible: false },
+    address: { label: "مقر السكن", visible: false },
+    status: { label: "الحالة", visible: true },
+    notes: { label: "ملاحظات", visible: true },
+};
 
 
 const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: (data: Partial<PreRegistration>) => void, onCancel: () => void, existingRegistration?: PreRegistration | null }) => {
@@ -112,7 +127,7 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
              <div className="space-y-2">
                 <Label htmlFor="educationalLevel">المستوى الدراسي</Label>
                  <Select dir="rtl" name="educationalLevel" defaultValue={existingRegistration?.educationalLevel}>
-                    <SelectTrigger id="educationalLevel"><SelectValue placeholder="اختر المستوى الدراسي" /></SelectTrigger>
+                    <SelectTrigger id="educationalLevel"><SelectValue placeholder="اختر المستوى الدراسي" /></SelectValue>
                     <SelectContent>
                         {educationalLevels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
                     </SelectContent>
@@ -181,6 +196,45 @@ export default function PreRegistrationPage() {
     const [levelFilter, setLevelFilter] = useState<string[]>([]);
     const [statusFilter, setStatusFilter] = useState('all');
     const [genderFilter, setGenderFilter] = useState('all');
+    
+    const [columnVisibility, setColumnVisibility] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('preRegColumnVisibility');
+            return saved ? JSON.parse(saved) : ALL_COLUMNS;
+        }
+        return ALL_COLUMNS;
+    });
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('preRegColumnVisibility', JSON.stringify(columnVisibility));
+        }
+    }, [columnVisibility]);
+
+    const toggleColumn = (key: keyof typeof ALL_COLUMNS) => {
+        setColumnVisibility((prev: any) => ({
+            ...prev,
+            [key]: { ...prev[key], visible: !prev[key].visible }
+        }));
+    };
+
+    const setQuickView = () => {
+        const quickViewCols: (keyof typeof ALL_COLUMNS)[] = ['fullName', 'educationalLevel', 'pageNumber'];
+        const newVisibility = { ...columnVisibility };
+        Object.keys(newVisibility).forEach(key => {
+            newVisibility[key as keyof typeof ALL_COLUMNS].visible = quickViewCols.includes(key as keyof typeof ALL_COLUMNS);
+        });
+        setColumnVisibility(newVisibility);
+    };
+
+    const setAllView = () => {
+        const newVisibility = { ...columnVisibility };
+        Object.keys(newVisibility).forEach(key => {
+            newVisibility[key as keyof typeof ALL_COLUMNS].visible = true;
+        });
+        setColumnVisibility(newVisibility);
+    };
+
 
     const filteredRegistrations = useMemo(() => {
         const lowercasedFilter = searchTerm.toLowerCase();
@@ -375,6 +429,27 @@ export default function PreRegistrationPage() {
                            <SelectItem value="أنثى">أنثى</SelectItem>
                         </SelectContent>
                     </Select>
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline"><View className="ml-2 h-4 w-4"/> عرض الأعمدة</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                            <DropdownMenuLabel>اختر الأعمدة للعرض</DropdownMenuLabel>
+                             <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={setQuickView}>عرض سريع</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={setAllView}>عرض الكل</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {Object.entries(columnVisibility).map(([key, value]) => (
+                                <DropdownMenuCheckboxItem
+                                    key={key}
+                                    checked={value.visible}
+                                    onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
+                                >
+                                    {value.label}
+                                </DropdownMenuCheckboxItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                  </CardContent>
             </Card>
 
@@ -401,36 +476,40 @@ export default function PreRegistrationPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>رقم الصفحة</TableHead>
-                                <TableHead>تاريخ التسجيل</TableHead>
-                                <TableHead>الإسم الكامل</TableHead>
-                                <TableHead>الجنس</TableHead>
-                                <TableHead>تاريخ الميلاد</TableHead>
-                                <TableHead>المستوى الدراسي</TableHead>
-                                <TableHead>إسم الولي</TableHead>
-                                <TableHead>رقم الهاتف 1</TableHead>
-                                <TableHead>الحالة</TableHead>
-                                <TableHead>ملاحظات</TableHead>
+                                {columnVisibility.pageNumber.visible && <TableHead>رقم الصفحة</TableHead>}
+                                {columnVisibility.requestedAt.visible && <TableHead>تاريخ التسجيل</TableHead>}
+                                {columnVisibility.fullName.visible && <TableHead>الإسم الكامل</TableHead>}
+                                {columnVisibility.gender.visible && <TableHead>الجنس</TableHead>}
+                                {columnVisibility.birthDate.visible && <TableHead>تاريخ الميلاد</TableHead>}
+                                {columnVisibility.educationalLevel.visible && <TableHead>المستوى الدراسي</TableHead>}
+                                {columnVisibility.guardianName.visible && <TableHead>إسم الولي</TableHead>}
+                                {columnVisibility.phone1.visible && <TableHead>رقم الهاتف 1</TableHead>}
+                                {columnVisibility.phone2.visible && <TableHead>رقم الهاتف 2</TableHead>}
+                                {columnVisibility.address.visible && <TableHead>مقر السكن</TableHead>}
+                                {columnVisibility.status.visible && <TableHead>الحالة</TableHead>}
+                                {columnVisibility.notes.visible && <TableHead>ملاحظات</TableHead>}
                                 <TableHead>إجراءات</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {filteredRegistrations.length > 0 ? filteredRegistrations.map(reg => (
                                 <TableRow key={reg.id} className={statusColors[reg.status]}>
-                                    <TableCell>{reg.pageNumber}</TableCell>
-                                    <TableCell>{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : reg.requestedAt.toString()}</TableCell>
-                                    <TableCell className="font-medium">{reg.fullName}</TableCell>
-                                    <TableCell>{reg.gender}</TableCell>
-                                    <TableCell>{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : reg.birthDate.toString()}</TableCell>
-                                    <TableCell>{reg.educationalLevel}</TableCell>
-                                    <TableCell>{reg.guardianName}</TableCell>
-                                    <TableCell>{reg.phone1}</TableCell>
-                                    <TableCell>
+                                    {columnVisibility.pageNumber.visible && <TableCell>{reg.pageNumber}</TableCell>}
+                                    {columnVisibility.requestedAt.visible && <TableCell>{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : reg.requestedAt.toString()}</TableCell>}
+                                    {columnVisibility.fullName.visible && <TableCell className="font-medium">{reg.fullName}</TableCell>}
+                                    {columnVisibility.gender.visible && <TableCell>{reg.gender}</TableCell>}
+                                    {columnVisibility.birthDate.visible && <TableCell>{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : reg.birthDate.toString()}</TableCell>}
+                                    {columnVisibility.educationalLevel.visible && <TableCell>{reg.educationalLevel}</TableCell>}
+                                    {columnVisibility.guardianName.visible && <TableCell>{reg.guardianName}</TableCell>}
+                                    {columnVisibility.phone1.visible && <TableCell>{reg.phone1}</TableCell>}
+                                    {columnVisibility.phone2.visible && <TableCell>{reg.phone2}</TableCell>}
+                                    {columnVisibility.address.visible && <TableCell>{reg.address}</TableCell>}
+                                    {columnVisibility.status.visible && <TableCell>
                                          <Badge variant="outline" className={cn("border", statusBadgeColors[reg.status])}>
                                             {reg.status}
                                         </Badge>
-                                    </TableCell>
-                                    <TableCell className="max-w-[200px] truncate">{reg.notes}</TableCell>
+                                    </TableCell>}
+                                    {columnVisibility.notes.visible && <TableCell className="max-w-[200px] truncate">{reg.notes}</TableCell>}
                                      <TableCell>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -485,7 +564,7 @@ export default function PreRegistrationPage() {
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={13} className="text-center h-24">
+                                    <TableCell colSpan={Object.values(columnVisibility).filter(c => c.visible).length + 1} className="text-center h-24">
                                         {searchTerm || levelFilter.length > 0 || statusFilter !== 'all' || genderFilter !== 'all'
                                             ? 'لم يتم العثور على نتائج مطابقة للبحث.'
                                             : 'لا توجد طلبات تسجيل جديدة في الوقت الحالي.'
@@ -502,3 +581,4 @@ export default function PreRegistrationPage() {
 }
 
     
+
