@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useRef, useState } from 'react';
@@ -99,6 +98,7 @@ export default function DataExchangePage() {
         const existingStudentNames = new Set((students ?? []).map(s => s.fullName.trim().toLowerCase()));
         const newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[] = [];
         let skippedCount = 0;
+        let invalidDateCount = 0;
 
         json.forEach((row, index) => {
            const fullName = (row['الاسم الكامل'] || '').trim();
@@ -109,11 +109,16 @@ export default function DataExchangePage() {
                return; // Skip duplicate student
            }
            
-           const birthDate = parseDate(row['تاريخ الميلاد']);
-           const registrationDate = parseDate(row['تاريخ التسجيل']);
+           let birthDate = parseDate(row['تاريخ الميلاد']);
+           let registrationDate = parseDate(row['تاريخ التسجيل']);
 
-           if (!birthDate || typeof birthDate === 'string' || !registrationDate || typeof registrationDate === 'string') {
-             throw new Error(`التواريخ غير صالحة في الصف رقم ${index + 2} للطالب ${fullName}. تأكد من أنها بصيغة DD/MM/YYYY.`);
+           if (!birthDate || typeof birthDate === 'string') {
+                birthDate = new Date();
+                invalidDateCount++;
+           }
+           if (!registrationDate || typeof registrationDate === 'string') {
+                registrationDate = new Date();
+                invalidDateCount++;
            }
 
            const status = row['حالة الطالب'] || 'نشط';
@@ -140,9 +145,14 @@ export default function DataExchangePage() {
             importStudents(newStudents);
         }
         
+        let description = `تم استيراد ${newStudents.length} طالبًا جديدًا بنجاح. وتم تخطي ${skippedCount} طالبًا لوجودهم مسبقًا.`;
+        if (invalidDateCount > 0) {
+            description += ` تم العثور على ${invalidDateCount} تواريخ غير صالحة وتم تعيينها إلى تاريخ اليوم مؤقتًا.`
+        }
+
         toast({
           title: "✅ اكتمل استيراد الطلاب",
-          description: `تم استيراد ${newStudents.length} طالبًا جديدًا بنجاح. وتم تخطي ${skippedCount} طالبًا لوجودهم مسبقًا.`,
+          description: description,
         });
 
       } catch (error) {
@@ -702,5 +712,7 @@ export default function DataExchangePage() {
     </div>
   );
 }
+
+    
 
     
