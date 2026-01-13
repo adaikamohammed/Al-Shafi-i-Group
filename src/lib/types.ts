@@ -24,6 +24,7 @@ export interface Student {
   fullName: string;
   gender: "ذكر" | "أنثى";
   pageNumber?: string;
+  educationalLevel?: string;
   guardianName: string;
   phone1: string;
   phone2?: string;
@@ -190,6 +191,7 @@ export interface PreRegistration {
     notes?: string;
     photoURL?: string;
 }
+
 
 
 

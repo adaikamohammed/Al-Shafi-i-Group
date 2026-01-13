@@ -631,6 +631,7 @@ export default function PreRegistrationPage() {
             gender: reg.gender,
             pageNumber: reg.pageNumber,
             guardianName: reg.guardianName || 'غير محدد',
+            educationalLevel: reg.educationalLevel || 'غير محدد',
             phone1: reg.phone1,
             phone2: reg.phone2,
             birthDate: new Date(reg.birthDate),
@@ -1073,3 +1074,4 @@ export default function PreRegistrationPage() {
     
 
     
+

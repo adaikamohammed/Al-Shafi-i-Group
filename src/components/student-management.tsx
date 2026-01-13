@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,6 +31,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 
+
+const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
 
 const statusVariant: { [key in StudentStatus]: "default" | "destructive" | "secondary" | "outline" } = {
   "نشط": "default",
@@ -547,8 +549,8 @@ export default function StudentManagementPage() {
                 <TableHead className="w-[65px] p-2">الهوية</TableHead>
                 <TableHead>الاسم الكامل</TableHead>
                 {isSuperAdmin && <TableHead className="text-center">الفوج</TableHead>}
-                <TableHead className="hidden md:table-cell text-center">اسم الولي</TableHead>
-                <TableHead className="hidden lg:table-cell text-center">العمر</TableHead>
+                <TableHead className="hidden md:table-cell text-center">المستوى الدراسي</TableHead>
+                <TableHead className="hidden lg:table-cell text-center">اسم الولي</TableHead>
                 <TableHead className="text-center">الحالة</TableHead>
                 <TableHead className="text-center">فئة الاشتراك</TableHead>
                 <TableHead className="hidden md:table-cell text-center">السور المحفوظة</TableHead>
@@ -618,8 +620,8 @@ export default function StudentManagementPage() {
                                 </div>
                             </TableCell>
                             {isSuperAdmin && <TableCell className="text-center"><Badge variant="outline">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
-                            <TableCell className="hidden md:table-cell text-center">{student.guardianName}</TableCell>
-                            <TableCell className="hidden lg:table-cell text-center">{calculateAge(student.birthDate)}</TableCell>
+                            <TableCell className="hidden md:table-cell text-center">{student.educationalLevel || 'غير محدد'}</TableCell>
+                            <TableCell className="hidden lg:table-cell text-center">{student.guardianName}</TableCell>
                             <TableCell className="text-center">
                                 <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
                             </TableCell>
@@ -841,6 +843,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     const studentData: Partial<Student> & { photoFile?: File | null } = {
         fullName: data.fullName,
         gender: data.gender,
+        educationalLevel: data.educationalLevel,
         guardianName: data.guardianName,
         phone1: data.phone1,
         phone2: data.phone2,
@@ -933,6 +936,15 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
           <div className="space-y-2">
             <Label htmlFor="guardianName">اسم الولي (اختياري)</Label>
             <Input name="guardianName" id="guardianName" defaultValue={student?.guardianName} />
+          </div>
+           <div className="space-y-2">
+            <Label htmlFor="educationalLevel">المستوى الدراسي</Label>
+             <Select dir="rtl" name="educationalLevel" defaultValue={student?.educationalLevel}>
+                <SelectTrigger id="educationalLevel"><SelectValue placeholder="اختر المستوى الدراسي" /></SelectTrigger>
+                <SelectContent>
+                    {educationalLevels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
+                </SelectContent>
+            </Select>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1125,3 +1137,4 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 
 
     
+
