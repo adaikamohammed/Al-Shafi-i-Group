@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -22,17 +23,23 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useStudentContext } from '@/context/StudentContext';
-import type { Student, StudentStatus, PreRegistration } from '@/lib/types';
+import type { Student, StudentStatus, PreRegistration, PreRegistrationStatus } from '@/lib/types';
 
-
-type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "قيد الانتظار";
 
 const statusColors: Record<PreRegistrationStatus, string> = {
+    "تم الإنضمام": "bg-green-100 dark:bg-green-900/30",
+    "مرفوض": "bg-red-100 dark:bg-red-900/30",
+    "مؤجل": "bg-yellow-100 dark:bg-yellow-900/30",
+    "إنضم لمدرسة أخرى": "bg-blue-100 dark:bg-blue-900/30",
+    "مرشح": "bg-orange-100 dark:bg-orange-900/30",
+};
+
+const statusBadgeColors: Record<PreRegistrationStatus, string> = {
     "تم الإنضمام": "bg-green-100 text-green-800 border-green-300",
     "مرفوض": "bg-red-100 text-red-800 border-red-300",
     "مؤجل": "bg-yellow-100 text-yellow-800 border-yellow-300",
-    "إنضم لمدرسة أخرى": "bg-gray-100 text-gray-800 border-gray-300",
-    "قيد الانتظار": "bg-blue-100 text-blue-800 border-blue-300",
+    "إنضم لمدرسة أخرى": "bg-blue-100 text-blue-800 border-blue-300",
+    "مرشح": "bg-orange-100 text-orange-800 border-orange-300",
 };
 
 const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
@@ -138,10 +145,10 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="status">الحالة</Label>
-                    <Select dir="rtl" name="status" defaultValue={existingRegistration?.status || "قيد الانتظار"}>
+                    <Select dir="rtl" name="status" defaultValue={existingRegistration?.status || "مرشح"}>
                         <SelectTrigger id="status"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                           <SelectItem value="قيد الانتظار">قيد الانتظار</SelectItem>
+                           <SelectItem value="مرشح">مرشح</SelectItem>
                            <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
                            <SelectItem value="مرفوض">مرفوض</SelectItem>
                            <SelectItem value="مؤجل">مؤجل</SelectItem>
@@ -228,7 +235,7 @@ export default function PreRegistrationPage() {
             const newReg: PreRegistration = {
                 id: uuidv4(),
                 requestedAt: new Date(),
-                status: 'قيد الانتظار',
+                status: 'مرشح',
                 ...data
             } as PreRegistration;
             updatedRegs = [newReg, ...preRegistrations];
@@ -312,6 +319,11 @@ export default function PreRegistrationPage() {
              <Card>
                 <CardHeader>
                     <CardTitle>أدوات البحث المتقدم</CardTitle>
+                    <CardContent className="pt-4 flex flex-wrap gap-2">
+                        {Object.entries(statusBadgeColors).map(([status, className]) => (
+                            <Badge key={status} className={cn("border", className)}>{status}</Badge>
+                        ))}
+                    </CardContent>
                 </CardHeader>
                  <CardContent className="flex flex-wrap items-center gap-2">
                     <DropdownMenu>
@@ -345,7 +357,7 @@ export default function PreRegistrationPage() {
                         </SelectTrigger>
                         <SelectContent>
                            <SelectItem value="all">كل الحالات</SelectItem>
-                           <SelectItem value="قيد الانتظار">قيد الانتظار</SelectItem>
+                           <SelectItem value="مرشح">مرشح</SelectItem>
                            <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
                            <SelectItem value="مرفوض">مرفوض</SelectItem>
                            <SelectItem value="مؤجل">مؤجل</SelectItem>
@@ -404,7 +416,7 @@ export default function PreRegistrationPage() {
                         </TableHeader>
                         <TableBody>
                             {filteredRegistrations.length > 0 ? filteredRegistrations.map(reg => (
-                                <TableRow key={reg.id}>
+                                <TableRow key={reg.id} className={statusColors[reg.status]}>
                                     <TableCell>{reg.pageNumber}</TableCell>
                                     <TableCell>{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : reg.requestedAt.toString()}</TableCell>
                                     <TableCell className="font-medium">{reg.fullName}</TableCell>
@@ -414,7 +426,7 @@ export default function PreRegistrationPage() {
                                     <TableCell>{reg.guardianName}</TableCell>
                                     <TableCell>{reg.phone1}</TableCell>
                                     <TableCell>
-                                         <Badge variant="outline" className={cn("border", statusColors[reg.status])}>
+                                         <Badge variant="outline" className={cn("border", statusBadgeColors[reg.status])}>
                                             {reg.status}
                                         </Badge>
                                     </TableCell>

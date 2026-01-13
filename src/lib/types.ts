@@ -170,7 +170,7 @@ export interface AppSettings {
     badges: BadgeConfig[];
 }
 
-export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "قيد الانتظار";
+export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "مرشح";
 
 export interface PreRegistration {
     id: string;
