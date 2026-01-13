@@ -1,0 +1,198 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Represents a user's profile information.",
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "group": {
+          "type": "string",
+          "description": "The group the user belongs to."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["sheikh", "super_admin"],
+          "description": "The user's role."
+        }
+      },
+      "required": ["displayName", "email", "role"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Represents a student in the school.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "groupName": { "type": "string" },
+        "fullName": { "type": "string" },
+        "guardianName": { "type": "string" },
+        "phone1": { "type": "string" },
+        "phone2": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "birthDate": { "type": "string", "format": "date-time" },
+        "registrationDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["نشط", "مطرود", "غائب طويل", "محذوف"] },
+        "subscriptionTier": { "type": "string", "enum": ["فئة الأكابر", "فئة الأصاغر"] },
+        "actionReason": { "type": "string" },
+        "memorizedSurahsCount": { "type": "number" },
+        "dailyMemorizationAmount": { "type": "string", "enum": ["ثمن", "ربع", "نصف", "صفحة", "أكثر"] },
+        "notes": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "covenants": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/entities/Covenant" }
+        }
+      },
+      "required": ["id", "ownerId", "fullName", "birthDate", "registrationDate", "status", "subscriptionTier"]
+    },
+    "Covenant": {
+      "title": "Covenant",
+      "description": "Represents a covenant or task for a student.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["تعهد غياب", "ميثاق حفظ", "التزام سلوكي"] },
+        "text": { "type": "string" },
+        "status": { "type": "string", "enum": ["نشط", "تم الوفاء به", "نُقِض"] },
+        "card": { "type": "string", "enum": ["بدون", "بطاقة صفراء", "بطاقة حمراء"] },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "type", "text", "status", "card", "date"]
+    },
+    "DailySession": {
+        "title": "Daily Session",
+        "description": "Represents a daily session for students.",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "date": { "type": "string", "format": "date" },
+            "sessionNumber": { "type": "number", "enum": [1, 2] },
+            "sessionType": { "type": "string", "enum": ["حصة أساسية", "حصة أنشطة", "يوم عطلة", "حصة تعويضية", "غياب الشيخ"] },
+            "records": {
+                "type": "object",
+                "additionalProperties": { "$ref": "#/entities/DailyRecord" }
+            },
+            "teacherAbsenceReason": { "type": "string" },
+            "substituteTeacher": { "type": "string" }
+        },
+        "required": ["id", "date", "sessionNumber", "sessionType"]
+    },
+    "DailyRecord": {
+        "title": "Daily Record",
+        "description": "Represents a student's record for a daily session.",
+        "type": "object",
+        "properties": {
+            "sessionId": { "type": "string" },
+            "studentId": { "type": "string" },
+            "attendance": { "type": "string", "enum": ["حاضر", "غائب", "متأخر", "تعويض"] },
+            "memorization": { "type": ["string", "null"], "enum": ["ممتاز", "جيد جداً", "جيد", "متوسط", "ضعيف", "لا يوجد", null] },
+            "review": { "type": ["boolean", "null"] },
+            "behavior": { "type": ["string", "null"], "enum": ["هادئ", "متوسط", "غير منضبط", null] },
+            "notes": { "type": "string" }
+        },
+        "required": ["sessionId", "studentId", "attendance"]
+    },
+    "DailyReport": {
+        "title": "Daily Report",
+        "description": "Represents a daily report from a sheikh.",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "date": { "type": "string", "format": "date" },
+            "note": { "type": "string" },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "authorName": { "type": "string" },
+            "authorId": { "type": "string" },
+            "category": { "type": "string" }
+        },
+        "required": ["id", "date", "note", "timestamp", "authorName", "authorId", "category"]
+    },
+    "SurahMastery": {
+        "title": "Surah Mastery",
+        "description": "Represents a student's mastery of a surah.",
+        "type": "object",
+        "additionalProperties": { "type": "number", "enum": [0, 1, 2] }
+    },
+    "Payment": {
+        "title": "Payment",
+        "description": "Represents a payment made by a student.",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "studentId": { "type": "string" },
+            "amount": { "type": "number" },
+            "date": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "studentId", "amount", "date"]
+    },
+    "AppSettings": {
+        "title": "App Settings",
+        "description": "Represents the application settings.",
+        "type": "object",
+        "properties": {}
+    },
+    "PreRegistration": {
+      "title": "Pre-Registration",
+      "description": "Represents a new student pre-registration request.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "guardianName": { "type": "string" },
+        "phone1": { "type": "string" },
+        "birthDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "requestedAt": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "fullName", "guardianName", "phone1", "birthDate", "status", "requestedAt"]
+    }
+  },
+  "auth": {
+    "providers": ["email"]
+  },
+  "database": {
+    "/users/{userId}/profile": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile data."
+    },
+    "/users/{userId}/students": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Students managed by a specific user."
+    },
+    "/users/{userId}/dailySessions": {
+        "schema": { "$ref": "#/entities/DailySession" },
+        "description": "Daily sessions for a user's students."
+    },
+    "/users/{userId}/dailyReports": {
+        "schema": { "$ref": "#/entities/DailyReport" },
+        "description": "Daily reports from a user."
+    },
+    "/users/{userId}/surahProgress": {
+        "schema": { "$ref": "#/entities/SurahMastery" },
+        "description": "Surah progress for a user's students."
+    },
+    "/users/{userId}/payments": {
+        "schema": { "$ref": "#/entities/Payment" },
+        "description": "Payments for a user's students."
+    },
+    "/users/{userId}/settings": {
+        "schema": { "$ref": "#/entities/AppSettings" },
+        "description": "Application settings for a user."
+    },
+    "/pre_registrations/{preRegistrationId}": {
+        "schema": { "$ref": "#/entities/PreRegistration" },
+        "description": "Shared list of new student pre-registrations, accessible by all authenticated users."
+    }
+  }
+}
