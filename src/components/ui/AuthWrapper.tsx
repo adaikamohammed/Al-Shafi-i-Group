@@ -106,16 +106,16 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
     const sidebarContent = (
     <>
-      <SidebarHeader className="p-0">
+      <SidebarHeader>
          <Link href="/profile" className="block p-4 hover:bg-sidebar-accent transition-colors">
              <div className="flex items-center gap-3">
-                 <Avatar>
+                 <Avatar className="h-12 w-12">
                     <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || ''} />
                     <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
                 </Avatar>
                  <div>
                     <h1 className="font-headline text-lg font-bold text-primary">
-                        {user?.group ? `${user.group}` : 'مدرسة الإمام الشافعي'}
+                        {user?.group || 'مدرسة الشافعي'}
                     </h1>
                     <p className="text-xs text-muted-foreground">{user?.displayName}</p>
                  </div>

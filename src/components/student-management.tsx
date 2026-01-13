@@ -587,7 +587,7 @@ export default function StudentManagementPage() {
       <Card>
         <CardHeader>
           <CardTitle>قائمة الطلبة ({filteredStudents.length})</CardTitle>
-          <CardDescription>{isSuperAdmin ? 'عرض شامل لجميع الطلبة في كل الأفواج' : (user?.group ? `طلبة ${user.group}` : 'فوج غير محدد')}</CardDescription>
+          <CardDescription>{isSuperAdmin ? 'عرض شامل لجميع الطلبة في كل الأفواج' : (user?.group || 'فوج غير محدد')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="relative w-full overflow-x-auto">
