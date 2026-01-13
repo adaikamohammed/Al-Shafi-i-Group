@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useStudentContext } from '@/context/StudentContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, User, KeyRound, Edit, Save, Users, CheckCircle, BookCopy } from 'lucide-react';
+import { Loader2, User, KeyRound, Edit, Save, Users, CheckCircle, BookCopy, BookHeart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -18,7 +18,7 @@ import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 
 export default function ProfilePage() {
     const { user, loading: authLoading, isSuperAdmin, updateUserProfile } = useAuth();
-    const { students, dailySessions } = useStudentContext();
+    const { students, dailySessions, surahProgress } = useStudentContext();
     const { toast } = useToast();
     
     const [isSaving, setIsSaving] = useState(false);
@@ -39,7 +39,7 @@ export default function ProfilePage() {
 
     const performanceStats = useMemo(() => {
         if (!user || !students || !dailySessions) {
-            return { studentCount: 0, attendanceRate: 0, masteredSurahs: 0 };
+            return { studentCount: 0, attendanceRate: 0, khatmeenCount: 0, totalMasteredSurahs: 0 };
         }
         
         const groupName = isSuperAdmin ? undefined : user.group;
@@ -51,7 +51,14 @@ export default function ProfilePage() {
         
         const studentCount = groupStudents.length;
 
-        const totalMasteredSurahs = groupStudents.reduce((sum, student) => sum + (student.memorizedSurahsCount || 0), 0);
+        let totalMasteredSurahs = 0;
+        const khatmeenCount = groupStudents.filter(student => {
+             const studentProgress = surahProgress ? (surahProgress[student.id] || {}) : {};
+             const masteredCount = Object.values(studentProgress).filter(status => status === 2).length;
+             totalMasteredSurahs += masteredCount;
+             // Consider a student has completed the Quran if they have mastered all 114 surahs.
+             return (student.memorizedSurahsCount || 0) >= 114;
+        }).length;
 
         const currentMonthStart = startOfMonth(new Date());
         const currentMonthEnd = endOfMonth(new Date());
@@ -80,9 +87,9 @@ export default function ProfilePage() {
         
         const attendanceRate = totalHeld > 0 ? (totalPresent / totalHeld) * 100 : 0;
 
-        return { studentCount, attendanceRate, masteredSurahs: totalMasteredSurahs };
+        return { studentCount, attendanceRate, khatmeenCount, totalMasteredSurahs };
 
-    }, [user, students, dailySessions, isSuperAdmin]);
+    }, [user, students, dailySessions, isSuperAdmin, surahProgress]);
 
     useEffect(() => {
         if (user) {
@@ -164,26 +171,33 @@ export default function ProfilePage() {
                     <CardTitle>بطاقات إحصائية سريعة</CardTitle>
                     <CardDescription>نظرة عامة على أداء فوجك هذا الشهر.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center p-4 bg-blue-50 rounded-lg">
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="flex items-center p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
                         <Users className="h-8 w-8 text-blue-500 mr-4" />
                         <div>
-                            <p className="text-sm text-blue-700">عدد الطلبة النشطين</p>
+                            <p className="text-sm text-blue-700 dark:text-blue-200">عدد الطلبة النشطين</p>
                             <p className="text-2xl font-bold">{performanceStats.studentCount}</p>
                         </div>
                     </div>
-                     <div className="flex items-center p-4 bg-green-50 rounded-lg">
+                     <div className="flex items-center p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
                         <CheckCircle className="h-8 w-8 text-green-500 mr-4" />
                         <div>
-                            <p className="text-sm text-green-700">متوسط الحضور الشهري</p>
+                            <p className="text-sm text-green-700 dark:text-green-200">معدل الحضور الشهري</p>
                             <p className="text-2xl font-bold">{performanceStats.attendanceRate.toFixed(1)}%</p>
                         </div>
                     </div>
-                     <div className="flex items-center p-4 bg-yellow-50 rounded-lg">
+                     <div className="flex items-center p-4 bg-purple-50 dark:bg-purple-900/30 rounded-lg">
+                        <BookHeart className="h-8 w-8 text-purple-500 mr-4" />
+                        <div>
+                            <p className="text-sm text-purple-700 dark:text-purple-200">عدد الخاتمين</p>
+                            <p className="text-2xl font-bold">{performanceStats.khatmeenCount}</p>
+                        </div>
+                    </div>
+                     <div className="flex items-center p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
                         <BookCopy className="h-8 w-8 text-yellow-500 mr-4" />
                         <div>
-                            <p className="text-sm text-yellow-700">إجمالي السور المتقنة</p>
-                            <p className="text-2xl font-bold">{performanceStats.masteredSurahs}</p>
+                            <p className="text-sm text-yellow-700 dark:text-yellow-200">إجمالي السور المتقنة</p>
+                            <p className="text-2xl font-bold">{performanceStats.totalMasteredSurahs}</p>
                         </div>
                     </div>
                 </CardContent>
