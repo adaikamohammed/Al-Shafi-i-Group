@@ -89,7 +89,7 @@ export default function ProfilePage() {
                 secondaryPhone: user.secondaryPhone || '',
                 certifications: user.certifications || '',
                 bio: user.bio || '',
-                joinDate: user.joinDate ? format(parseISO(user.joinDate), 'yyyy-MM-dd') : '',
+                joinDate: user.joinDate || '',
             });
             setPhotoPreview(user.photoURL || null);
         }
@@ -241,7 +241,7 @@ export default function ProfilePage() {
                                  </div>
                                   <div className="space-y-2">
                                      <Label htmlFor="joinDate">تاريخ الانضمام</Label>
-                                     <Input id="joinDate" name="joinDate" value={formData.joinDate} disabled />
+                                     <Input id="joinDate" name="joinDate" type="date" value={formData.joinDate} onChange={(e) => handleInputChange(e, 'joinDate')} disabled={!isSuperAdmin} />
                                  </div>
                                 <div className="space-y-2 md:col-span-2">
                                     <Label htmlFor="certifications">الإجازات والروايات</Label>

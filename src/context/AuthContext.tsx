@@ -16,7 +16,7 @@ import type { AppUser } from '@/lib/types';
 import { ref, set, get, update } from 'firebase/database';
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 const sheikhInitialData: { [email: string]: { name: string; group: string; role: 'sheikh' | 'super_admin' } } = {
   "admin0@gmail.com": { name: "المدير العام", group: "كل الأفواج", role: "super_admin" },
