@@ -694,6 +694,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
   const [covenants, setCovenants] = useState<Covenant[]>(student?.covenants || []);
   const [originalCovenants, setOriginalCovenants] = useState<Covenant[]>(student?.covenants || []);
   const [photoPreview, setPhotoPreview] = useState<string | null>(student?.photoURL || null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -708,7 +709,8 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         toast({ title: 'خطأ', description: 'صيغة الملف غير مدعومة. الرجاء رفع صورة بصيغة JPG أو PNG.', variant: 'destructive' });
         return;
     }
-
+    
+    setPhotoFile(file);
     const reader = new FileReader();
     reader.onload = (loadEvent) => {
         setPhotoPreview(loadEvent.target?.result as string);
@@ -730,7 +732,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     // Check for status change from "نشط" to "تم الوفاء به"
     covenants.forEach((newCovenant, index) => {
         const oldCovenant = originalCovenants.find(oc => oc.id === newCovenant.id);
-        if (oldCovenant && oldCovenant.status === 'نشط' && newCovenant.status === 'تم الوفاء به') {
+        if (oldCovenant && oldCovenant.status === 'نشط' && newCovenant.status === 'تم الوفاء بها') {
              toast({
                 title: `🎉 +${settings.points.covenantCompleted} نقطة`,
                 description: `تمت مكافأة الطالب ${student?.fullName} لإنجازه المهمة بنجاح. سيتم تحديث ترتيبه.`,
@@ -738,7 +740,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         }
     });
 
-    const studentData: Partial<Student> = {
+    const studentData: Partial<Student> & { photoFile?: File | null } = {
         fullName: data.fullName,
         guardianName: data.guardianName,
         phone1: data.phone1,
@@ -750,7 +752,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         dailyMemorizationAmount: data.memorizationAmount,
         notes: data.notes,
         covenants: covenants,
-        photoURL: photoPreview,
+        photoFile: photoFile,
     };
 
     if (student) {
@@ -758,7 +760,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         updateStudent(student.id, studentData, student.ownerId);
     } else {
         // Add new student
-        addStudent(studentData as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>);
+        addStudent(studentData as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> & { photoFile?: File | null });
     }
     
     onSuccess();
@@ -1009,6 +1011,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     
 
     
+
 
 
 

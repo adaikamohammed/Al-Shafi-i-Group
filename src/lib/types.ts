@@ -1,10 +1,11 @@
 
+
 export type StudentStatus = "نشط" | "مطرود" | "غائب طويل" | "محذوف";
 export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "أكثر";
 export type SubscriptionTier = "فئة الأكابر" | "فئة الأصاغر";
 
 export type CovenantType = "تعهد غياب" | "ميثاق حفظ" | "التزام سلوكي";
-export type CovenantStatus = "نشط" | "تم الوفاء به" | "نُقِض";
+export type CovenantStatus = "نشط" | "تم الوفاء بها" | "نُقِض";
 export type CovenantCard = "بدون" | "بطاقة صفراء" | "بطاقة حمراء";
 
 export interface Covenant {
@@ -185,5 +186,7 @@ export interface PreRegistration {
     status: PreRegistrationStatus;
     pageNumber?: string;
     notes?: string;
+    photoURL?: string;
 }
+
 

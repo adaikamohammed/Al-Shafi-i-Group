@@ -7,8 +7,9 @@ import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMas
 import { isWithinInterval, parseISO, isValid } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { ref, set, onValue, off, remove, DatabaseReference, update } from 'firebase/database';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
 
 const DEFAULT_POINTS_CONFIG: PointsConfig = {
@@ -54,8 +55,8 @@ interface StudentContextType {
   payments: Payment[];
   settings: AppSettings;
   loading: boolean;
-  addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => void;
-  updateStudent: (studentId: string, updatedData: Partial<Student>, ownerId: string) => void;
+  addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> & { photoFile?: File | null }) => void;
+  updateStudent: (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => void;
   deleteStudent: (studentId: string, ownerId: string) => void;
   deleteAllStudents: () => void;
   addDailySession: (session: DailySession) => void;
@@ -236,18 +237,29 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }, [authContextUser, authLoading, isSuperAdmin]);
 
 
-  const addStudent = (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>) => {
+  const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> & { photoFile?: File | null }) => {
     if (!authContextUser) return;
 
     const studentId = uuidv4();
+    let photoURL = '';
+
+    if (studentData.photoFile) {
+        const imageRef = storageRef(storage, `student_photos/${studentId}`);
+        await uploadBytes(imageRef, studentData.photoFile);
+        photoURL = await getDownloadURL(imageRef);
+    }
+    
+    const { photoFile, ...restOfStudentData } = studentData;
+
     const newStudent: Omit<Student, 'id'> & {id: string} = {
-      ...studentData,
+      ...restOfStudentData,
       id: studentId,
       ownerId: authContextUser.uid,
       memorizedSurahsCount: 0,
       subscriptionTier: studentData.subscriptionTier || 'فئة الأصاغر',
       updatedAt: new Date(),
       covenants: [],
+      photoURL: photoURL
     };
     const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
     set(studentRef, {
@@ -288,7 +300,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "🗑️ تم الحذف", description: "تم مسح جميع التسجيلات الأولية بنجاح." });
   };
 
-  const updateStudent = (studentId: string, updatedData: Partial<Student>, ownerId: string) => {
+  const updateStudent = async (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => {
     if (!authContextUser) return;
     
     if (isSuperAdmin || authContextUser.uid !== ownerId) return;
@@ -296,8 +308,18 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const originalStudent = (students ?? []).find(s => s.id === studentId);
     if (!originalStudent) return;
     
+    let photoURL = originalStudent.photoURL;
+
+    if (updatedData.photoFile) {
+        const imageRef = storageRef(storage, `student_photos/${studentId}`);
+        await uploadBytes(imageRef, updatedData.photoFile);
+        photoURL = await getDownloadURL(imageRef);
+    }
+    
+    const { photoFile, ...restOfUpdatedData } = updatedData;
+
     const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
-    const finalData = { ...originalStudent, ...updatedData, updatedAt: new Date() };
+    const finalData = { ...originalStudent, ...restOfUpdatedData, photoURL, updatedAt: new Date() };
 
     const covenantsObject = (finalData.covenants || []).reduce((acc, cov) => {
       acc[cov.id] = cov;
@@ -313,17 +335,31 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     });
   };
   
-  const deleteStudent = (studentId: string, ownerId: string) => {
+  const deleteStudent = async (studentId: string, ownerId: string) => {
       if (!authContextUser) return;
       if (isSuperAdmin || authContextUser.uid !== ownerId) return;
       const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
-      remove(studentRef);
+      await remove(studentRef);
+
+      // Delete photo from storage
+      try {
+        const imageRef = storageRef(storage, `student_photos/${studentId}`);
+        await deleteObject(imageRef);
+      } catch(error: any) {
+        if(error.code !== 'storage/object-not-found') {
+            console.error("Error deleting student photo:", error);
+        }
+      }
   }
   
   const deleteAllStudents = () => {
       if (!authContextUser || isSuperAdmin) return;
-      const userStudentsRef = ref(db, `users/${authContextUser.uid}/students`);
-      remove(userStudentsRef);
+      
+      students.forEach(student => {
+          if (student.ownerId === authContextUser.uid) {
+              deleteStudent(student.id, student.ownerId);
+          }
+      });
   }
 
   const addDailySession = (session: DailySession) => {
