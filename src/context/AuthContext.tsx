@@ -11,9 +11,11 @@ import {
   onAuthStateChanged,
   FirebaseError
 } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import type { AppUser } from '@/lib/types';
-import { ref, set, get } from 'firebase/database';
+import { ref, set, get, update } from 'firebase/database';
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { useToast } from '@/hooks/use-toast';
 
 const sheikhInitialData: { [email: string]: { name: string; group: string; role: 'sheikh' | 'super_admin' } } = {
   "admin0@gmail.com": { name: "المدير العام", group: "كل الأفواج", role: "super_admin" },
@@ -36,6 +38,7 @@ interface AuthContextType {
   role: 'sheikh' | 'super_admin' | null;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
+  updateUserProfile: (data: { photoFile?: File | null }) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -61,14 +64,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 uid: currentUser.uid,
                 email: currentUser.email,
                 displayName: profileData.displayName,
-                photoURL: currentUser.photoURL,
+                photoURL: profileData.photoURL,
                 group: profileData.group,
                 role: profileData.role 
             };
         } else {
              const sheikhInfo = sheikhInitialData[currentUser.email || ''] || { name: currentUser.displayName || 'مستخدم جديد', group: 'فوج غير محدد', role: 'sheikh' };
              
-             // Ensure displayName from initial data is used if available
              const displayName = sheikhInfo.name || currentUser.displayName || 'مستخدم جديد';
 
              appUser = {
@@ -79,7 +81,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 group: sheikhInfo.group,
                 role: sheikhInfo.role,
             };
-            // If profile doesn't exist, create it. This is crucial for new sign-ups or first logins.
             const newProfileRef = ref(db, `users/${currentUser.uid}/profile`);
             await set(newProfileRef, { 
                 email: appUser.email, 
@@ -87,7 +88,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 group: appUser.group,
                 role: appUser.role,
             });
-            // Also update the auth profile display name if it's different
             if (currentUser.displayName !== appUser.displayName) {
                 await updateProfile(currentUser, { displayName: appUser.displayName });
             }
@@ -128,12 +128,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await signInWithEmailAndPassword(auth, email, password);
   }
 
+  const updateUserProfile = async (data: { photoFile?: File | null }) => {
+    if (!auth.currentUser) throw new Error("User not authenticated.");
+
+    let photoURL = auth.currentUser.photoURL;
+    const updates: any = {};
+
+    if (data.photoFile) {
+        const imageRef = storageRef(storage, `sheikh_profiles/${auth.currentUser.uid}`);
+        await uploadBytes(imageRef, data.photoFile);
+        photoURL = await getDownloadURL(imageRef);
+        updates[`/users/${auth.currentUser.uid}/profile/photoURL`] = photoURL;
+        await updateProfile(auth.currentUser, { photoURL });
+    }
+    
+    if (Object.keys(updates).length > 0) {
+        await update(ref(db), updates);
+        setUser(prevUser => prevUser ? { ...prevUser, photoURL: photoURL } : null);
+    }
+  };
+
   const logout = async () => {
     await signOut(auth);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isSuperAdmin, role, signUpWithEmail, signInWithEmail, logout }}>
+    <AuthContext.Provider value={{ user, loading, isSuperAdmin, role, signUpWithEmail, signInWithEmail, updateUserProfile, logout }}>
       {children}
     </AuthContext.Provider>
   );
