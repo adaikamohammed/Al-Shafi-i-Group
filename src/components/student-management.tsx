@@ -591,12 +591,15 @@ export default function StudentManagementPage() {
                                 />
                             </TableCell>
                             <TableCell className="p-2">
-                                <Avatar className="w-10 h-10">
-                                    <AvatarImage src={student.photoURL} />
-                                    <AvatarFallback className={cn(student.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
-                                        {student.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
-                                    </AvatarFallback>
-                                </Avatar>
+                                <div className="flex flex-col items-center gap-1">
+                                    <Avatar className="w-10 h-10">
+                                        <AvatarImage src={student.photoURL} />
+                                        <AvatarFallback className={cn(student.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
+                                            {student.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    {student.pageNumber && <Badge variant="secondary" className="px-1.5 py-0.5 text-xs">{student.pageNumber}</Badge>}
+                                </div>
                             </TableCell>
                             <TableCell className="font-medium">
                                 <div className="flex items-center gap-2">

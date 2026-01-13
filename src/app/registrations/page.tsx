@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -628,6 +629,7 @@ export default function PreRegistrationPage() {
         const newStudentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> = {
             fullName: reg.fullName,
             gender: reg.gender,
+            pageNumber: reg.pageNumber,
             guardianName: reg.guardianName || 'غير محدد',
             phone1: reg.phone1,
             phone2: reg.phone2,

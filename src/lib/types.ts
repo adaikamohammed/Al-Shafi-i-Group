@@ -23,6 +23,7 @@ export interface Student {
   groupName?: string; // Name of the group/sheikh
   fullName: string;
   gender: "ذكر" | "أنثى";
+  pageNumber?: string;
   guardianName: string;
   phone1: string;
   phone2?: string;
@@ -189,6 +190,7 @@ export interface PreRegistration {
     notes?: string;
     photoURL?: string;
 }
+
 
 
 
