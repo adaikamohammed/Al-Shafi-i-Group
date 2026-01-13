@@ -46,7 +46,7 @@ const calculateAge = (birthDate?: Date) => {
   return Math.abs(ageDate.getUTCFullYear() - 1970);
 };
 
-const StudentProfileCard = ({ student, user, rankingData }: { student: Student, user: any, rankingData: any }) => {
+const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }: { student: Student, user: any, rankingData: any, onEdit: () => void, onViewStats: () => void }) => {
     const { students, dailySessions, settings } = useStudentContext();
     
     const medalHistory = useMemo(() => {
@@ -269,6 +269,10 @@ const StudentProfileCard = ({ student, user, rankingData }: { student: Student, 
                     </div>
                 </CardContent>
             </Card>
+             <DialogFooter>
+                <Button variant="secondary" onClick={onViewStats}>عرض الإحصائيات</Button>
+                <Button onClick={onEdit}>تعديل البيانات</Button>
+            </DialogFooter>
         </DialogContent>
     );
 };
@@ -277,6 +281,7 @@ export default function StudentManagementPage() {
   const { students, updateStudent, deleteStudent, loading, deleteAllStudents, dailySessions, settings } = useStudentContext();
   const { user, isSuperAdmin } = useAuth();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
+  const [isEditStudentDialogOpen, setEditStudentDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
@@ -575,7 +580,7 @@ export default function StudentManagementPage() {
                             </TableCell>
                             <TableCell className="hidden md:table-cell text-center">{student.memorizedSurahsCount || 0}</TableCell>
                             {!isSuperAdmin && <TableCell className="text-center">
-                                <StudentActions student={student} onStatusChange={handleStatusChange} />
+                                <StudentActions student={student} onStatusChange={handleStatusChange} onEdit={() => { setSelectedStudent(student); setEditStudentDialogOpen(true); }}/>
                             </TableCell>}
                         </TableRow>
                     )
@@ -593,17 +598,44 @@ export default function StudentManagementPage() {
       </Card>
       
        {selectedStudent && (
-        <Dialog open={!!selectedStudent} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}>
-            <StudentProfileCard student={selectedStudent} user={user} rankingData={rankingData} />
+        <Dialog open={!!selectedStudent && !isEditStudentDialogOpen} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}>
+            <StudentProfileCard 
+                student={selectedStudent} 
+                user={user} 
+                rankingData={rankingData}
+                onEdit={() => { setEditStudentDialogOpen(true); }}
+                onViewStats={() => {
+                     // This should navigate to the student report page
+                     // For now, we can just log it or close the dialog
+                     setSelectedStudent(null);
+                }}
+            />
         </Dialog>
+      )}
+
+      {selectedStudent && isEditStudentDialogOpen && (
+          <Dialog open={isEditStudentDialogOpen} onOpenChange={setEditStudentDialogOpen}>
+              <DialogContent className="sm:max-w-[600px]">
+                  <StudentForm
+                      student={selectedStudent}
+                      onSuccess={() => {
+                          setEditStudentDialogOpen(false);
+                          setSelectedStudent(null);
+                      }}
+                      onCancel={() => {
+                          setEditStudentDialogOpen(false);
+                          setSelectedStudent(null);
+                      }}
+                  />
+              </DialogContent>
+          </Dialog>
       )}
     </div>
     </TooltipProvider>
   );
 }
 
-function StudentActions({ student, onStatusChange }: { student: Student, onStatusChange: (student: Student, status: StudentStatus, reason?: string) => void }) {
-  const [isEditOpen, setEditOpen] = useState(false);
+function StudentActions({ student, onStatusChange, onEdit }: { student: Student, onStatusChange: (student: Student, status: StudentStatus, reason?: string) => void, onEdit: () => void }) {
   const [actionReason, setActionReason] = useState('');
 
   return (
@@ -616,21 +648,11 @@ function StudentActions({ student, onStatusChange }: { student: Student, onStatu
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
         <DropdownMenuLabel>إجراءات الطالب</DropdownMenuLabel>
-        <Dialog open={isEditOpen} onOpenChange={setEditOpen}>
-          <DialogTrigger asChild>
-            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-              <FilePen className="ml-2 h-4 w-4" />
-              تعديل
-            </DropdownMenuItem>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
-            <StudentForm 
-              student={student} 
-              onSuccess={() => setEditOpen(false)} 
-              onCancel={() => setEditOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
+        <DropdownMenuItem onSelect={onEdit}>
+            <FilePen className="ml-2 h-4 w-4" />
+            تعديل
+        </DropdownMenuItem>
+
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => { e.preventDefault(); setActionReason('') }}>
@@ -1011,6 +1033,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     
 
     
+
 
 
 

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -12,7 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, Home, GraduationCap, GripVertical } from 'lucide-react';
+import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, GraduationCap, GripVertical } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -24,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { useStudentContext } from '@/context/StudentContext';
 import type { Student, StudentStatus, PreRegistration, PreRegistrationStatus } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useRouter } from 'next/navigation';
 
 
 const statusColors: Record<PreRegistrationStatus, string> = {
@@ -78,7 +80,7 @@ const calculateAge = (birthDate?: Date | string) => {
     }
 };
 
-const StudentProfileCard = ({ student }: { student: PreRegistration }) => {
+const StudentProfileCard = ({ student, onPromote, onEdit }: { student: PreRegistration, onPromote: () => void, onEdit: () => void }) => {
     const headerColor = statusHeaderColors[student.status] || 'bg-gray-500';
 
     return (
@@ -119,15 +121,19 @@ const StudentProfileCard = ({ student }: { student: PreRegistration }) => {
                          <p><strong className="min-w-[100px] inline-block">مقر السكن:</strong> {student.address || 'غير محدد'}</p>
                     </div>
                 </div>
-                {(student.status === 'مرفوض' || student.notes) && (
+                {(student.status === 'مرفوض' || student.status === 'مرشح' || student.notes) && (
                     <div className="md:col-span-2">
-                        <h3 className="font-semibold mb-2 border-b pb-1">سبب الحالة / ملاحظات</h3>
+                        <h3 className="font-semibold mb-2 border-b pb-1">{student.status === 'مرفوض' ? 'سبب الرفض' : student.status === 'مرشح' ? 'سبب الترشيح' : 'ملاحظات'}</h3>
                         <div className="p-3 bg-muted rounded-md text-sm">
                             <p>{student.notes || 'لا توجد ملاحظات مسجلة.'}</p>
                         </div>
                     </div>
                 )}
             </div>
+             <DialogFooter>
+                <Button variant="secondary" onClick={onEdit}>تعديل</Button>
+                <Button onClick={onPromote} disabled={student.status === 'تم الإنضمام'}>نقل إلى فوج</Button>
+            </DialogFooter>
         </DialogContent>
     );
 };
@@ -158,12 +164,12 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData.entries());
-        onSave({ ...data, birthDate, id: existingRegistration?.id });
+        onSave({ ...data, birthDate, id: existingRegistration?.id, notes });
     }
 
     const showReasonField = status === 'مرفوض' || status === 'مؤجل' || status === 'مرشح';
     let reasonLabel = "ملاحظات";
-    if (status === 'مرفوض') reasonLabel = "سبب الرفض (إلزامي)";
+    if (status === 'مرفوض') reasonLabel = "سبب الرفض";
     if (status === 'مؤجل') reasonLabel = "سبب التأجيل";
     if (status === 'مرشح') reasonLabel = "سبب الترشيح / تفاصيل إضافية";
 
@@ -256,7 +262,7 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
              {showReasonField && (
                  <div className="space-y-2">
                     <Label htmlFor="notes">{reasonLabel}</Label>
-                    <Textarea id="notes" name="notes" placeholder="اكتب السبب هنا..." value={notes} onChange={(e) => setNotes(e.target.value)} required={status === 'مرفوض'} />
+                    <Textarea id="notes" name="notes" placeholder="اكتب السبب هنا..." value={notes} onChange={(e) => setNotes(e.target.value)} />
                 </div>
              )}
             <DialogFooter>
@@ -280,6 +286,7 @@ export default function PreRegistrationPage() {
     const [levelFilter, setLevelFilter] = useState<string[]>([]);
     const [statusFilter, setStatusFilter] = useState('all');
     const [genderFilter, setGenderFilter] = useState('all');
+    const router = useRouter();
     
     const [sortConfig, setSortConfig] = useState<{ key: keyof PreRegistration; direction: 'ascending' | 'descending' }>({ key: 'pageNumber', direction: 'ascending' });
 
@@ -403,6 +410,7 @@ export default function PreRegistrationPage() {
     }
     
     const handleEdit = (reg: PreRegistration) => {
+        setSelectedStudent(null);
         setEditingRegistration(reg);
         setFormOpen(true);
     }
@@ -436,6 +444,8 @@ export default function PreRegistrationPage() {
             title: '✅ تم النقل بنجاح!',
             description: `تم نقل الطالب ${reg.fullName} إلى فوجك الرسمي.`,
         });
+        setSelectedStudent(null);
+        router.push('/');
     };
     
     if (loading) {
@@ -571,7 +581,11 @@ export default function PreRegistrationPage() {
             
             {selectedStudent && (
                  <Dialog open={!!selectedStudent} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}>
-                    <StudentProfileCard student={selectedStudent} />
+                    <StudentProfileCard 
+                        student={selectedStudent} 
+                        onPromote={() => handlePromoteStudent(selectedStudent)}
+                        onEdit={() => handleEdit(selectedStudent)}
+                    />
                 </Dialog>
             )}
 
