@@ -316,7 +316,7 @@ export default function MonthlyStatisticsPage() {
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="w-full">
                     <h1 className="text-3xl font-headline font-bold">لوحة الإحصائيات</h1>
-                    <p className="text-muted-foreground">{user?.group ? `نظرة عامة على ${user.group}` : ''}</p>
+                    <p className="text-muted-foreground">{user?.group ? `نظرة عامة على ${user.group}` : 'نظرة عامة'}</p>
                 </div>
                  <div className="flex gap-2 w-full md:w-auto">
                     <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>

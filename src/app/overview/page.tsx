@@ -154,7 +154,7 @@ export default function OverviewPage() {
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="w-full">
                     <h1 className="text-3xl font-headline font-bold">نظرة عامة</h1>
-                    <p className="text-muted-foreground">{isSuperAdmin ? 'عرض شامل لكل الأفواج' : (user?.group ? `مرحباً بك في ${user.group}` : 'لوحة التحكم')}</p>
+                    <p className="text-muted-foreground">{isSuperAdmin ? 'عرض شامل لكل الأفواج' : (user?.group ? `${user.group}` : 'لوحة التحكم')}</p>
                 </div>
             </div>
             

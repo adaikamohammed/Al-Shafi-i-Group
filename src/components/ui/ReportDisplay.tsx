@@ -31,7 +31,7 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                 <header className="text-center border-b-2 pb-4 border-gray-300">
                     <h1 className="text-2xl font-bold text-gray-800">{`تقرير أداء الطالب ${reportData.reportTitle}`}</h1>
                     <p className="text-lg font-semibold text-gray-700">المدرسة القرآنية للإمام الشافعي</p>
-                    {user?.group && <p className="text-md text-gray-600">{`فوج ${user.group} — ${user.displayName}`}</p>}
+                    {user?.group && <p className="text-md text-gray-600">{`${user.group} — ${user.displayName}`}</p>}
                     <p className="font-semibold mt-2 text-lg">{reportData.statsPeriod}</p>
                 </header>
                 
@@ -45,7 +45,7 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                                 <div><span className="font-semibold">العمر:</span> {calculateAge(reportData.student.birthDate)} سنة</div>
                                 <div><span className="font-semibold">رقم هاتف الولي:</span> {reportData.student.phone1}</div>
                                 <div><span className="font-semibold">تاريخ التسجيل:</span> {format(reportData.student.registrationDate, 'yyyy/MM/dd')}</div>
-                                <div><span className="font-semibold">الفوج:</span> {user?.group || 'غير محدد'}</div>
+                                <div><span className="font-semibold">الفوج:</span> {reportData.student.groupName || 'غير محدد'}</div>
                             </div>
                         </CardContent>
                     </Card>

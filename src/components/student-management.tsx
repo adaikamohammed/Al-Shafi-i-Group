@@ -364,7 +364,7 @@ export default function StudentManagementPage() {
   const handleExportStudents = () => {
     const dataToExport = (students ?? []).map(s => ({
         "الاسم الكامل": s.fullName,
-        "الفوج": s.groupName || user?.group || 'غير محدد',
+        "الفوج": s.groupName || 'غير محدد',
         "اسم الولي": s.guardianName,
         "رقم الهاتف 1": s.phone1,
         "رقم الهاتف 2": s.phone2 || '',
@@ -1227,9 +1227,3 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
-
-    
-
-    
-
-    
