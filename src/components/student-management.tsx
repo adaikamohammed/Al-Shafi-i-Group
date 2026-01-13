@@ -150,7 +150,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
     return (
         <DialogContent className="sm:max-w-3xl">
              <DialogHeader>
-                 <DialogTitle className="sr-only">بطاقة هوية الطالب: {student.fullName}</DialogTitle>
+                <DialogTitle className="sr-only">بطاقة هوية الطالب: {student.fullName}</DialogTitle>
              </DialogHeader>
              <div className="flex flex-col items-center pt-4">
                 <Avatar className="w-24 h-24 mb-4 border-4 border-primary">
@@ -522,7 +522,7 @@ export default function StudentManagementPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[80px]">الهوية</TableHead>
+                <TableHead className="w-[65px] p-2">الهوية</TableHead>
                 <TableHead>الاسم الكامل</TableHead>
                 {isSuperAdmin && <TableHead className="text-center">الفوج</TableHead>}
                 <TableHead className="hidden md:table-cell text-center">اسم الولي</TableHead>
@@ -554,11 +554,11 @@ export default function StudentManagementPage() {
                             activeCovenant?.card === 'بطاقة صفراء' && 'bg-yellow-50 dark:bg-yellow-900/20',
                             activeCovenant?.card === 'بطاقة حمراء' && 'bg-red-50 dark:bg-red-900/20'
                         )} onClick={() => setSelectedStudent(student)}>
-                            <TableCell>
+                            <TableCell className="p-2">
                                 <Avatar className="w-10 h-10">
                                     <AvatarImage src={student.photoURL} />
-                                    <AvatarFallback className={cn((student as any).gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
-                                         {(student as any).gender === 'أنثى' ? <UserRound /> : <UserIcon />}
+                                    <AvatarFallback className={cn(student.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
+                                        {student.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
                                     </AvatarFallback>
                                 </Avatar>
                             </TableCell>
@@ -773,6 +773,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 
     const studentData: Partial<Student> & { photoFile?: File | null } = {
         fullName: data.fullName,
+        gender: data.gender,
         guardianName: data.guardianName,
         phone1: data.phone1,
         phone2: data.phone2,
@@ -838,7 +839,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
           {student ? 'قم بتحديث معلومات الطالب هنا.' : 'املأ الحقول أدناه لإضافة طالب جديد إلى الفوج.'}
         </DialogDescription>
       </DialogHeader>
-      <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-2">
+      <div className="max-h-[70vh] overflow-y-auto p-4 space-y-4">
         <div className="flex flex-col items-center gap-4">
             <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
              <Avatar className="w-24 h-24 mb-2 border-4 border-muted">
@@ -851,6 +852,16 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
           <div className="space-y-2">
             <Label htmlFor="fullName">الاسم الكامل</Label>
             <Input name="fullName" id="fullName" defaultValue={student?.fullName} required />
+          </div>
+           <div className="space-y-2">
+            <Label htmlFor="gender">الجنس</Label>
+             <Select dir="rtl" name="gender" defaultValue={student?.gender || "ذكر"}>
+                <SelectTrigger id="gender"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="ذكر">ذكر</SelectItem>
+                    <SelectItem value="أنثى">أنثى</SelectItem>
+                </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="guardianName">اسم الولي (اختياري)</Label>
@@ -1031,12 +1042,13 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         </div>
 
       </div>
-      <DialogFooter>
+      <DialogFooter className="border-t pt-4">
         <Button variant="outline" type="button" onClick={onCancel}>إلغاء</Button>
         <Button type="submit">{student ? 'حفظ التغييرات' : 'إضافة طالب'}</Button>
       </DialogFooter>
     </form>
   );
 }
+
 
 
