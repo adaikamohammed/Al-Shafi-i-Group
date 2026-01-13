@@ -12,13 +12,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search } from 'lucide-react';
+import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useStudentContext } from '@/context/StudentContext';
@@ -35,10 +35,12 @@ const statusColors: Record<PreRegistrationStatus, string> = {
     "قيد الانتظار": "bg-blue-100 text-blue-800 border-blue-300",
 };
 
+const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
+
 
 const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: (data: Partial<PreRegistration>) => void, onCancel: () => void, existingRegistration?: PreRegistration | null }) => {
-    const [birthDate, setBirthDate] = useState<Date | undefined>(existingRegistration?.birthDate ? new Date(existingRegistration.birthDate) : undefined);
-    const [age, setAge] = useState<number | string>(existingRegistration && existingRegistration.birthDate ? differenceInYears(new Date(), new Date(existingRegistration.birthDate)) : '');
+    const [birthDate, setBirthDate] = useState<Date | undefined>(existingRegistration?.birthDate && isValid(new Date(existingRegistration.birthDate)) ? new Date(existingRegistration.birthDate) : undefined);
+    const [age, setAge] = useState<number | string>(existingRegistration && existingRegistration.birthDate && isValid(new Date(existingRegistration.birthDate)) ? differenceInYears(new Date(), new Date(existingRegistration.birthDate)) : '');
 
     useEffect(() => {
         if (birthDate) {
@@ -61,8 +63,6 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
         const data = Object.fromEntries(formData.entries());
         onSave({ ...data, birthDate, id: existingRegistration?.id });
     }
-
-    const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -172,6 +172,9 @@ export default function PreRegistrationPage() {
     const [isFormOpen, setFormOpen] = useState(false);
     const [editingRegistration, setEditingRegistration] = useState<PreRegistration | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [levelFilter, setLevelFilter] = useState<string[]>([]);
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [genderFilter, setGenderFilter] = useState('all');
 
     useEffect(() => {
         if (preRegistrations) {
@@ -180,20 +183,40 @@ export default function PreRegistrationPage() {
     }, [preRegistrations]);
 
     const filteredRegistrations = useMemo(() => {
-        if (!searchTerm) return registrations;
-        
         const lowercasedFilter = searchTerm.toLowerCase();
-        
-        return registrations.filter(reg => {
-            return (
-                reg.fullName?.toLowerCase().includes(lowercasedFilter) ||
-                reg.guardianName?.toLowerCase().includes(lowercasedFilter) ||
-                reg.phone1?.toLowerCase().includes(lowercasedFilter) ||
-                reg.phone2?.toLowerCase().includes(lowercasedFilter) ||
-                reg.notes?.toLowerCase().includes(lowercasedFilter)
-            );
-        });
-    }, [registrations, searchTerm]);
+
+        return registrations
+            .filter(reg => {
+                const searchMatch = !searchTerm || (
+                    reg.fullName?.toLowerCase().includes(lowercasedFilter) ||
+                    reg.guardianName?.toLowerCase().includes(lowercasedFilter) ||
+                    reg.phone1?.toLowerCase().includes(lowercasedFilter) ||
+                    reg.phone2?.toLowerCase().includes(lowercasedFilter) ||
+                    reg.notes?.toLowerCase().includes(lowercasedFilter)
+                );
+                const levelMatch = levelFilter.length === 0 || (reg.educationalLevel && levelFilter.includes(reg.educationalLevel));
+                const statusMatch = statusFilter === 'all' || reg.status === statusFilter;
+                const genderMatch = genderFilter === 'all' || reg.gender === genderFilter;
+
+                return searchMatch && levelMatch && statusMatch && genderMatch;
+            })
+            .sort((a, b) => {
+                const pageNumA = a.pageNumber ? parseInt(a.pageNumber, 10) : Infinity;
+                const pageNumB = b.pageNumber ? parseInt(b.pageNumber, 10) : Infinity;
+                
+                if (!isNaN(pageNumA) && !isNaN(pageNumB)) {
+                    if (pageNumA !== pageNumB) return pageNumA - pageNumB;
+                } else if (!isNaN(pageNumA)) {
+                    return -1;
+                } else if (!isNaN(pageNumB)) {
+                    return 1;
+                }
+                
+                const dateA = a.requestedAt instanceof Date ? a.requestedAt.getTime() : 0;
+                const dateB = b.requestedAt instanceof Date ? b.requestedAt.getTime() : 0;
+                return dateB - dateA; // Secondary sort by date
+            });
+    }, [registrations, searchTerm, levelFilter, statusFilter, genderFilter]);
 
     const handleSaveRegistration = (data: Partial<PreRegistration>) => {
         if (!data.fullName || !data.birthDate || !data.phone1) {
@@ -274,7 +297,7 @@ export default function PreRegistrationPage() {
                 <CardHeader>
                     <CardTitle className="text-3xl font-headline font-bold">إدارة التسجيلات الجديدة</CardTitle>
                     <CardDescription>
-                        استقبل طلبات التسجيل الجديدة وقم بمعالجتها. يمكنك الموافقة على الطلب ونقله إلى فوج، أو رفضه.
+                        استقبل طلبات التسجيل الجديدة، قم بفلترتها، ومعالجتها. يمكنك الموافقة على الطلب ونقله إلى فوج، أو رفضه.
                     </CardDescription>
                 </CardHeader>
                  <CardContent className="flex flex-col md:flex-row gap-4">
@@ -291,6 +314,63 @@ export default function PreRegistrationPage() {
                         />
                     </div>
                 </CardContent>
+            </Card>
+
+             <Card>
+                <CardHeader>
+                    <CardTitle>أدوات البحث المتقدم</CardTitle>
+                </CardHeader>
+                 <CardContent className="flex flex-wrap items-center gap-2">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline"><Filter className="ml-2 h-4 w-4"/>المستوى الدراسي {levelFilter.length > 0 && `(${levelFilter.length})`}</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                            <DropdownMenuLabel>اختر المستويات</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {educationalLevels.map(level => (
+                                <DropdownMenuCheckboxItem
+                                    key={level}
+                                    checked={levelFilter.includes(level)}
+                                    onCheckedChange={(checked) => {
+                                        if (checked) {
+                                            setLevelFilter(prev => [...prev, level]);
+                                        } else {
+                                            setLevelFilter(prev => prev.filter(l => l !== level));
+                                        }
+                                    }}
+                                >
+                                    {level}
+                                </DropdownMenuCheckboxItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                     <Select dir="rtl" value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-full md:w-[180px]">
+                            <SelectValue placeholder="الحالة" />
+                        </SelectTrigger>
+                        <SelectContent>
+                           <SelectItem value="all">كل الحالات</SelectItem>
+                           <SelectItem value="قيد الانتظار">قيد الانتظار</SelectItem>
+                           <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
+                           <SelectItem value="مرفوض">مرفوض</SelectItem>
+                           <SelectItem value="مؤجل">مؤجل</SelectItem>
+                           <SelectItem value="إنضم لمدرسة أخرى">إنضم لمدرسة أخرى</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    
+                    <Select dir="rtl" value={genderFilter} onValueChange={setGenderFilter}>
+                        <SelectTrigger className="w-full md:w-[150px]">
+                            <SelectValue placeholder="الجنس" />
+                        </SelectTrigger>
+                        <SelectContent>
+                           <SelectItem value="all">الكل</SelectItem>
+                           <SelectItem value="ذكر">ذكر</SelectItem>
+                           <SelectItem value="أنثى">أنثى</SelectItem>
+                        </SelectContent>
+                    </Select>
+                 </CardContent>
             </Card>
 
             <Dialog open={isFormOpen} onOpenChange={(open) => {
@@ -310,12 +390,13 @@ export default function PreRegistrationPage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>قائمة طلبات التسجيل</CardTitle>
+                    <CardTitle>قائمة طلبات التسجيل ({filteredRegistrations.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead>رقم الصفحة</TableHead>
                                 <TableHead>تاريخ التسجيل</TableHead>
                                 <TableHead>الإسم الكامل</TableHead>
                                 <TableHead>الجنس</TableHead>
@@ -323,10 +404,7 @@ export default function PreRegistrationPage() {
                                 <TableHead>المستوى الدراسي</TableHead>
                                 <TableHead>إسم الولي</TableHead>
                                 <TableHead>رقم الهاتف 1</TableHead>
-                                <TableHead>رقم الهاتف 2</TableHead>
-                                <TableHead>مقر السكن</TableHead>
                                 <TableHead>الحالة</TableHead>
-                                <TableHead>رقم الصفحة</TableHead>
                                 <TableHead>ملاحظات</TableHead>
                                 <TableHead>إجراءات</TableHead>
                             </TableRow>
@@ -334,6 +412,7 @@ export default function PreRegistrationPage() {
                         <TableBody>
                             {filteredRegistrations.length > 0 ? filteredRegistrations.map(reg => (
                                 <TableRow key={reg.id}>
+                                    <TableCell>{reg.pageNumber}</TableCell>
                                     <TableCell>{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : reg.requestedAt.toString()}</TableCell>
                                     <TableCell className="font-medium">{reg.fullName}</TableCell>
                                     <TableCell>{reg.gender}</TableCell>
@@ -341,14 +420,11 @@ export default function PreRegistrationPage() {
                                     <TableCell>{reg.educationalLevel}</TableCell>
                                     <TableCell>{reg.guardianName}</TableCell>
                                     <TableCell>{reg.phone1}</TableCell>
-                                    <TableCell>{reg.phone2}</TableCell>
-                                    <TableCell>{reg.address}</TableCell>
                                     <TableCell>
                                          <Badge variant="outline" className={cn("border", statusColors[reg.status])}>
                                             {reg.status}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell>{reg.pageNumber}</TableCell>
                                     <TableCell className="max-w-[200px] truncate">{reg.notes}</TableCell>
                                      <TableCell>
                                         <DropdownMenu>
@@ -405,7 +481,10 @@ export default function PreRegistrationPage() {
                             )) : (
                                 <TableRow>
                                     <TableCell colSpan={13} className="text-center h-24">
-                                        {searchTerm ? 'لم يتم العثور على نتائج مطابقة للبحث.' : 'لا توجد طلبات تسجيل جديدة في الوقت الحالي.'}
+                                        {searchTerm || levelFilter.length > 0 || statusFilter !== 'all' || genderFilter !== 'all'
+                                            ? 'لم يتم العثور على نتائج مطابقة للبحث.'
+                                            : 'لا توجد طلبات تسجيل جديدة في الوقت الحالي.'
+                                        }
                                     </TableCell>
                                 </TableRow>
                             )}
