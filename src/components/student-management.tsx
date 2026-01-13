@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -522,7 +522,8 @@ export default function StudentManagementPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-center">الاسم الكامل</TableHead>
+                <TableHead className="w-[80px]">الهوية</TableHead>
+                <TableHead>الاسم الكامل</TableHead>
                 {isSuperAdmin && <TableHead className="text-center">الفوج</TableHead>}
                 <TableHead className="hidden md:table-cell text-center">اسم الولي</TableHead>
                 <TableHead className="hidden lg:table-cell text-center">العمر</TableHead>
@@ -553,8 +554,16 @@ export default function StudentManagementPage() {
                             activeCovenant?.card === 'بطاقة صفراء' && 'bg-yellow-50 dark:bg-yellow-900/20',
                             activeCovenant?.card === 'بطاقة حمراء' && 'bg-red-50 dark:bg-red-900/20'
                         )} onClick={() => setSelectedStudent(student)}>
-                            <TableCell className="font-medium text-center">
-                                <div className="flex items-center justify-center gap-2">
+                            <TableCell>
+                                <Avatar className="w-10 h-10">
+                                    <AvatarImage src={student.photoURL} />
+                                    <AvatarFallback className={cn((student as any).gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
+                                         {(student as any).gender === 'أنثى' ? <UserRound /> : <UserIcon />}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </TableCell>
+                            <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
                                      {activeCovenant && (
                                         <Tooltip>
                                             <TooltipTrigger>
@@ -1029,4 +1038,5 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
 

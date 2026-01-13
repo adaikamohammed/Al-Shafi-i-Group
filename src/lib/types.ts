@@ -22,6 +22,7 @@ export interface Student {
   ownerId: string; // UID of the user who owns this student record
   groupName?: string; // Name of the group/sheikh
   fullName: string;
+  gender?: "ذكر" | "أنثى";
   guardianName: string;
   phone1: string;
   phone2?: string;
@@ -188,5 +189,6 @@ export interface PreRegistration {
     notes?: string;
     photoURL?: string;
 }
+
 
 

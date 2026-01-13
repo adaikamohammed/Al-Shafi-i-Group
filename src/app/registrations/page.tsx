@@ -93,8 +93,8 @@ const StudentProfileCard = ({ student, onPromote, onEdit }: { student: PreRegist
                 <div className="flex items-center gap-4">
                      <Avatar className="w-20 h-20 border-4 border-white/50">
                         <AvatarImage src={student.photoURL} />
-                        <AvatarFallback className={cn(student.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
-                            {student.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
+                        <AvatarFallback className={cn((student as any).gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
+                            {(student as any).gender === 'أنثى' ? <UserRound /> : <UserIcon />}
                         </AvatarFallback>
                     </Avatar>
                     <div>
@@ -216,7 +216,7 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
                      <Avatar className="w-24 h-24 mb-2 border-4 border-muted">
                         <AvatarImage src={photoPreview} />
                         <AvatarFallback className={cn(existingRegistration?.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
-                             {existingRegistration?.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
+                             {(existingRegistration as any)?.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
                         </AvatarFallback>
                     </Avatar>
                     <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>تغيير الصورة</Button>
@@ -625,122 +625,124 @@ export default function PreRegistrationPage() {
                     <CardTitle>قائمة طلبات التسجيل ({filteredRegistrations.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[80px]">
-                                    <Button variant="ghost" onClick={() => requestSort('pageNumber')} className="px-2">
-                                        الهوية
-                                        <ArrowUpDown className="mr-2 h-4 w-4" />
-                                    </Button>
-                                </TableHead>
-                                {columnVisibility.requestedAt.visible && <TableHead className="text-center">تاريخ التسجيل</TableHead>}
-                                {columnVisibility.fullName.visible && <TableHead className="text-center">الإسم الكامل</TableHead>}
-                                {columnVisibility.gender.visible && <TableHead className="text-center">الجنس</TableHead>}
-                                {columnVisibility.birthDate.visible && <TableHead className="text-center">تاريخ الميلاد</TableHead>}
-                                {columnVisibility.educationalLevel.visible && <TableHead className="text-center">المستوى الدراسي</TableHead>}
-                                {columnVisibility.guardianName.visible && <TableHead className="text-center">إسم الولي</TableHead>}
-                                {columnVisibility.phone1.visible && <TableHead className="text-center">رقم الهاتف 1</TableHead>}
-                                {columnVisibility.phone2.visible && <TableHead className="text-center">رقم الهاتف 2</TableHead>}
-                                {columnVisibility.address.visible && <TableHead className="text-center">مقر السكن</TableHead>}
-                                {columnVisibility.status.visible && <TableHead className="text-center">الحالة</TableHead>}
-                                {columnVisibility.notes.visible && <TableHead className="text-center">ملاحظات</TableHead>}
-                                <TableHead className="text-center">إجراءات</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredRegistrations.length > 0 ? filteredRegistrations.map(reg => (
-                                <TableRow key={reg.id} className={cn("cursor-pointer", statusColors[reg.status])} onClick={() => setSelectedStudent(reg)}>
-                                    <TableCell>
-                                        <div className="flex flex-col items-center gap-1">
-                                            <Avatar className="w-10 h-10">
-                                                <AvatarImage src={reg.photoURL} />
-                                                <AvatarFallback className={cn(reg.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
-                                                    {reg.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <Badge variant="secondary" className="px-1.5 py-0.5 text-xs">{reg.pageNumber || 'N/A'}</Badge>
-                                        </div>
-                                    </TableCell>
-                                    {columnVisibility.requestedAt.visible && <TableCell className="text-center">{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt ? reg.requestedAt.toString() : '-')}</TableCell>}
-                                    {columnVisibility.fullName.visible && <TableCell className="font-medium text-center">{reg.fullName}</TableCell>}
-                                    {columnVisibility.gender.visible && <TableCell className="text-center">{reg.gender}</TableCell>}
-                                    {columnVisibility.birthDate.visible && <TableCell className="text-center">{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : (reg.birthDate ? reg.birthDate.toString() : 'غير محدد')}</TableCell>}
-                                    {columnVisibility.educationalLevel.visible && <TableCell className="text-center">{reg.educationalLevel}</TableCell>}
-                                    {columnVisibility.guardianName.visible && <TableCell className="text-center">{reg.guardianName}</TableCell>}
-                                    {columnVisibility.phone1.visible && <TableCell className="text-center">{reg.phone1}</TableCell>}
-                                    {columnVisibility.phone2.visible && <TableCell className="text-center">{reg.phone2}</TableCell>}
-                                    {columnVisibility.address.visible && <TableCell className="text-center">{reg.address}</TableCell>}
-                                    {columnVisibility.status.visible && <TableCell className="text-center">
-                                         <Badge variant="outline" className={cn("border", statusBadgeColors[reg.status])}>
-                                            {reg.status}
-                                        </Badge>
-                                    </TableCell>}
-                                    {columnVisibility.notes.visible && <TableCell className="max-w-[200px] truncate text-center">{reg.notes}</TableCell>}
-                                     <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={reg.status === 'تم الإنضمام'}>
-                                                            <ArrowUpCircle className="ml-2 h-4 w-4" /> نقل إلى فوج
-                                                        </DropdownMenuItem>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>تأكيد النقل</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                                هل أنت متأكد من نقل الطالب "{reg.fullName}" إلى فوجك الرسمي؟ سيتم إنشاء سجل طالب جديد له.
-                                                            </AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                                            <AlertDialogAction onClick={() => handlePromoteStudent(reg)}>تأكيد النقل</AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem onClick={() => handleEdit(reg)}>
-                                                    <Edit className="ml-2 h-4 w-4" /> تعديل
-                                                </DropdownMenuItem>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                                                            <Trash2 className="ml-2 h-4 w-4" /> حذف
-                                                        </DropdownMenuItem>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                                سيتم حذف طلب التسجيل هذا نهائياً.
-                                                            </AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                                            <AlertDialogAction onClick={() => handleDelete(reg.id)}>تأكيد الحذف</AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
-                                </TableRow>
-                            )) : (
+                    <div className="relative w-full overflow-x-auto">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={Object.values(columnVisibility).filter(c => c.visible).length + 2} className="text-center h-24">
-                                        {searchTerm || levelFilter.length > 0 || statusFilter !== 'all' || genderFilter !== 'all'
-                                            ? 'لم يتم العثور على نتائج مطابقة للبحث.'
-                                            : 'لا توجد طلبات تسجيل جديدة في الوقت الحالي.'
-                                        }
-                                    </TableCell>
+                                    <TableHead className="w-[80px]">
+                                        <Button variant="ghost" onClick={() => requestSort('pageNumber')} className="px-2">
+                                            الهوية
+                                            <ArrowUpDown className="mr-2 h-4 w-4" />
+                                        </Button>
+                                    </TableHead>
+                                    {columnVisibility.requestedAt.visible && <TableHead className="text-center">تاريخ التسجيل</TableHead>}
+                                    {columnVisibility.fullName.visible && <TableHead className="text-center">الإسم الكامل</TableHead>}
+                                    {columnVisibility.gender.visible && <TableHead className="text-center">الجنس</TableHead>}
+                                    {columnVisibility.birthDate.visible && <TableHead className="text-center">تاريخ الميلاد</TableHead>}
+                                    {columnVisibility.educationalLevel.visible && <TableHead className="text-center">المستوى الدراسي</TableHead>}
+                                    {columnVisibility.guardianName.visible && <TableHead className="text-center">إسم الولي</TableHead>}
+                                    {columnVisibility.phone1.visible && <TableHead className="text-center">رقم الهاتف 1</TableHead>}
+                                    {columnVisibility.phone2.visible && <TableHead className="text-center">رقم الهاتف 2</TableHead>}
+                                    {columnVisibility.address.visible && <TableHead className="text-center">مقر السكن</TableHead>}
+                                    {columnVisibility.status.visible && <TableHead className="text-center">الحالة</TableHead>}
+                                    {columnVisibility.notes.visible && <TableHead className="text-center">ملاحظات</TableHead>}
+                                    <TableHead className="text-center">إجراءات</TableHead>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredRegistrations.length > 0 ? filteredRegistrations.map(reg => (
+                                    <TableRow key={reg.id} className={cn("cursor-pointer", statusColors[reg.status])} onClick={() => setSelectedStudent(reg)}>
+                                        <TableCell>
+                                            <div className="flex flex-col items-center gap-1">
+                                                <Avatar className="w-10 h-10">
+                                                    <AvatarImage src={reg.photoURL} />
+                                                    <AvatarFallback className={cn(reg.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
+                                                        {reg.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <Badge variant="secondary" className="px-1.5 py-0.5 text-xs">{reg.pageNumber || 'N/A'}</Badge>
+                                            </div>
+                                        </TableCell>
+                                        {columnVisibility.requestedAt.visible && <TableCell className="text-center">{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt ? reg.requestedAt.toString() : '-')}</TableCell>}
+                                        {columnVisibility.fullName.visible && <TableCell className="font-medium text-center">{reg.fullName}</TableCell>}
+                                        {columnVisibility.gender.visible && <TableCell className="text-center">{reg.gender}</TableCell>}
+                                        {columnVisibility.birthDate.visible && <TableCell className="text-center">{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : (reg.birthDate ? reg.birthDate.toString() : 'غير محدد')}</TableCell>}
+                                        {columnVisibility.educationalLevel.visible && <TableCell className="text-center">{reg.educationalLevel}</TableCell>}
+                                        {columnVisibility.guardianName.visible && <TableCell className="text-center">{reg.guardianName}</TableCell>}
+                                        {columnVisibility.phone1.visible && <TableCell className="text-center">{reg.phone1}</TableCell>}
+                                        {columnVisibility.phone2.visible && <TableCell className="text-center">{reg.phone2}</TableCell>}
+                                        {columnVisibility.address.visible && <TableCell className="text-center">{reg.address}</TableCell>}
+                                        {columnVisibility.status.visible && <TableCell className="text-center">
+                                            <Badge variant="outline" className={cn("border", statusBadgeColors[reg.status])}>
+                                                {reg.status}
+                                            </Badge>
+                                        </TableCell>}
+                                        {columnVisibility.notes.visible && <TableCell className="max-w-[200px] truncate text-center">{reg.notes}</TableCell>}
+                                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={reg.status === 'تم الإنضمام'}>
+                                                                <ArrowUpCircle className="ml-2 h-4 w-4" /> نقل إلى فوج
+                                                            </DropdownMenuItem>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>تأكيد النقل</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    هل أنت متأكد من نقل الطالب "{reg.fullName}" إلى فوجك الرسمي؟ سيتم إنشاء سجل طالب جديد له.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handlePromoteStudent(reg)}>تأكيد النقل</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={() => handleEdit(reg)}>
+                                                        <Edit className="ml-2 h-4 w-4" /> تعديل
+                                                    </DropdownMenuItem>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                                                <Trash2 className="ml-2 h-4 w-4" /> حذف
+                                                            </DropdownMenuItem>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    سيتم حذف طلب التسجيل هذا نهائياً.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handleDelete(reg.id)}>تأكيد الحذف</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                )) : (
+                                    <TableRow>
+                                        <TableCell colSpan={Object.values(columnVisibility).filter(c => c.visible).length + 2} className="text-center h-24">
+                                            {searchTerm || levelFilter.length > 0 || statusFilter !== 'all' || genderFilter !== 'all'
+                                                ? 'لم يتم العثور على نتائج مطابقة للبحث.'
+                                                : 'لا توجد طلبات تسجيل جديدة في الوقت الحالي.'
+                                            }
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
         </div>
@@ -748,6 +750,7 @@ export default function PreRegistrationPage() {
 }
 
     
+
 
 
 
