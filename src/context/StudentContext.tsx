@@ -96,7 +96,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
    useEffect(() => {
     if (authContextUser && students.length > 0 && !loading) {
-      const migrationKey = 'groupNameMigration_v1';
+      const migrationKey = 'groupNameMigration_v2';
       const hasMigrated = localStorage.getItem(migrationKey);
 
       if (!hasMigrated) {
