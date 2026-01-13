@@ -107,14 +107,14 @@ function AppContent({ children }: { children: React.ReactNode }) {
     const sidebarContent = (
     <>
       <SidebarHeader>
-         <Link href="/profile" className="block p-4 hover:bg-sidebar-accent transition-colors">
+         <Link href="/profile" className="block p-4 rounded-lg hover:bg-sidebar-accent transition-colors">
              <div className="flex items-center gap-3">
                  <Avatar className="h-12 w-12">
-                    <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || ''} />
+                    <AvatarImage src={user?.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${user?.displayName}`} alt={user?.displayName || ''} />
                     <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
                 </Avatar>
                  <div>
-                    <h1 className="font-headline text-lg font-bold text-primary">
+                    <h1 className="font-headline text-lg font-bold text-sidebar-primary-foreground">
                         {user?.group || 'مدرسة الشافعي'}
                     </h1>
                     <p className="text-xs text-muted-foreground">{user?.displayName}</p>
