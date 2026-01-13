@@ -459,7 +459,13 @@ export default function PreRegistrationPage() {
             setIsDataVisible(true);
             setIsVisibilityModalOpen(false);
             setVisibilityCode('');
-            toast({ title: '✅ تم عرض البيانات', description: 'البيانات الآن ظاهرة.' });
+            toast({ title: '✅ تم عرض البيانات', description: 'البيانات الآن ظاهرة. وضع التعديل لا يزال مقفلاً.' });
+        } else if (visibilityCode === 'admin8888') {
+            setIsDataVisible(true);
+            setIsLocked(false);
+            setIsVisibilityModalOpen(false);
+            setVisibilityCode('');
+            toast({ title: '✅ تم الدخول بصلاحيات المدير', description: 'تم عرض البيانات وفتح وضع التعديل.' });
         } else {
             toast({ title: '❌ خطأ', description: 'كود الوصول غير صحيح.', variant: 'destructive' });
         }
