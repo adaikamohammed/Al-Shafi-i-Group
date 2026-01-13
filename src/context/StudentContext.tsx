@@ -66,6 +66,7 @@ interface StudentContextType {
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession[]>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
   importPreRegistrations: (newPreRegs: Omit<PreRegistration, 'id'>[]) => void;
+  updatePreRegistration: (regId: string, data: Partial<PreRegistration> & { photoFile?: File | null }, isEditing: boolean) => Promise<void>;
   deleteAllPreRegistrations: () => void;
   saveDailyReport: (report: Omit<DailyReport, 'id'>, reportIdToUpdate?: string) => Promise<void>;
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
@@ -278,6 +279,40 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
      if (!authContextUser) return;
      newStudents.forEach(s => addStudent(s));
   }
+  
+  const updatePreRegistration = async (regId: string, data: Partial<PreRegistration> & { photoFile?: File | null }, isEditing: boolean) => {
+    if (!authContextUser) return;
+    
+    let photoURL = data.photoURL;
+
+    if (data.photoFile) {
+        const imageRef = storageRef(storage, `pre_reg_photos/${regId}`);
+        await uploadBytes(imageRef, data.photoFile);
+        photoURL = await getDownloadURL(imageRef);
+    }
+    
+    const { photoFile, ...restOfData } = data;
+    
+    const finalData = {
+        ...restOfData,
+        photoURL,
+        birthDate: data.birthDate instanceof Date ? data.birthDate.toISOString() : data.birthDate,
+        requestedAt: data.requestedAt instanceof Date ? data.requestedAt.toISOString() : data.requestedAt,
+    };
+    
+    if (!isEditing) {
+        finalData.requestedAt = new Date().toISOString();
+        finalData.status = 'مرشح';
+    }
+
+    const regRef = ref(db, `pre_registrations/${regId}`);
+    await update(regRef, finalData);
+
+    toast({
+        title: isEditing ? '✅ تم التحديث' : '✅ تم التسجيل',
+        description: `تم تحديث بيانات ${data.fullName} بنجاح.`
+    });
+};
   
   const importPreRegistrations = (newPreRegs: Omit<PreRegistration, 'id'>[]) => {
     if (!authContextUser) return;
@@ -495,7 +530,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <StudentContext.Provider value={{ students, preRegistrations, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, deleteAllPreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
+    <StudentContext.Provider value={{ students, preRegistrations, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, updatePreRegistration, deleteAllPreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
       {children}
     </StudentContext.Provider>
   );
@@ -510,3 +545,4 @@ export const useStudentContext = () => {
 };
 
   
+

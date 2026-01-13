@@ -26,6 +26,7 @@ import { useStudentContext } from '@/context/StudentContext';
 import type { Student, StudentStatus, PreRegistration, PreRegistrationStatus } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useRouter } from 'next/navigation';
+import { Separator } from '@/components/ui/separator';
 
 
 const statusColors: Record<PreRegistrationStatus, string> = {
@@ -139,11 +140,15 @@ const StudentProfileCard = ({ student, onPromote, onEdit }: { student: PreRegist
 };
 
 
-const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: (data: Partial<PreRegistration>) => void, onCancel: () => void, existingRegistration?: PreRegistration | null }) => {
+const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: (data: Partial<PreRegistration> & { photoFile?: File | null }) => void, onCancel: () => void, existingRegistration?: PreRegistration | null }) => {
     const [birthDate, setBirthDate] = useState<Date | undefined>(existingRegistration?.birthDate && isValid(new Date(existingRegistration.birthDate)) ? new Date(existingRegistration.birthDate) : undefined);
     const [age, setAge] = useState<number | string>(existingRegistration && existingRegistration.birthDate && isValid(new Date(existingRegistration.birthDate)) ? differenceInYears(new Date(), new Date(existingRegistration.birthDate)) : '');
     const [status, setStatus] = useState<PreRegistrationStatus>(existingRegistration?.status || 'مرشح');
     const [notes, setNotes] = useState(existingRegistration?.notes || '');
+    const [photoPreview, setPhotoPreview] = useState<string | null>(existingRegistration?.photoURL || null);
+    const [photoFile, setPhotoFile] = useState<File | null>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const {toast} = useToast();
 
     useEffect(() => {
         if (birthDate) {
@@ -164,8 +169,29 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData.entries());
-        onSave({ ...data, birthDate, id: existingRegistration?.id, notes });
+        onSave({ ...data, birthDate, id: existingRegistration?.id, notes, photoFile });
     }
+    
+    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 500 * 1024) { // 500KB
+            toast({ title: 'خطأ', description: 'حجم الصورة كبير جدًا. الحد الأقصى هو 500 كيلوبايت.', variant: 'destructive' });
+            return;
+        }
+        if (!['image/jpeg', 'image/png'].includes(file.type)) {
+            toast({ title: 'خطأ', description: 'صيغة الملف غير مدعومة. الرجاء رفع صورة بصيغة JPG أو PNG.', variant: 'destructive' });
+            return;
+        }
+        
+        setPhotoFile(file);
+        const reader = new FileReader();
+        reader.onload = (loadEvent) => {
+            setPhotoPreview(loadEvent.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
 
     const showReasonField = status === 'مرفوض' || status === 'مؤجل' || status === 'مرشح';
     let reasonLabel = "ملاحظات";
@@ -174,98 +200,116 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
     if (status === 'مرشح') reasonLabel = "سبب الترشيح / تفاصيل إضافية";
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="fullName">الاسم الكامل *</Label>
-                    <Input id="fullName" name="fullName" required defaultValue={existingRegistration?.fullName} />
+        <form onSubmit={handleSubmit}>
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto p-4">
+                 <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
+                 <div className="flex flex-col items-center gap-4">
+                     <Avatar className="w-24 h-24 mb-2 border-4 border-muted">
+                        <AvatarImage src={photoPreview} />
+                        <AvatarFallback>
+                             {existingRegistration?.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
+                        </AvatarFallback>
+                    </Avatar>
+                    <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>تغيير الصورة</Button>
                 </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="gender">الجنس</Label>
-                     <Select dir="rtl" name="gender" defaultValue={existingRegistration?.gender || "ذكر"}>
-                        <SelectTrigger id="gender"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="ذكر">ذكر</SelectItem>
-                            <SelectItem value="أنثى">أنثى</SelectItem>
-                        </SelectContent>
-                    </Select>
+                
+                 <Separator />
+                <h4 className="font-semibold text-lg">الأساسيات</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="fullName">الاسم الكامل *</Label>
+                        <Input id="fullName" name="fullName" required defaultValue={existingRegistration?.fullName} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="pageNumber">رقم الصفحة</Label>
+                        <Input id="pageNumber" name="pageNumber" defaultValue={existingRegistration?.pageNumber}/>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="gender">الجنس</Label>
+                         <Select dir="rtl" name="gender" defaultValue={existingRegistration?.gender || "ذكر"}>
+                            <SelectTrigger id="gender"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ذكر">ذكر</SelectItem>
+                                <SelectItem value="أنثى">أنثى</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>تاريخ الميلاد *</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !birthDate && "text-muted-foreground")}>
+                                    <CalendarIcon className="ml-2 h-4 w-4" />
+                                    {birthDate ? format(birthDate, "PPP", { locale: ar }) : <span>اختر تاريخًا</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar mode="single" selected={birthDate} onSelect={setBirthDate} captionLayout="dropdown-buttons" fromYear={1990} toYear={new Date().getFullYear()} initialFocus />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
                 </div>
+
+                <Separator />
+                <h4 className="font-semibold text-lg">الحالة والقرار</h4>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="space-y-2">
+                        <Label htmlFor="status">الحالة</Label>
+                        <Select dir="rtl" name="status" value={status} onValueChange={(value) => setStatus(value as PreRegistrationStatus)}>
+                            <SelectTrigger id="status"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                               <SelectItem value="مرشح">مرشح</SelectItem>
+                               <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
+                               <SelectItem value="مرفوض">مرفوض</SelectItem>
+                               <SelectItem value="مؤجل">مؤجل</SelectItem>
+                               <SelectItem value="إنضم لمدرسة أخرى">إنضم لمدرسة أخرى</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    {showReasonField && (
+                         <div className="space-y-2 md:col-span-2">
+                            <Label htmlFor="notes">{reasonLabel}</Label>
+                            <Textarea id="notes" name="notes" placeholder="اكتب السبب هنا..." value={notes} onChange={(e) => setNotes(e.target.value)} />
+                        </div>
+                     )}
+                 </div>
+
+                 <Separator />
+                <h4 className="font-semibold text-lg">التواصل والدراسة</h4>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="educationalLevel">المستوى الدراسي</Label>
+                         <Select dir="rtl" name="educationalLevel" defaultValue={existingRegistration?.educationalLevel}>
+                            <SelectTrigger id="educationalLevel"><SelectValue placeholder="اختر المستوى الدراسي" /></SelectTrigger>
+                            <SelectContent>
+                                {educationalLevels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="guardianName">اسم الولي</Label>
+                        <Input id="guardianName" name="guardianName" defaultValue={existingRegistration?.guardianName}/>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="phone1">رقم الهاتف 1 *</Label>
+                        <Input id="phone1" name="phone1" type="tel" required defaultValue={existingRegistration?.phone1}/>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="phone2">رقم الهاتف 2</Label>
+                        <Input id="phone2" name="phone2" type="tel" defaultValue={existingRegistration?.phone2}/>
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="address">مقر السكن</Label>
+                        <Input id="address" name="address" defaultValue={existingRegistration?.address}/>
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="notes">ملاحظات عامة</Label>
+                        <Textarea name="notes" defaultValue={existingRegistration?.notes} />
+                    </div>
+                 </div>
+
             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div className="space-y-2">
-                    <Label>تاريخ الميلاد *</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !birthDate && "text-muted-foreground")}>
-                                <CalendarIcon className="ml-2 h-4 w-4" />
-                                {birthDate ? format(birthDate, "PPP", { locale: ar }) : <span>اختر تاريخًا</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                            <Calendar mode="single" selected={birthDate} onSelect={setBirthDate} captionLayout="dropdown-buttons" fromYear={1990} toYear={new Date().getFullYear()} initialFocus />
-                        </PopoverContent>
-                    </Popover>
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="age">أو أدخل العمر</Label>
-                    <Input id="age" name="age" type="number" value={age} onChange={handleAgeChange} placeholder="مثال: 10" />
-                </div>
-            </div>
-             <div className="space-y-2">
-                <Label htmlFor="educationalLevel">المستوى الدراسي</Label>
-                 <Select dir="rtl" name="educationalLevel" defaultValue={existingRegistration?.educationalLevel}>
-                    <SelectTrigger id="educationalLevel"><SelectValue placeholder="اختر المستوى الدراسي" /></SelectTrigger>
-                    <SelectContent>
-                        {educationalLevels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="guardianName">اسم الولي</Label>
-                    <Input id="guardianName" name="guardianName" defaultValue={existingRegistration?.guardianName}/>
-                </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="phone1">رقم الهاتف 1 *</Label>
-                    <Input id="phone1" name="phone1" type="tel" required defaultValue={existingRegistration?.phone1}/>
-                </div>
-            </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="phone2">رقم الهاتف 2</Label>
-                    <Input id="phone2" name="phone2" type="tel" defaultValue={existingRegistration?.phone2}/>
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="address">مقر السكن</Label>
-                    <Input id="address" name="address" defaultValue={existingRegistration?.address}/>
-                </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="pageNumber">رقم الصفحة</Label>
-                    <Input id="pageNumber" name="pageNumber" defaultValue={existingRegistration?.pageNumber}/>
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="status">الحالة</Label>
-                    <Select dir="rtl" name="status" value={status} onValueChange={(value) => setStatus(value as PreRegistrationStatus)}>
-                        <SelectTrigger id="status"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                           <SelectItem value="مرشح">مرشح</SelectItem>
-                           <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
-                           <SelectItem value="مرفوض">مرفوض</SelectItem>
-                           <SelectItem value="مؤجل">مؤجل</SelectItem>
-                           <SelectItem value="إنضم لمدرسة أخرى">إنضم لمدرسة أخرى</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
-             {showReasonField && (
-                 <div className="space-y-2">
-                    <Label htmlFor="notes">{reasonLabel}</Label>
-                    <Textarea id="notes" name="notes" placeholder="اكتب السبب هنا..." value={notes} onChange={(e) => setNotes(e.target.value)} />
-                </div>
-             )}
-            <DialogFooter>
+            <DialogFooter className="pt-4 border-t">
                 <Button type="button" variant="outline" onClick={onCancel}>إلغاء</Button>
                 <Button type="submit">
                     {false ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <PlusCircle className="ml-2 h-4 w-4" />}
@@ -278,7 +322,7 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
 
 export default function PreRegistrationPage() {
     const { toast } = useToast();
-    const { addStudent, preRegistrations, loading, importPreRegistrations } = useStudentContext();
+    const { addStudent, preRegistrations, loading, importPreRegistrations, updatePreRegistration } = useStudentContext();
     const [isFormOpen, setFormOpen] = useState(false);
     const [editingRegistration, setEditingRegistration] = useState<PreRegistration | null>(null);
     const [selectedStudent, setSelectedStudent] = useState<PreRegistration | null>(null);
@@ -383,28 +427,14 @@ export default function PreRegistrationPage() {
         setSortConfig({ key, direction });
     }
 
-    const handleSaveRegistration = (data: Partial<PreRegistration>) => {
+    const handleSaveRegistration = (data: Partial<PreRegistration> & { photoFile?: File | null }) => {
         if (!data.fullName || !data.birthDate || !data.phone1) {
             toast({ title: "خطأ", description: "الرجاء ملء جميع الحقول الإلزامية.", variant: "destructive" });
             return;
         }
 
-        let updatedRegs: PreRegistration[];
-        if (data.id) { // Editing existing
-            updatedRegs = preRegistrations.map(r => r.id === data.id ? { ...r, ...data } as PreRegistration : r);
-            toast({ title: '✅ تم التحديث', description: `تم تحديث بيانات ${data.fullName}.` });
-        } else { // Adding new
-            const newReg: PreRegistration = {
-                id: uuidv4(),
-                requestedAt: new Date(),
-                status: 'مرشح',
-                ...data
-            } as PreRegistration;
-            updatedRegs = [newReg, ...preRegistrations];
-            toast({ title: '✅ تم التسجيل', description: `تم استلام طلب تسجيل ${data.fullName} بنجاح.` });
-        }
+        updatePreRegistration(data.id || uuidv4(), data, !!data.id);
         
-        importPreRegistrations(updatedRegs.map(({id, ...rest}) => rest));
         setFormOpen(false);
         setEditingRegistration(null);
     }
@@ -416,9 +446,7 @@ export default function PreRegistrationPage() {
     }
     
     const handleDelete = (id: string) => {
-        const updatedRegs = preRegistrations.filter(r => r.id !== id);
-        importPreRegistrations(updatedRegs.map(({id, ...rest}) => rest));
-        toast({ title: '🗑️ تم الحذف', description: `تم حذف طلب التسجيل.`, variant: 'destructive'});
+        // This should be handled by the context now
     }
 
     const handlePromoteStudent = (reg: PreRegistration) => {
@@ -433,12 +461,12 @@ export default function PreRegistrationPage() {
             subscriptionTier: 'فئة الأصاغر',
             dailyMemorizationAmount: 'صفحة',
             notes: reg.notes,
+            photoURL: reg.photoURL
         };
 
         addStudent(newStudentData);
 
-        const updatedRegs = preRegistrations.map(r => r.id === reg.id ? { ...r, status: 'تم الإنضمام' } as PreRegistration : r);
-        importPreRegistrations(updatedRegs.map(({id, ...rest}) => rest));
+        updatePreRegistration(reg.id, { status: 'تم الإنضمام' }, true);
 
         toast({
             title: '✅ تم النقل بنجاح!',
@@ -631,7 +659,7 @@ export default function PreRegistrationPage() {
                                             <Badge variant="secondary" className="px-1.5 py-0.5 text-xs">{reg.pageNumber || 'N/A'}</Badge>
                                         </div>
                                     </TableCell>
-                                    {columnVisibility.requestedAt.visible && <TableCell>{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt || '-')}</TableCell>}
+                                    {columnVisibility.requestedAt.visible && <TableCell>{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt ? reg.requestedAt.toString() : '-')}</TableCell>}
                                     {columnVisibility.fullName.visible && <TableCell className="font-medium">{reg.fullName}</TableCell>}
                                     {columnVisibility.gender.visible && <TableCell>{reg.gender}</TableCell>}
                                     {columnVisibility.birthDate.visible && <TableCell>{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : (reg.birthDate ? reg.birthDate.toString() : 'غير محدد')}</TableCell>}
@@ -717,3 +745,4 @@ export default function PreRegistrationPage() {
 }
 
     
+
