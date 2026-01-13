@@ -127,7 +127,7 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
              <div className="space-y-2">
                 <Label htmlFor="educationalLevel">المستوى الدراسي</Label>
                  <Select dir="rtl" name="educationalLevel" defaultValue={existingRegistration?.educationalLevel}>
-                    <SelectTrigger id="educationalLevel"><SelectValue placeholder="اختر المستوى الدراسي" /></SelectValue>
+                    <SelectTrigger id="educationalLevel"><SelectValue placeholder="اختر المستوى الدراسي" /></SelectTrigger>
                     <SelectContent>
                         {educationalLevels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
                     </SelectContent>
@@ -581,4 +581,6 @@ export default function PreRegistrationPage() {
 }
 
     
+
+
 
