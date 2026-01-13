@@ -710,97 +710,6 @@ export default function PreRegistrationPage() {
                 </CardContent>
             </Card>
 
-             <Card>
-                <CardContent className="p-4 space-y-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                        {Object.entries(statusBadgeColors).map(([status, className]) => (
-                            <Badge key={status} className={cn("border cursor-pointer", className, statusFilter === status && "ring-2 ring-ring")} onClick={() => setStatusFilter(prev => prev === status ? 'all' : status as PreRegistrationStatus)}>{status}</Badge>
-                        ))}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative flex-grow sm:flex-grow-0">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="بحث شامل..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-9 w-full sm:w-[250px]"
-                            />
-                        </div>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline"><Filter className="ml-2 h-4 w-4" />المستوى الدراسي {levelFilter.length > 0 && `(${levelFilter.length})`}</Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-56">
-                                <DropdownMenuLabel>اختر المستويات</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                {educationalLevels.map(level => (
-                                    <DropdownMenuCheckboxItem
-                                        key={level}
-                                        checked={levelFilter.includes(level)}
-                                        onCheckedChange={(checked) => {
-                                            if (checked) {
-                                                setLevelFilter(prev => [...prev, level]);
-                                            } else {
-                                                setLevelFilter(prev => prev.filter(l => l !== level));
-                                            }
-                                        }}
-                                    >
-                                        {level}
-                                    </DropdownMenuCheckboxItem>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-
-                         <Select dir="rtl" value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-full flex-grow sm:w-[180px]">
-                                <SelectValue placeholder="الحالة" />
-                            </SelectTrigger>
-                            <SelectContent>
-                               <SelectItem value="all">كل الحالات</SelectItem>
-                               <SelectItem value="مرشح">مرشح</SelectItem>
-                               <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
-                               <SelectItem value="مرفوض">مرفوض</SelectItem>
-                               <SelectItem value="مؤجل">مؤجل</SelectItem>
-                               <SelectItem value="إنضم لمدرسة أخرى">إنضم لمدرسة أخرى</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        
-                        <Select dir="rtl" value={genderFilter} onValueChange={setGenderFilter}>
-                            <SelectTrigger className="w-full flex-grow sm:w-[150px]">
-                                <SelectValue placeholder="الجنس" />
-                            </SelectTrigger>
-                            <SelectContent>
-                               <SelectItem value="all">الكل</SelectItem>
-                               <SelectItem value="ذكر">ذكر</SelectItem>
-                               <SelectItem value="أنثى">أنثى</SelectItem>
-                            </SelectContent>
-                        </Select>
-                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline"><View className="ml-2 h-4 w-4"/> عرض الأعمدة</Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-56">
-                                <DropdownMenuLabel>اختر الأعمدة للعرض</DropdownMenuLabel>
-                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onSelect={setQuickView}>عرض سريع</DropdownMenuItem>
-                                <DropdownMenuItem onSelect={setAllView}>عرض الكل</DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                {Object.entries(columnVisibility).map(([key, value]) => (
-                                    <DropdownMenuCheckboxItem
-                                        key={key}
-                                        checked={value.visible}
-                                        onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
-                                    >
-                                        {value.label}
-                                    </DropdownMenuCheckboxItem>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                 </CardContent>
-            </Card>
-
             <Dialog open={isFormOpen} onOpenChange={(open) => {
                 setFormOpen(open);
                 if (!open) setEditingRegistration(null);
@@ -829,145 +738,238 @@ export default function PreRegistrationPage() {
             />
 
             {isDataVisible ? (
-                <Card className={cn('transition-all', !isLocked && 'border-green-500 ring-2 ring-green-500/20')}>
-                    <CardHeader>
-                        <CardTitle>قائمة طلبات التسجيل ({filteredRegistrations.length})</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="relative w-full overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[50px] px-2">
-                                            <Checkbox
-                                                checked={selectedRows.length > 0 && selectedRows.length === filteredRegistrations.length && filteredRegistrations.length > 0}
+                <>
+                    <Card>
+                        <CardContent className="p-4 space-y-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                                {Object.entries(statusBadgeColors).map(([status, className]) => (
+                                    <Badge key={status} className={cn("border cursor-pointer", className, statusFilter === status && "ring-2 ring-ring")} onClick={() => setStatusFilter(prev => prev === status ? 'all' : status as PreRegistrationStatus)}>{status}</Badge>
+                                ))}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="relative flex-grow sm:flex-grow-0">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="بحث شامل..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="pl-9 w-full sm:w-[250px]"
+                                    />
+                                </div>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline"><Filter className="ml-2 h-4 w-4" />المستوى الدراسي {levelFilter.length > 0 && `(${levelFilter.length})`}</Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-56">
+                                        <DropdownMenuLabel>اختر المستويات</DropdownMenuLabel>
+                                        <DropdownMenuSeparator />
+                                        {educationalLevels.map(level => (
+                                            <DropdownMenuCheckboxItem
+                                                key={level}
+                                                checked={levelFilter.includes(level)}
                                                 onCheckedChange={(checked) => {
                                                     if (checked) {
-                                                        setSelectedRows(filteredRegistrations.map(r => r.id));
+                                                        setLevelFilter(prev => [...prev, level]);
                                                     } else {
-                                                        setSelectedRows([]);
+                                                        setLevelFilter(prev => prev.filter(l => l !== level));
                                                     }
                                                 }}
-                                                aria-label="Select all"
-                                                disabled={isLocked}
-                                            />
-                                        </TableHead>
-                                        <TableHead className="w-[80px]">
-                                            <Button variant="ghost" onClick={() => requestSort('pageNumber')} className="px-2">
-                                                الهوية
-                                                <ArrowUpDown className="mr-2 h-4 w-4" />
-                                            </Button>
-                                        </TableHead>
-                                        {columnVisibility.fullName.visible && <TableHead className="flex-1 text-center">الإسم الكامل</TableHead>}
-                                        {columnVisibility.gender.visible && <TableHead className="text-center">الجنس</TableHead>}
-                                        {columnVisibility.birthDate.visible && <TableHead className="text-center">تاريخ الميلاد</TableHead>}
-                                        {columnVisibility.educationalLevel.visible && <TableHead className="text-center">المستوى الدراسي</TableHead>}
-                                        {columnVisibility.guardianName.visible && <TableHead className="text-center">إسم الولي</TableHead>}
-                                        {columnVisibility.phone1.visible && <TableHead className="text-center">رقم الهاتف 1</TableHead>}
-                                        {columnVisibility.phone2.visible && <TableHead className="text-center">رقم الهاتف 2</TableHead>}
-                                        {columnVisibility.address.visible && <TableHead className="text-center">مقر السكن</TableHead>}
-                                        {columnVisibility.status.visible && <TableHead className="text-center">الحالة</TableHead>}
-                                        {columnVisibility.notes.visible && <TableHead className="text-center">ملاحظات</TableHead>}
-                                        {columnVisibility.requestedAt.visible && <TableHead className="text-center">تاريخ التسجيل</TableHead>}
-                                        <TableHead className="text-center">إجراءات</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredRegistrations.length > 0 ? filteredRegistrations.map(reg => (
-                                        <TableRow 
-                                            key={reg.id} 
-                                            className={cn("cursor-pointer", statusColors[reg.status])} 
-                                            onClick={() => setSelectedStudent(reg)}
-                                            data-state={selectedRows.includes(reg.id) && "selected"}
-                                        >
-                                            <TableCell className="px-2" onClick={(e) => e.stopPropagation()}>
+                                            >
+                                                {level}
+                                            </DropdownMenuCheckboxItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
+                                <Select dir="rtl" value={statusFilter} onValueChange={setStatusFilter}>
+                                    <SelectTrigger className="w-full flex-grow sm:w-[180px]">
+                                        <SelectValue placeholder="الحالة" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                    <SelectItem value="all">كل الحالات</SelectItem>
+                                    <SelectItem value="مرشح">مرشح</SelectItem>
+                                    <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
+                                    <SelectItem value="مرفوض">مرفوض</SelectItem>
+                                    <SelectItem value="مؤجل">مؤجل</SelectItem>
+                                    <SelectItem value="إنضم لمدرسة أخرى">إنضم لمدرسة أخرى</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                
+                                <Select dir="rtl" value={genderFilter} onValueChange={setGenderFilter}>
+                                    <SelectTrigger className="w-full flex-grow sm:w-[150px]">
+                                        <SelectValue placeholder="الجنس" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                    <SelectItem value="all">الكل</SelectItem>
+                                    <SelectItem value="ذكر">ذكر</SelectItem>
+                                    <SelectItem value="أنثى">أنثى</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline"><View className="ml-2 h-4 w-4"/> عرض الأعمدة</Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-56">
+                                        <DropdownMenuLabel>اختر الأعمدة للعرض</DropdownMenuLabel>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onSelect={setQuickView}>عرض سريع</DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={setAllView}>عرض الكل</DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        {Object.entries(columnVisibility).map(([key, value]) => (
+                                            <DropdownMenuCheckboxItem
+                                                key={key}
+                                                checked={value.visible}
+                                                onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
+                                            >
+                                                {value.label}
+                                            </DropdownMenuCheckboxItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className={cn('transition-all', !isLocked && 'border-green-500 ring-2 ring-green-500/20')}>
+                        <CardHeader>
+                            <CardTitle>قائمة طلبات التسجيل ({filteredRegistrations.length})</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="relative w-full overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-[50px] px-2">
                                                 <Checkbox
-                                                    checked={selectedRows.includes(reg.id)}
+                                                    checked={selectedRows.length > 0 && selectedRows.length === filteredRegistrations.length && filteredRegistrations.length > 0}
                                                     onCheckedChange={(checked) => {
                                                         if (checked) {
-                                                            setSelectedRows(prev => [...prev, reg.id]);
+                                                            setSelectedRows(filteredRegistrations.map(r => r.id));
                                                         } else {
-                                                            setSelectedRows(prev => prev.filter(id => id !== reg.id));
+                                                            setSelectedRows([]);
                                                         }
                                                     }}
-                                                    aria-label="Select row"
+                                                    aria-label="Select all"
                                                     disabled={isLocked}
                                                 />
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col items-center gap-1">
-                                                    <Avatar className="w-10 h-10">
-                                                        <AvatarImage src={reg.photoURL} />
-                                                        <AvatarFallback className={cn(reg.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
-                                                            {reg.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <Badge variant="secondary" className="px-1.5 py-0.5 text-xs">{reg.pageNumber || 'N/A'}</Badge>
-                                                </div>
-                                            </TableCell>
-                                            {columnVisibility.fullName.visible && <TableCell className="font-medium text-center">{reg.fullName}</TableCell>}
-                                            {columnVisibility.gender.visible && <TableCell className="text-center">{reg.gender}</TableCell>}
-                                            {columnVisibility.birthDate.visible && <TableCell className="text-center">{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : (reg.birthDate ? reg.birthDate.toString() : 'غير محدد')}</TableCell>}
-                                            {columnVisibility.educationalLevel.visible && <TableCell className="text-center">{reg.educationalLevel}</TableCell>}
-                                            {columnVisibility.guardianName.visible && <TableCell className="text-center">{reg.guardianName}</TableCell>}
-                                            {columnVisibility.phone1.visible && <TableCell className="text-center">{reg.phone1}</TableCell>}
-                                            {columnVisibility.phone2.visible && <TableCell className="text-center">{reg.phone2}</TableCell>}
-                                            {columnVisibility.address.visible && <TableCell className="text-center">{reg.address}</TableCell>}
-                                            {columnVisibility.status.visible && <TableCell className="text-center">
-                                                <Badge variant="outline" className={cn("border", statusBadgeColors[reg.status])}>
-                                                    {reg.status}
-                                                </Badge>
-                                            </TableCell>}
-                                            {columnVisibility.notes.visible && <TableCell className="max-w-[200px] truncate text-center">{reg.notes}</TableCell>}
-                                            {columnVisibility.requestedAt.visible && <TableCell className="text-center">{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt ? reg.requestedAt.toString() : '-')}</TableCell>}
-                                            <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" disabled={isLocked}><MoreHorizontal className="h-4 w-4" /></Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent>
-                                                        <AlertDialog>
-                                                            <AlertDialogTrigger asChild>
-                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={reg.status === 'تم الإنضمام'}>
-                                                                    <ArrowUpCircle className="ml-2 h-4 w-4" /> نقل إلى فوج
-                                                                </DropdownMenuItem>
-                                                            </AlertDialogTrigger>
-                                                            <AlertDialogContent>
-                                                                <AlertDialogHeader>
-                                                                    <AlertDialogTitle>تأكيد النقل</AlertDialogTitle>
-                                                                    <AlertDialogDescription>
-                                                                        هل أنت متأكد من نقل الطالب "{reg.fullName}" إلى فوجك الرسمي؟ سيتم إنشاء سجل طالب جديد له.
-                                                                    </AlertDialogDescription>
-                                                                </AlertDialogHeader>
-                                                                <AlertDialogFooter>
-                                                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                                                    <AlertDialogAction onClick={() => handlePromoteStudent(reg)}>تأكيد النقل</AlertDialogAction>
-                                                                </AlertDialogFooter>
-                                                            </AlertDialogContent>
-                                                        </AlertDialog>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem onClick={() => handleEdit(reg)}>
-                                                            <Edit className="ml-2 h-4 w-4" /> تعديل
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </TableCell>
+                                            </TableHead>
+                                            <TableHead className="w-[80px]">
+                                                <Button variant="ghost" onClick={() => requestSort('pageNumber')} className="px-2">
+                                                    الهوية
+                                                    <ArrowUpDown className="mr-2 h-4 w-4" />
+                                                </Button>
+                                            </TableHead>
+                                            {columnVisibility.fullName.visible && <TableHead className="flex-1 text-center">الإسم الكامل</TableHead>}
+                                            {columnVisibility.gender.visible && <TableHead className="text-center">الجنس</TableHead>}
+                                            {columnVisibility.birthDate.visible && <TableHead className="text-center">تاريخ الميلاد</TableHead>}
+                                            {columnVisibility.educationalLevel.visible && <TableHead className="text-center">المستوى الدراسي</TableHead>}
+                                            {columnVisibility.guardianName.visible && <TableHead className="text-center">إسم الولي</TableHead>}
+                                            {columnVisibility.phone1.visible && <TableHead className="text-center">رقم الهاتف 1</TableHead>}
+                                            {columnVisibility.phone2.visible && <TableHead className="text-center">رقم الهاتف 2</TableHead>}
+                                            {columnVisibility.address.visible && <TableHead className="text-center">مقر السكن</TableHead>}
+                                            {columnVisibility.status.visible && <TableHead className="text-center">الحالة</TableHead>}
+                                            {columnVisibility.notes.visible && <TableHead className="text-center">ملاحظات</TableHead>}
+                                            {columnVisibility.requestedAt.visible && <TableHead className="text-center">تاريخ التسجيل</TableHead>}
+                                            <TableHead className="text-center">إجراءات</TableHead>
                                         </TableRow>
-                                    )) : (
-                                        <TableRow>
-                                            <TableCell colSpan={Object.values(columnVisibility).filter(c => c.visible).length + 3} className="text-center h-24">
-                                                {searchTerm || levelFilter.length > 0 || statusFilter !== 'all' || genderFilter !== 'all'
-                                                    ? 'لم يتم العثور على نتائج مطابقة للبحث.'
-                                                    : 'لا توجد طلبات تسجيل جديدة في الوقت الحالي.'
-                                                }
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredRegistrations.length > 0 ? filteredRegistrations.map(reg => (
+                                            <TableRow 
+                                                key={reg.id} 
+                                                className={cn("cursor-pointer", statusColors[reg.status])} 
+                                                onClick={() => setSelectedStudent(reg)}
+                                                data-state={selectedRows.includes(reg.id) && "selected"}
+                                            >
+                                                <TableCell className="px-2" onClick={(e) => e.stopPropagation()}>
+                                                    <Checkbox
+                                                        checked={selectedRows.includes(reg.id)}
+                                                        onCheckedChange={(checked) => {
+                                                            if (checked) {
+                                                                setSelectedRows(prev => [...prev, reg.id]);
+                                                            } else {
+                                                                setSelectedRows(prev => prev.filter(id => id !== reg.id));
+                                                            }
+                                                        }}
+                                                        aria-label="Select row"
+                                                        disabled={isLocked}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <Avatar className="w-10 h-10">
+                                                            <AvatarImage src={reg.photoURL} />
+                                                            <AvatarFallback className={cn(reg.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
+                                                                {reg.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                        <Badge variant="secondary" className="px-1.5 py-0.5 text-xs">{reg.pageNumber || 'N/A'}</Badge>
+                                                    </div>
+                                                </TableCell>
+                                                {columnVisibility.fullName.visible && <TableCell className="font-medium text-center">{reg.fullName}</TableCell>}
+                                                {columnVisibility.gender.visible && <TableCell className="text-center">{reg.gender}</TableCell>}
+                                                {columnVisibility.birthDate.visible && <TableCell className="text-center">{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : (reg.birthDate ? reg.birthDate.toString() : 'غير محدد')}</TableCell>}
+                                                {columnVisibility.educationalLevel.visible && <TableCell className="text-center">{reg.educationalLevel}</TableCell>}
+                                                {columnVisibility.guardianName.visible && <TableCell className="text-center">{reg.guardianName}</TableCell>}
+                                                {columnVisibility.phone1.visible && <TableCell className="text-center">{reg.phone1}</TableCell>}
+                                                {columnVisibility.phone2.visible && <TableCell className="text-center">{reg.phone2}</TableCell>}
+                                                {columnVisibility.address.visible && <TableCell className="text-center">{reg.address}</TableCell>}
+                                                {columnVisibility.status.visible && <TableCell className="text-center">
+                                                    <Badge variant="outline" className={cn("border", statusBadgeColors[reg.status])}>
+                                                        {reg.status}
+                                                    </Badge>
+                                                </TableCell>}
+                                                {columnVisibility.notes.visible && <TableCell className="max-w-[200px] truncate text-center">{reg.notes}</TableCell>}
+                                                {columnVisibility.requestedAt.visible && <TableCell className="text-center">{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt ? reg.requestedAt.toString() : '-')}</TableCell>}
+                                                <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" disabled={isLocked}><MoreHorizontal className="h-4 w-4" /></Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent>
+                                                            <AlertDialog>
+                                                                <AlertDialogTrigger asChild>
+                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={reg.status === 'تم الإنضمام'}>
+                                                                        <ArrowUpCircle className="ml-2 h-4 w-4" /> نقل إلى فوج
+                                                                    </DropdownMenuItem>
+                                                                </AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader>
+                                                                        <AlertDialogTitle>تأكيد النقل</AlertDialogTitle>
+                                                                        <AlertDialogDescription>
+                                                                            هل أنت متأكد من نقل الطالب "{reg.fullName}" إلى فوجك الرسمي؟ سيتم إنشاء سجل طالب جديد له.
+                                                                        </AlertDialogDescription>
+                                                                    </AlertDialogHeader>
+                                                                    <AlertDialogFooter>
+                                                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                                                        <AlertDialogAction onClick={() => handlePromoteStudent(reg)}>تأكيد النقل</AlertDialogAction>
+                                                                    </AlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem onClick={() => handleEdit(reg)}>
+                                                                <Edit className="ml-2 h-4 w-4" /> تعديل
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        )) : (
+                                            <TableRow>
+                                                <TableCell colSpan={Object.values(columnVisibility).filter(c => c.visible).length + 3} className="text-center h-24">
+                                                    {searchTerm || levelFilter.length > 0 || statusFilter !== 'all' || genderFilter !== 'all'
+                                                        ? 'لم يتم العثور على نتائج مطابقة للبحث.'
+                                                        : 'لا توجد طلبات تسجيل جديدة في الوقت الحالي.'
+                                                    }
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </>
             ) : (
                 <Card className="flex flex-col items-center justify-center min-h-[300px] border-dashed">
                     <CardHeader className="text-center">
