@@ -28,6 +28,7 @@ const sheikhInitialData: { [email: string]: { name: string; group: string; role:
   "admin10@gmail.com": { name: "الشيخ محمد منصور", group: "فوج 10", role: "sheikh" },
 };
 
+
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
