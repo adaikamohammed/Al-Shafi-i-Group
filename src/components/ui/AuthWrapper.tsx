@@ -115,7 +115,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
                 </Avatar>
                  <div>
                     <h1 className="font-headline text-lg font-bold text-sidebar-primary-foreground">
-                        {user?.group || 'مدرسة الشافعي'}
+                        {isSuperAdmin ? 'الإدارة العامة' : (user?.group || 'مجموعة غير محددة')}
                     </h1>
                     <p className="text-xs text-muted-foreground">{user?.displayName}</p>
                  </div>
@@ -167,7 +167,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
                           </Button>
                         </SheetTrigger>
                         <h1 className="font-headline text-lg font-semibold text-primary">
-                          {user?.group || 'مدرسة الشافعي'}
+                          {isSuperAdmin ? 'الإدارة العامة' : (user?.group || 'مجموعة غير محددة')}
                         </h1>
                     </div>
                     <Button
