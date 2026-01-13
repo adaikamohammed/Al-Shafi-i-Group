@@ -58,7 +58,6 @@ const statusBadgeColors: Record<PreRegistrationStatus, string> = {
 const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
 
 const ALL_COLUMNS = {
-    requestedAt: { label: "تاريخ التسجيل", visible: true },
     fullName: { label: "الإسم الكامل", visible: true },
     gender: { label: "الجنس", visible: false },
     birthDate: { label: "تاريخ الميلاد", visible: true },
@@ -69,6 +68,7 @@ const ALL_COLUMNS = {
     address: { label: "مقر السكن", visible: false },
     status: { label: "الحالة", visible: true },
     notes: { label: "ملاحظات", visible: true },
+    requestedAt: { label: "تاريخ التسجيل", visible: false },
 };
 
 const calculateAge = (birthDate?: Date | string) => {
@@ -665,14 +665,14 @@ export default function PreRegistrationPage() {
                             <Badge key={status} className={cn("border cursor-pointer", className, statusFilter === status && "ring-2 ring-ring")} onClick={() => setStatusFilter(prev => prev === status ? 'all' : status as PreRegistrationStatus)}>{status}</Badge>
                         ))}
                     </div>
-                    <div className="flex flex-col md:flex-row items-center gap-2">
-                        <div className="relative w-full sm:max-w-xs">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative flex-grow sm:flex-grow-0">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="بحث شامل..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-9"
+                                className="pl-9 w-full sm:w-[250px]"
                             />
                         </div>
                         <DropdownMenu>
@@ -701,7 +701,7 @@ export default function PreRegistrationPage() {
                         </DropdownMenu>
 
                          <Select dir="rtl" value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-full md:w-[180px]">
+                            <SelectTrigger className="w-full flex-grow sm:w-[180px]">
                                 <SelectValue placeholder="الحالة" />
                             </SelectTrigger>
                             <SelectContent>
@@ -715,7 +715,7 @@ export default function PreRegistrationPage() {
                         </Select>
                         
                         <Select dir="rtl" value={genderFilter} onValueChange={setGenderFilter}>
-                            <SelectTrigger className="w-full md:w-[150px]">
+                            <SelectTrigger className="w-full flex-grow sm:w-[150px]">
                                 <SelectValue placeholder="الجنس" />
                             </SelectTrigger>
                             <SelectContent>
@@ -776,7 +776,7 @@ export default function PreRegistrationPage() {
                 onSave={handleBulkEditSave}
             />
 
-            <Card>
+            <Card className={cn('transition-all', !isLocked && 'border-green-500 ring-2 ring-green-500/20')}>
                 <CardHeader>
                     <CardTitle>قائمة طلبات التسجيل ({filteredRegistrations.length})</CardTitle>
                 </CardHeader>
@@ -805,7 +805,6 @@ export default function PreRegistrationPage() {
                                             <ArrowUpDown className="mr-2 h-4 w-4" />
                                         </Button>
                                     </TableHead>
-                                    {columnVisibility.requestedAt.visible && <TableHead className="text-center">تاريخ التسجيل</TableHead>}
                                     {columnVisibility.fullName.visible && <TableHead className="flex-1 text-center">الإسم الكامل</TableHead>}
                                     {columnVisibility.gender.visible && <TableHead className="text-center">الجنس</TableHead>}
                                     {columnVisibility.birthDate.visible && <TableHead className="text-center">تاريخ الميلاد</TableHead>}
@@ -816,6 +815,7 @@ export default function PreRegistrationPage() {
                                     {columnVisibility.address.visible && <TableHead className="text-center">مقر السكن</TableHead>}
                                     {columnVisibility.status.visible && <TableHead className="text-center">الحالة</TableHead>}
                                     {columnVisibility.notes.visible && <TableHead className="text-center">ملاحظات</TableHead>}
+                                    {columnVisibility.requestedAt.visible && <TableHead className="text-center">تاريخ التسجيل</TableHead>}
                                     <TableHead className="text-center">إجراءات</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -852,7 +852,6 @@ export default function PreRegistrationPage() {
                                                 <Badge variant="secondary" className="px-1.5 py-0.5 text-xs">{reg.pageNumber || 'N/A'}</Badge>
                                             </div>
                                         </TableCell>
-                                        {columnVisibility.requestedAt.visible && <TableCell className="text-center">{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt ? reg.requestedAt.toString() : '-')}</TableCell>}
                                         {columnVisibility.fullName.visible && <TableCell className="font-medium text-center">{reg.fullName}</TableCell>}
                                         {columnVisibility.gender.visible && <TableCell className="text-center">{reg.gender}</TableCell>}
                                         {columnVisibility.birthDate.visible && <TableCell className="text-center">{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : (reg.birthDate ? reg.birthDate.toString() : 'غير محدد')}</TableCell>}
@@ -867,6 +866,7 @@ export default function PreRegistrationPage() {
                                             </Badge>
                                         </TableCell>}
                                         {columnVisibility.notes.visible && <TableCell className="max-w-[200px] truncate text-center">{reg.notes}</TableCell>}
+                                        {columnVisibility.requestedAt.visible && <TableCell className="text-center">{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt ? reg.requestedAt.toString() : '-')}</TableCell>}
                                         <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
@@ -947,15 +947,3 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
-
-    
-
-
-
-
-
-
-
-
-
-
