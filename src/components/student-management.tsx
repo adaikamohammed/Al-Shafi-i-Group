@@ -533,7 +533,7 @@ export default function StudentManagementPage() {
               <TableRow>
                 <TableHead className="w-[50px] px-2">
                     <Checkbox
-                        checked={selectedRows.length > 0 && selectedRows.length === filteredStudents.length}
+                        checked={selectedRows.length > 0 && selectedRows.length === filteredStudents.length && filteredStudents.length > 0}
                         onCheckedChange={(checked) => {
                             if (checked) {
                                 setSelectedRows(filteredStudents.map(s => s.id));
@@ -676,13 +676,12 @@ export default function StudentManagementPage() {
               </DialogContent>
           </Dialog>
       )}
-       {selectedRows.length > 0 && (
+       {selectedRows.length > 0 && !isSuperAdmin && (
             <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-auto p-2 bg-background/95 border-t shadow-lg z-50 rounded-t-lg">
                 <div className="container mx-auto flex justify-between items-center gap-4">
                     <p className="font-semibold text-sm">{selectedRows.length} طلاب محددون</p>
                     <div className="flex gap-2">
                             <Button variant="outline" size="sm" onClick={() => setSelectedRows([])}>إلغاء التحديد</Button>
-                            <Button size="sm">تعديل جماعي</Button>
                              <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                     <Button variant="destructive" size="sm">حذف المحدد</Button>
@@ -1120,3 +1119,6 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 
 
 
+
+
+    
