@@ -4,7 +4,7 @@
 import '../../app/globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
-import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield, UserPlus } from 'lucide-react';
+import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield, UserPlus, UserCog } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -104,15 +104,17 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
     const sidebarContent = (
     <>
-      <SidebarHeader className="p-4">
-         <div className="flex items-center gap-3">
-             <div>
-                <h1 className="font-headline text-lg font-bold text-primary">
-                    {user?.group ? `إدارة ${user.group}` : 'إدارة فوج - الإمام الشافعي'}
-                </h1>
-                <p className="text-xs text-muted-foreground">{user?.email}</p>
+      <SidebarHeader className="p-0">
+         <Link href="/profile" className="block p-4 hover:bg-sidebar-accent transition-colors">
+             <div className="flex items-center gap-3">
+                 <div>
+                    <h1 className="font-headline text-lg font-bold text-primary">
+                        {user?.group ? `إدارة ${user.group}` : 'إدارة فوج - الإمام الشافعي'}
+                    </h1>
+                    <p className="text-xs text-muted-foreground">{user?.email}</p>
+                 </div>
              </div>
-         </div>
+         </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
