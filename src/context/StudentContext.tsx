@@ -321,10 +321,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration>) => {
     const updates: { [key: string]: any } = {};
     ids.forEach(id => {
-      updates[`/pre_registrations/${id}`] = {
-        ...preRegistrations.find(p => p.id === id),
-        ...data,
+      const existingData = preRegistrations.find(p => p.id === id);
+      if (!existingData) return;
+
+      const updatedReg = { ...existingData, ...data };
+      const regToSave = {
+          ...updatedReg,
+          birthDate: updatedReg.birthDate instanceof Date ? updatedReg.birthDate.toISOString() : updatedReg.birthDate,
+          requestedAt: updatedReg.requestedAt instanceof Date ? updatedReg.requestedAt.toISOString() : updatedReg.requestedAt,
       };
+      
+      updates[`/pre_registrations/${id}`] = regToSave;
     });
     const dbRef = ref(db);
     update(dbRef, updates);
@@ -594,3 +601,6 @@ export const useStudentContext = () => {
 
 
 
+
+
+    

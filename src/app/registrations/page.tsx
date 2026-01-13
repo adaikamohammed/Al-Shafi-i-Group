@@ -341,7 +341,7 @@ const BulkEditModal = ({ open, onOpenChange, selectedCount, onSave }: { open: bo
     const handleSave = () => {
         const finalUpdateData: Partial<PreRegistration> = {};
         for (const field in fieldsToUpdate) {
-            if (fieldsToUpdate[field] && updateData[field as keyof PreRegistration] !== undefined) {
+            if (fieldsToUpdate[field as keyof typeof fieldsToUpdate] && updateData[field as keyof PreRegistration] !== undefined) {
                 finalUpdateData[field as keyof PreRegistration] = updateData[field as keyof PreRegistration];
             }
         }
@@ -1017,5 +1017,7 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
+    
 
     
