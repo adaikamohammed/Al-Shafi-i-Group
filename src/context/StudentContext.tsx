@@ -93,6 +93,58 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
+
+   useEffect(() => {
+    if (authContextUser && students.length > 0 && !loading) {
+      const migrationKey = 'groupNameMigration_v1';
+      const hasMigrated = localStorage.getItem(migrationKey);
+
+      if (!hasMigrated) {
+        console.log("Running one-time data migration for group names...");
+        
+        const groupMapping: { [key: string]: string } = {
+          'فوج 1': 'فوج الشيخ زياد درويش',
+          'فوج 2': 'فوج الشيخ عبد الحميد',
+          'فوج 3': 'فوج الشيخ فؤاد بن عمر',
+          'فوج 4': 'فوج الشيخ أحمد بن عمر',
+          'فوج 5': 'فوج الشيخ إبراهيم مراد',
+          'فوج 6': 'فوج الشيخ سفيان نصيرة',
+          'فوج 7': 'فوج الشيخ محمد منصور',
+          'فوج 8': 'فوج الشيخ عبد الحق نصيرة',
+          'فوج 9': 'فوج الشيخ صهيب نصيب',
+        };
+
+        const updates: { [key: string]: any } = {};
+        let studentsToUpdate = 0;
+
+        students.forEach(student => {
+          if (student.groupName && groupMapping[student.groupName]) {
+            const newGroupName = groupMapping[student.groupName];
+            const studentRefPath = `users/${student.ownerId}/students/${student.id}/groupName`;
+            updates[studentRefPath] = newGroupName;
+            studentsToUpdate++;
+          }
+        });
+
+        if (studentsToUpdate > 0) {
+          const dbRef = ref(db);
+          update(dbRef, updates)
+            .then(() => {
+              console.log(`${studentsToUpdate} student records updated successfully.`);
+              localStorage.setItem(migrationKey, 'true');
+              toast({ title: "✅ تم تحديث النظام", description: `تم تحديث أسماء أفواج ${studentsToUpdate} طالبًا بنجاح.` });
+            })
+            .catch(error => {
+              console.error("Data migration failed:", error);
+              toast({ title: "❌ فشلت هجرة البيانات", description: "لم نتمكن من تحديث سجلات الطلاب القديمة.", variant: 'destructive'});
+            });
+        } else {
+            // No students to update, still mark as migrated to not run again
+            localStorage.setItem(migrationKey, 'true');
+        }
+      }
+    }
+  }, [students, authContextUser, loading, toast]);
   
  useEffect(() => {
     if (authLoading) {
@@ -215,7 +267,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         let userStudents: Student[] = [];
         if (data.students) {
           userStudents = Object.entries(data.students).map(([id, s]: [string, any]) => 
-              processStudentData({ ...s, id }, authContextUser.uid)
+              processStudentData({ ...s, id }, authContextUser.uid, data.profile?.group)
           );
         }
         const paymentsArray = data.payments ? Object.entries(data.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : [];
@@ -602,5 +654,7 @@ export const useStudentContext = () => {
 
 
 
+
+    
 
     
