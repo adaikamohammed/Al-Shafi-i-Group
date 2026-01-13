@@ -13,7 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, GraduationCap, GripVertical, Settings2 } from 'lucide-react';
+import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, GraduationCap, GripVertical, Settings2, Lock, Unlock } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -82,7 +82,7 @@ const calculateAge = (birthDate?: Date | string) => {
     }
 };
 
-const StudentProfileCard = ({ student, onPromote, onEdit }: { student: PreRegistration, onPromote: () => void, onEdit: () => void }) => {
+const StudentProfileCard = ({ student, onPromote, onEdit, isLocked }: { student: PreRegistration, onPromote: () => void, onEdit: () => void, isLocked: boolean }) => {
     const headerColor = statusHeaderColors[student.status] || 'bg-gray-500';
 
     return (
@@ -136,8 +136,8 @@ const StudentProfileCard = ({ student, onPromote, onEdit }: { student: PreRegist
                 )}
             </div>
              <DialogFooter>
-                <Button variant="secondary" onClick={onEdit}>تعديل</Button>
-                <Button onClick={onPromote} disabled={student.status === 'تم الإنضمام'}>نقل إلى فوج</Button>
+                <Button variant="secondary" onClick={onEdit} disabled={isLocked}>تعديل</Button>
+                <Button onClick={onPromote} disabled={student.status === 'تم الإنضمام' || isLocked}>نقل إلى فوج</Button>
             </DialogFooter>
         </DialogContent>
     );
@@ -419,6 +419,10 @@ export default function PreRegistrationPage() {
     const [selectedRows, setSelectedRows] = useState<string[]>([]);
     const [isBulkEditOpen, setBulkEditOpen] = useState(false);
     const router = useRouter();
+
+    const [isLocked, setIsLocked] = useState(true);
+    const [isUnlockModalOpen, setUnlockModalOpen] = useState(false);
+    const [adminCode, setAdminCode] = useState('');
     
     const [sortConfig, setSortConfig] = useState<{ key: keyof PreRegistration; direction: 'ascending' | 'descending' }>({ key: 'pageNumber', direction: 'ascending' });
 
@@ -435,6 +439,17 @@ export default function PreRegistrationPage() {
             localStorage.setItem('preRegColumnVisibility', JSON.stringify(columnVisibility));
         }
     }, [columnVisibility]);
+
+    const handleUnlock = () => {
+        if (adminCode === 'admin8888') {
+            setIsLocked(false);
+            setUnlockModalOpen(false);
+            setAdminCode('');
+            toast({ title: '✅ تم فتح وضع التعديل', description: 'يمكنك الآن إجراء التعديلات.' });
+        } else {
+            toast({ title: '❌ خطأ', description: 'كود الإدارة غير صحيح.', variant: 'destructive' });
+        }
+    };
 
     const toggleColumn = (key: keyof typeof ALL_COLUMNS) => {
         setColumnVisibility((prev: any) => ({
@@ -581,6 +596,54 @@ export default function PreRegistrationPage() {
 
     return (
         <div className="space-y-6">
+             <Card className={cn("sticky top-0 z-40 transition-colors", isLocked ? "bg-yellow-100 border-yellow-300" : "bg-green-100 border-green-300")}>
+                <CardContent className="p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-semibold">
+                        {isLocked ? (
+                            <>
+                                <Lock className="h-5 w-5 text-yellow-700"/>
+                                <span className="text-yellow-800">⚠️ الصفحة مقفلة - لا يمكن التعديل.</span>
+                            </>
+                        ) : (
+                             <>
+                                <Unlock className="h-5 w-5 text-green-700"/>
+                                <span className="text-green-800">تم فتح وضع التعديل.</span>
+                            </>
+                        )}
+                    </div>
+                    {isLocked ? (
+                        <Button onClick={() => setUnlockModalOpen(true)}>فتح التعديل</Button>
+                    ) : (
+                        <Button variant="secondary" onClick={() => setIsLocked(true)}>إعادة قفل الصفحة</Button>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Dialog open={isUnlockModalOpen} onOpenChange={setUnlockModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>فتح وضع التعديل</DialogTitle>
+                        <DialogDescription>
+                            لإجراء أي تعديلات على هذه الصفحة، يرجى إدخال كود الإدارة.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 py-4">
+                        <Label htmlFor="admin-code">كود الإدارة</Label>
+                        <Input 
+                            id="admin-code" 
+                            type="password"
+                            value={adminCode}
+                            onChange={(e) => setAdminCode(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setUnlockModalOpen(false)}>إلغاء</Button>
+                        <Button onClick={handleUnlock}>تأكيد</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <Card>
                 <CardHeader>
                     <CardTitle className="text-3xl font-headline font-bold">إدارة التسجيلات الجديدة</CardTitle>
@@ -589,7 +652,7 @@ export default function PreRegistrationPage() {
                     </CardDescription>
                 </CardHeader>
                  <CardContent>
-                     <Button onClick={() => { setEditingRegistration(null); setFormOpen(true); }}>
+                     <Button onClick={() => { setEditingRegistration(null); setFormOpen(true); }} disabled={isLocked}>
                         <PlusCircle className="ml-2 h-4 w-4" /> إضافة طلب تسجيل يدوي
                      </Button>
                 </CardContent>
@@ -701,6 +764,7 @@ export default function PreRegistrationPage() {
                         student={selectedStudent} 
                         onPromote={() => handlePromoteStudent(selectedStudent)}
                         onEdit={() => handleEdit(selectedStudent)}
+                        isLocked={isLocked}
                     />
                 </Dialog>
             )}
@@ -732,6 +796,7 @@ export default function PreRegistrationPage() {
                                                 }
                                             }}
                                             aria-label="Select all"
+                                            disabled={isLocked}
                                         />
                                     </TableHead>
                                     <TableHead className="w-[80px]">
@@ -773,6 +838,7 @@ export default function PreRegistrationPage() {
                                                     }
                                                 }}
                                                 aria-label="Select row"
+                                                disabled={isLocked}
                                             />
                                         </TableCell>
                                         <TableCell>
@@ -804,7 +870,7 @@ export default function PreRegistrationPage() {
                                         <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                    <Button variant="ghost" size="icon" disabled={isLocked}><MoreHorizontal className="h-4 w-4" /></Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent>
                                                     <AlertDialog>
@@ -855,11 +921,11 @@ export default function PreRegistrationPage() {
                     <div className="container mx-auto flex justify-between items-center">
                         <p className="font-semibold">{selectedRows.length} طلاب محددون</p>
                         <div className="flex gap-2">
-                             <Button variant="outline" onClick={() => setSelectedRows([])}>إلغاء التحديد</Button>
-                             <Button onClick={() => setBulkEditOpen(true)}><Settings2 className="ml-2 h-4 w-4" /> تعديل جماعي</Button>
+                             <Button variant="outline" onClick={() => setSelectedRows([])} disabled={isLocked}>إلغاء التحديد</Button>
+                             <Button onClick={() => setBulkEditOpen(true)} disabled={isLocked}><Settings2 className="ml-2 h-4 w-4" /> تعديل جماعي</Button>
                              <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <Button variant="destructive"><Trash2 className="ml-2 h-4 w-4" /> حذف المحدد</Button>
+                                    <Button variant="destructive" disabled={isLocked}><Trash2 className="ml-2 h-4 w-4" /> حذف المحدد</Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                     <AlertDialogHeader>
@@ -883,6 +949,7 @@ export default function PreRegistrationPage() {
 }
 
     
+
 
 
 
