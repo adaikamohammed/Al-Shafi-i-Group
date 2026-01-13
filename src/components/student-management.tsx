@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -834,7 +834,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         <div className="flex flex-col items-center gap-4">
              <Avatar className="w-24 h-24 mb-2 border-4 border-muted">
                 <AvatarImage src={photoPreview || `https://api.dicebear.com/7.x/initials/svg?seed=${student?.fullName || ''}`} alt={student?.fullName} />
-                <AvatarFallback>{student?.fullName.charAt(0)}</AvatarFallback>
+                <AvatarFallback>{student?.fullName?.charAt(0) || '?'}</AvatarFallback>
             </Avatar>
             <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>تغيير الصورة</Button>
         </div>
