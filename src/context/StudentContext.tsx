@@ -1,8 +1,9 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration } from '@/lib/types';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -46,6 +47,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 interface StudentContextType {
   students: Student[];
+  preRegistrations: PreRegistration[];
   dailySessions: Record<string, Record<string, DailySession>>;
   dailyReports: { [date: string]: { [reportId: string]: DailyReport } };
   surahProgress: Record<string, SurahMastery>;
@@ -62,6 +64,7 @@ interface StudentContextType {
   getSessionById: (sessionId: string) => DailySession | undefined;
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession[]>;
   importStudents: (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => void;
+  importPreRegistrations: (newPreRegs: Omit<PreRegistration, 'id'>[]) => void;
   saveDailyReport: (report: Omit<DailyReport, 'id'>, reportIdToUpdate?: string) => Promise<void>;
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
@@ -77,6 +80,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   
   const [students, setStudents] = useState<Student[]>([]);
+  const [preRegistrations, setPreRegistrations] = useState<PreRegistration[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, Record<string, DailySession>>>({});
   const [dailyReports, setDailyReports] = useState<{ [date: string]: { [reportId: string]: DailyReport } }>({});
   const [surahProgress, setSurahProgress] = useState<Record<string, SurahMastery>>({});
@@ -98,13 +102,16 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setSurahProgress({});
       setPayments([]);
       setSettingsState(DEFAULT_SETTINGS);
+      setPreRegistrations([]);
       return;
     }
 
     setLoading(true);
 
-    let dataRef: DatabaseReference;
-    let listener: () => void;
+    let usersRef: DatabaseReference;
+    let preRegsRef: DatabaseReference;
+    let usersListener: () => void;
+    let preRegsListener: () => void;
 
     const processStudentData = (studentData: any, uid: string, groupName?: string): Student => ({
         ...studentData,
@@ -117,10 +124,20 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         covenants: studentData.covenants ? Object.values(studentData.covenants) : [],
     });
 
+    // Listener for pre_registrations
+    preRegsRef = ref(db, 'pre_registrations');
+    preRegsListener = onValue(preRegsRef, (snapshot) => {
+        const data = snapshot.val();
+        const preRegsArray = data ? Object.entries(data).map(([id, r]) => ({ id, ...(r as any) })) : [];
+        setPreRegistrations(preRegsArray);
+    }, (error) => {
+        console.error(`Firebase read failed for pre_registrations: ${error.message}`);
+    });
+
 
     if (isSuperAdmin) {
-      dataRef = ref(db, 'users');
-      listener = onValue(dataRef, (snapshot) => {
+      usersRef = ref(db, 'users');
+      usersListener = onValue(usersRef, (snapshot) => {
         if (!snapshot.exists()) {
           setLoading(false);
           return;
@@ -133,7 +150,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         let allPayments: Payment[] = [];
         let finalSettings: AppSettings = DEFAULT_SETTINGS;
 
-        // Super admin sees their own settings if they exist, otherwise default.
         if (allUsersData[authContextUser.uid]?.settings) {
             finalSettings = {
                 ...DEFAULT_SETTINGS,
@@ -175,8 +191,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       });
 
     } else {
-      dataRef = ref(db, `users/${authContextUser.uid}`);
-      listener = onValue(dataRef, (snapshot) => {
+      usersRef = ref(db, `users/${authContextUser.uid}`);
+      usersListener = onValue(usersRef, (snapshot) => {
         if (!snapshot.exists()) {
           setLoading(false);
           setStudents([]); setDailySessions({}); setDailyReports({});
@@ -207,7 +223,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
 
     return () => {
-      off(dataRef, 'value', listener);
+      off(usersRef, 'value', usersListener);
+      off(preRegsRef, 'value', preRegsListener);
     };
   }, [authContextUser, authLoading, isSuperAdmin]);
 
@@ -234,7 +251,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         covenants: newStudent.covenants || null // Use null for empty array
     });
     
-    // Initialize surah progress for the new student
     const surahProgressRef = ref(db, `users/${authContextUser.uid}/surahProgress/${studentId}`);
     set(surahProgressRef, {});
   };
@@ -243,11 +259,24 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
      if (!authContextUser) return;
      newStudents.forEach(s => addStudent(s));
   }
+  
+  const importPreRegistrations = (newPreRegs: Omit<PreRegistration, 'id'>[]) => {
+    if (!authContextUser) return;
+    const updates: { [key: string]: any } = {};
+    newPreRegs.forEach(reg => {
+      const regId = uuidv4();
+      updates[`/pre_registrations/${regId}`] = {
+        ...reg,
+        requestedAt: reg.requestedAt.toISOString(),
+        birthDate: reg.birthDate.toISOString(),
+      };
+    });
+    set(ref(db), { ...updates });
+  }
 
   const updateStudent = (studentId: string, updatedData: Partial<Student>, ownerId: string) => {
     if (!authContextUser) return;
     
-    // Super admin cannot edit student data directly.
     if (isSuperAdmin || authContextUser.uid !== ownerId) return;
 
     const originalStudent = (students ?? []).find(s => s.id === studentId);
@@ -291,7 +320,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   
   const deleteDailySession = (sessionId: string) => {
     if (!authContextUser || isSuperAdmin) return;
-    const date = sessionId.substring(0, 10); // Extract YYYY-MM-DD from session ID
+    const date = sessionId.substring(0, 10);
     const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${date}/${sessionId}`);
     remove(sessionRef);
   }
@@ -351,7 +380,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     if(authContextUser.uid !== studentOwnerId) return;
 
     const studentProgressMap = { ...(surahProgress[studentId] || {}) };
-    const currentStatus = studentProgressMap[surahId] || 0; // 0: not memorized, 1: memorized, 2: mastered
+    const currentStatus = studentProgressMap[surahId] || 0;
 
     const nextStatus = (currentStatus + 1) % 3;
     studentProgressMap[surahId] = nextStatus;
@@ -359,7 +388,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const pointsMemorized = settings.points.surah['memorized'];
     const pointsMastered = settings.points.surah['mastered'];
 
-    // Point logic
     if (currentStatus === 0 && nextStatus === 1) {
       toast({ title: `✅ +${pointsMemorized} نقطة`, description: 'تم إضافة نقاط للحفظ الجديد.' });
     } else if (currentStatus === 1 && nextStatus === 2) {
@@ -417,7 +445,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <StudentContext.Provider value={{ students, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
+    <StudentContext.Provider value={{ students, preRegistrations, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
       {children}
     </StudentContext.Provider>
   );

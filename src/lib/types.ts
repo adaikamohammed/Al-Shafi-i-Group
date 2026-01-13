@@ -1,4 +1,5 @@
 
+
 export type StudentStatus = "نشط" | "مطرود" | "غائب طويل" | "محذوف";
 export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "أكثر";
 export type SubscriptionTier = "فئة الأكابر" | "فئة الأصاغر";
@@ -167,4 +168,22 @@ export interface AppSettings {
     points: PointsConfig;
     rewards: Reward[];
     badges: BadgeConfig[];
+}
+
+export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "قيد الانتظار";
+
+export interface PreRegistration {
+    id: string;
+    requestedAt: Date;
+    fullName: string;
+    gender?: "ذكر" | "أنثى";
+    birthDate: Date;
+    educationalLevel?: string;
+    guardianName?: string;
+    phone1: string;
+    phone2?: string;
+    address?: string;
+    status: PreRegistrationStatus;
+    pageNumber?: string;
+    notes?: string;
 }

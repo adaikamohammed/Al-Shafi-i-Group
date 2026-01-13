@@ -6,21 +6,25 @@ import React, { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, History, Loader2, CalendarClock } from 'lucide-react';
+import { Upload, Download, History, Loader2, CalendarClock, UserPlus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { Student, DailyRecord, SessionType, DailySession } from '@/lib/types';
+import type { Student, DailyRecord, SessionType, DailySession, PreRegistration } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
 import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { v4 as uuidv4 } from 'uuid';
+
 
 export default function DataExchangePage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sessionFileInputRef = useRef<HTMLInputElement>(null);
   const monthlySessionFileInputRef = useRef<HTMLInputElement>(null);
+  const preRegFileInputRef = useRef<HTMLInputElement>(null);
 
-  const { students, addDailySession, getRecordsForDateRange, importStudents } = useStudentContext();
+
+  const { students, addDailySession, getRecordsForDateRange, importStudents, importPreRegistrations, preRegistrations } = useStudentContext();
   const activeStudents = (students ?? []).filter(s => s.status === 'نشط');
 
   // State for monthly export
@@ -35,6 +39,7 @@ export default function DataExchangePage() {
   const [isImportingStudents, setIsImportingStudents] = useState(false);
   const [isImportingSessions, setIsImportingSessions] = useState(false);
   const [isImportingMonthly, setIsImportingMonthly] = useState(false);
+  const [isImportingPreRegs, setIsImportingPreRegs] = useState(false);
 
 
  const parseDate = (dateInput: any): Date | null => {
@@ -164,6 +169,90 @@ export default function DataExchangePage() {
     };
     reader.readAsArrayBuffer(file);
   };
+
+  const handlePreRegFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setIsImportingPreRegs(true);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = new Uint8Array(e.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json<any>(worksheet, { raw: false });
+
+            const existingNames = new Set((preRegistrations ?? []).map(p => p.fullName.trim().toLowerCase()));
+            const newPreRegs: Omit<PreRegistration, 'id'>[] = [];
+            let skippedCount = 0;
+
+            json.forEach((row, index) => {
+                const fullName = (row['الإسم الكامل'] || '').trim();
+                if (!fullName) return;
+
+                if (existingNames.has(fullName.toLowerCase())) {
+                    skippedCount++;
+                    return;
+                }
+
+                const birthDate = parseDate(row['تاريخ الميلاد']);
+                if (!birthDate || isNaN(birthDate.getTime())) {
+                    throw new Error(`تاريخ الميلاد غير صالح في الصف رقم ${index + 2} للمسجل ${fullName}.`);
+                }
+                
+                const preRegData: Omit<PreRegistration, 'id'> = {
+                    requestedAt: new Date(),
+                    fullName: fullName,
+                    gender: row['الجنس'] || 'ذكر',
+                    birthDate: birthDate,
+                    educationalLevel: row['المستوى الدراسي'] || '',
+                    guardianName: row['إسم الولي'] || '',
+                    phone1: row['رقم الهاتف 1']?.toString() || 'N/A',
+                    phone2: row['رقم الهاتف 2']?.toString() || '',
+                    address: row['مقر السكن'] || '',
+                    status: row['الحالة'] || 'قيد الانتظار',
+                    pageNumber: row['رقم الصفحة']?.toString() || '',
+                    notes: row['ملاحظات'] || '',
+                };
+                newPreRegs.push(preRegData);
+                existingNames.add(fullName.toLowerCase());
+            });
+
+            if (newPreRegs.length > 0) {
+                importPreRegistrations(newPreRegs);
+                toast({
+                  title: "نجاح ✅",
+                  description: `تم استيراد ${newPreRegs.length} طلب تسجيل جديد. تم تخطي ${skippedCount} طلبًا لوجودهم مسبقًا.`,
+                });
+            } else if (skippedCount > 0) {
+                 toast({
+                  title: "لم تتم إضافة طلبات جديدة",
+                  description: `تم تخطي ${skippedCount} طلبًا لوجودهم مسبقًا في قائمة الانتظار.`,
+                });
+            } else {
+                 toast({
+                    title: "ملف فارغ",
+                    description: "لم يتم العثور على طلبات تسجيل جديدة في الملف.",
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+            console.error("Error parsing pre-registration file:", error);
+            const errorMessage = error instanceof Error ? error.message : "حدث خطأ أثناء قراءة الملف. يرجى التأكد من أن الملف بالصيغة الصحيحة.";
+            toast({
+                title: "خطأ في استيراد التسجيلات ❌",
+                description: errorMessage,
+                variant: 'destructive',
+            });
+        } finally {
+            setIsImportingPreRegs(false);
+            if (preRegFileInputRef.current) preRegFileInputRef.current.value = '';
+        }
+    };
+    reader.readAsArrayBuffer(file);
+};
   
    const handleSessionFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -386,6 +475,29 @@ export default function DataExchangePage() {
     XLSX.writeFile(wb, "نموذج_استيراد_الطلبة.xlsx");
   };
 
+  const handleDownloadPreRegTemplate = () => {
+    const headers = ["تاريخ التسجيل", "الإسم الكامل", "الجنس", "تاريخ الميلاد", "المستوى الدراسي", "إسم الولي", "رقم الهاتف 1", "رقم الهاتف 2", "مقر السكن", "الحالة", "رقم الصفحة", "ملاحظات"];
+    const exampleRow = {
+        "تاريخ التسجيل": format(new Date(), 'dd/MM/yyyy'),
+        "الإسم الكامل": "مثال ابن مثال",
+        "الجنس": "ذكر",
+        "تاريخ الميلاد": "01/01/2015",
+        "المستوى الدراسي": "3 ابتدائي",
+        "إسم الولي": "فلان الفلاني",
+        "رقم الهاتف 1": "0501234567",
+        "رقم الهاتف 2": "",
+        "مقر السكن": "حي النور",
+        "الحالة": "قيد الانتظار",
+        "رقم الصفحة": "",
+        "ملاحظات": "طالب جديد"
+    };
+    const ws = XLSX.utils.json_to_sheet([exampleRow], { header: headers });
+    ws['!cols'] = headers.map(h => ({ wch: 20 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "نموذج التسجيلات");
+    XLSX.writeFile(wb, "نموذج_التسجيلات_الأولية.xlsx");
+  }
+
   const handleDownloadSessionTemplate = () => {
     const today = new Date();
     const formattedDate = format(today, 'dd/MM/yyyy');
@@ -474,10 +586,12 @@ export default function DataExchangePage() {
       <input type="file" ref={fileInputRef} onChange={handleStudentFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingStudents}/>
       <input type="file" ref={sessionFileInputRef} onChange={handleSessionFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingSessions}/>
       <input type="file" ref={monthlySessionFileInputRef} onChange={handleMonthlySessionUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingMonthly}/>
+      <input type="file" ref={preRegFileInputRef} onChange={handlePreRegFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingPreRegs}/>
+
       
       <h1 className="text-3xl font-headline font-bold">استيراد وتصدير البيانات</h1>
       
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>📥 بيانات الطلبة</CardTitle>
@@ -524,9 +638,31 @@ export default function DataExchangePage() {
              {activeStudents.length === 0 && <p className="text-xs text-destructive text-center mt-2">يجب إضافة طلبة نشطين أولاً.</p>}
           </CardContent>
         </Card>
+         <Card>
+          <CardHeader>
+            <CardTitle>📥 بيانات التسجيلات الأولية</CardTitle>
+            <CardDescription>
+              رفع ملف Excel يحتوي على طلبات التسجيل الجديدة لتسجيلها في النظام بشكل دائم.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              لن يتم إضافة طلب تسجيل إذا كان الاسم موجودًا بالفعل. استخدم النموذج الرسمي.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button className="flex-grow" onClick={() => preRegFileInputRef.current?.click()} disabled={isImportingPreRegs}>
+                {isImportingPreRegs ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <UserPlus className="ml-2 h-4 w-4" />}
+                {isImportingPreRegs ? 'جاري الاستيراد...' : 'رفع ملف التسجيلات'}
+              </Button>
+               <Button variant="outline" onClick={handleDownloadPreRegTemplate}>
+                <Download className="ml-2 h-4 w-4" /> تحميل نموذج التسجيلات
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-       <Card className="col-span-1 md:col-span-2">
+       <Card className="col-span-1 md:col-span-2 lg:col-span-3">
           <CardHeader>
             <CardTitle>🗓️ بيانات شهر كامل</CardTitle>
             <CardDescription>
