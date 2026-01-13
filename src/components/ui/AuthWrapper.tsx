@@ -4,7 +4,7 @@
 import '../../app/globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
-import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield } from 'lucide-react';
+import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import { CommandBar } from '@/components/ui/CommandBar';
 const allNavItems = [
   { href: '/overview', label: 'نظرة عامة', icon: LayoutDashboard },
   { href: '/', label: 'إدارة الطلبة', icon: Users },
+  { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus },
   { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList },
   { href: '/stats', label: 'المتابعة الأسبوعية', icon: Calendar },
   { href: '/comparison', label: 'ساحة المقارنة', icon: Swords },
