@@ -12,7 +12,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle } from 'lucide-react';
+import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -22,26 +22,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useStudentContext } from '@/context/StudentContext';
-import type { Student, StudentStatus } from '@/lib/types';
+import type { Student, StudentStatus, PreRegistration } from '@/lib/types';
 
 
 type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "قيد الانتظار";
-
-interface PreRegistration {
-    id: string;
-    requestedAt: Date;
-    fullName: string;
-    gender?: "ذكر" | "أنثى";
-    birthDate: Date;
-    educationalLevel?: string;
-    guardianName?: string;
-    phone1: string;
-    phone2?: string;
-    address?: string;
-    status: PreRegistrationStatus;
-    pageNumber?: string;
-    notes?: string;
-}
 
 const statusColors: Record<PreRegistrationStatus, string> = {
     "تم الإنضمام": "bg-green-100 text-green-800 border-green-300",
@@ -53,8 +37,8 @@ const statusColors: Record<PreRegistrationStatus, string> = {
 
 
 const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: (data: Partial<PreRegistration>) => void, onCancel: () => void, existingRegistration?: PreRegistration | null }) => {
-    const [birthDate, setBirthDate] = useState<Date | undefined>(existingRegistration?.birthDate);
-    const [age, setAge] = useState<number | string>(existingRegistration ? differenceInYears(new Date(), existingRegistration.birthDate) : '');
+    const [birthDate, setBirthDate] = useState<Date | undefined>(existingRegistration?.birthDate ? new Date(existingRegistration.birthDate) : undefined);
+    const [age, setAge] = useState<number | string>(existingRegistration && existingRegistration.birthDate ? differenceInYears(new Date(), new Date(existingRegistration.birthDate)) : '');
 
     useEffect(() => {
         if (birthDate) {
@@ -183,10 +167,33 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
 
 export default function PreRegistrationPage() {
     const { toast } = useToast();
-    const { addStudent } = useStudentContext();
+    const { addStudent, preRegistrations, loading, importPreRegistrations } = useStudentContext();
     const [registrations, setRegistrations] = useState<PreRegistration[]>([]);
     const [isFormOpen, setFormOpen] = useState(false);
     const [editingRegistration, setEditingRegistration] = useState<PreRegistration | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    useEffect(() => {
+        if (preRegistrations) {
+            setRegistrations(preRegistrations);
+        }
+    }, [preRegistrations]);
+
+    const filteredRegistrations = useMemo(() => {
+        if (!searchTerm) return registrations;
+        
+        const lowercasedFilter = searchTerm.toLowerCase();
+        
+        return registrations.filter(reg => {
+            return (
+                reg.fullName?.toLowerCase().includes(lowercasedFilter) ||
+                reg.guardianName?.toLowerCase().includes(lowercasedFilter) ||
+                reg.phone1?.toLowerCase().includes(lowercasedFilter) ||
+                reg.phone2?.toLowerCase().includes(lowercasedFilter) ||
+                reg.notes?.toLowerCase().includes(lowercasedFilter)
+            );
+        });
+    }, [registrations, searchTerm]);
 
     const handleSaveRegistration = (data: Partial<PreRegistration>) => {
         if (!data.fullName || !data.birthDate || !data.phone1) {
@@ -194,8 +201,9 @@ export default function PreRegistrationPage() {
             return;
         }
 
+        let updatedRegs: PreRegistration[];
         if (data.id) { // Editing existing
-            setRegistrations(regs => regs.map(r => r.id === data.id ? { ...r, ...data } as PreRegistration : r));
+            updatedRegs = registrations.map(r => r.id === data.id ? { ...r, ...data } as PreRegistration : r);
             toast({ title: '✅ تم التحديث', description: `تم تحديث بيانات ${data.fullName}.` });
         } else { // Adding new
             const newReg: PreRegistration = {
@@ -204,9 +212,12 @@ export default function PreRegistrationPage() {
                 status: 'قيد الانتظار',
                 ...data
             } as PreRegistration;
-            setRegistrations(prev => [newReg, ...prev]);
+            updatedRegs = [newReg, ...registrations];
             toast({ title: '✅ تم التسجيل', description: `تم استلام طلب تسجيل ${data.fullName} بنجاح.` });
         }
+        
+        importPreRegistrations(updatedRegs.map(({id, ...rest}) => rest));
+        setRegistrations(updatedRegs);
         setFormOpen(false);
         setEditingRegistration(null);
     }
@@ -217,36 +228,45 @@ export default function PreRegistrationPage() {
     }
     
     const handleDelete = (id: string) => {
-        setRegistrations(regs => regs.filter(r => r.id !== id));
+        const updatedRegs = registrations.filter(r => r.id !== id);
+        importPreRegistrations(updatedRegs.map(({id, ...rest}) => rest));
+        setRegistrations(updatedRegs);
         toast({ title: '🗑️ تم الحذف', description: `تم حذف طلب التسجيل.`, variant: 'destructive'});
     }
 
     const handlePromoteStudent = (reg: PreRegistration) => {
-        // Create a new student object from the registration data
         const newStudentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> = {
             fullName: reg.fullName,
             guardianName: reg.guardianName || 'غير محدد',
             phone1: reg.phone1,
             phone2: reg.phone2,
-            birthDate: reg.birthDate,
-            registrationDate: new Date(), // Set registration date to today
+            birthDate: new Date(reg.birthDate),
+            registrationDate: new Date(),
             status: 'نشط' as StudentStatus,
-            subscriptionTier: 'فئة الأصاغر', // Default value
-            dailyMemorizationAmount: 'صفحة', // Default value
+            subscriptionTier: 'فئة الأصاغر',
+            dailyMemorizationAmount: 'صفحة',
             notes: reg.notes,
         };
 
-        // Call the context function to add the student
         addStudent(newStudentData);
 
-        // Update the registration status
-        handleSaveRegistration({ ...reg, status: 'تم الإنضمام' });
+        const updatedRegs = registrations.map(r => r.id === reg.id ? { ...r, status: 'تم الإنضمام' } as PreRegistration : r);
+        importPreRegistrations(updatedRegs.map(({id, ...rest}) => rest));
+        setRegistrations(updatedRegs);
 
         toast({
             title: '✅ تم النقل بنجاح!',
             description: `تم نقل الطالب ${reg.fullName} إلى فوجك الرسمي.`,
         });
     };
+    
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -257,10 +277,19 @@ export default function PreRegistrationPage() {
                         استقبل طلبات التسجيل الجديدة وقم بمعالجتها. يمكنك الموافقة على الطلب ونقله إلى فوج، أو رفضه.
                     </CardDescription>
                 </CardHeader>
-                 <CardContent>
+                 <CardContent className="flex flex-col md:flex-row gap-4">
                      <Button onClick={() => { setEditingRegistration(null); setFormOpen(true); }}>
                         <PlusCircle className="ml-2 h-4 w-4" /> إضافة طلب تسجيل يدوي
                      </Button>
+                      <div className="relative w-full md:max-w-sm">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                            placeholder="بحث شامل بالاسم، الولي، الهاتف، أو الملاحظات..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-9"
+                        />
+                    </div>
                 </CardContent>
             </Card>
 
@@ -303,12 +332,12 @@ export default function PreRegistrationPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {registrations.length > 0 ? registrations.map(reg => (
+                            {filteredRegistrations.length > 0 ? filteredRegistrations.map(reg => (
                                 <TableRow key={reg.id}>
-                                    <TableCell>{format(reg.requestedAt, 'yyyy/MM/dd')}</TableCell>
+                                    <TableCell>{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : reg.requestedAt.toString()}</TableCell>
                                     <TableCell className="font-medium">{reg.fullName}</TableCell>
                                     <TableCell>{reg.gender}</TableCell>
-                                    <TableCell>{isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : 'غير صالح'}</TableCell>
+                                    <TableCell>{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : reg.birthDate.toString()}</TableCell>
                                     <TableCell>{reg.educationalLevel}</TableCell>
                                     <TableCell>{reg.guardianName}</TableCell>
                                     <TableCell>{reg.phone1}</TableCell>
@@ -376,7 +405,7 @@ export default function PreRegistrationPage() {
                             )) : (
                                 <TableRow>
                                     <TableCell colSpan={13} className="text-center h-24">
-                                        لا توجد طلبات تسجيل جديدة في الوقت الحالي.
+                                        {searchTerm ? 'لم يتم العثور على نتائج مطابقة للبحث.' : 'لا توجد طلبات تسجيل جديدة في الوقت الحالي.'}
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -387,5 +416,3 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
-
-    
