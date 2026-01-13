@@ -87,7 +87,7 @@ const StudentProfileCard = ({ student, onPromote, onEdit }: { student: PreRegist
     return (
         <DialogContent className="sm:max-w-2xl p-0">
              <DialogHeader>
-                 <DialogTitle className="sr-only">بطاقة الطالب: {student.fullName}</DialogTitle>
+                <DialogTitle className="sr-only">بطاقة الطالب: {student.fullName}</DialogTitle>
              </DialogHeader>
              <div className={cn("p-6 rounded-t-lg text-white", headerColor)}>
                 <div className="flex items-center gap-4">
@@ -210,7 +210,7 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
                     {existingRegistration ? 'قم بتحديث بيانات الطالب هنا.' : 'املأ بيانات الطالب الجديد. الحقول المعلمة بـ * إلزامية.'}
                 </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto p-4">
+            <div className="max-h-[60vh] overflow-y-auto p-4 space-y-4">
                  <div className="flex flex-col items-center gap-4">
                     <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
                      <Avatar className="w-24 h-24 mb-2 border-4 border-muted">
@@ -461,6 +461,7 @@ export default function PreRegistrationPage() {
     const handlePromoteStudent = (reg: PreRegistration) => {
         const newStudentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> = {
             fullName: reg.fullName,
+            gender: reg.gender,
             guardianName: reg.guardianName || 'غير محدد',
             phone1: reg.phone1,
             phone2: reg.phone2,
@@ -502,7 +503,7 @@ export default function PreRegistrationPage() {
                         استقبل طلبات التسجيل الجديدة، قم بفلترتها، ومعالجتها. يمكنك الموافقة على الطلب ونقله إلى فوج، أو رفضه.
                     </CardDescription>
                 </CardHeader>
-                 <CardContent className="flex flex-col md:flex-row gap-4">
+                 <CardContent>
                      <Button onClick={() => { setEditingRegistration(null); setFormOpen(true); }}>
                         <PlusCircle className="ml-2 h-4 w-4" /> إضافة طلب تسجيل يدوي
                      </Button>
@@ -512,92 +513,94 @@ export default function PreRegistrationPage() {
              <Card>
                 <CardHeader>
                     <CardTitle>أدوات البحث المتقدم والفلترة</CardTitle>
-                    <CardContent className="pt-4 flex flex-wrap gap-2">
-                        {Object.entries(statusBadgeColors).map(([status, className]) => (
+                </CardHeader>
+                 <CardContent className="flex flex-col gap-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                         {Object.entries(statusBadgeColors).map(([status, className]) => (
                              <Badge key={status} className={cn("border cursor-pointer", className)} onClick={() => setStatusFilter(status as PreRegistrationStatus)}>{status}</Badge>
                         ))}
-                    </CardContent>
-                </CardHeader>
-                 <CardContent className="flex flex-wrap items-center gap-2">
-                    <div className="relative w-full sm:max-w-xs">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            placeholder="بحث شامل..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-9"
-                        />
                     </div>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline"><Filter className="ml-2 h-4 w-4"/>المستوى الدراسي {levelFilter.length > 0 && `(${levelFilter.length})`}</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56">
-                            <DropdownMenuLabel>اختر المستويات</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {educationalLevels.map(level => (
-                                <DropdownMenuCheckboxItem
-                                    key={level}
-                                    checked={levelFilter.includes(level)}
-                                    onCheckedChange={(checked) => {
-                                        if (checked) {
-                                            setLevelFilter(prev => [...prev, level]);
-                                        } else {
-                                            setLevelFilter(prev => prev.filter(l => l !== level));
-                                        }
-                                    }}
-                                >
-                                    {level}
-                                </DropdownMenuCheckboxItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                     <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative w-full sm:max-w-xs">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                                placeholder="بحث شامل..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-9"
+                            />
+                        </div>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline"><Filter className="ml-2 h-4 w-4"/>المستوى الدراسي {levelFilter.length > 0 && `(${levelFilter.length})`}</Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56">
+                                <DropdownMenuLabel>اختر المستويات</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {educationalLevels.map(level => (
+                                    <DropdownMenuCheckboxItem
+                                        key={level}
+                                        checked={levelFilter.includes(level)}
+                                        onCheckedChange={(checked) => {
+                                            if (checked) {
+                                                setLevelFilter(prev => [...prev, level]);
+                                            } else {
+                                                setLevelFilter(prev => prev.filter(l => l !== level));
+                                            }
+                                        }}
+                                    >
+                                        {level}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
 
-                     <Select dir="rtl" value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-full md:w-[180px]">
-                            <SelectValue placeholder="الحالة" />
-                        </SelectTrigger>
-                        <SelectContent>
-                           <SelectItem value="all">كل الحالات</SelectItem>
-                           <SelectItem value="مرشح">مرشح</SelectItem>
-                           <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
-                           <SelectItem value="مرفوض">مرفوض</SelectItem>
-                           <SelectItem value="مؤجل">مؤجل</SelectItem>
-                           <SelectItem value="إنضم لمدرسة أخرى">إنضم لمدرسة أخرى</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    
-                    <Select dir="rtl" value={genderFilter} onValueChange={setGenderFilter}>
-                        <SelectTrigger className="w-full md:w-[150px]">
-                            <SelectValue placeholder="الجنس" />
-                        </SelectTrigger>
-                        <SelectContent>
-                           <SelectItem value="all">الكل</SelectItem>
-                           <SelectItem value="ذكر">ذكر</SelectItem>
-                           <SelectItem value="أنثى">أنثى</SelectItem>
-                        </SelectContent>
-                    </Select>
-                     <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline"><View className="ml-2 h-4 w-4"/> عرض الأعمدة</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56">
-                            <DropdownMenuLabel>اختر الأعمدة للعرض</DropdownMenuLabel>
-                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onSelect={setQuickView}>عرض سريع</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={setAllView}>عرض الكل</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {Object.entries(columnVisibility).map(([key, value]) => (
-                                <DropdownMenuCheckboxItem
-                                    key={key}
-                                    checked={value.visible}
-                                    onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
-                                >
-                                    {value.label}
-                                </DropdownMenuCheckboxItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                         <Select dir="rtl" value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className="w-full md:w-[180px]">
+                                <SelectValue placeholder="الحالة" />
+                            </SelectTrigger>
+                            <SelectContent>
+                               <SelectItem value="all">كل الحالات</SelectItem>
+                               <SelectItem value="مرشح">مرشح</SelectItem>
+                               <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
+                               <SelectItem value="مرفوض">مرفوض</SelectItem>
+                               <SelectItem value="مؤجل">مؤجل</SelectItem>
+                               <SelectItem value="إنضم لمدرسة أخرى">إنضم لمدرسة أخرى</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        
+                        <Select dir="rtl" value={genderFilter} onValueChange={setGenderFilter}>
+                            <SelectTrigger className="w-full md:w-[150px]">
+                                <SelectValue placeholder="الجنس" />
+                            </SelectTrigger>
+                            <SelectContent>
+                               <SelectItem value="all">الكل</SelectItem>
+                               <SelectItem value="ذكر">ذكر</SelectItem>
+                               <SelectItem value="أنثى">أنثى</SelectItem>
+                            </SelectContent>
+                        </Select>
+                         <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline"><View className="ml-2 h-4 w-4"/> عرض الأعمدة</Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56">
+                                <DropdownMenuLabel>اختر الأعمدة للعرض</DropdownMenuLabel>
+                                 <DropdownMenuSeparator />
+                                <DropdownMenuItem onSelect={setQuickView}>عرض سريع</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={setAllView}>عرض الكل</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {Object.entries(columnVisibility).map(([key, value]) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={key}
+                                        checked={value.visible}
+                                        onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
+                                    >
+                                        {value.label}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                  </CardContent>
             </Card>
 
@@ -750,6 +753,7 @@ export default function PreRegistrationPage() {
 }
 
     
+
 
 
 
