@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -13,7 +12,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View } from 'lucide-react';
+import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -197,6 +196,8 @@ export default function PreRegistrationPage() {
     const [statusFilter, setStatusFilter] = useState('all');
     const [genderFilter, setGenderFilter] = useState('all');
     
+    const [sortConfig, setSortConfig] = useState<{ key: keyof PreRegistration; direction: 'ascending' | 'descending' }>({ key: 'pageNumber', direction: 'ascending' });
+
     const [columnVisibility, setColumnVisibility] = useState(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('preRegColumnVisibility');
@@ -219,7 +220,7 @@ export default function PreRegistrationPage() {
     };
 
     const setQuickView = () => {
-        const quickViewCols: (keyof typeof ALL_COLUMNS)[] = ['fullName', 'educationalLevel', 'pageNumber'];
+        const quickViewCols: (keyof typeof ALL_COLUMNS)[] = ['fullName', 'educationalLevel', 'pageNumber', 'status'];
         const newVisibility = { ...columnVisibility };
         Object.keys(newVisibility).forEach(key => {
             newVisibility[key as keyof typeof ALL_COLUMNS].visible = quickViewCols.includes(key as keyof typeof ALL_COLUMNS);
@@ -239,7 +240,7 @@ export default function PreRegistrationPage() {
     const filteredRegistrations = useMemo(() => {
         const lowercasedFilter = searchTerm.toLowerCase();
 
-        return (preRegistrations ?? [])
+        const filtered = (preRegistrations ?? [])
             .filter(reg => {
                 const searchMatch = !searchTerm || (
                     reg.fullName?.toLowerCase().includes(lowercasedFilter) ||
@@ -253,27 +254,42 @@ export default function PreRegistrationPage() {
                 const genderMatch = genderFilter === 'all' || reg.gender === genderFilter;
 
                 return searchMatch && levelMatch && statusMatch && genderMatch;
-            })
-            .sort((a, b) => {
-                 const pageNumA = a.pageNumber ? parseInt(a.pageNumber, 10) : Infinity;
-                const pageNumB = b.pageNumber ? parseInt(b.pageNumber, 10) : Infinity;
-                
-                if (!isNaN(pageNumA) && !isNaN(pageNumB)) {
-                    if (pageNumA !== pageNumB) return pageNumA - pageNumB;
-                } else if (!isNaN(pageNumA)) {
-                    return -1;
-                } else if (!isNaN(pageNumB)) {
-                    return 1;
-                }
-                
-                const dateA = a.requestedAt instanceof Date ? a.requestedAt.getTime() : (typeof a.requestedAt === 'string' ? parseISO(a.requestedAt).getTime() : 0);
-                const dateB = b.requestedAt instanceof Date ? b.requestedAt.getTime() : (typeof b.requestedAt === 'string' ? parseISO(b.requestedAt).getTime() : 0);
-                
-                if(isNaN(dateA) || isNaN(dateB)) return 0;
-                
-                return dateB - dateA;
             });
-    }, [preRegistrations, searchTerm, levelFilter, statusFilter, genderFilter]);
+            
+        return filtered.sort((a, b) => {
+            if (sortConfig.key === 'pageNumber') {
+                 const pageNumA = a.pageNumber ? parseInt(a.pageNumber, 10) : Infinity;
+                 const pageNumB = b.pageNumber ? parseInt(b.pageNumber, 10) : Infinity;
+                 
+                 let comparison = 0;
+                 if (!isNaN(pageNumA) && !isNaN(pageNumB)) {
+                    comparison = pageNumA - pageNumB;
+                 } else if (!isNaN(pageNumA)) {
+                    comparison = -1;
+                 } else if (!isNaN(pageNumB)) {
+                    comparison = 1;
+                 }
+                 
+                 return sortConfig.direction === 'ascending' ? comparison : -comparison;
+            }
+             
+            const dateA = a.requestedAt instanceof Date ? a.requestedAt.getTime() : (typeof a.requestedAt === 'string' ? parseISO(a.requestedAt).getTime() : 0);
+            const dateB = b.requestedAt instanceof Date ? b.requestedAt.getTime() : (typeof b.requestedAt === 'string' ? parseISO(b.requestedAt).getTime() : 0);
+            
+            if(isNaN(dateA) || isNaN(dateB)) return 0;
+            
+            return sortConfig.direction === 'ascending' ? dateB - dateA : dateA - dateB;
+        });
+
+    }, [preRegistrations, searchTerm, levelFilter, statusFilter, genderFilter, sortConfig]);
+    
+    const requestSort = (key: keyof PreRegistration) => {
+        let direction: 'ascending' | 'descending' = 'ascending';
+        if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    }
 
     const handleSaveRegistration = (data: Partial<PreRegistration>) => {
         if (!data.fullName || !data.birthDate || !data.phone1) {
@@ -476,7 +492,14 @@ export default function PreRegistrationPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                {columnVisibility.pageNumber.visible && <TableHead>رقم الصفحة</TableHead>}
+                                {columnVisibility.pageNumber.visible && (
+                                    <TableHead>
+                                        <Button variant="ghost" onClick={() => requestSort('pageNumber')}>
+                                            رقم الصفحة
+                                            <ArrowUpDown className="mr-2 h-4 w-4" />
+                                        </Button>
+                                    </TableHead>
+                                )}
                                 {columnVisibility.requestedAt.visible && <TableHead>تاريخ التسجيل</TableHead>}
                                 {columnVisibility.fullName.visible && <TableHead>الإسم الكامل</TableHead>}
                                 {columnVisibility.gender.visible && <TableHead>الجنس</TableHead>}
@@ -581,6 +604,3 @@ export default function PreRegistrationPage() {
 }
 
     
-
-
-
