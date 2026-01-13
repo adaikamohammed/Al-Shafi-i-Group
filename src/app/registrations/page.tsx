@@ -12,15 +12,17 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { useStudentContext } from '@/context/StudentContext';
+import type { Student, StudentStatus } from '@/lib/types';
 
 
 type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "قيد الانتظار";
@@ -181,6 +183,7 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
 
 export default function PreRegistrationPage() {
     const { toast } = useToast();
+    const { addStudent } = useStudentContext();
     const [registrations, setRegistrations] = useState<PreRegistration[]>([]);
     const [isFormOpen, setFormOpen] = useState(false);
     const [editingRegistration, setEditingRegistration] = useState<PreRegistration | null>(null);
@@ -217,6 +220,33 @@ export default function PreRegistrationPage() {
         setRegistrations(regs => regs.filter(r => r.id !== id));
         toast({ title: '🗑️ تم الحذف', description: `تم حذف طلب التسجيل.`, variant: 'destructive'});
     }
+
+    const handlePromoteStudent = (reg: PreRegistration) => {
+        // Create a new student object from the registration data
+        const newStudentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> = {
+            fullName: reg.fullName,
+            guardianName: reg.guardianName || 'غير محدد',
+            phone1: reg.phone1,
+            phone2: reg.phone2,
+            birthDate: reg.birthDate,
+            registrationDate: new Date(), // Set registration date to today
+            status: 'نشط' as StudentStatus,
+            subscriptionTier: 'فئة الأصاغر', // Default value
+            dailyMemorizationAmount: 'صفحة', // Default value
+            notes: reg.notes,
+        };
+
+        // Call the context function to add the student
+        addStudent(newStudentData);
+
+        // Update the registration status
+        handleSaveRegistration({ ...reg, status: 'تم الإنضمام' });
+
+        toast({
+            title: '✅ تم النقل بنجاح!',
+            description: `تم نقل الطالب ${reg.fullName} إلى فوجك الرسمي.`,
+        });
+    };
 
     return (
         <div className="space-y-6">
@@ -297,6 +327,26 @@ export default function PreRegistrationPage() {
                                                 <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={reg.status === 'تم الإنضمام'}>
+                                                            <ArrowUpCircle className="ml-2 h-4 w-4" /> نقل إلى فوج
+                                                        </DropdownMenuItem>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>تأكيد النقل</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                هل أنت متأكد من نقل الطالب "{reg.fullName}" إلى فوجك الرسمي؟ سيتم إنشاء سجل طالب جديد له.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => handlePromoteStudent(reg)}>تأكيد النقل</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                                <DropdownMenuSeparator />
                                                 <DropdownMenuItem onClick={() => handleEdit(reg)}>
                                                     <Edit className="ml-2 h-4 w-4" /> تعديل
                                                 </DropdownMenuItem>
@@ -337,3 +387,5 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
+    
