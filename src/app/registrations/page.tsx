@@ -168,7 +168,6 @@ const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: 
 export default function PreRegistrationPage() {
     const { toast } = useToast();
     const { addStudent, preRegistrations, loading, importPreRegistrations } = useStudentContext();
-    const [registrations, setRegistrations] = useState<PreRegistration[]>([]);
     const [isFormOpen, setFormOpen] = useState(false);
     const [editingRegistration, setEditingRegistration] = useState<PreRegistration | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -176,16 +175,10 @@ export default function PreRegistrationPage() {
     const [statusFilter, setStatusFilter] = useState('all');
     const [genderFilter, setGenderFilter] = useState('all');
 
-    useEffect(() => {
-        if (preRegistrations) {
-            setRegistrations(preRegistrations);
-        }
-    }, [preRegistrations]);
-
     const filteredRegistrations = useMemo(() => {
         const lowercasedFilter = searchTerm.toLowerCase();
 
-        return registrations
+        return (preRegistrations ?? [])
             .filter(reg => {
                 const searchMatch = !searchTerm || (
                     reg.fullName?.toLowerCase().includes(lowercasedFilter) ||
@@ -201,7 +194,7 @@ export default function PreRegistrationPage() {
                 return searchMatch && levelMatch && statusMatch && genderMatch;
             })
             .sort((a, b) => {
-                const pageNumA = a.pageNumber ? parseInt(a.pageNumber, 10) : Infinity;
+                 const pageNumA = a.pageNumber ? parseInt(a.pageNumber, 10) : Infinity;
                 const pageNumB = b.pageNumber ? parseInt(b.pageNumber, 10) : Infinity;
                 
                 if (!isNaN(pageNumA) && !isNaN(pageNumB)) {
@@ -212,11 +205,14 @@ export default function PreRegistrationPage() {
                     return 1;
                 }
                 
-                const dateA = a.requestedAt instanceof Date ? a.requestedAt.getTime() : 0;
-                const dateB = b.requestedAt instanceof Date ? b.requestedAt.getTime() : 0;
-                return dateB - dateA; // Secondary sort by date
+                const dateA = a.requestedAt instanceof Date ? a.requestedAt.getTime() : (typeof a.requestedAt === 'string' ? parseISO(a.requestedAt).getTime() : 0);
+                const dateB = b.requestedAt instanceof Date ? b.requestedAt.getTime() : (typeof b.requestedAt === 'string' ? parseISO(b.requestedAt).getTime() : 0);
+                
+                if(isNaN(dateA) || isNaN(dateB)) return 0;
+                
+                return dateB - dateA;
             });
-    }, [registrations, searchTerm, levelFilter, statusFilter, genderFilter]);
+    }, [preRegistrations, searchTerm, levelFilter, statusFilter, genderFilter]);
 
     const handleSaveRegistration = (data: Partial<PreRegistration>) => {
         if (!data.fullName || !data.birthDate || !data.phone1) {
@@ -226,7 +222,7 @@ export default function PreRegistrationPage() {
 
         let updatedRegs: PreRegistration[];
         if (data.id) { // Editing existing
-            updatedRegs = registrations.map(r => r.id === data.id ? { ...r, ...data } as PreRegistration : r);
+            updatedRegs = preRegistrations.map(r => r.id === data.id ? { ...r, ...data } as PreRegistration : r);
             toast({ title: '✅ تم التحديث', description: `تم تحديث بيانات ${data.fullName}.` });
         } else { // Adding new
             const newReg: PreRegistration = {
@@ -235,12 +231,11 @@ export default function PreRegistrationPage() {
                 status: 'قيد الانتظار',
                 ...data
             } as PreRegistration;
-            updatedRegs = [newReg, ...registrations];
+            updatedRegs = [newReg, ...preRegistrations];
             toast({ title: '✅ تم التسجيل', description: `تم استلام طلب تسجيل ${data.fullName} بنجاح.` });
         }
         
         importPreRegistrations(updatedRegs.map(({id, ...rest}) => rest));
-        setRegistrations(updatedRegs);
         setFormOpen(false);
         setEditingRegistration(null);
     }
@@ -251,9 +246,8 @@ export default function PreRegistrationPage() {
     }
     
     const handleDelete = (id: string) => {
-        const updatedRegs = registrations.filter(r => r.id !== id);
+        const updatedRegs = preRegistrations.filter(r => r.id !== id);
         importPreRegistrations(updatedRegs.map(({id, ...rest}) => rest));
-        setRegistrations(updatedRegs);
         toast({ title: '🗑️ تم الحذف', description: `تم حذف طلب التسجيل.`, variant: 'destructive'});
     }
 
@@ -273,9 +267,8 @@ export default function PreRegistrationPage() {
 
         addStudent(newStudentData);
 
-        const updatedRegs = registrations.map(r => r.id === reg.id ? { ...r, status: 'تم الإنضمام' } as PreRegistration : r);
+        const updatedRegs = preRegistrations.map(r => r.id === reg.id ? { ...r, status: 'تم الإنضمام' } as PreRegistration : r);
         importPreRegistrations(updatedRegs.map(({id, ...rest}) => rest));
-        setRegistrations(updatedRegs);
 
         toast({
             title: '✅ تم النقل بنجاح!',
@@ -495,3 +488,5 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
+    

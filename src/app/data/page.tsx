@@ -184,6 +184,7 @@ export default function DataExchangePage() {
     const reader = new FileReader();
     reader.onload = (e) => {
         let newRegsCount = 0;
+        let skippedCount = 0;
         try {
             const data = new Uint8Array(e.target?.result as ArrayBuffer);
             const workbook = XLSX.read(data, { type: 'array', cellDates: true });
@@ -195,7 +196,7 @@ export default function DataExchangePage() {
 
             json.forEach((row) => {
                 const fullName = (row['الإسم الكامل'] || '').trim();
-                // Import every row, even if only the name is present or nothing at all
+                 if (!fullName) return; // Skip empty rows
                 
                 const birthDateValue = parseDate(row['تاريخ الميلاد']);
                 let finalBirthDate: Date | string = new Date(); // Default if invalid
@@ -232,7 +233,7 @@ export default function DataExchangePage() {
             
             toast({
               title: "✅ اكتمل رفع التسجيلات",
-              description: `تم رفع ${newRegsCount} سجل جديد إلى قائمة التسجيلات الأولية.`,
+              description: `تم رفع ${newRegsCount} سجل جديد بنجاح. وتم تخطي ${skippedCount} سجل مكرر.`,
               action: <Button onClick={() => router.push('/registrations')}>الانتقال للقائمة</Button>
             });
             
@@ -750,3 +751,5 @@ export default function DataExchangePage() {
 }
 
   
+
+    
