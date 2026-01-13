@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -112,6 +113,8 @@ export default function ProfilePage() {
                 bio: user.bio || '',
                 joinDate: user.joinDate || '',
             });
+            setAdminNotes(user.adminNotes || '');
+            setAdminAwards(user.adminAwards || '');
             setPhotoPreview(user.photoURL || null);
             if(isSuperAdmin) setIsAdminViewUnlocked(true); // Auto-unlock for super admin
         }
@@ -166,9 +169,7 @@ export default function ProfilePage() {
         if (!user || !isAdminViewUnlocked) return;
         setIsSaving(true);
         try {
-             // In a real app, you'd save adminNotes and adminAwards to a separate, secure node
-             // For now, we only handle joinDate update
-            await updateUserProfile({ joinDate: formData.joinDate });
+            await updateUserProfile({ joinDate: formData.joinDate, adminNotes, adminAwards });
             toast({ title: `✅ تم تحديث السجل الإداري للشيخ ${formData.displayName}` });
         } catch (error) {
             toast({ title: '❌ خطأ', description: 'فشل تحديث السجل الإداري.', variant: 'destructive'});

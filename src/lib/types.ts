@@ -129,6 +129,8 @@ export interface AppUser {
     certifications?: string;
     bio?: string;
     joinDate?: string;
+    adminNotes?: string;
+    adminAwards?: string;
 }
 
 export interface StudentStat extends Partial<SessionRecord> {

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -110,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     await updateProfile(newUser, { displayName: sheikhInfo.name });
 
-    const profileData: Omit<AppUser, 'uid' | 'photoURL'> = {
+    const profileData: Omit<AppUser, 'uid' | 'photoURL' | 'adminNotes' | 'adminAwards'> = {
         email: newUser.email,
         displayName: sheikhInfo.name,
         group: sheikhInfo.group,
