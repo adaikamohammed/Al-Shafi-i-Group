@@ -204,7 +204,7 @@ export default function ProfilePage() {
                                  <Avatar className="w-24 h-24 mb-2 border-4 border-muted">
                                     <AvatarImage src={photoPreview || `https://api.dicebear.com/7.x/initials/svg?seed=${user.displayName}`} />
                                     <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
-                                </Avatar>
+                                 </Avatar>
                                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2">
                                     <Edit className="h-4 w-4" />
                                     تغيير الصورة الشخصية
@@ -270,12 +270,17 @@ export default function ProfilePage() {
                         <CardTitle>وصول مقيد</CardTitle>
                         <CardDescription className="mb-4">هذا الجزء مخصص للمدير العام فقط.</CardDescription>
                          {isSuperAdmin && (
-                            <div className="flex w-full max-w-sm items-center space-x-2 space-x-reverse">
-                                <Input 
-                                    type="password" 
-                                    placeholder="أدخل كود المدير العام"
-                                />
-                                <Button>دخول</Button>
+                            <div className="w-full text-left space-y-4">
+                               <div className="space-y-2">
+                                  <Label>تقييم الإدارة للشيخ</Label>
+                                  {/* Star rating component would go here */}
+                                   <p className="text-sm text-muted-foreground"> (سيتم إضافة مكون التقييم هنا)</p>
+                               </div>
+                               <div className="space-y-2">
+                                  <Label>الجوائز والتكريمات</Label>
+                                  <Textarea placeholder="سجل هنا أي تكريمات أو جوائز تم منحها للشيخ..."/>
+                               </div>
+                                <Button>حفظ التقييم الإداري</Button>
                             </div>
                          )}
                     </Card>
