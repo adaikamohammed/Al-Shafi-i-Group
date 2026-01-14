@@ -154,7 +154,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
     return (
         <DialogContent className="sm:max-w-3xl p-0 flex flex-col max-h-[90vh]">
             <DialogHeader className="p-6 border-b flex flex-col items-center">
-                 <DialogTitle className="sr-only">الملف الشخصي للطالب {student.fullName}</DialogTitle>
+                <DialogTitle className="sr-only">الملف الشخصي للطالب {student.fullName}</DialogTitle>
                 <Avatar className="w-24 h-24 mb-4 border-4 border-primary">
                     <AvatarImage src={student.photoURL} alt={student.fullName} />
                     <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
@@ -176,7 +176,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
                 </h2>
                 <div className="flex items-center gap-4 mt-2">
                     <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
-                    <p className="text-sm text-muted-foreground">الشيخ: {user?.displayName}</p>
+                    <p className="text-sm text-muted-foreground">الشيخ المشرف: {user?.displayName}</p>
                 </div>
             </DialogHeader>
 
@@ -415,7 +415,6 @@ export default function StudentManagementPage() {
   const filteredStudents = useMemo(() => {
     const statusOrder: { [key in StudentStatus]: number } = { "نشط": 1, "غائب طويل": 2, "مطرود": 3, "محذوف": 4, };
     
-    // The students state is already filtered by the StudentContext based on the user's role
     let sortableStudents = isSuperAdmin ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
         
     sortableStudents = sortableStudents.filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -440,10 +439,16 @@ export default function StudentManagementPage() {
         if (a.status !== b.status) {
             return statusOrder[a.status] - statusOrder[b.status];
         }
-        if (a[sortConfig.key as keyof Student] < b[sortConfig.key as keyof Student]) {
+        const valA = a[sortConfig.key as keyof Student];
+        const valB = b[sortConfig.key as keyof Student];
+
+        if (valA === undefined || valA === null) return 1;
+        if (valB === undefined || valB === null) return -1;
+        
+        if (valA < valB) {
             return sortConfig.direction === 'ascending' ? -1 : 1;
         }
-        if (a[sortConfig.key as keyof Student] > b[sortConfig.key as keyof Student]) {
+        if (valA > valB) {
             return sortConfig.direction === 'ascending' ? 1 : -1;
         }
         return 0;
@@ -1248,6 +1253,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
 
 
 

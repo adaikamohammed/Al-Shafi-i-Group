@@ -549,7 +549,7 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
     } else if (currentStatus === 1 && nextStatus === 2) {
       toast({ title: `✅ +${pointsMastered} نقطة`, description: 'تم إضافة نقاط للإتقان.' });
     } else if (currentStatus === 2 && nextStatus === 0) {
-      toast({ title: `🔄 -${pointsMemorized + pointsMastered} نقطة`, description: 'تم خصم نقاط الحفظ والإتقان.', variant: 'destructive' });
+        toast({ title: `🔄 -${pointsMemorized + pointsMastered} نقطة`, description: 'تم خصم نقاط الحفظ والإتقان.', variant: 'destructive' });
     } else if (currentStatus === 1 && nextStatus === 0) {
         toast({ title: `🔄 -${pointsMemorized} نقطة`, description: 'تم خصم نقاط الحفظ.', variant: 'destructive' });
     } else if (currentStatus === 2 && nextStatus === 1) {
@@ -561,7 +561,7 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
     }
 
     const surahProgressRef = ref(db, `users/${studentOwnerId}/surahProgress/${studentId}`);
-    set(surahProgressRef, surahProgressMap);
+    set(surahProgressRef, studentProgressMap);
     
     const memorizedCount = Object.values(studentProgressMap).filter(status => status > 0).length;
     updateStudent(studentId, { memorizedSurahsCount: memorizedCount }, studentOwnerId);
@@ -613,3 +613,4 @@ export const useStudentContext = () => {
   }
   return context;
 };
+
