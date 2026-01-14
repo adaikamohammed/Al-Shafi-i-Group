@@ -26,12 +26,10 @@ service firebase.storage {
         ".write": "auth != null && auth.uid === $uid"
       }
     },
-    
     "pre_registrations": {
-      // Allow read/write access to any authenticated user.
-      ".read": "auth !== null",
+      ".read": "auth != null",
       ".write": "auth != null && root.child('users').child(auth.uid).child('profile').hasChild('role')",
-      ".indexOn": ["status", "full_name", "phone_1"]
+      ".indexOn": ["status", "fullName", "phone1"]
     }
   }
 }
