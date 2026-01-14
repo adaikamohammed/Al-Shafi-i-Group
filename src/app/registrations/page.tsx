@@ -560,10 +560,14 @@ export default function PreRegistrationPage() {
     };
 
     const toggleColumn = (key: keyof typeof ALL_COLUMNS) => {
-        setColumnVisibility((prev) => ({
-            ...prev,
-            [key]: { ...prev[key as keyof typeof prev], visible: !prev[key as keyof typeof prev]?.visible },
-        }));
+        setColumnVisibility((prev) => {
+            const newVisibility = { ...prev };
+            const currentColumn = newVisibility[key as keyof typeof newVisibility];
+            if(currentColumn) {
+                currentColumn.visible = !currentColumn.visible;
+            }
+            return newVisibility;
+        });
     };
     
     const handlePrint = () => {
@@ -1140,19 +1144,14 @@ export default function PreRegistrationPage() {
 
             {/* Print Styles */}
             <style jsx global>{`
+                @page {
+                    size: A4 landscape;
+                    margin: 1cm;
+                }
                 @media print {
                     body {
-                        font-size: 10pt;
-                        background-color: #ffffff !important;
-                    }
-                    body * {
-                        visibility: hidden;
-                        background-color: #ffffff !important;
-                        color: #000000 !important;
-                        box-shadow: none !important;
-                    }
-                    .print-container, .print-container * {
-                        visibility: visible;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
                     }
                     .print-container {
                         position: absolute;
@@ -1160,6 +1159,7 @@ export default function PreRegistrationPage() {
                         top: 0;
                         width: 100%;
                         border: none !important;
+                        box-shadow: none !important;
                         ring-width: 0 !important;
                     }
                     .print-header {
@@ -1170,44 +1170,44 @@ export default function PreRegistrationPage() {
                     .print-hidden {
                         display: none !important;
                     }
-                    .print-only-td {
+                     .print-only-td {
                         display: table-cell !important;
-                        width: 3cm;
+                        width: 3cm !important;
+                        min-width: 3cm !important;
                     }
                     #print-table {
-                        width: 100%;
-                        border-collapse: collapse;
+                        width: 100% !important;
                         table-layout: auto !important;
+                        border-collapse: collapse;
+                        background-color: white !important;
                     }
                     #print-table th, #print-table td {
                         border: 0.5pt solid black !important;
                         padding: 4px 6px !important;
-                        background-color: #ffffff !important;
+                        background-color: white !important;
+                        color: black !important;
+                        box-shadow: none !important;
                     }
                     #print-table thead {
                         display: table-header-group !important;
                     }
+                     #print-table tbody {
+                        display: table-row-group !important;
+                    }
                     #print-table tr {
-                        page-break-inside: avoid;
-                        break-inside: avoid;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
                     }
                     #print-table th {
                         font-weight: bold;
+                        background-color: #f2f2f2 !important;
                     }
-                    #print-table .badge {
-                        border: 0.5pt solid black !important;
-                        background-color: #ffffff !important;
-                        color: #000000 !important;
-                    }
-                }
-                 @page {
-                    size: A4 landscape;
-                    margin: 10mm;
                 }
             `}</style>
         </div>
     );
 }
+
 
 
 
