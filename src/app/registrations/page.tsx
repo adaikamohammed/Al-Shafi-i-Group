@@ -111,9 +111,9 @@ const StudentProfileCard = ({ student, onEdit, isLocked }: { student: PreRegistr
 
     return (
         <DialogContent className="sm:max-w-2xl p-0">
-             <DialogHeader className="sr-only">
-                <DialogTitle>بطاقة الطالب: {student.fullName}</DialogTitle>
-                <DialogDescription>عرض تفصيلي لبيانات الطالب.</DialogDescription>
+             <DialogHeader className="p-6 pb-0">
+                <DialogTitle className="sr-only">بطاقة الطالب: {student.fullName}</DialogTitle>
+                <DialogDescription className="sr-only">عرض تفصيلي لبيانات الطالب.</DialogDescription>
             </DialogHeader>
             <div className={cn("p-6 rounded-t-lg text-white", headerColor)}>
                 <div className="flex items-center gap-4">
@@ -508,15 +508,14 @@ export default function PreRegistrationPage() {
     const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const [columnVisibility, setColumnVisibility] = useState(() => {
-        const initialVisibility: { [key: string]: { label: string; visible: boolean } } = { ...ALL_COLUMNS };
+        const initialVisibility: { [key: string]: { label: string; visible: boolean } } = JSON.parse(JSON.stringify(ALL_COLUMNS));
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('preRegColumnVisibility');
             try {
                 if (saved) {
                     const parsed = JSON.parse(saved);
-                    // Merge with ALL_COLUMNS to ensure all keys are present and have a 'visible' property
                     for (const key in initialVisibility) {
-                        if (parsed[key] !== undefined) {
+                         if (parsed[key] && typeof parsed[key].visible === 'boolean') {
                             initialVisibility[key as keyof typeof initialVisibility].visible = parsed[key].visible;
                         }
                     }
@@ -583,31 +582,6 @@ export default function PreRegistrationPage() {
 
         setTimeout(() => window.print(), 100);
     };
-
-
-    const setQuickView = () => {
-        const quickViewCols: (keyof typeof ALL_COLUMNS)[] = ['fullName', 'educationalLevel', 'status'];
-        const newVisibility = { ...columnVisibility };
-        Object.keys(newVisibility).forEach(key => {
-            const columnKey = key as keyof typeof ALL_COLUMNS;
-            if (newVisibility[columnKey]) {
-                newVisibility[columnKey] = { ...newVisibility[columnKey], visible: quickViewCols.includes(columnKey) };
-            }
-        });
-        setColumnVisibility(newVisibility);
-    };
-
-    const setAllView = () => {
-        const newVisibility = { ...columnVisibility };
-        Object.keys(newVisibility).forEach(key => {
-             const columnKey = key as keyof typeof ALL_COLUMNS;
-            if (newVisibility[columnKey]) {
-                newVisibility[columnKey] = { ...newVisibility[columnKey], visible: true };
-            }
-        });
-        setColumnVisibility(newVisibility);
-    };
-
 
     const filteredRegistrations = useMemo(() => {
         const lowercasedFilter = searchTerm.toLowerCase();
@@ -892,31 +866,6 @@ export default function PreRegistrationPage() {
                                         ))}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
-
-                                 <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline"><Filter className="ml-2 h-4 w-4" />الحالة {statusFilter.length > 0 && `(${statusFilter.length})`}</Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-56">
-                                        <DropdownMenuLabel>اختر الحالات</DropdownMenuLabel>
-                                        <DropdownMenuSeparator />
-                                        {statusOptions.map(status => (
-                                            <DropdownMenuCheckboxItem
-                                                key={status}
-                                                checked={statusFilter.includes(status)}
-                                                onCheckedChange={(checked) => {
-                                                    if (checked) {
-                                                        setStatusFilter(prev => [...prev, status]);
-                                                    } else {
-                                                        setStatusFilter(prev => prev.filter(s => s !== status));
-                                                    }
-                                                }}
-                                            >
-                                                {status}
-                                            </DropdownMenuCheckboxItem>
-                                        ))}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
                                 
                                 <Select dir="rtl" value={genderFilter} onValueChange={setGenderFilter}>
                                     <SelectTrigger className="w-full flex-grow sm:w-[150px]">
@@ -941,14 +890,11 @@ export default function PreRegistrationPage() {
                         </CardHeader>
                          <CardContent>
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                               {Object.entries(ALL_COLUMNS).map(([key, { label }]) => {
-                                const column = (columnVisibility as any)[key];
-                                if (!column) return null;
-                                return (
+                               {Object.entries(columnVisibility).map(([key, { label, visible }]) => (
                                 <div key={key} className="flex items-center space-x-2 space-x-reverse">
                                     <Checkbox
                                         id={`col-${key}`}
-                                        checked={column.visible}
+                                        checked={visible}
                                         onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
                                     />
                                     <label
@@ -958,7 +904,7 @@ export default function PreRegistrationPage() {
                                         {label}
                                     </label>
                                 </div>
-                               )})}
+                               ))}
                             </div>
                         </CardContent>
                     </Card>
@@ -1140,17 +1086,12 @@ export default function PreRegistrationPage() {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid grid-cols-2 gap-4 py-4">
-                        {Object.entries(ALL_COLUMNS).map(([key, { label }]) => {
-                            const column = (columnVisibility as any)[key];
-                            if (!column) return null; // Defensive check
-                            return (
+                        {Object.entries(columnVisibility).map(([key, { label, visible }]) => (
                             <div key={key} className="flex items-center space-x-2 space-x-reverse">
                                 <Checkbox
                                     id={`print-col-${key}`}
-                                    checked={column.visible}
-                                    onCheckedChange={(checked) => {
-                                        setColumnVisibility(prev => ({...prev, [key as keyof typeof prev]: {...(prev as any)[key], visible: !!checked}}));
-                                    }}
+                                    checked={visible}
+                                    onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
                                 />
                                 <label
                                     htmlFor={`print-col-${key}`}
@@ -1159,7 +1100,7 @@ export default function PreRegistrationPage() {
                                     {label}
                                 </label>
                             </div>
-                        )})}
+                        ))}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setPrintModalOpen(false)}>إلغاء</Button>
@@ -1230,12 +1171,4 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
-
-
-
-
-
-
-
-
 
