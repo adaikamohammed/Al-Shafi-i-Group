@@ -153,8 +153,11 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
 
     return (
         <DialogContent className="sm:max-w-3xl p-0 flex flex-col max-h-[90vh]">
-            <DialogHeader className="p-6 border-b flex flex-col items-center">
-                <DialogTitle className="sr-only">الملف الشخصي للطالب {student.fullName}</DialogTitle>
+             <DialogHeader className="sr-only">
+                <DialogTitle>ملف الطالب: {student.fullName}</DialogTitle>
+                <DialogDescription>عرض تفصيلي لبيانات وأداء الطالب.</DialogDescription>
+            </DialogHeader>
+            <div className="p-6 border-b flex flex-col items-center">
                 <Avatar className="w-24 h-24 mb-4 border-4 border-primary">
                     <AvatarImage src={student.photoURL} alt={student.fullName} />
                     <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
@@ -178,7 +181,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
                     <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
                     <p className="text-sm text-muted-foreground">الشيخ المشرف: {user?.displayName}</p>
                 </div>
-            </DialogHeader>
+            </div>
 
             <div className="overflow-y-auto px-6 pb-6 space-y-4">
                  <Card>
@@ -485,6 +488,10 @@ export default function StudentManagementPage() {
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
+                 <DialogHeader className="sr-only">
+                    <DialogTitle>إضافة طالب جديد</DialogTitle>
+                    <DialogDescription>املأ الحقول أدناه لإضافة طالب جديد إلى الفوج.</DialogDescription>
+                </DialogHeader>
                 <StudentForm 
                 onSuccess={() => setAddStudentDialogOpen(false)} 
                 onCancel={() => setAddStudentDialogOpen(false)}
@@ -746,6 +753,10 @@ export default function StudentManagementPage() {
       {selectedStudent && isEditStudentDialogOpen && (
           <Dialog open={isEditStudentDialogOpen} onOpenChange={setEditStudentDialogOpen}>
               <DialogContent className="sm:max-w-[600px]">
+                   <DialogHeader className="sr-only">
+                        <DialogTitle>تعديل بيانات: {selectedStudent.fullName}</DialogTitle>
+                        <DialogDescription>قم بتحديث معلومات الطالب هنا.</DialogDescription>
+                    </DialogHeader>
                   <StudentForm
                       student={selectedStudent}
                       onSuccess={() => {
@@ -1036,7 +1047,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
             <Input name="guardianName" id="guardianName" defaultValue={student?.guardianName} />
           </div>
            <div className="space-y-2">
-            <Label htmlFor="educationalLevel">المستوى الدراسي</Label>
+            <Label htmlFor="educationalLevel">المستوى الدراسي (اختياري)</Label>
              <Select dir="rtl" name="educationalLevel" defaultValue={student?.educationalLevel}>
                 <SelectTrigger id="educationalLevel"><SelectValue placeholder="اختر المستوى الدراسي" /></SelectTrigger>
                 <SelectContent>
@@ -1045,7 +1056,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
             </Select>
           </div>
            <div className="space-y-2">
-            <Label htmlFor="pageNumber">رقم الصفحة</Label>
+            <Label htmlFor="pageNumber">رقم الصفحة (اختياري)</Label>
             <Input name="pageNumber" id="pageNumber" defaultValue={student?.pageNumber} />
           </div>
            {isSuperAdmin && (
@@ -1080,15 +1091,16 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div className="space-y-2">
-                <Label>العمر (اختياري)</Label>
+                <Label htmlFor="age-input">العمر (اختياري)</Label>
                 <Input id="age-input" type="number" value={age} onChange={handleAgeChange} placeholder="مثال: 12"/>
             </div>
             <div className="space-y-2 md:col-span-2">
-                <Label>تاريخ الميلاد (اختياري)</Label>
+                <Label htmlFor="birthDate-popover">تاريخ الميلاد (اختياري)</Label>
                 <Popover>
                     <PopoverTrigger asChild>
                     <Button
                         variant={"outline"}
+                        id="birthDate-popover"
                         className={cn("w-full justify-start text-right font-normal", !birthDate && "text-muted-foreground")}
                     >
                         <CalendarIcon className="ml-2 h-4 w-4" />
@@ -1253,6 +1265,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
 
 
 
