@@ -29,6 +29,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 
 
 const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
@@ -242,6 +243,8 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
                     </CardContent>
                 </Card>
 
+                <Separator />
+                
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex justify-between items-center">
@@ -252,7 +255,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-12 gap-2 text-center">
+                        <div className="grid grid-cols-6 md:grid-cols-12 gap-2 text-center">
                             {medalHistory.history.map((medal, index) => {
                                 const monthName = format(new Date(2024, index, 1), 'MMM', {locale: ar});
                                 return (
