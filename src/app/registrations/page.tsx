@@ -83,6 +83,7 @@ const ALL_COLUMNS = {
     status: { label: "الحالة", visible: true },
     notes: { label: "ملاحظات", visible: true },
     requestedAt: { label: "تاريخ التسجيل", visible: false },
+    manualActions: { label: "عمود الإجراءات", visible: false },
 };
 
 const calculateAge = (birthDate?: Date | string) => {
@@ -901,6 +902,7 @@ export default function PreRegistrationPage() {
                                             {columnVisibility.status.visible && <TableHead className="text-center">الحالة</TableHead>}
                                             {columnVisibility.notes.visible && <TableHead className="text-center">ملاحظات</TableHead>}
                                             {columnVisibility.requestedAt.visible && <TableHead className="text-center">تاريخ التسجيل</TableHead>}
+                                            {columnVisibility.manualActions.visible && <TableHead className="text-center print-only-th">الإجراءات / ملاحظات الإدارة</TableHead>}
                                             <TableHead className="text-center print-hidden">إجراءات</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -952,6 +954,7 @@ export default function PreRegistrationPage() {
                                                 </TableCell>}
                                                 {columnVisibility.notes.visible && <TableCell className="max-w-[200px] truncate text-center">{reg.notes}</TableCell>}
                                                 {columnVisibility.requestedAt.visible && <TableCell className="text-center">{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt ? reg.requestedAt.toString() : '-')}</TableCell>}
+                                                {columnVisibility.manualActions.visible && <TableCell className="print-only-td"></TableCell>}
                                                 <TableCell className="text-center print-hidden" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
@@ -1073,8 +1076,9 @@ export default function PreRegistrationPage() {
                     }
                     body * {
                         visibility: hidden;
-                        background-color: #fff !important;
+                        background-color: transparent !important;
                         box-shadow: none !important;
+                        color: #000 !important;
                     }
                     .print-container, .print-container * {
                         visibility: visible;
@@ -1093,12 +1097,13 @@ export default function PreRegistrationPage() {
                     .print-hidden {
                         display: none !important;
                     }
+                    .print-only-th, .print-only-td {
+                        display: table-cell !important;
+                        width: 3cm; /* Fixed width for the manual actions column */
+                    }
                     #print-table th, #print-table td {
                         border: 0.5pt solid black !important;
                         padding: 4px 6px !important;
-                        background-color: transparent !important;
-                        color: #000 !important;
-                        box-shadow: none !important;
                     }
                     #print-table th {
                         font-weight: bold;
@@ -1107,10 +1112,10 @@ export default function PreRegistrationPage() {
                         width: 100%;
                         border-collapse: collapse;
                     }
-                    #print-table badge {
+                    #print-table .badge {
                         background-color: transparent !important;
                         color: #000 !important;
-                        border-color: #000 !important;
+                        border: 0.5pt solid black !important;
                     }
                 }
                  @page {
@@ -1121,4 +1126,5 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
 
