@@ -697,9 +697,24 @@ export default function PreRegistrationPage() {
     };
     
     const columnsToRender = useMemo(() => {
-        return Object.entries(columnVisibility)
-            .filter(([, { visible }]) => visible)
+        const forcedOrder = ['pageNumber', 'fullName'];
+        const manualActionsKey = 'manualActions';
+
+        // Filter visible columns and separate forced, manual, and others
+        const visibleEntries = Object.entries(columnVisibility).filter(([, { visible }]) => visible);
+
+        const forced = forcedOrder.map(key => visibleEntries.find(([k]) => k === key)).filter(Boolean) as [string, { label: string; visible: boolean; printOrder: number }][];
+        const manualActions = visibleEntries.find(([k]) => k === manualActionsKey);
+        const others = visibleEntries
+            .filter(([k]) => !forcedOrder.includes(k) && k !== manualActionsKey)
             .sort(([, a], [, b]) => (a.printOrder || 99) - (b.printOrder || 99));
+
+        let finalOrder = [...forced, ...others];
+        if (manualActions) {
+            finalOrder.push(manualActions);
+        }
+        
+        return finalOrder;
     }, [columnVisibility]);
 
     
@@ -890,22 +905,27 @@ export default function PreRegistrationPage() {
                         </CardContent>
                     </Card>
                     
-                     <Card className="print-hidden">
+                    <Card className="print-hidden">
                         <CardHeader>
                             <CardTitle>عرض الأعمدة</CardTitle>
                         </CardHeader>
-                         <CardContent>
+                        <CardContent>
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                               {Object.keys(ALL_COLUMNS).map((key) => (
-                                <Button
-                                    key={key}
-                                    variant={columnVisibility[key as keyof typeof columnVisibility]?.visible ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
-                                >
-                                    {ALL_COLUMNS[key as keyof typeof ALL_COLUMNS].label}
-                                </Button>
-                               ))}
+                                {Object.keys(ALL_COLUMNS).map((key) => (
+                                    <div key={key} className="flex items-center space-x-2 space-x-reverse">
+                                        <Checkbox
+                                            id={`col-${key}`}
+                                            checked={columnVisibility[key as keyof typeof columnVisibility]?.visible ?? false}
+                                            onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
+                                        />
+                                        <label
+                                            htmlFor={`col-${key}`}
+                                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                        >
+                                            {ALL_COLUMNS[key as keyof typeof ALL_COLUMNS].label}
+                                        </label>
+                                    </div>
+                                ))}
                             </div>
                         </CardContent>
                     </Card>
@@ -1087,8 +1107,10 @@ export default function PreRegistrationPage() {
                             <div key={key} className="flex items-center space-x-2 space-x-reverse">
                                 <Checkbox
                                     id={`print-col-${key}`}
-                                    checked={columnVisibility[key as keyof typeof columnVisibility]?.visible || false}
-                                    onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
+                                    checked={columnVisibility[key as keyof typeof columnVisibility]?.visible ?? false}
+                                    onCheckedChange={(checked) => {
+                                        setColumnVisibility(prev => ({...prev, [key]: {...prev[key as keyof typeof prev], visible: !!checked}}));
+                                    }}
                                 />
                                 <label
                                     htmlFor={`print-col-${key}`}
@@ -1145,17 +1167,24 @@ export default function PreRegistrationPage() {
                         display: table-cell !important;
                         width: 3cm;
                     }
+                    #print-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
                     #print-table th, #print-table td {
                         border: 0.5pt solid black !important;
                         padding: 4px 6px !important;
                         background-color: #ffffff !important;
                     }
+                    #print-table thead {
+                        display: table-header-group !important;
+                    }
+                    #print-table tr {
+                        page-break-inside: avoid;
+                        break-inside: avoid;
+                    }
                     #print-table th {
                         font-weight: bold;
-                    }
-                    #print-table {
-                        width: 100%;
-                        border-collapse: collapse;
                     }
                     #print-table .badge {
                         border: 0.5pt solid black !important;
@@ -1171,6 +1200,7 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
 
 
 
