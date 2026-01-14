@@ -259,11 +259,11 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-2">
-                            <Label>العمر (تقريبي)</Label>
+                            <Label>العمر (اختياري)</Label>
                             <Input id="age-input" type="number" value={age} onChange={handleAgeChange} placeholder="مثال: 12"/>
                         </div>
                         <div className="space-y-2">
-                            <Label>تاريخ الميلاد</Label>
+                            <Label>تاريخ الميلاد (اختياري)</Label>
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !birthDate && "text-muted-foreground")}>
@@ -1055,4 +1055,5 @@ export default function PreRegistrationPage() {
 
 
     
+
 

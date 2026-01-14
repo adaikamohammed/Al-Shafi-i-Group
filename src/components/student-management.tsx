@@ -1074,11 +1074,11 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div className="space-y-2">
-                <Label>العمر (تقريبي)</Label>
+                <Label>العمر (اختياري)</Label>
                 <Input id="age-input" type="number" value={age} onChange={handleAgeChange} placeholder="مثال: 12"/>
             </div>
             <div className="space-y-2 md:col-span-2">
-                <Label>تاريخ الميلاد</Label>
+                <Label>تاريخ الميلاد (اختياري)</Label>
                 <Popover>
                     <PopoverTrigger asChild>
                     <Button
@@ -1247,6 +1247,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
 
 
 
