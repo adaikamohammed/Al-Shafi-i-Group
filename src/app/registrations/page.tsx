@@ -439,11 +439,7 @@ export default function PreRegistrationPage() {
     const [selectedRows, setSelectedRows] = useState<string[]>([]);
     const [isBulkEditOpen, setBulkEditOpen] = useState(false);
     const [isPrintModalOpen, setPrintModalOpen] = useState(false);
-    const [printableColumns, setPrintableColumns] = useState(
-        Object.keys(ALL_COLUMNS).reduce((acc, key) => ({ ...acc, [key]: true }), {})
-    );
-    const router = useRouter();
-
+    
     const [accessLevel, setAccessLevel] = useState<'hidden' | 'view_only' | 'unlocked'>('hidden');
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
     const [accessCode, setAccessCode] = useState('');
@@ -851,7 +847,7 @@ export default function PreRegistrationPage() {
                     </Card>
 
                     <Card className={cn('transition-all print-container', !isLocked && 'border-green-500 ring-2 ring-green-500/20')}>
-                        <CardHeader className="print-hidden">
+                        <CardHeader className="print-header">
                             <CardTitle>قائمة طلبات التسجيل ({filteredRegistrations.length})</CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -1029,9 +1025,9 @@ export default function PreRegistrationPage() {
                             <div key={key} className="flex items-center space-x-2 space-x-reverse">
                                 <Checkbox
                                     id={`print-col-${key}`}
-                                    checked={(printableColumns as any)[key]}
+                                    checked={(columnVisibility as any)[key].visible}
                                     onCheckedChange={(checked) => {
-                                        setPrintableColumns(prev => ({ ...prev, [key]: checked }));
+                                        setColumnVisibility(prev => ({...prev, [key]: {...prev[key as keyof typeof prev], visible: checked}}));
                                     }}
                                 />
                                 <label
@@ -1056,6 +1052,9 @@ export default function PreRegistrationPage() {
             {/* Print Styles */}
             <style jsx global>{`
                 @media print {
+                    body {
+                        font-size: 10pt;
+                    }
                     body * {
                         visibility: hidden;
                     }
@@ -1068,21 +1067,29 @@ export default function PreRegistrationPage() {
                         top: 0;
                         width: 100%;
                     }
+                    .print-header {
+                        display: block !important;
+                        text-align: center;
+                        margin-bottom: 1rem;
+                    }
                     .print-hidden {
-                        display: none;
+                        display: none !important;
                     }
                     #print-table th, #print-table td {
-                        border: 1px solid #ddd;
-                        padding: 8px;
-                        text-align: center;
+                        border: 1px solid #ccc !important;
+                        padding: 4px 6px !important;
                     }
                     #print-table th {
-                        background-color: #f2f2f2;
+                        background-color: #f2f2f2 !important;
+                    }
+                    #print-table {
+                        width: 100%;
+                        border-collapse: collapse;
                     }
                 }
                  @page {
-                    size: landscape;
-                    margin: 20mm;
+                    size: A4 landscape;
+                    margin: 10mm;
                 }
             `}</style>
         </div>
