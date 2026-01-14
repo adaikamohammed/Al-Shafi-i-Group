@@ -444,10 +444,10 @@ export default function StudentManagementPage() {
         if (a.status !== b.status) {
             return statusOrder[a.status] - statusOrder[b.status];
         }
-        if (a[sortConfig.key] < b[sortConfig.key]) {
+        if (a[sortConfig.key as keyof Student] < b[sortConfig.key as keyof Student]) {
             return sortConfig.direction === 'ascending' ? -1 : 1;
         }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
+        if (a[sortConfig.key as keyof Student] > b[sortConfig.key as keyof Student]) {
             return sortConfig.direction === 'ascending' ? 1 : -1;
         }
         return 0;
@@ -943,7 +943,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         updateStudent(student.id, studentData, student.ownerId);
     } else {
         // Add new student
-        addStudent(studentData as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> & { photoFile?: File | null });
+        addStudent(studentData as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> & { photoFile?: File | null, ownerId: string, groupName: string });
     }
     
     onSuccess();

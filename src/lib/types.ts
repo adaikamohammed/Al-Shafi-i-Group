@@ -186,7 +186,7 @@ export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مر
 
 export interface PreRegistration {
     id: string;
-    ownerId?: string;
+    ownerId?: string; // This will store the UID of the Sheikh who approved the student
     requestedAt: Date | string;
     fullName: string;
     gender: "ذكر" | "أنثى";
