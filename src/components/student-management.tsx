@@ -153,9 +153,9 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
 
     return (
         <DialogContent className="sm:max-w-3xl p-0 flex flex-col max-h-[90vh]">
-             <DialogHeader className="sr-only">
-                <DialogTitle>ملف الطالب: {student.fullName}</DialogTitle>
-                <DialogDescription>عرض تفصيلي لبيانات وأداء الطالب.</DialogDescription>
+            <DialogHeader>
+              <DialogTitle className="sr-only">ملف الطالب: {student.fullName}</DialogTitle>
+              <DialogDescription className="sr-only">عرض تفصيلي لبيانات وأداء الطالب.</DialogDescription>
             </DialogHeader>
             <div className="p-6 border-b flex flex-col items-center">
                 <Avatar className="w-24 h-24 mb-4 border-4 border-primary">
@@ -287,7 +287,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
 };
 
 export default function StudentManagementPage() {
-  const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings } = useStudentContext();
+  const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings, addStudent } = useStudentContext();
   const { user, isSuperAdmin } = useAuth();
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setEditStudentDialogOpen] = useState(false);
@@ -488,13 +488,10 @@ export default function StudentManagementPage() {
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
-                 <DialogHeader>
-                    <DialogTitle>إضافة طالب جديد</DialogTitle>
-                    <DialogDescription>املأ الحقول أدناه لإضافة طالب جديد إلى الفوج.</DialogDescription>
-                </DialogHeader>
                 <StudentForm 
-                onSuccess={() => setAddStudentDialogOpen(false)} 
-                onCancel={() => setAddStudentDialogOpen(false)}
+                  addStudent={addStudent}
+                  onSuccess={() => setAddStudentDialogOpen(false)} 
+                  onCancel={() => setAddStudentDialogOpen(false)}
                 />
             </DialogContent>
             </Dialog>}
@@ -519,8 +516,9 @@ export default function StudentManagementPage() {
           </DialogTrigger>
           <DialogContent className="sm:max-w-[600px]">
               <StudentForm 
-              onSuccess={() => setAddStudentDialogOpen(false)} 
-              onCancel={() => setAddStudentDialogOpen(false)}
+                addStudent={addStudent}
+                onSuccess={() => setAddStudentDialogOpen(false)} 
+                onCancel={() => setAddStudentDialogOpen(false)}
               />
           </DialogContent>
           </Dialog>}
@@ -759,6 +757,8 @@ export default function StudentManagementPage() {
                   </DialogHeader>
                   <StudentForm
                       student={selectedStudent}
+                      addStudent={addStudent}
+                      updateStudent={updateStudent}
                       onSuccess={() => {
                           setEditStudentDialogOpen(false);
                           setSelectedStudent(null);
@@ -880,8 +880,8 @@ function StudentActions({ student, onStatusChange, onEdit, isSuperAdmin }: { stu
 }
 
 
-function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSuccess: () => void, onCancel: () => void }) {
-  const { addStudent, updateStudent, settings } = useStudentContext();
+function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }: { student?: Student, onSuccess: () => void, onCancel: () => void, addStudent: (data: any) => void, updateStudent: (id: string, data: any, ownerId: string) => void }) {
+  const { settings } = useStudentContext();
   const { user, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const [birthDate, setBirthDate] = useState<Date | undefined>(student?.birthDate ? new Date(student.birthDate) : undefined);
@@ -971,7 +971,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         updateStudent(student.id, studentData, student.ownerId);
     } else if (user) {
         // Add new student
-        addStudent({...studentData, ownerId: user.uid, groupName: user.group || 'غير محدد' } as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string });
+        addStudent({...studentData, ownerId: user.uid, groupName: user.group || 'غير محدد' });
     }
     
     onSuccess();
@@ -1012,12 +1012,6 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
 
   return (
     <form onSubmit={handleSubmit}>
-      <DialogHeader>
-        <DialogTitle>{student ? `تعديل بيانات: ${student.fullName}` : 'إضافة طالب جديد'}</DialogTitle>
-        <DialogDescription>
-          {student ? 'قم بتحديث معلومات الطالب هنا.' : 'املأ الحقول أدناه لإضافة طالب جديد إلى الفوج.'}
-        </DialogDescription>
-      </DialogHeader>
       <div className="max-h-[70vh] overflow-y-auto p-4 space-y-4">
         <div className="flex flex-col items-center gap-4">
             <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
@@ -1265,6 +1259,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
 
 
 
