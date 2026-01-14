@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -1259,12 +1258,3 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
     </form>
   );
 }
-
-
-
-
-
-
-
-
-
