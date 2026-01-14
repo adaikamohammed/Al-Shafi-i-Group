@@ -13,7 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, GraduationCap, GripVertical, Settings2, Lock, Unlock, Eye, EyeOff } from 'lucide-react';
+import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, GraduationCap, GripVertical, Settings2, Lock, Unlock, Eye, EyeOff, Printer } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -438,6 +438,10 @@ export default function PreRegistrationPage() {
     const [genderFilter, setGenderFilter] = useState('all');
     const [selectedRows, setSelectedRows] = useState<string[]>([]);
     const [isBulkEditOpen, setBulkEditOpen] = useState(false);
+    const [isPrintModalOpen, setPrintModalOpen] = useState(false);
+    const [printableColumns, setPrintableColumns] = useState(
+        Object.keys(ALL_COLUMNS).reduce((acc, key) => ({ ...acc, [key]: true }), {})
+    );
     const router = useRouter();
 
     const [accessLevel, setAccessLevel] = useState<'hidden' | 'view_only' | 'unlocked'>('hidden');
@@ -495,6 +499,11 @@ export default function PreRegistrationPage() {
             [key]: { ...prev[key], visible: !prev[key].visible }
         }));
     };
+    
+    const handlePrint = () => {
+        window.print();
+    };
+
 
     const setQuickView = () => {
         const quickViewCols: (keyof typeof ALL_COLUMNS)[] = ['fullName', 'educationalLevel', 'status'];
@@ -834,20 +843,23 @@ export default function PreRegistrationPage() {
                                         ))}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
+                                 <Button variant="outline" onClick={() => setPrintModalOpen(true)}>
+                                    <Printer className="ml-2 h-4 w-4" /> طباعة التقرير المفلتر
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className={cn('transition-all', !isLocked && 'border-green-500 ring-2 ring-green-500/20')}>
-                        <CardHeader>
+                    <Card className={cn('transition-all print-container', !isLocked && 'border-green-500 ring-2 ring-green-500/20')}>
+                        <CardHeader className="print-hidden">
                             <CardTitle>قائمة طلبات التسجيل ({filteredRegistrations.length})</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="relative w-full overflow-x-auto">
-                                <Table>
+                                <Table id="print-table">
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[50px] px-2">
+                                            <TableHead className="w-[50px] px-2 print-hidden">
                                                 <Checkbox
                                                     checked={selectedRows.length > 0 && selectedRows.length === filteredRegistrations.length && filteredRegistrations.length > 0}
                                                     onCheckedChange={(checked) => {
@@ -861,7 +873,7 @@ export default function PreRegistrationPage() {
                                                     disabled={isLocked}
                                                 />
                                             </TableHead>
-                                            <TableHead className="w-[80px]">
+                                            <TableHead className="w-[80px] print-hidden">
                                                 <Button variant="ghost" onClick={() => requestSort('pageNumber')} className="px-2">
                                                     الهوية
                                                     <ArrowUpDown className="mr-2 h-4 w-4" />
@@ -878,7 +890,7 @@ export default function PreRegistrationPage() {
                                             {columnVisibility.status.visible && <TableHead className="text-center">الحالة</TableHead>}
                                             {columnVisibility.notes.visible && <TableHead className="text-center">ملاحظات</TableHead>}
                                             {columnVisibility.requestedAt.visible && <TableHead className="text-center">تاريخ التسجيل</TableHead>}
-                                            <TableHead className="text-center">إجراءات</TableHead>
+                                            <TableHead className="text-center print-hidden">إجراءات</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -889,7 +901,7 @@ export default function PreRegistrationPage() {
                                                 onClick={() => setSelectedStudent(reg)}
                                                 data-state={selectedRows.includes(reg.id) && "selected"}
                                             >
-                                                <TableCell className="px-2" onClick={(e) => e.stopPropagation()}>
+                                                <TableCell className="px-2 print-hidden" onClick={(e) => e.stopPropagation()}>
                                                     <Checkbox
                                                         checked={selectedRows.includes(reg.id)}
                                                         onCheckedChange={(checked) => {
@@ -903,7 +915,7 @@ export default function PreRegistrationPage() {
                                                         disabled={isLocked}
                                                     />
                                                 </TableCell>
-                                                <TableCell>
+                                                <TableCell className="print-hidden">
                                                     <div className="flex flex-col items-center gap-1">
                                                         <Avatar className="w-10 h-10">
                                                             <AvatarImage src={reg.photoURL} />
@@ -929,7 +941,7 @@ export default function PreRegistrationPage() {
                                                 </TableCell>}
                                                 {columnVisibility.notes.visible && <TableCell className="max-w-[200px] truncate text-center">{reg.notes}</TableCell>}
                                                 {columnVisibility.requestedAt.visible && <TableCell className="text-center">{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt ? reg.requestedAt.toString() : '-')}</TableCell>}
-                                                <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                                <TableCell className="text-center print-hidden" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
                                                             <Button variant="ghost" size="icon" disabled={isLocked}><MoreHorizontal className="h-4 w-4" /></Button>
@@ -1002,6 +1014,77 @@ export default function PreRegistrationPage() {
                     </div>
                 </div>
             )}
+            
+             {/* Print Modal */}
+            <Dialog open={isPrintModalOpen} onOpenChange={setPrintModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>إعدادات طباعة التقرير</DialogTitle>
+                        <DialogDescription>
+                            اختر الأعمدة التي ترغب في تضمينها في التقرير المطبوع. سيتم طباعة الصفوف المفلترة حاليًا فقط.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid grid-cols-2 gap-4 py-4">
+                        {Object.entries(ALL_COLUMNS).map(([key, { label }]) => (
+                            <div key={key} className="flex items-center space-x-2 space-x-reverse">
+                                <Checkbox
+                                    id={`print-col-${key}`}
+                                    checked={(printableColumns as any)[key]}
+                                    onCheckedChange={(checked) => {
+                                        setPrintableColumns(prev => ({ ...prev, [key]: checked }));
+                                    }}
+                                />
+                                <label
+                                    htmlFor={`print-col-${key}`}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                    {label}
+                                </label>
+                            </div>
+                        ))}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setPrintModalOpen(false)}>إلغاء</Button>
+                        <Button onClick={() => { handlePrint(); setPrintModalOpen(false); }}>
+                            <Printer className="ml-2 h-4 w-4" />
+                            اطبع الآن
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Print Styles */}
+            <style jsx global>{`
+                @media print {
+                    body * {
+                        visibility: hidden;
+                    }
+                    .print-container, .print-container * {
+                        visibility: visible;
+                    }
+                    .print-container {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                    }
+                    .print-hidden {
+                        display: none;
+                    }
+                    #print-table th, #print-table td {
+                        border: 1px solid #ddd;
+                        padding: 8px;
+                        text-align: center;
+                    }
+                    #print-table th {
+                        background-color: #f2f2f2;
+                    }
+                }
+                 @page {
+                    size: landscape;
+                    margin: 20mm;
+                }
+            `}</style>
         </div>
     );
 }
