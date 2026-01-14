@@ -21,8 +21,6 @@ service firebase.storage {
 {
   "rules": {
     "users": {
-      // يسمح لأي شيخ مسجل بقراءة قائمة المستخدمين للتأكد من الصلاحيات
-      ".read": "auth != null && root.child('users').child(auth.uid).child('profile').child('role').val() === 'sheikh'",
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid"
