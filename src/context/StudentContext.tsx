@@ -258,7 +258,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
   const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string }) => {
     if (!authContextUser) return;
-    if (!isSuperAdmin && studentData.ownerId !== authContextUser.uid) return;
+    
+    const ownerId = isSuperAdmin ? studentData.ownerId : authContextUser.uid;
+    if (!ownerId) return;
 
     const studentId = uuidv4();
     let photoURL = studentData.photoURL || '';
@@ -274,14 +276,15 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const newStudent: Omit<Student, 'id'> & {id: string} = {
       ...(restOfStudentData as any),
       id: studentId,
-      ownerId: studentData.ownerId,
+      ownerId: ownerId,
+      groupName: isSuperAdmin ? studentData.groupName : (authContextUser.group || 'غير محدد'),
       memorizedSurahsCount: 0,
       subscriptionTier: studentData.subscriptionTier || 'فئة الأصاغر',
       updatedAt: new Date(),
       covenants: [],
       photoURL: photoURL
     };
-    const studentRef = ref(db, `users/${studentData.ownerId}/students/${studentId}`);
+    const studentRef = ref(db, `users/${ownerId}/students/${studentId}`);
     set(studentRef, {
         ...newStudent, 
         birthDate: newStudent.birthDate.toISOString(), 
@@ -290,7 +293,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         covenants: newStudent.covenants || null // Use null for empty array
     });
     
-    const surahProgressRef = ref(db, `users/${studentData.ownerId}/surahProgress/${studentId}`);
+    const surahProgressRef = ref(db, `users/${ownerId}/surahProgress/${studentId}`);
     set(surahProgressRef, {});
   };
   
@@ -314,7 +317,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     
     const finalData: Partial<PreRegistration> = {
         ...restOfData,
-        photoURL: finalPhotoURL,
+        photoURL: finalPhotoURL || null,
         birthDate: data.birthDate instanceof Date ? data.birthDate.toISOString() : data.birthDate,
     };
     
@@ -426,8 +429,10 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
   
   const deleteStudent = async (studentId: string, ownerId: string) => {
       if (!authContextUser) return;
-      if (isSuperAdmin || authContextUser.uid !== ownerId) return;
-      const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
+      const studentOwnerId = isSuperAdmin ? ownerId : authContextUser.uid;
+      if (!studentOwnerId) return;
+      
+      const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
       await remove(studentRef);
 
       // Delete photo from storage
@@ -621,5 +626,6 @@ export const useStudentContext = () => {
     
 
     
+
 
 
