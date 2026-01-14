@@ -138,7 +138,7 @@ const StudentProfileCard = ({ student, onPromote, onEdit, isLocked, sheikhs }: {
                 <Button variant="secondary" onClick={onEdit} disabled={isLocked}>تعديل</Button>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                         <Button disabled={isLocked}>نقل إلى فوج</Button>
+                         <Button disabled={isLocked || student.status === 'تم الإنضمام'}>نقل إلى فوج</Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
                         <DropdownMenuLabel>اختر فوج الشيخ</DropdownMenuLabel>
@@ -1045,14 +1045,3 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
-
-    
-
-    
-
-
-
-    
-
-
-
