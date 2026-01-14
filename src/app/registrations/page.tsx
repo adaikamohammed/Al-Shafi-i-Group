@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, GraduationCap, GripVertical, Settings2, Lock, Unlock, Eye, EyeOff } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
@@ -96,14 +96,14 @@ const calculateAge = (birthDate?: Date | string) => {
     }
 };
 
-const StudentProfileCard = ({ student, onPromote, onEdit, isLocked, sheikhs }: { student: PreRegistration, onPromote: (sheikhEmail: string) => void, onEdit: () => void, isLocked: boolean, sheikhs: AppUser[] }) => {
+const StudentProfileCard = ({ student, onEdit, isLocked }: { student: PreRegistration, onEdit: () => void, isLocked: boolean }) => {
     const headerColor = statusHeaderColors[student.status] || 'bg-gray-500';
 
     return (
         <DialogContent className="sm:max-w-2xl p-0">
-             <DialogHeader>
-                <DialogTitle className="sr-only">بطاقة الطالب: {student.fullName}</DialogTitle>
-                <DialogDescription className="sr-only">عرض تفصيلي لبيانات الطالب.</DialogDescription>
+             <DialogHeader className="sr-only">
+                <DialogTitle>بطاقة الطالب: {student.fullName}</DialogTitle>
+                <DialogDescription>عرض تفصيلي لبيانات الطالب.</DialogDescription>
             </DialogHeader>
             <div className={cn("p-6 rounded-t-lg text-white", headerColor)}>
                 <div className="flex items-center gap-4">
@@ -152,20 +152,6 @@ const StudentProfileCard = ({ student, onPromote, onEdit, isLocked, sheikhs }: {
             </div>
              <DialogFooter>
                 <Button variant="secondary" onClick={onEdit} disabled={isLocked}>تعديل</Button>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                         <Button disabled={isLocked || student.status === 'تم الإنضمام'}>نقل إلى فوج</Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                        <DropdownMenuLabel>اختر فوج الشيخ</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {SHEIKHS_LIST.map(sheikh => (
-                            <DropdownMenuItem key={sheikh.id} onSelect={() => onPromote(sheikh.email)}>
-                                {sheikh.name}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
             </DialogFooter>
         </DialogContent>
     );
@@ -645,52 +631,6 @@ export default function PreRegistrationPage() {
         setSelectedRows([]);
     };
 
-    const handlePromoteStudent = (reg: PreRegistration, sheikhEmail: string) => {
-        if (!reg.birthDate || !isValid(new Date(reg.birthDate))) {
-             toast({
-                title: 'خطأ في تاريخ الميلاد',
-                description: 'الرجاء تصحيح تاريخ ميلاد الطالب قبل نقله إلى فوج.',
-                variant: 'destructive',
-            });
-            handleEdit(reg);
-            return;
-        }
-        
-        const chosenSheikh = allUsers.find(u => u.email === sheikhEmail);
-        if (!chosenSheikh) {
-            toast({ title: 'خطأ', description: 'لم يتم العثور على الشيخ المختار.', variant: 'destructive'});
-            return;
-        }
-
-        const newStudentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & {ownerId: string, groupName: string} = {
-            ownerId: chosenSheikh.uid,
-            groupName: chosenSheikh.group || 'فوج غير محدد',
-            fullName: reg.fullName,
-            gender: reg.gender,
-            guardianName: reg.guardianName || 'غير محدد',
-            educationalLevel: reg.educationalLevel || 'غير محدد',
-            phone1: reg.phone1,
-            phone2: reg.phone2,
-            birthDate: new Date(reg.birthDate),
-            registrationDate: new Date(),
-            status: 'نشط' as StudentStatus,
-            subscriptionTier: 'فئة الأصاغر',
-            dailyMemorizationAmount: 'صفحة',
-            notes: reg.notes,
-            photoURL: reg.photoURL
-        };
-
-        addStudent(newStudentData);
-
-        updatePreRegistration(reg.id, { ...reg, status: 'تم الإنضمام', ownerId: chosenSheikh.uid }, true);
-
-        toast({
-            title: '✅ تم النقل بنجاح!',
-            description: `تم نقل الطالب ${reg.fullName} إلى ${chosenSheikh.group}.`,
-        });
-        setSelectedStudent(null);
-        router.push('/');
-    };
     
     if (loading) {
         return (
@@ -792,10 +732,8 @@ export default function PreRegistrationPage() {
                  <Dialog open={!!selectedStudent} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}>
                     <StudentProfileCard 
                         student={selectedStudent} 
-                        onPromote={(sheikhEmail) => handlePromoteStudent(selectedStudent, sheikhEmail)}
                         onEdit={() => handleEdit(selectedStudent)}
                         isLocked={isLocked}
-                        sheikhs={sheikhs}
                     />
                 </Dialog>
             )}
