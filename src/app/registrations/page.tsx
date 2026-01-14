@@ -13,7 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, GraduationCap, GripVertical, Settings2, Lock, Unlock, Eye, EyeOff, Printer, ChevronsUpDown, Check } from 'lucide-react';
+import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, GraduationCap, GripVertical, Settings2, Lock, Unlock, Eye, EyeOff, Printer, ChevronsUpDown, Check, X } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -81,18 +81,19 @@ const allEducationalLevels = Object.values(educationalLevels).flat();
 
 
 const ALL_COLUMNS = {
-    fullName: { label: "الإسم الكامل", visible: true },
-    gender: { label: "الجنس", visible: false },
-    birthDate: { label: "تاريخ الميلاد (اختياري)", visible: true },
-    educationalLevel: { label: "المستوى الدراسي", visible: true },
-    guardianName: { label: "إسم الولي", visible: false },
-    phone1: { label: "رقم الهاتف 1", visible: true },
-    phone2: { label: "رقم الهاتف 2", visible: false },
-    address: { label: "مقر السكن", visible: false },
-    status: { label: "الحالة", visible: true },
-    notes: { label: "ملاحظات", visible: true },
-    requestedAt: { label: "تاريخ التسجيل", visible: false },
-    manualActions: { label: "عمود الإجراءات", visible: false },
+    pageNumber: { label: "رقم الصفحة", visible: false, printOrder: 1 },
+    fullName: { label: "الإسم الكامل", visible: true, printOrder: 2 },
+    gender: { label: "الجنس", visible: false, printOrder: 10 },
+    birthDate: { label: "تاريخ الميلاد", visible: true, printOrder: 5 },
+    educationalLevel: { label: "المستوى الدراسي", visible: true, printOrder: 4 },
+    guardianName: { label: "إسم الولي", visible: false, printOrder: 6 },
+    phone1: { label: "رقم الهاتف 1", visible: true, printOrder: 3 },
+    phone2: { label: "رقم الهاتف 2", visible: false, printOrder: 7 },
+    address: { label: "مقر السكن", visible: false, printOrder: 8 },
+    status: { label: "الحالة", visible: true, printOrder: 9 },
+    notes: { label: "ملاحظات", visible: true, printOrder: 11 },
+    requestedAt: { label: "تاريخ التسجيل", visible: false, printOrder: 12 },
+    manualActions: { label: "عمود الإجراءات", visible: false, printOrder: 99 },
 };
 
 const calculateAge = (birthDate?: Date | string) => {
@@ -508,19 +509,16 @@ export default function PreRegistrationPage() {
     const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const [columnVisibility, setColumnVisibility] = useState(() => {
-        const initialVisibility: { [key: string]: { label: string; visible: boolean } } = JSON.parse(JSON.stringify(ALL_COLUMNS));
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('preRegColumnVisibility');
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('preRegColumnVisibility') : null;
+        let initialVisibility = { ...ALL_COLUMNS };
+        if (saved) {
             try {
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    for (const key in initialVisibility) {
-                         if (parsed[key] && typeof parsed[key].visible === 'boolean') {
-                            initialVisibility[key as keyof typeof initialVisibility].visible = parsed[key].visible;
-                        }
+                const parsed = JSON.parse(saved);
+                 Object.keys(initialVisibility).forEach(key => {
+                    if (parsed[key] && typeof parsed[key].visible === 'boolean') {
+                        initialVisibility[key as keyof typeof initialVisibility].visible = parsed[key].visible;
                     }
-                    return initialVisibility;
-                }
+                });
             } catch (e) {
                 console.error("Failed to parse column visibility from localStorage", e);
             }
@@ -699,6 +697,12 @@ export default function PreRegistrationPage() {
         bulkUpdatePreRegistrations(selectedRows, updateData);
         setSelectedRows([]);
     };
+    
+    const columnsToRender = useMemo(() => {
+        return Object.entries(columnVisibility)
+            .filter(([, { visible }]) => visible)
+            .sort(([, a], [, b]) => (a.printOrder || 99) - (b.printOrder || 99));
+    }, [columnVisibility]);
 
     
     if (loading) {
@@ -732,7 +736,7 @@ export default function PreRegistrationPage() {
 
     return (
         <div className="space-y-6">
-             <Card className={cn("sticky top-0 z-40 transition-colors", currentAccess.color)}>
+             <Card className={cn("sticky top-0 z-40 transition-colors print-hidden", currentAccess.color)}>
                 <CardContent className="p-3 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Button variant="ghost" size="icon" onClick={() => setIsAccessModalOpen(true)}>
@@ -776,7 +780,7 @@ export default function PreRegistrationPage() {
                 </DialogContent>
             </Dialog>
 
-            <Card>
+            <Card className="print-hidden">
                 <CardHeader>
                     <CardTitle className="text-3xl font-headline font-bold">إدارة التسجيلات الجديدة</CardTitle>
                     <CardDescription>
@@ -818,14 +822,18 @@ export default function PreRegistrationPage() {
 
             {accessLevel !== 'hidden' ? (
                 <>
-                    <Card>
+                    <Card className="print-hidden">
+                        <CardHeader>
+                            <CardTitle>أدوات الفلترة والبحث</CardTitle>
+                        </CardHeader>
                         <CardContent className="p-4 space-y-4">
-                            <div className="flex flex-wrap items-center gap-2">
-                                {Object.entries(statusBadgeColors).map(([status, className]) => (
-                                    <Badge key={status} className={cn("border cursor-pointer", className, statusFilter.includes(status) && "ring-2 ring-ring")} onClick={() => {
+                             <div className="flex flex-wrap items-center gap-2">
+                                {statusOptions.map(status => (
+                                    <Button key={status} variant={statusFilter.includes(status) ? 'default' : 'outline'} className={cn(statusFilter.includes(status) && statusBadgeColors[status])} onClick={() => {
                                         setStatusFilter(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status])
-                                    }}>{status}</Badge>
+                                    }}>{status}</Button>
                                 ))}
+                                {statusFilter.length > 0 && <Button variant="ghost" size="sm" onClick={() => setStatusFilter([])}>إلغاء الكل <X className="h-4 w-4 mr-1"/></Button>}
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <div className="relative flex-grow sm:flex-grow-0">
@@ -890,18 +898,18 @@ export default function PreRegistrationPage() {
                         </CardHeader>
                          <CardContent>
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                               {Object.entries(columnVisibility).map(([key, { label, visible }]) => (
+                               {Object.keys(ALL_COLUMNS).map((key) => (
                                 <div key={key} className="flex items-center space-x-2 space-x-reverse">
                                     <Checkbox
                                         id={`col-${key}`}
-                                        checked={visible}
+                                        checked={columnVisibility[key as keyof typeof columnVisibility]?.visible || false}
                                         onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
                                     />
                                     <label
                                         htmlFor={`col-${key}`}
                                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                                     >
-                                        {label}
+                                        {ALL_COLUMNS[key as keyof typeof ALL_COLUMNS].label}
                                     </label>
                                 </div>
                                ))}
@@ -932,24 +940,15 @@ export default function PreRegistrationPage() {
                                                     disabled={isLocked}
                                                 />
                                             </TableHead>
-                                            <TableHead className="w-[80px] print-hidden">
+                                            <TableHead className="w-[80px] p-2 print-hidden">
                                                 <Button variant="ghost" onClick={() => requestSort('pageNumber')} className="px-2">
                                                     الهوية
                                                     <ArrowUpDown className="mr-2 h-4 w-4" />
                                                 </Button>
                                             </TableHead>
-                                            {columnVisibility.fullName.visible && <TableHead className="flex-1 text-center">الإسم الكامل</TableHead>}
-                                            {columnVisibility.gender.visible && <TableHead className="text-center">الجنس</TableHead>}
-                                            {columnVisibility.birthDate.visible && <TableHead className="text-center">تاريخ الميلاد</TableHead>}
-                                            {columnVisibility.educationalLevel.visible && <TableHead className="text-center">المستوى الدراسي</TableHead>}
-                                            {columnVisibility.guardianName.visible && <TableHead className="text-center">إسم الولي</TableHead>}
-                                            {columnVisibility.phone1.visible && <TableHead className="text-center">رقم الهاتف 1</TableHead>}
-                                            {columnVisibility.phone2.visible && <TableHead className="text-center">رقم الهاتف 2</TableHead>}
-                                            {columnVisibility.address.visible && <TableHead className="text-center">مقر السكن</TableHead>}
-                                            {columnVisibility.status.visible && <TableHead className="text-center">الحالة</TableHead>}
-                                            {columnVisibility.notes.visible && <TableHead className="text-center">ملاحظات</TableHead>}
-                                            {columnVisibility.requestedAt.visible && <TableHead className="text-center">تاريخ التسجيل</TableHead>}
-                                            {columnVisibility.manualActions.visible && <TableHead className="text-center print-only-th">الإجراءات / ملاحظات الإدارة</TableHead>}
+                                            {columnsToRender.map(([key, { label }]) => (
+                                                <TableHead key={key} className="text-center">{label}</TableHead>
+                                            ))}
                                             <TableHead className="text-center print-hidden">إجراءات</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -975,7 +974,7 @@ export default function PreRegistrationPage() {
                                                         disabled={isLocked}
                                                     />
                                                 </TableCell>
-                                                <TableCell className="print-hidden">
+                                                <TableCell className="p-2 print-hidden">
                                                     <div className="flex flex-col items-center gap-1">
                                                         <Avatar className="w-10 h-10">
                                                             <AvatarImage src={reg.photoURL} />
@@ -983,25 +982,25 @@ export default function PreRegistrationPage() {
                                                                 {reg.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
                                                             </AvatarFallback>
                                                         </Avatar>
-                                                        <Badge variant="secondary" className="px-1.5 py-0.5 text-xs">{reg.pageNumber || 'N/A'}</Badge>
+                                                        
                                                     </div>
                                                 </TableCell>
-                                                {columnVisibility.fullName.visible && <TableCell className="font-medium text-center">{reg.fullName}</TableCell>}
-                                                {columnVisibility.gender.visible && <TableCell className="text-center">{reg.gender}</TableCell>}
-                                                {columnVisibility.birthDate.visible && <TableCell className="text-center">{reg.birthDate instanceof Date && isValid(reg.birthDate) ? format(reg.birthDate, 'yyyy/MM/dd') : (reg.birthDate ? reg.birthDate.toString() : 'غير محدد')}</TableCell>}
-                                                {columnVisibility.educationalLevel.visible && <TableCell className="text-center">{reg.educationalLevel}</TableCell>}
-                                                {columnVisibility.guardianName.visible && <TableCell className="text-center">{reg.guardianName}</TableCell>}
-                                                {columnVisibility.phone1.visible && <TableCell className="text-center">{reg.phone1}</TableCell>}
-                                                {columnVisibility.phone2.visible && <TableCell className="text-center">{reg.phone2}</TableCell>}
-                                                {columnVisibility.address.visible && <TableCell className="text-center">{reg.address}</TableCell>}
-                                                {columnVisibility.status.visible && <TableCell className="text-center">
-                                                    <Badge variant="outline" className={cn("border", statusBadgeColors[reg.status])}>
-                                                        {reg.status}
-                                                    </Badge>
-                                                </TableCell>}
-                                                {columnVisibility.notes.visible && <TableCell className="max-w-[200px] truncate text-center">{reg.notes}</TableCell>}
-                                                {columnVisibility.requestedAt.visible && <TableCell className="text-center">{reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (reg.requestedAt ? reg.requestedAt.toString() : '-')}</TableCell>}
-                                                {columnVisibility.manualActions.visible && <TableCell className="print-only-td"></TableCell>}
+                                                {columnsToRender.map(([key]) => {
+                                                    const value = reg[key as keyof PreRegistration];
+                                                    let content: React.ReactNode = value as string;
+                                                    if (key === 'status') {
+                                                        content = <Badge variant="outline" className={cn("border", statusBadgeColors[value as PreRegistrationStatus])}>{value as string}</Badge>;
+                                                    } else if (key === 'birthDate' || key === 'requestedAt') {
+                                                        content = value instanceof Date && isValid(value) ? format(value, 'yyyy/MM/dd') : (value ? value.toString() : 'غير محدد');
+                                                    } else if (key === 'fullName') {
+                                                        content = <span className="font-medium">{value as string}</span>;
+                                                    } else if (key === 'notes') {
+                                                        content = <span className="max-w-[200px] truncate block">{value as string}</span>;
+                                                    } else if (key === 'manualActions') {
+                                                        content = <div className="print-only-td"></div>
+                                                    }
+                                                    return <TableCell key={key} className="text-center">{content}</TableCell>;
+                                                })}
                                                 <TableCell className="text-center print-hidden" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
@@ -1017,7 +1016,7 @@ export default function PreRegistrationPage() {
                                             </TableRow>
                                         )) : (
                                             <TableRow>
-                                                <TableCell colSpan={Object.values(columnVisibility).filter(c => c.visible).length + 3} className="text-center h-24">
+                                                <TableCell colSpan={columnsToRender.length + 3} className="text-center h-24">
                                                     {searchTerm || levelFilter.length > 0 || statusFilter.length > 0 || genderFilter !== 'all'
                                                         ? 'لم يتم العثور على نتائج مطابقة للبحث.'
                                                         : 'لا توجد طلبات تسجيل جديدة في الوقت الحالي.'
@@ -1032,7 +1031,7 @@ export default function PreRegistrationPage() {
                     </Card>
                 </>
             ) : (
-                <Card className="flex flex-col items-center justify-center min-h-[300px] border-dashed">
+                <Card className="flex flex-col items-center justify-center min-h-[300px] border-dashed print-hidden">
                     <CardHeader className="text-center">
                         <EyeOff className="mx-auto h-12 w-12 text-muted-foreground" />
                         <CardTitle>البيانات مخفية</CardTitle>
@@ -1048,7 +1047,7 @@ export default function PreRegistrationPage() {
             )}
             
             {accessLevel === 'unlocked' && selectedRows.length > 0 && (
-                <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 border-t shadow-lg z-50">
+                <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 border-t shadow-lg z-50 print-hidden">
                     <div className="container mx-auto flex justify-between items-center">
                         <p className="font-semibold">{selectedRows.length} طلاب محددون</p>
                         <div className="flex gap-2">
@@ -1086,18 +1085,18 @@ export default function PreRegistrationPage() {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid grid-cols-2 gap-4 py-4">
-                        {Object.entries(columnVisibility).map(([key, { label, visible }]) => (
+                        {Object.keys(ALL_COLUMNS).map((key) => (
                             <div key={key} className="flex items-center space-x-2 space-x-reverse">
                                 <Checkbox
                                     id={`print-col-${key}`}
-                                    checked={visible}
+                                    checked={columnVisibility[key as keyof typeof columnVisibility]?.visible || false}
                                     onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
                                 />
                                 <label
                                     htmlFor={`print-col-${key}`}
                                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                                 >
-                                    {label}
+                                    {ALL_COLUMNS[key as keyof typeof ALL_COLUMNS].label}
                                 </label>
                             </div>
                         ))}
@@ -1117,21 +1116,24 @@ export default function PreRegistrationPage() {
                 @media print {
                     body {
                         font-size: 10pt;
+                        background-color: #ffffff !important;
                     }
                     body * {
                         visibility: hidden;
-                    }
-                    .print-container, .print-container * {
-                        visibility: visible;
                         background-color: #ffffff !important;
                         color: #000000 !important;
                         box-shadow: none !important;
+                    }
+                    .print-container, .print-container * {
+                        visibility: visible;
                     }
                     .print-container {
                         position: absolute;
                         left: 0;
                         top: 0;
                         width: 100%;
+                        border: none !important;
+                        ring-width: 0 !important;
                     }
                     .print-header {
                         display: block !important;
@@ -1141,14 +1143,13 @@ export default function PreRegistrationPage() {
                     .print-hidden {
                         display: none !important;
                     }
-                    .print-only-th, .print-only-td {
+                    .print-only-td {
                         display: table-cell !important;
-                        width: 3cm; /* Fixed width for the manual actions column */
+                        width: 3cm;
                     }
                     #print-table th, #print-table td {
                         border: 0.5pt solid black !important;
                         padding: 4px 6px !important;
-                        background-color: #ffffff !important;
                     }
                     #print-table th {
                         font-weight: bold;
@@ -1158,8 +1159,6 @@ export default function PreRegistrationPage() {
                         border-collapse: collapse;
                     }
                     #print-table .badge {
-                        background-color: transparent !important;
-                        color: #000000 !important;
                         border: 0.5pt solid black !important;
                     }
                 }
@@ -1171,4 +1170,5 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
 
