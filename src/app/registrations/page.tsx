@@ -928,30 +928,37 @@ export default function PreRegistrationPage() {
                                     <SelectItem value="أنثى">أنثى</SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline"><View className="ml-2 h-4 w-4"/> عرض الأعمدة</Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-56">
-                                        <DropdownMenuLabel>اختر الأعمدة للعرض</DropdownMenuLabel>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onSelect={setQuickView}>عرض سريع</DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={setAllView}>عرض الكل</DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        {Object.entries(columnVisibility).map(([key, value]) => (
-                                            <DropdownMenuCheckboxItem
-                                                key={key}
-                                                checked={columnVisibility[key as keyof typeof columnVisibility].visible}
-                                                onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
-                                            >
-                                                {value.label}
-                                            </DropdownMenuCheckboxItem>
-                                        ))}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
                                  <Button variant="outline" onClick={() => setPrintModalOpen(true)}>
                                     <Printer className="ml-2 h-4 w-4" /> طباعة التقرير المفلتر
                                 </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    
+                    <Card className="print-hidden">
+                        <CardHeader>
+                            <CardTitle>عرض الأعمدة</CardTitle>
+                        </CardHeader>
+                         <CardContent>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                               {Object.entries(ALL_COLUMNS).map(([key, { label }]) => {
+                                const column = (columnVisibility as any)[key];
+                                if (!column) return null;
+                                return (
+                                <div key={key} className="flex items-center space-x-2 space-x-reverse">
+                                    <Checkbox
+                                        id={`col-${key}`}
+                                        checked={column.visible}
+                                        onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
+                                    />
+                                    <label
+                                        htmlFor={`col-${key}`}
+                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                    >
+                                        {label}
+                                    </label>
+                                </div>
+                               )})}
                             </div>
                         </CardContent>
                     </Card>
@@ -1134,7 +1141,7 @@ export default function PreRegistrationPage() {
                     </DialogHeader>
                     <div className="grid grid-cols-2 gap-4 py-4">
                         {Object.entries(ALL_COLUMNS).map(([key, { label }]) => {
-                            const column = columnVisibility[key as keyof typeof columnVisibility];
+                            const column = (columnVisibility as any)[key];
                             if (!column) return null; // Defensive check
                             return (
                             <div key={key} className="flex items-center space-x-2 space-x-reverse">
@@ -1223,6 +1230,7 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
 
 
 
