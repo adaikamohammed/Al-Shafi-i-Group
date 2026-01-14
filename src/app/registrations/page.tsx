@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
@@ -69,7 +69,14 @@ const statusBadgeColors: Record<PreRegistrationStatus, string> = {
     "مرشح": "bg-orange-100 text-orange-800 border-orange-300",
 };
 
-const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
+const educationalLevels = {
+    "الطور الابتدائي": ["1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي"],
+    "الطور المتوسط": ["1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط"],
+    "الطور الثانوي": ["1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا"],
+    "أخرى": ["روضة", "تحضيري", "جامعي", "متوقف عن الدراسة"]
+};
+const allEducationalLevels = Object.values(educationalLevels).flat();
+
 
 const ALL_COLUMNS = {
     fullName: { label: "الإسم الكامل", visible: true },
@@ -307,10 +314,15 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="educationalLevel">المستوى الدراسي</Label>
-                         <Select dir="rtl" name="educationalLevel" defaultValue={existingRegistration?.educationalLevel}>
+                        <Select dir="rtl" name="educationalLevel" defaultValue={existingRegistration?.educationalLevel}>
                             <SelectTrigger id="educationalLevel"><SelectValue placeholder="اختر المستوى الدراسي" /></SelectTrigger>
                             <SelectContent>
-                                {educationalLevels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
+                                {Object.entries(educationalLevels).map(([group, levels]) => (
+                                    <SelectGroup key={group}>
+                                        <SelectLabel>{group}</SelectLabel>
+                                        {levels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
+                                    </SelectGroup>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
@@ -404,7 +416,7 @@ const BulkEditModal = ({ open, onOpenChange, selectedCount, onSave }: { open: bo
                              <Select dir="rtl" name="educationalLevel" disabled={!fieldsToUpdate.educationalLevel} onValueChange={(val) => handleInputChange('educationalLevel', val)}>
                                 <SelectTrigger id="level-select"><SelectValue placeholder="اختر المستوى الجديد" /></SelectTrigger>
                                 <SelectContent>
-                                    {educationalLevels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
+                                    {allEducationalLevels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -789,20 +801,25 @@ export default function PreRegistrationPage() {
                                     <DropdownMenuContent className="w-56">
                                         <DropdownMenuLabel>اختر المستويات</DropdownMenuLabel>
                                         <DropdownMenuSeparator />
-                                        {educationalLevels.map(level => (
-                                            <DropdownMenuCheckboxItem
-                                                key={level}
-                                                checked={levelFilter.includes(level)}
-                                                onCheckedChange={(checked) => {
-                                                    if (checked) {
-                                                        setLevelFilter(prev => [...prev, level]);
-                                                    } else {
-                                                        setLevelFilter(prev => prev.filter(l => l !== level));
-                                                    }
-                                                }}
-                                            >
-                                                {level}
-                                            </DropdownMenuCheckboxItem>
+                                        {Object.entries(educationalLevels).map(([group, levels]) => (
+                                            <React.Fragment key={group}>
+                                                <DropdownMenuLabel className="px-1 text-xs font-bold text-muted-foreground">{group}</DropdownMenuLabel>
+                                                {levels.map(level => (
+                                                    <DropdownMenuCheckboxItem
+                                                        key={level}
+                                                        checked={levelFilter.includes(level)}
+                                                        onCheckedChange={(checked) => {
+                                                            if (checked) {
+                                                                setLevelFilter(prev => [...prev, level]);
+                                                            } else {
+                                                                setLevelFilter(prev => prev.filter(l => l !== level));
+                                                            }
+                                                        }}
+                                                    >
+                                                        {level}
+                                                    </DropdownMenuCheckboxItem>
+                                                ))}
+                                            </React.Fragment>
                                         ))}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
@@ -1051,9 +1068,9 @@ export default function PreRegistrationPage() {
                             <div key={key} className="flex items-center space-x-2 space-x-reverse">
                                 <Checkbox
                                     id={`print-col-${key}`}
-                                    checked={(columnVisibility as any)[key]?.visible ?? false}
+                                    checked={columnVisibility[key as keyof typeof ALL_COLUMNS]?.visible ?? false}
                                     onCheckedChange={(checked) => {
-                                        setColumnVisibility(prev => ({...prev, [key]: {...prev[key as keyof typeof prev], visible: !!checked}}));
+                                        setColumnVisibility(prev => ({...prev, [key as keyof typeof prev]: {...prev[key as keyof typeof prev], visible: !!checked}}));
                                     }}
                                 />
                                 <label
@@ -1134,6 +1151,7 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
 
 
 
