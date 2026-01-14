@@ -488,7 +488,7 @@ export default function StudentManagementPage() {
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
-                 <DialogHeader className="sr-only">
+                 <DialogHeader>
                     <DialogTitle>إضافة طالب جديد</DialogTitle>
                     <DialogDescription>املأ الحقول أدناه لإضافة طالب جديد إلى الفوج.</DialogDescription>
                 </DialogHeader>
@@ -753,10 +753,10 @@ export default function StudentManagementPage() {
       {selectedStudent && isEditStudentDialogOpen && (
           <Dialog open={isEditStudentDialogOpen} onOpenChange={setEditStudentDialogOpen}>
               <DialogContent className="sm:max-w-[600px]">
-                   <DialogHeader className="sr-only">
-                        <DialogTitle>تعديل بيانات: {selectedStudent.fullName}</DialogTitle>
-                        <DialogDescription>قم بتحديث معلومات الطالب هنا.</DialogDescription>
-                    </DialogHeader>
+                  <DialogHeader>
+                    <DialogTitle>تعديل بيانات: {selectedStudent.fullName}</DialogTitle>
+                    <DialogDescription>قم بتحديث معلومات الطالب هنا.</DialogDescription>
+                  </DialogHeader>
                   <StudentForm
                       student={selectedStudent}
                       onSuccess={() => {
@@ -1265,6 +1265,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
 
 
 
