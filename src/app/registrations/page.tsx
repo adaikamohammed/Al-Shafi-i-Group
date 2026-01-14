@@ -13,7 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, GraduationCap, GripVertical, Settings2, Lock, Unlock, Eye, EyeOff, Printer } from 'lucide-react';
+import { PlusCircle, Loader2, CalendarIcon, MoreHorizontal, Edit, Trash2, ArrowUpCircle, Search, Filter, View, ArrowUpDown, User as UserIcon, UserRound, Phone, GraduationCap, GripVertical, Settings2, Lock, Unlock, Eye, EyeOff, Printer, ChevronsUpDown, Check } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -29,6 +29,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+
 
 // 1. قائمة المشايخ الرسمية مرتبة (المرجع الأساسي)
 const SHEIKHS_LIST = [
@@ -173,6 +175,8 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
     const [notes, setNotes] = useState(existingRegistration?.notes || '');
     const [photoPreview, setPhotoPreview] = useState<string | null>(existingRegistration?.photoURL || null);
     const [photoFile, setPhotoFile] = useState<File | null>(null);
+    const [eduLevel, setEduLevel] = useState(existingRegistration?.educationalLevel || "");
+    const [isEduLevelPopoverOpen, setEduLevelPopoverOpen] = useState(false);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const {toast} = useToast();
 
@@ -195,7 +199,7 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData.entries());
-        onSave({ ...data, birthDate, id: existingRegistration?.id, notes, photoFile });
+        onSave({ ...data, educationalLevel: eduLevel, birthDate, id: existingRegistration?.id, notes, photoFile });
     }
     
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -314,17 +318,44 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="educationalLevel">المستوى الدراسي</Label>
-                        <Select dir="rtl" name="educationalLevel" defaultValue={existingRegistration?.educationalLevel}>
-                            <SelectTrigger id="educationalLevel"><SelectValue placeholder="اختر المستوى الدراسي" /></SelectTrigger>
-                            <SelectContent>
-                                {Object.entries(educationalLevels).map(([group, levels]) => (
-                                    <SelectGroup key={group}>
-                                        <SelectLabel>{group}</SelectLabel>
-                                        {levels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
-                                    </SelectGroup>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <Popover open={isEduLevelPopoverOpen} onOpenChange={setEduLevelPopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={isEduLevelPopoverOpen}
+                                    className="w-full justify-between"
+                                >
+                                    {eduLevel ? eduLevel : "اختر المستوى الدراسي..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                <Command>
+                                    <CommandInput placeholder="ابحث عن مستوى..."/>
+                                    <CommandList>
+                                        <CommandEmpty>لم يتم العثور على المستوى.</CommandEmpty>
+                                        {Object.entries(educationalLevels).map(([group, levels]) => (
+                                            <CommandGroup key={group} heading={group}>
+                                                {levels.map(level => (
+                                                    <CommandItem
+                                                        key={level}
+                                                        value={level}
+                                                        onSelect={(currentValue) => {
+                                                            setEduLevel(currentValue === eduLevel ? "" : currentValue);
+                                                            setEduLevelPopoverOpen(false);
+                                                        }}
+                                                    >
+                                                        <Check className={cn("mr-2 h-4 w-4", eduLevel === level ? "opacity-100" : "opacity-0")}/>
+                                                        {level}
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        ))}
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="guardianName">اسم الولي</Label>
@@ -468,8 +499,14 @@ export default function PreRegistrationPage() {
             try {
                 if (saved) {
                     const parsed = JSON.parse(saved);
-                    // Merge with ALL_COLUMNS to ensure all keys are present
-                    return { ...ALL_COLUMNS, ...parsed };
+                    // Merge with ALL_COLUMNS to ensure all keys are present and have a 'visible' property
+                    const merged = { ...ALL_COLUMNS };
+                    for (const key in parsed) {
+                        if (key in merged) {
+                            merged[key as keyof typeof ALL_COLUMNS].visible = parsed[key].visible;
+                        }
+                    }
+                    return merged;
                 }
             } catch (e) {
                 console.error("Failed to parse column visibility from localStorage", e);
@@ -1151,6 +1188,7 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
 
 
 
