@@ -1054,6 +1054,7 @@ export default function PreRegistrationPage() {
                 @media print {
                     body {
                         font-size: 10pt;
+                        color: #000;
                     }
                     body * {
                         visibility: hidden;
@@ -1076,11 +1077,14 @@ export default function PreRegistrationPage() {
                         display: none !important;
                     }
                     #print-table th, #print-table td {
-                        border: 1px solid #ccc !important;
+                        border: 1px solid #000 !important;
                         padding: 4px 6px !important;
+                        background-color: transparent !important;
+                        color: #000 !important;
+                        box-shadow: none !important;
                     }
                     #print-table th {
-                        background-color: #f2f2f2 !important;
+                        font-weight: bold;
                     }
                     #print-table {
                         width: 100%;
