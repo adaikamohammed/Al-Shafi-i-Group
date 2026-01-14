@@ -319,7 +319,7 @@ const PrintableWeeklyLog = ({ students, adminName, weekDates }: { students: Stud
                     }
                     @page {
                         size: A4 landscape;
-                        margin: 0.5cm;
+                        margin: 0.3cm;
                     }
                     .print-only {
                         display: block !important;
@@ -340,22 +340,31 @@ const PrintableWeeklyLog = ({ students, adminName, weekDates }: { students: Stud
                     .print-table {
                         width: 100%;
                         border-collapse: collapse;
-                        font-size: 0.8rem;
+                        font-size: 9pt;
                     }
                     .print-table th, .print-table td {
                         border: 1px solid black;
                         padding: 4px;
                         text-align: center;
                     }
+                    .print-table thead {
+                        display: table-header-group !important;
+                    }
                     .print-table th {
                         background-color: #f2f2f2 !important;
                     }
                     .student-row {
                         height: 40px; /* Ensure space for handwriting */
+                         page-break-inside: avoid;
+                         break-inside: avoid;
                     }
                     .sub-col {
                         width: 25px;
                         min-width: 25px;
+                        border-style: dotted !important;
+                    }
+                    .sub-col-header {
+                        font-size: 7pt;
                     }
                 }
             `}</style>
@@ -379,7 +388,7 @@ const PrintableWeeklyLog = ({ students, adminName, weekDates }: { students: Stud
                     <tr>
                         {Array(5).fill(0).map((_, i) => (
                             <React.Fragment key={i}>
-                                <th className="sub-col">ح</th><th className="sub-col">ت</th><th className="sub-col">م</th><th className="sub-col">س</th>
+                                <th className="sub-col sub-col-header">ح</th><th className="sub-col sub-col-header">ت</th><th className="sub-col sub-col-header">م</th><th className="sub-col sub-col-header">س</th>
                             </React.Fragment>
                         ))}
                     </tr>
@@ -391,7 +400,7 @@ const PrintableWeeklyLog = ({ students, adminName, weekDates }: { students: Stud
                             <td style={{textAlign: 'right', paddingRight: '8px'}}>{student.fullName}</td>
                             <td>{student.educationalLevel || ''}</td>
                             {/* Saturday to Wednesday cells */}
-                            {Array(20).fill(0).map((_, i) => <td key={i}></td>)}
+                            {Array(20).fill(0).map((_, i) => <td key={i} className="sub-col"></td>)}
                         </tr>
                     ))}
                 </tbody>
@@ -1410,5 +1419,6 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
 
     
     
+
 
 
