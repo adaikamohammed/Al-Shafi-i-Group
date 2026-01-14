@@ -117,9 +117,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     setLoading(true);
 
-    let usersRef: DatabaseReference;
+    let dataRef: DatabaseReference;
     let preRegsRef: DatabaseReference;
-    let usersListener: () => void;
+    let dataListener: () => void;
     let preRegsListener: () => void;
     
     const allUsersRef = ref(db, 'users');
@@ -162,8 +162,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
 
     if (isSuperAdmin) {
-      usersRef = ref(db, 'users');
-      usersListener = onValue(usersRef, (snapshot) => {
+      dataRef = ref(db, 'users');
+      dataListener = onValue(dataRef, (snapshot) => {
         if (!snapshot.exists()) {
           setLoading(false);
           return;
@@ -217,8 +217,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       });
 
     } else {
-      usersRef = ref(db, `users/${authContextUser.uid}`);
-      usersListener = onValue(usersRef, (snapshot) => {
+      dataRef = ref(db, `users/${authContextUser.uid}`);
+      dataListener = onValue(dataRef, (snapshot) => {
         if (!snapshot.exists()) {
           setLoading(false);
           setStudents([]); setDailySessions({}); setDailyReports({});
@@ -249,7 +249,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
 
     return () => {
-      off(usersRef, 'value', usersListener);
+      off(dataRef, 'value', dataListener);
       off(preRegsRef, 'value', preRegsListener);
       off(allUsersRef, 'value', allUsersListener);
     };
@@ -614,3 +614,5 @@ export const useStudentContext = () => {
   return context;
 };
 
+
+      
