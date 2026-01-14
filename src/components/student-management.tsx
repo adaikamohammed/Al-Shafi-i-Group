@@ -151,68 +151,50 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
     const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط');
 
     return (
-        <DialogContent className="sm:max-w-3xl p-0">
-             <div className="p-6 border-b">
-                 <div className="flex flex-col items-center">
-                    <Avatar className="w-24 h-24 mb-4 border-4 border-primary">
-                        <AvatarImage src={student.photoURL} alt={student.fullName} />
-                        <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <h2 className="text-2xl font-bold flex items-center gap-2">
-                        {student.fullName}
-                        {medalHistory.grandMaster && (
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger>
-                                        <Award className="h-6 w-6 text-amber-500" />
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>وسام "المتقن الكبير" (3 ميداليات ذهبية متتالية)</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        )}
-                    </h2>
-                    <p className="text-muted-foreground">{student.status}</p>
+        <DialogContent className="sm:max-w-3xl p-0 flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b flex flex-col items-center">
+                <Avatar className="w-24 h-24 mb-4 border-4 border-primary">
+                    <AvatarImage src={student.photoURL} alt={student.fullName} />
+                    <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                    {student.fullName}
+                    {medalHistory.grandMaster && (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger>
+                                    <Award className="h-6 w-6 text-amber-500" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>وسام "المتقن الكبير" (3 ميداليات ذهبية متتالية)</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
+                </h2>
+                <div className="flex items-center gap-4 mt-2">
+                    <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
+                    <p className="text-sm text-muted-foreground">الشيخ: {user?.displayName}</p>
                 </div>
             </div>
 
             <div className="overflow-y-auto px-6 pb-6 space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4">
-                    <div className="p-3 bg-muted rounded-lg">
-                        <dt className="text-sm font-medium text-muted-foreground">العمر</dt>
-                        <dd className="font-semibold">{calculateAge(student.birthDate)} سنة</dd>
-                    </div>
-                    <div className="p-3 bg-muted rounded-lg">
-                        <dt className="text-sm font-medium text-muted-foreground">تاريخ التسجيل</dt>
-                        <dd className="font-semibold">{format(student.registrationDate, 'd MMM yyyy', {locale: ar})}</dd>
-                    </div>
-                    <div className="p-3 bg-muted rounded-lg">
-                        <dt className="text-sm font-medium text-muted-foreground">هاتف الولي</dt>
-                        <dd className="font-semibold">{student.phone1}</dd>
-                    </div>
-                     <div className="p-3 bg-muted rounded-lg">
-                        <dt className="text-sm font-medium text-muted-foreground">الفوج</dt>
-                        <dd className="font-semibold">{student.groupName || 'غير محدد'}</dd>
-                    </div>
-                     <div className="p-3 bg-muted rounded-lg">
-                        <dt className="text-sm font-medium text-muted-foreground">الشيخ المشرف</dt>
-                        <dd className="font-semibold">{user?.displayName}</dd>
-                    </div>
-                     <div className="p-3 bg-muted rounded-lg">
-                        <dt className="text-sm font-medium text-muted-foreground">المستوى الحالي</dt>
-                        <dd className="font-semibold">{student.subscriptionTier}</dd>
-                    </div>
-                </div>
                  <Card>
                     <CardHeader>
-                        <CardTitle>المؤشرات الذكية</CardTitle>
+                        <CardTitle className="text-base">مؤشرات الأداء</CardTitle>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                         <TooltipProvider>
+                         <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                             <GraduationCap className="h-5 w-5 text-muted-foreground"/>
+                             <div>
+                                <p className="text-xs text-muted-foreground">المستوى الدراسي</p>
+                                 <p className="font-bold">{student.educationalLevel || 'غير محدد'}</p>
+                            </div>
+                        </div>
+                        <TooltipProvider>
                          <Tooltip>
-                            <TooltipTrigger>
-                                <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md">
+                            <TooltipTrigger asChild>
+                                <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
                                     <Award className="h-5 w-5 text-blue-600"/>
                                     <div>
                                         <p className="text-xs text-blue-800">الترتيب الشهري الحالي</p>
@@ -226,28 +208,43 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
                         </Tooltip>
                         </TooltipProvider>
 
-                         <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-md">
+                         <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
                             <FolderKanban className="h-5 w-5 text-orange-600"/>
                             <div>
                                 <p className="text-xs text-orange-800">ميزان الالتزام</p>
                                 <p className="font-bold">{commitmentBalance > 0 ? `مدين بـ ${commitmentBalance} حصص` : "لا يوجد دين"}</p>
                             </div>
                         </div>
-                         <div className="flex items-center gap-2 p-2 bg-yellow-50 rounded-md">
-                            <ShieldAlert className="h-5 w-5 text-yellow-600"/>
-                            <div>
-                                <p className="text-xs text-yellow-800">المواثيق النشطة</p>
-                                <p className="font-bold">{activeCovenant ? activeCovenant.card : "لا يوجد"}</p>
+                    </CardContent>
+                </Card>
+
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">بيانات التواصل</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex items-center gap-2 p-2">
+                             <UserIcon className="h-5 w-5 text-muted-foreground"/>
+                             <div>
+                                <p className="text-xs text-muted-foreground">اسم الولي</p>
+                                 <p className="font-bold">{student.guardianName}</p>
+                            </div>
+                        </div>
+                         <div className="flex items-center gap-2 p-2">
+                             <Phone className="h-5 w-5 text-muted-foreground"/>
+                             <div>
+                                <p className="text-xs text-muted-foreground">رقم هاتف الولي</p>
+                                 <p className="font-bold">{student.phone1}</p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
-
+                
                 <Separator />
                 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex justify-between items-center">
+                        <CardTitle className="flex justify-between items-center text-base">
                             <span>حصاد الأوسمة السنوي ({getYear(new Date())})</span>
                              <div className="flex items-center gap-2 text-base">
                                 <span className="font-bold text-amber-500">{medalHistory.goldCount} 🥇</span>
@@ -276,7 +273,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
                     </CardContent>
                 </Card>
             </div>
-             <DialogFooter>
+             <DialogFooter className="border-t p-6">
                 <Button variant="secondary" onClick={onViewStats}>عرض الإحصائيات</Button>
                 <Button onClick={onEdit}>تعديل البيانات</Button>
             </DialogFooter>
@@ -1236,3 +1233,4 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
