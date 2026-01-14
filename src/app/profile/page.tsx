@@ -190,10 +190,9 @@ export default function ProfilePage() {
         setIsSaving(true);
         try {
             await updateUserProfile({ ...formData, photoFile });
-            toast({ title: `✅ تم تحديث ملفك الشخصي بنجاح يا شيخ ${formData.displayName}` });
             setPhotoFile(null); // Reset file input after save
         } catch (error) {
-            toast({ title: '❌ خطأ', description: 'فشل تحديث الملف الشخصي.', variant: 'destructive'});
+           // Error toast is handled in updateUserProfile
         } finally {
             setIsSaving(false);
         }
@@ -204,9 +203,8 @@ export default function ProfilePage() {
         setIsSaving(true);
         try {
             await updateUserProfile({ joinDate: formData.joinDate, adminNotes, adminAwards });
-            toast({ title: `✅ تم تحديث السجل الإداري للشيخ ${formData.displayName}` });
         } catch (error) {
-            toast({ title: '❌ خطأ', description: 'فشل تحديث السجل الإداري.', variant: 'destructive'});
+            // Error toast is handled in updateUserProfile
         } finally {
             setIsSaving(false);
         }

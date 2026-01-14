@@ -50,6 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<'sheikh' | 'super_admin' | null>(null);
+  const { toast } = useToast();
   const isSuperAdmin = role === 'super_admin';
 
   useEffect(() => {
@@ -131,42 +132,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const updateUserProfile = async (data: Partial<AppUser> & { photoFile?: File | Blob | null }) => {
     if (!auth.currentUser) throw new Error("User not authenticated.");
+    
+    try {
+        const { photoFile, ...profileData } = data;
+        const updates: { [key: string]: any } = {};
+        let newPhotoURL = user?.photoURL || null;
 
-    const { photoFile, ...profileData } = data;
-    const updates: { [key: string]: any } = {};
-    let newPhotoURL = user?.photoURL || null;
-
-    if (photoFile) {
-        const imageRef = storageRef(storage, `sheikh_profiles/${auth.currentUser.uid}`);
-        await uploadBytes(imageRef, photoFile);
-        newPhotoURL = await getDownloadURL(imageRef);
-        updates[`users/${auth.currentUser.uid}/profile/photoURL`] = newPhotoURL;
-    }
-
-    // Prepare updates for all provided data
-    for (const key in profileData) {
-        if (Object.prototype.hasOwnProperty.call(profileData, key)) {
-            updates[`users/${auth.currentUser.uid}/profile/${key}`] = (profileData as any)[key];
+        if (photoFile) {
+            const imageRef = storageRef(storage, `sheikh_profiles/${auth.currentUser.uid}`);
+            await uploadBytes(imageRef, photoFile);
+            newPhotoURL = await getDownloadURL(imageRef);
+            updates[`users/${auth.currentUser.uid}/profile/photoURL`] = newPhotoURL;
         }
-    }
 
-    if (Object.keys(updates).length > 0) {
-        await update(ref(db), updates);
+        // Prepare updates for all provided data
+        for (const key in profileData) {
+            if (Object.prototype.hasOwnProperty.call(profileData, key)) {
+                updates[`users/${auth.currentUser.uid}/profile/${key}`] = (profileData as any)[key];
+            }
+        }
+
+        if (Object.keys(updates).length > 0) {
+            await update(ref(db), updates);
+            
+            // Update Firebase Auth profile if displayName or photoURL changed
+            const authUpdates: { displayName?: string; photoURL?: string } = {};
+            if (profileData.displayName && profileData.displayName !== auth.currentUser.displayName) {
+              authUpdates.displayName = profileData.displayName;
+            }
+            if (newPhotoURL && newPhotoURL !== auth.currentUser.photoURL) {
+              authUpdates.photoURL = newPhotoURL;
+            }
+
+            if (Object.keys(authUpdates).length > 0) {
+              await updateProfile(auth.currentUser, authUpdates);
+            }
+            
+            setUser(prevUser => prevUser ? { ...prevUser, ...profileData, photoURL: newPhotoURL } : null);
+        }
         
-        // Update Firebase Auth profile if displayName or photoURL changed
-        const authUpdates: { displayName?: string; photoURL?: string } = {};
-        if (profileData.displayName && profileData.displayName !== auth.currentUser.displayName) {
-          authUpdates.displayName = profileData.displayName;
-        }
-        if (newPhotoURL && newPhotoURL !== auth.currentUser.photoURL) {
-          authUpdates.photoURL = newPhotoURL;
-        }
+        toast({
+            title: `✅ تم الحفظ بنجاح!`,
+            description: `تم تحديث ملفك الشخصي يا شيخ ${profileData.displayName || user?.displayName}.`,
+        });
 
-        if (Object.keys(authUpdates).length > 0) {
-          await updateProfile(auth.currentUser, authUpdates);
-        }
-        
-        setUser(prevUser => prevUser ? { ...prevUser, ...profileData, photoURL: newPhotoURL } : null);
+    } catch (error) {
+        console.error("Error updating profile:", error);
+        toast({
+            title: '❌ خطأ في التحديث',
+            description: 'فشل حفظ التغييرات. يرجى التأكد من اتصالك بالإنترنت والمحاولة مرة أخرى.',
+            variant: 'destructive',
+        });
+        throw error; // Re-throw error to be caught by the calling component
     }
   };
 
