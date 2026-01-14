@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser } from '@/lib/types';
 import { isWithinInterval, parseISO, isValid } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -49,6 +49,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 interface StudentContextType {
   students: Student[];
   preRegistrations: PreRegistration[];
+  allUsers: AppUser[];
   dailySessions: Record<string, Record<string, DailySession>>;
   dailyReports: { [date: string]: { [reportId: string]: DailyReport } };
   surahProgress: Record<string, SurahMastery>;
@@ -87,64 +88,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   
   const [students, setStudents] = useState<Student[]>([]);
   const [preRegistrations, setPreRegistrations] = useState<PreRegistration[]>([]);
+  const [allUsers, setAllUsers] = useState<AppUser[]>([]);
   const [dailySessions, setDailySessions] = useState<Record<string, Record<string, DailySession>>>({});
   const [dailyReports, setDailyReports] = useState<{ [date: string]: { [reportId: string]: DailyReport } }>({});
   const [surahProgress, setSurahProgress] = useState<Record<string, SurahMastery>>({});
   const [payments, setPayments] = useState<Payment[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
-
-   useEffect(() => {
-    if (authContextUser && students.length > 0 && !loading) {
-      const migrationKey = 'groupNameMigration_v2';
-      const hasMigrated = localStorage.getItem(migrationKey);
-
-      if (!hasMigrated) {
-        console.log("Running one-time data migration for group names...");
-        
-        const groupMapping: { [key: string]: string } = {
-          'فوج 1': 'فوج الشيخ زياد درويش',
-          'فوج 2': 'فوج الشيخ عبد الحميد',
-          'فوج 3': 'فوج الشيخ فؤاد بن عمر',
-          'فوج 4': 'فوج الشيخ أحمد بن عمر',
-          'فوج 5': 'فوج الشيخ إبراهيم مراد',
-          'فوج 6': 'فوج الشيخ سفيان نصيرة',
-          'فوج 7': 'فوج الشيخ محمد منصور',
-          'فوج 8': 'فوج الشيخ عبد الحق نصيرة',
-          'فوج 9': 'فوج الشيخ صهيب نصيب',
-        };
-
-        const updates: { [key: string]: any } = {};
-        let studentsToUpdate = 0;
-
-        students.forEach(student => {
-          if (student.groupName && groupMapping[student.groupName]) {
-            const newGroupName = groupMapping[student.groupName];
-            const studentRefPath = `users/${student.ownerId}/students/${student.id}/groupName`;
-            updates[studentRefPath] = newGroupName;
-            studentsToUpdate++;
-          }
-        });
-
-        if (studentsToUpdate > 0) {
-          const dbRef = ref(db);
-          update(dbRef, updates)
-            .then(() => {
-              console.log(`${studentsToUpdate} student records updated successfully.`);
-              localStorage.setItem(migrationKey, 'true');
-              toast({ title: "✅ تم تحديث النظام", description: `تم تحديث أسماء أفواج ${studentsToUpdate} طالبًا بنجاح.` });
-            })
-            .catch(error => {
-              console.error("Data migration failed:", error);
-              toast({ title: "❌ فشلت هجرة البيانات", description: "لم نتمكن من تحديث سجلات الطلاب القديمة.", variant: 'destructive'});
-            });
-        } else {
-            // No students to update, still mark as migrated to not run again
-            localStorage.setItem(migrationKey, 'true');
-        }
-      }
-    }
-  }, [students, authContextUser, loading, toast]);
   
  useEffect(() => {
     if (authLoading) {
@@ -161,6 +111,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setPayments([]);
       setSettingsState(DEFAULT_SETTINGS);
       setPreRegistrations([]);
+      setAllUsers([]);
       return;
     }
 
@@ -170,6 +121,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     let preRegsRef: DatabaseReference;
     let usersListener: () => void;
     let preRegsListener: () => void;
+    
+    const allUsersRef = ref(db, 'users');
+    const allUsersListener = onValue(allUsersRef, (snapshot) => {
+        const usersData = snapshot.val();
+        const usersArray = usersData ? Object.entries(usersData).map(([uid, data]: [string, any]) => ({
+            uid,
+            ...data.profile
+        })) : [];
+        setAllUsers(usersArray);
+    });
+
 
     const processStudentData = (studentData: any, uid: string, groupName?: string): Student => ({
         ...studentData,
@@ -289,6 +251,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       off(usersRef, 'value', usersListener);
       off(preRegsRef, 'value', preRegsListener);
+      off(allUsersRef, 'value', allUsersListener);
     };
   }, [authContextUser, authLoading, isSuperAdmin]);
 
@@ -298,7 +261,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     if (!isSuperAdmin && studentData.ownerId !== authContextUser.uid) return;
 
     const studentId = uuidv4();
-    let photoURL = '';
+    let photoURL = studentData.photoURL || '';
 
     if (studentData.photoFile) {
         const imageRef = storageRef(storage, `student_photos/${studentId}`);
@@ -428,9 +391,10 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
   const updateStudent = async (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => {
     if (!authContextUser) return;
     
-    if (isSuperAdmin || authContextUser.uid !== ownerId) return;
+    const studentOwnerId = isSuperAdmin ? ownerId : authContextUser.uid;
+    if (!studentOwnerId) return;
 
-    const originalStudent = (students ?? []).find(s => s.id === studentId);
+    const originalStudent = students.find(s => s.id === studentId);
     if (!originalStudent) return;
     
     let finalPhotoURL = originalStudent.photoURL;
@@ -443,7 +407,7 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
     
     const { photoFile, ...restOfUpdatedData } = updatedData;
 
-    const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
+    const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
     const finalData = { ...originalStudent, ...restOfUpdatedData, photoURL: finalPhotoURL, updatedAt: new Date() };
 
     const covenantsObject = (finalData.covenants || []).reduce((acc, cov) => {
@@ -488,12 +452,11 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
   }
 
   const deleteMultipleStudents = (studentsToDelete: { id: string, ownerId: string }[]) => {
-    if (!authContextUser || isSuperAdmin) return;
+    if (!authContextUser) return;
     const updates: { [key: string]: null } = {};
     studentsToDelete.forEach(({ id, ownerId }) => {
-      if (ownerId === authContextUser.uid) {
+      if (isSuperAdmin || ownerId === authContextUser.uid) {
         updates[`/users/${ownerId}/students/${id}`] = null;
-        // Optionally delete other related data like surahProgress, payments, etc.
         updates[`/users/${ownerId}/surahProgress/${id}`] = null;
       }
     });
@@ -564,10 +527,10 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
   }
   
  const toggleSurahStatus = (studentId: string, surahId: number) => {
-    if (!authContextUser || isSuperAdmin) return;
+    if (!authContextUser) return;
 
     const studentOwnerId = students.find(s => s.id === studentId)?.ownerId;
-    if(authContextUser.uid !== studentOwnerId) return;
+    if(!studentOwnerId || (!isSuperAdmin && authContextUser.uid !== studentOwnerId)) return;
 
     const studentProgressMap = { ...(surahProgress[studentId] || {}) };
     const currentStatus = studentProgressMap[surahId] || 0;
@@ -590,16 +553,15 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
         toast({ title: `🔄 -${pointsMastered} نقطة`, description: 'تم خصم نقاط الإتقان.', variant: 'destructive' });
     }
 
-
     if (nextStatus === 0) {
         delete studentProgressMap[surahId];
     }
 
-    const surahProgressRef = ref(db, `users/${authContextUser.uid}/surahProgress/${studentId}`);
+    const surahProgressRef = ref(db, `users/${studentOwnerId}/surahProgress/${studentId}`);
     set(surahProgressRef, surahProgressMap);
     
     const memorizedCount = Object.values(studentProgressMap).filter(status => status > 0).length;
-    updateStudent(studentId, { memorizedSurahsCount: memorizedCount }, authContextUser.uid);
+    updateStudent(studentId, { memorizedSurahsCount: memorizedCount }, studentOwnerId);
   }
 
   const addPayment = async (paymentData: Omit<Payment, 'id'>) => {
@@ -635,7 +597,7 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
   };
 
   return (
-    <StudentContext.Provider value={{ students, preRegistrations, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, deleteMultipleStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, updatePreRegistration, bulkUpdatePreRegistrations, deleteAllPreRegistrations, deleteMultiplePreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
+    <StudentContext.Provider value={{ students, preRegistrations, allUsers, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, deleteMultipleStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, updatePreRegistration, bulkUpdatePreRegistrations, deleteAllPreRegistrations, deleteMultiplePreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
       {children}
     </StudentContext.Provider>
   );
@@ -659,4 +621,5 @@ export const useStudentContext = () => {
     
 
     
+
 

@@ -19,12 +19,12 @@ import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import type { Student, StudentStatus, PreRegistration, PreRegistrationStatus } from '@/lib/types';
+import type { Student, StudentStatus, PreRegistration, PreRegistrationStatus, AppUser } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
@@ -83,7 +83,7 @@ const calculateAge = (birthDate?: Date | string) => {
     }
 };
 
-const StudentProfileCard = ({ student, onPromote, onEdit, isLocked }: { student: PreRegistration, onPromote: () => void, onEdit: () => void, isLocked: boolean }) => {
+const StudentProfileCard = ({ student, onPromote, onEdit, isLocked, sheikhs }: { student: PreRegistration, onPromote: (ownerId: string, groupName: string) => void, onEdit: () => void, isLocked: boolean, sheikhs: AppUser[] }) => {
     const headerColor = statusHeaderColors[student.status] || 'bg-gray-500';
 
     return (
@@ -138,7 +138,20 @@ const StudentProfileCard = ({ student, onPromote, onEdit, isLocked }: { student:
             </div>
              <DialogFooter>
                 <Button variant="secondary" onClick={onEdit} disabled={isLocked}>تعديل</Button>
-                <Button onClick={onPromote} disabled={student.status === 'تم الإنضمام' || isLocked}>نقل إلى فوج</Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                         <Button disabled={student.status === 'تم الإنضمام' || isLocked}>نقل إلى فوج</Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <DropdownMenuLabel>اختر فوج الشيخ</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {sheikhs.map(sheikh => (
+                            <DropdownMenuItem key={sheikh.uid} onSelect={() => onPromote(sheikh.uid, sheikh.group || 'فوج غير محدد')}>
+                                {sheikh.group}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </DialogFooter>
         </DialogContent>
     );
@@ -409,7 +422,7 @@ const BulkEditModal = ({ open, onOpenChange, selectedCount, onSave }: { open: bo
 
 export default function PreRegistrationPage() {
     const { toast } = useToast();
-    const { addStudent, preRegistrations, loading, updatePreRegistration, deleteMultiplePreRegistrations, bulkUpdatePreRegistrations } = useStudentContext();
+    const { addStudent, preRegistrations, loading, updatePreRegistration, deleteMultiplePreRegistrations, bulkUpdatePreRegistrations, allUsers } = useStudentContext();
     const [isFormOpen, setFormOpen] = useState(false);
     const [editingRegistration, setEditingRegistration] = useState<PreRegistration | null>(null);
     const [selectedStudent, setSelectedStudent] = useState<PreRegistration | null>(null);
@@ -439,6 +452,8 @@ export default function PreRegistrationPage() {
     });
 
     const isLocked = accessLevel !== 'unlocked';
+    
+    const sheikhs = useMemo(() => allUsers.filter(u => u.role === 'sheikh'), [allUsers]);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -611,7 +626,7 @@ export default function PreRegistrationPage() {
     };
 
     const handlePromoteStudent = (reg: PreRegistration, ownerId: string, groupName: string) => {
-        if (!reg.birthDate || !(reg.birthDate instanceof Date) || !isValid(reg.birthDate)) {
+        if (!reg.birthDate || !isValid(new Date(reg.birthDate))) {
              toast({
                 title: 'خطأ في تاريخ الميلاد',
                 description: 'الرجاء تصحيح تاريخ ميلاد الطالب قبل نقله إلى فوج.',
@@ -645,7 +660,7 @@ export default function PreRegistrationPage() {
 
         toast({
             title: '✅ تم النقل بنجاح!',
-            description: `تم نقل الطالب ${reg.fullName} إلى فوج الشيخ ${groupName}.`,
+            description: `تم نقل الطالب ${reg.fullName} إلى ${groupName}.`,
         });
         setSelectedStudent(null);
         router.push('/');
@@ -751,9 +766,10 @@ export default function PreRegistrationPage() {
                  <Dialog open={!!selectedStudent} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}>
                     <StudentProfileCard 
                         student={selectedStudent} 
-                        onPromote={() => { /* This is now handled by the Dropdown in the row */ }}
+                        onPromote={(ownerId, groupName) => handlePromoteStudent(selectedStudent, ownerId, groupName)}
                         onEdit={() => handleEdit(selectedStudent)}
                         isLocked={isLocked}
+                        sheikhs={sheikhs}
                     />
                 </Dialog>
             )}
@@ -1029,3 +1045,4 @@ export default function PreRegistrationPage() {
     
 
     
+
