@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import type { Student, DailyRecord, SessionType, DailySession, PreRegistration, PreRegistrationStatus, MemorizationAmount, SubscriptionTier, StudentStatus } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
-import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth, isValid, startOfYear, setYear, differenceInYears } from 'date-fns';
+import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth, isValid, startOfYear, setYear, differenceInYears, getYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/navigation';
@@ -41,35 +41,36 @@ export default function DataExchangePage() {
 
   const [isImportingStudents, setIsImportingStudents] = useState(false);
   const [isImportingSessions, setIsImportingSessions] = useState(false);
-  const [isImportingMonthly, setIsImportingMonthly] = useState(false);
+  const [isImportingMonthly, setIsImportingMonthly = useState(false);
   const [isImportingPreRegs, setIsImportingPreRegs] = useState(false);
 
 
- const parseDate = (dateInput: any, age?: number): Date | string | null => {
+ const parseDate = (dateInput: any, age?: number): Date | null => {
     if (dateInput) {
-        if (dateInput instanceof Date && isValid(dateInput)) return dateInput;
+        // Check if it's already a valid date object
+        if (dateInput instanceof Date && isValid(dateInput)) {
+            return dateInput;
+        }
+        // Check for string format dd/mm/yyyy or similar
         if (typeof dateInput === 'string') {
             const parts = dateInput.split(/[/.-]/);
             if (parts.length === 3) {
                 const day = parseInt(parts[0], 10);
                 const month = parseInt(parts[1], 10) - 1;
                 let year = parseInt(parts[2], 10);
-                if(year < 100) year += 2000;
+                if (year < 100) year += 2000;
                 const newDate = new Date(year, month, day);
                 if (isValid(newDate)) return newDate;
             }
-             if(parts.length === 1 && /^\d{4}$/.test(parts[0])) {
-                 return dateInput;
-             }
         }
+        // Handle Excel's numeric date format
         if (typeof dateInput === 'number') {
-            const parsedFromExcel = XLSX.SSF.parse_date_code(dateInput);
-            if(parsedFromExcel) return new Date(parsedFromExcel.y, parsedFromExcel.m - 1, parsedFromExcel.d);
+            // This is a simplified conversion, you might need a more robust one.
+            // Excel stores dates as the number of days since 1900-01-01.
+            const excelEpoch = new Date(1899, 11, 30);
+            const newDate = new Date(excelEpoch.getTime() + dateInput * 24 * 60 * 60 * 1000);
+            if(isValid(newDate)) return newDate;
         }
-        try {
-            const parsed = parseISO(dateInput);
-            if(isValid(parsed)) return parsed;
-        } catch(e) { /* ignore parse error */ }
     }
     
     // Fallback to age if birthdate is invalid or missing
@@ -78,7 +79,7 @@ export default function DataExchangePage() {
         return startOfYear(setYear(new Date(), birthYear));
     }
     
-    return dateInput ? dateInput.toString() : null; // Return raw string or null if parsing fails
+    return null; // Return null if all parsing fails
  };
 
 
@@ -121,11 +122,11 @@ export default function DataExchangePage() {
            let birthDate = parseDate(row['تاريخ الميلاد'], row['العمر']);
            let registrationDate = parseDate(row['تاريخ التسجيل']);
 
-           if (!birthDate || typeof birthDate === 'string' || !isValid(birthDate as Date)) {
+           if (!birthDate) {
                 birthDate = new Date(); // Default to today if both are invalid
                 invalidDateCount++;
            }
-           if (!registrationDate || typeof registrationDate === 'string' || !isValid(registrationDate as Date)) {
+           if (!registrationDate) {
                 registrationDate = new Date();
            }
 
@@ -153,8 +154,8 @@ export default function DataExchangePage() {
               pageNumber: row['رقم الصفحة']?.toString() || '',
               phone1: row['رقم الهاتف 1']?.toString() || 'N/A',
               phone2: row['رقم الهاتف 2']?.toString() || '',
-              birthDate: birthDate as Date,
-              registrationDate: registrationDate as Date,
+              birthDate: birthDate,
+              registrationDate: registrationDate,
               status: status as StudentStatus,
               subscriptionTier: subscriptionTier as SubscriptionTier,
               dailyMemorizationAmount: dailyMemorizationAmount as MemorizationAmount,
@@ -490,10 +491,10 @@ export default function DataExchangePage() {
         "حالة الطالب", "فئة الاشتراك", "مقدار الحفظ اليومي", "ملاحظات عامة"
     ];
     
-    // Create an empty worksheet
+    // Create a worksheet with headers
     const ws = XLSX.utils.aoa_to_sheet([headers]);
     
-    // Set column widths
+    // Define column widths
     ws['!cols'] = [ 
         { wch: 20 }, { wch: 10 }, { wch: 20 }, { wch: 15 }, { wch: 10 }, 
         { wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 15 }, { wch: 15 }, 
@@ -501,15 +502,16 @@ export default function DataExchangePage() {
     ];
 
     // Add Data Validation for dropdowns
-    ws['!dataValidation'] = [
+    if (!ws['!dataValidation']) ws['!dataValidation'] = [];
+    ws['!dataValidation'].push(
         { sqref: 'B2:B999', type: 'list', formula1: '"ذكر,أنثى"' },
         { sqref: 'K2:K999', type: 'list', formula1: '"نشط,غائب طويل,مطرود"' },
         { sqref: 'L2:L999', type: 'list', formula1: '"فئة الأصاغر,فئة الأكابر"' },
-        { sqref: 'M2:M999', type: 'list', formula1: '"نصف صفحة,صفحة,ثمن,ربع,أكثر"' },
-    ];
+        { sqref: 'M2:M999', type: 'list', formula1: '"نصف صفحة,صفحة,ثمن,ربع,أكثر"' }
+    );
     
-    // Add example row
-     const exampleRow = {
+    // Add an example row for clarity
+    const exampleRow = {
       "الاسم الكامل": "عبدالله بن محمد", "الجنس": "ذكر", "اسم الولي": "محمد الأحمد",
       "المستوى الدراسي": "3 ابتدائي", "رقم الصفحة": "15", "رقم الهاتف 1": "0501234567",
       "رقم الهاتف 2": "", "العمر": 9, "تاريخ الميلاد": "15/01/2015",
@@ -799,8 +801,4 @@ export default function DataExchangePage() {
   );
 }
 
-  
-
     
-
-
