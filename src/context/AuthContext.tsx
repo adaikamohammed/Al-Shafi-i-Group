@@ -129,7 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await signInWithEmailAndPassword(auth, email, password);
   }
 
-  const updateUserProfile = async (data: Partial<AppUser> & { photoFile?: File | null }) => {
+  const updateUserProfile = async (data: Partial<AppUser> & { photoFile?: File | Blob | null }) => {
     if (!auth.currentUser) throw new Error("User not authenticated.");
 
     const { photoFile, ...profileData } = data;
@@ -153,9 +153,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (Object.keys(updates).length > 0) {
         await update(ref(db), updates);
         
-        // Update Firebase Auth profile if displayName changed
+        // Update Firebase Auth profile if displayName or photoURL changed
+        const authUpdates: { displayName?: string; photoURL?: string } = {};
         if (profileData.displayName && profileData.displayName !== auth.currentUser.displayName) {
-            await updateProfile(auth.currentUser, { displayName: profileData.displayName });
+          authUpdates.displayName = profileData.displayName;
+        }
+        if (newPhotoURL && newPhotoURL !== auth.currentUser.photoURL) {
+          authUpdates.photoURL = newPhotoURL;
+        }
+
+        if (Object.keys(authUpdates).length > 0) {
+          await updateProfile(auth.currentUser, authUpdates);
         }
         
         setUser(prevUser => prevUser ? { ...prevUser, ...profileData, photoURL: newPhotoURL } : null);

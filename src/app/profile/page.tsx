@@ -134,22 +134,56 @@ export default function ProfilePage() {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        if (file.size > 500 * 1024) { // 500KB
-            toast({ title: 'خطأ', description: 'حجم الصورة كبير جدًا. الحد الأقصى هو 500 كيلوبايت.', variant: 'destructive' });
-            return;
-        }
         if (!['image/jpeg', 'image/png'].includes(file.type)) {
             toast({ title: 'خطأ', description: 'صيغة الملف غير مدعومة. الرجاء رفع صورة بصيغة JPG أو PNG.', variant: 'destructive' });
             return;
         }
-        
-        setPhotoFile(file);
+
         const reader = new FileReader();
         reader.onload = (loadEvent) => {
-            setPhotoPreview(loadEvent.target?.result as string);
+            const img = new Image();
+            img.src = loadEvent.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 500;
+                const MAX_HEIGHT = 500;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                ctx.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const compressedFile = new File([blob], file.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        setPhotoFile(compressedFile);
+                        setPhotoPreview(URL.createObjectURL(compressedFile));
+                    }
+                }, 'image/jpeg', 0.7);
+            };
         };
         reader.readAsDataURL(file);
     };
+
 
     const handleSaveChanges = async () => {
         if (!user) return;
