@@ -434,7 +434,7 @@ export default function PreRegistrationPage() {
     const [selectedStudent, setSelectedStudent] = useState<PreRegistration | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [levelFilter, setLevelFilter] = useState<string[]>([]);
-    const [statusFilter, setStatusFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState<string[]>([]);
     const [genderFilter, setGenderFilter] = useState('all');
     const [selectedRows, setSelectedRows] = useState<string[]>([]);
     const [isBulkEditOpen, setBulkEditOpen] = useState(false);
@@ -533,7 +533,7 @@ export default function PreRegistrationPage() {
                     reg.notes?.toLowerCase().includes(lowercasedFilter)
                 );
                 const levelMatch = levelFilter.length === 0 || (reg.educationalLevel && levelFilter.includes(reg.educationalLevel));
-                const statusMatch = statusFilter === 'all' || reg.status === statusFilter;
+                const statusMatch = statusFilter.length === 0 || statusFilter.includes(reg.status);
                 const genderMatch = genderFilter === 'all' || reg.gender === genderFilter;
 
                 return searchMatch && levelMatch && statusMatch && genderMatch;
@@ -663,6 +663,8 @@ export default function PreRegistrationPage() {
         }
     }
     const currentAccess = accessLevelConfig[accessLevel];
+    
+    const statusOptions: PreRegistrationStatus[] = ["مرشح", "تم الإنضمام", "مرفوض", "مؤجل", "إنضم لمدرسة أخرى"];
 
     return (
         <div className="space-y-6">
@@ -756,7 +758,9 @@ export default function PreRegistrationPage() {
                         <CardContent className="p-4 space-y-4">
                             <div className="flex flex-wrap items-center gap-2">
                                 {Object.entries(statusBadgeColors).map(([status, className]) => (
-                                    <Badge key={status} className={cn("border cursor-pointer", className, statusFilter === status && "ring-2 ring-ring")} onClick={() => setStatusFilter(prev => prev === status ? 'all' : status as PreRegistrationStatus)}>{status}</Badge>
+                                    <Badge key={status} className={cn("border cursor-pointer", className, statusFilter.includes(status) && "ring-2 ring-ring")} onClick={() => {
+                                        setStatusFilter(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status])
+                                    }}>{status}</Badge>
                                 ))}
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
@@ -794,19 +798,30 @@ export default function PreRegistrationPage() {
                                     </DropdownMenuContent>
                                 </DropdownMenu>
 
-                                <Select dir="rtl" value={statusFilter} onValueChange={setStatusFilter}>
-                                    <SelectTrigger className="w-full flex-grow sm:w-[180px]">
-                                        <SelectValue placeholder="الحالة" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                    <SelectItem value="all">كل الحالات</SelectItem>
-                                    <SelectItem value="مرشح">مرشح</SelectItem>
-                                    <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
-                                    <SelectItem value="مرفوض">مرفوض</SelectItem>
-                                    <SelectItem value="مؤجل">مؤجل</SelectItem>
-                                    <SelectItem value="إنضم لمدرسة أخرى">إنضم لمدرسة أخرى</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                 <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline"><Filter className="ml-2 h-4 w-4" />الحالة {statusFilter.length > 0 && `(${statusFilter.length})`}</Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-56">
+                                        <DropdownMenuLabel>اختر الحالات</DropdownMenuLabel>
+                                        <DropdownMenuSeparator />
+                                        {statusOptions.map(status => (
+                                            <DropdownMenuCheckboxItem
+                                                key={status}
+                                                checked={statusFilter.includes(status)}
+                                                onCheckedChange={(checked) => {
+                                                    if (checked) {
+                                                        setStatusFilter(prev => [...prev, status]);
+                                                    } else {
+                                                        setStatusFilter(prev => prev.filter(s => s !== status));
+                                                    }
+                                                }}
+                                            >
+                                                {status}
+                                            </DropdownMenuCheckboxItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                                 
                                 <Select dir="rtl" value={genderFilter} onValueChange={setGenderFilter}>
                                     <SelectTrigger className="w-full flex-grow sm:w-[150px]">
@@ -953,7 +968,7 @@ export default function PreRegistrationPage() {
                                         )) : (
                                             <TableRow>
                                                 <TableCell colSpan={Object.values(columnVisibility).filter(c => c.visible).length + 3} className="text-center h-24">
-                                                    {searchTerm || levelFilter.length > 0 || statusFilter !== 'all' || genderFilter !== 'all'
+                                                    {searchTerm || levelFilter.length > 0 || statusFilter.length > 0 || genderFilter !== 'all'
                                                         ? 'لم يتم العثور على نتائج مطابقة للبحث.'
                                                         : 'لا توجد طلبات تسجيل جديدة في الوقت الحالي.'
                                                     }
@@ -1058,6 +1073,8 @@ export default function PreRegistrationPage() {
                     }
                     body * {
                         visibility: hidden;
+                        background-color: #fff !important;
+                        box-shadow: none !important;
                     }
                     .print-container, .print-container * {
                         visibility: visible;
@@ -1077,7 +1094,7 @@ export default function PreRegistrationPage() {
                         display: none !important;
                     }
                     #print-table th, #print-table td {
-                        border: 1px solid #000 !important;
+                        border: 0.5pt solid black !important;
                         padding: 4px 6px !important;
                         background-color: transparent !important;
                         color: #000 !important;
@@ -1090,6 +1107,11 @@ export default function PreRegistrationPage() {
                         width: 100%;
                         border-collapse: collapse;
                     }
+                    #print-table badge {
+                        background-color: transparent !important;
+                        color: #000 !important;
+                        border-color: #000 !important;
+                    }
                 }
                  @page {
                     size: A4 landscape;
@@ -1099,3 +1121,4 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
