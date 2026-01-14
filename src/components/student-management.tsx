@@ -413,11 +413,8 @@ export default function StudentManagementPage() {
   const filteredStudents = useMemo(() => {
     const statusOrder: { [key in StudentStatus]: number } = { "نشط": 1, "غائب طويل": 2, "مطرود": 3, "محذوف": 4, };
     
+    // The students state is already filtered by the StudentContext based on the user's role
     let sortableStudents = (students ?? []);
-
-    if (!isSuperAdmin && user?.group) {
-        sortableStudents = sortableStudents.filter(student => student.groupName === user.group);
-    }
         
     sortableStudents = sortableStudents.filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -452,7 +449,7 @@ export default function StudentManagementPage() {
 
     return sortableStudents;
 
-  }, [students, searchTerm, statusFilter, levelFilter, sortConfig, isSuperAdmin, user]);
+  }, [students, searchTerm, statusFilter, levelFilter, sortConfig]);
   
   const getActiveCovenant = (student: Student): Covenant | null => {
       if (!student.covenants || student.covenants.length === 0) return null;
