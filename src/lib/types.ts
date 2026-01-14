@@ -186,6 +186,7 @@ export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مر
 
 export interface PreRegistration {
     id: string;
+    ownerId?: string;
     requestedAt: Date | string;
     fullName: string;
     gender: "ذكر" | "أنثى";

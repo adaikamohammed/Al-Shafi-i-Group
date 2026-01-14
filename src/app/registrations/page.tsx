@@ -23,6 +23,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useStudentContext } from '@/context/StudentContext';
+import { useAuth } from '@/context/AuthContext';
 import type { Student, StudentStatus, PreRegistration, PreRegistrationStatus } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useRouter } from 'next/navigation';
@@ -625,8 +626,20 @@ export default function PreRegistrationPage() {
         setSelectedRows([]);
     };
 
-    const handlePromoteStudent = (reg: PreRegistration) => {
-        const newStudentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> = {
+    const handlePromoteStudent = (reg: PreRegistration, ownerId: string, groupName: string) => {
+        if (!reg.birthDate || !(reg.birthDate instanceof Date) || !isValid(reg.birthDate)) {
+             toast({
+                title: 'خطأ في تاريخ الميلاد',
+                description: 'الرجاء تصحيح تاريخ ميلاد الطالب قبل نقله إلى فوج.',
+                variant: 'destructive',
+            });
+            handleEdit(reg);
+            return;
+        }
+        
+        const newStudentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & {ownerId: string, groupName: string} = {
+            ownerId,
+            groupName,
             fullName: reg.fullName,
             gender: reg.gender,
             pageNumber: reg.pageNumber,
@@ -645,11 +658,11 @@ export default function PreRegistrationPage() {
 
         addStudent(newStudentData);
 
-        updatePreRegistration(reg.id, { status: 'تم الإنضمام' }, true);
+        updatePreRegistration(reg.id, { status: 'تم الإنضمام', ownerId }, true);
 
         toast({
             title: '✅ تم النقل بنجاح!',
-            description: `تم نقل الطالب ${reg.fullName} إلى فوجك الرسمي.`,
+            description: `تم نقل الطالب ${reg.fullName} إلى فوج الشيخ ${groupName}.`,
         });
         setSelectedStudent(null);
         router.push('/');
@@ -772,7 +785,7 @@ export default function PreRegistrationPage() {
                  <Dialog open={!!selectedStudent} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}>
                     <StudentProfileCard 
                         student={selectedStudent} 
-                        onPromote={() => handlePromoteStudent(selectedStudent)}
+                        onPromote={() => { /* This is now handled by the Dropdown in the row */ }}
                         onEdit={() => handleEdit(selectedStudent)}
                         isLocked={isLocked}
                     />
@@ -976,26 +989,6 @@ export default function PreRegistrationPage() {
                                                             <Button variant="ghost" size="icon" disabled={isLocked}><MoreHorizontal className="h-4 w-4" /></Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent>
-                                                            <AlertDialog>
-                                                                <AlertDialogTrigger asChild>
-                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={reg.status === 'تم الإنضمام'}>
-                                                                        <ArrowUpCircle className="ml-2 h-4 w-4" /> نقل إلى فوج
-                                                                    </DropdownMenuItem>
-                                                                </AlertDialogTrigger>
-                                                                <AlertDialogContent>
-                                                                    <AlertDialogHeader>
-                                                                        <AlertDialogTitle>تأكيد النقل</AlertDialogTitle>
-                                                                        <AlertDialogDescription>
-                                                                            هل أنت متأكد من نقل الطالب "{reg.fullName}" إلى فوجك الرسمي؟ سيتم إنشاء سجل طالب جديد له.
-                                                                        </AlertDialogDescription>
-                                                                    </AlertDialogHeader>
-                                                                    <AlertDialogFooter>
-                                                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                                                        <AlertDialogAction onClick={() => handlePromoteStudent(reg)}>تأكيد النقل</AlertDialogAction>
-                                                                    </AlertDialogFooter>
-                                                                </AlertDialogContent>
-                                                            </AlertDialog>
-                                                            <DropdownMenuSeparator />
                                                             <DropdownMenuItem onClick={() => handleEdit(reg)}>
                                                                 <Edit className="ml-2 h-4 w-4" /> تعديل
                                                             </DropdownMenuItem>

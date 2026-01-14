@@ -55,7 +55,7 @@ interface StudentContextType {
   payments: Payment[];
   settings: AppSettings;
   loading: boolean;
-  addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> & { photoFile?: File | null }) => void;
+  addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string }) => void;
   updateStudent: (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => void;
   deleteStudent: (studentId: string, ownerId: string) => void;
   deleteAllStudents: () => void;
@@ -293,8 +293,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }, [authContextUser, authLoading, isSuperAdmin]);
 
 
-  const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> & { photoFile?: File | null }) => {
+  const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string }) => {
     if (!authContextUser) return;
+    if (!isSuperAdmin && studentData.ownerId !== authContextUser.uid) return;
 
     const studentId = uuidv4();
     let photoURL = '';
@@ -310,14 +311,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const newStudent: Omit<Student, 'id'> & {id: string} = {
       ...(restOfStudentData as any),
       id: studentId,
-      ownerId: authContextUser.uid,
+      ownerId: studentData.ownerId,
       memorizedSurahsCount: 0,
       subscriptionTier: studentData.subscriptionTier || 'فئة الأصاغر',
       updatedAt: new Date(),
       covenants: [],
       photoURL: photoURL
     };
-    const studentRef = ref(db, `users/${authContextUser.uid}/students/${studentId}`);
+    const studentRef = ref(db, `users/${studentData.ownerId}/students/${studentId}`);
     set(studentRef, {
         ...newStudent, 
         birthDate: newStudent.birthDate.toISOString(), 
@@ -326,13 +327,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         covenants: newStudent.covenants || null // Use null for empty array
     });
     
-    const surahProgressRef = ref(db, `users/${authContextUser.uid}/surahProgress/${studentId}`);
+    const surahProgressRef = ref(db, `users/${studentData.ownerId}/surahProgress/${studentId}`);
     set(surahProgressRef, {});
   };
   
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
      if (!authContextUser) return;
-     newStudents.forEach(s => addStudent(s));
+     newStudents.forEach(s => addStudent({...s, ownerId: authContextUser.uid, groupName: authContextUser.group || 'غير محدد' }));
   }
   
   const updatePreRegistration = async (regId: string, data: Partial<PreRegistration> & { photoFile?: File | null }, isEditing: boolean) => {
@@ -658,3 +659,4 @@ export const useStudentContext = () => {
     
 
     
+
