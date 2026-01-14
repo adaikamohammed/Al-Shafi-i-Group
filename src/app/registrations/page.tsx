@@ -144,7 +144,7 @@ const StudentProfileCard = ({ student, onPromote, onEdit, isLocked }: { student:
 };
 
 
-const RegistrationForm = ({ onSave, onCancel, existingRegistration }: { onSave: (data: Partial<PreRegistration> & { photoFile?: File | null }) => void, onCancel: () => void, existingRegistration?: PreRegistration | null }) => {
+function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: (data: Partial<PreRegistration> & { photoFile?: File | null }) => void, onCancel: () => void, existingRegistration?: PreRegistration | null }) {
     const [birthDate, setBirthDate] = useState<Date | undefined>(existingRegistration?.birthDate && isValid(new Date(existingRegistration.birthDate)) ? new Date(existingRegistration.birthDate) : undefined);
     const [age, setAge] = useState<number | string>(existingRegistration && existingRegistration.birthDate && isValid(new Date(existingRegistration.birthDate)) ? differenceInYears(new Date(), new Date(existingRegistration.birthDate)) : '');
     const [status, setStatus] = useState<PreRegistrationStatus>(existingRegistration?.status || 'مرشح');
@@ -1027,12 +1027,3 @@ export default function PreRegistrationPage() {
 }
 
     
-
-    
-
-    
-
-    
-
-
-
