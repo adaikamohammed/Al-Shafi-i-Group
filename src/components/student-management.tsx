@@ -150,127 +150,129 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
     const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط');
 
     return (
-        <DialogContent className="sm:max-w-3xl">
-            <DialogHeader>
-                <DialogTitle className="sr-only">بطاقة هوية الطالب: {student.fullName}</DialogTitle>
-            </DialogHeader>
-             <div className="flex flex-col items-center pt-4">
-                <Avatar className="w-24 h-24 mb-4 border-4 border-primary">
-                    <AvatarImage src={student.photoURL} alt={student.fullName} />
-                    <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <h2 className="text-2xl font-bold flex items-center gap-2">
-                    {student.fullName}
-                    {medalHistory.grandMaster && (
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger>
-                                    <Award className="h-6 w-6 text-amber-500" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>وسام "المتقن الكبير" (3 ميداليات ذهبية متتالية)</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                    )}
-                </h2>
-                <p className="text-muted-foreground">{student.status}</p>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4">
-                <div className="p-3 bg-muted rounded-lg">
-                    <dt className="text-sm font-medium text-muted-foreground">العمر</dt>
-                    <dd className="font-semibold">{calculateAge(student.birthDate)} سنة</dd>
-                </div>
-                <div className="p-3 bg-muted rounded-lg">
-                    <dt className="text-sm font-medium text-muted-foreground">تاريخ التسجيل</dt>
-                    <dd className="font-semibold">{format(student.registrationDate, 'd MMM yyyy', {locale: ar})}</dd>
-                </div>
-                <div className="p-3 bg-muted rounded-lg">
-                    <dt className="text-sm font-medium text-muted-foreground">هاتف الولي</dt>
-                    <dd className="font-semibold">{student.phone1}</dd>
-                </div>
-                 <div className="p-3 bg-muted rounded-lg">
-                    <dt className="text-sm font-medium text-muted-foreground">الفوج</dt>
-                    <dd className="font-semibold">{student.groupName || 'غير محدد'}</dd>
-                </div>
-                 <div className="p-3 bg-muted rounded-lg">
-                    <dt className="text-sm font-medium text-muted-foreground">الشيخ المشرف</dt>
-                    <dd className="font-semibold">{user?.displayName}</dd>
-                </div>
-                 <div className="p-3 bg-muted rounded-lg">
-                    <dt className="text-sm font-medium text-muted-foreground">المستوى الحالي</dt>
-                    <dd className="font-semibold">{student.subscriptionTier}</dd>
+        <DialogContent className="sm:max-w-3xl p-0">
+             <div className="p-6 border-b">
+                 <div className="flex flex-col items-center">
+                    <Avatar className="w-24 h-24 mb-4 border-4 border-primary">
+                        <AvatarImage src={student.photoURL} alt={student.fullName} />
+                        <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <h2 className="text-2xl font-bold flex items-center gap-2">
+                        {student.fullName}
+                        {medalHistory.grandMaster && (
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger>
+                                        <Award className="h-6 w-6 text-amber-500" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>وسام "المتقن الكبير" (3 ميداليات ذهبية متتالية)</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        )}
+                    </h2>
+                    <p className="text-muted-foreground">{student.status}</p>
                 </div>
             </div>
-             <Card>
-                <CardHeader>
-                    <CardTitle>المؤشرات الذكية</CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                     <TooltipProvider>
-                     <Tooltip>
-                        <TooltipTrigger>
-                            <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md">
-                                <Award className="h-5 w-5 text-blue-600"/>
-                                <div>
-                                    <p className="text-xs text-blue-800">الترتيب الشهري الحالي</p>
-                                     <p className="font-bold">{rank !== 'N/A' ? `المركز ${rank}`: 'خارج الترتيب'}</p>
-                                </div>
-                            </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>ترتيب مستحق بناءً على محرك النقاط - آخر تحديث: {format(new Date(), 'd MMMM yyyy', { locale: ar })}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                    </TooltipProvider>
 
-                     <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-md">
-                        <FolderKanban className="h-5 w-5 text-orange-600"/>
-                        <div>
-                            <p className="text-xs text-orange-800">ميزان الالتزام</p>
-                            <p className="font-bold">{commitmentBalance > 0 ? `مدين بـ ${commitmentBalance} حصص` : "لا يوجد دين"}</p>
-                        </div>
+            <div className="overflow-y-auto px-6 pb-6 space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4">
+                    <div className="p-3 bg-muted rounded-lg">
+                        <dt className="text-sm font-medium text-muted-foreground">العمر</dt>
+                        <dd className="font-semibold">{calculateAge(student.birthDate)} سنة</dd>
                     </div>
-                     <div className="flex items-center gap-2 p-2 bg-yellow-50 rounded-md">
-                        <ShieldAlert className="h-5 w-5 text-yellow-600"/>
-                        <div>
-                            <p className="text-xs text-yellow-800">المواثيق النشطة</p>
-                            <p className="font-bold">{activeCovenant ? activeCovenant.card : "لا يوجد"}</p>
-                        </div>
+                    <div className="p-3 bg-muted rounded-lg">
+                        <dt className="text-sm font-medium text-muted-foreground">تاريخ التسجيل</dt>
+                        <dd className="font-semibold">{format(student.registrationDate, 'd MMM yyyy', {locale: ar})}</dd>
                     </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex justify-between items-center">
-                        <span>حصاد الأوسمة السنوي ({getYear(new Date())})</span>
-                         <div className="flex items-center gap-2 text-base">
-                            <span className="font-bold text-amber-500">{medalHistory.goldCount} 🥇</span>
-                        </div>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-12 gap-2 text-center">
-                        {medalHistory.history.map((medal, index) => {
-                            const monthName = format(new Date(2024, index, 1), 'MMM', {locale: ar});
-                            return (
-                                <div key={index} className="flex flex-col items-center gap-1">
-                                    <span className="text-xs text-muted-foreground">{monthName}</span>
-                                    <div className={cn("h-8 w-8 rounded-full flex items-center justify-center text-lg",
-                                        medal === 'gold' ? 'bg-medal-gold' :
-                                        medal === 'silver' ? 'bg-medal-silver' :
-                                        medal === 'bronze' ? 'bg-medal-bronze' :
-                                        'bg-gray-200 dark:bg-gray-700'
-                                    )}>
-                                        {medal === 'gold' ? '🥇' : medal === 'silver' ? '🥈' : medal === 'bronze' ? '🥉' : ''}
+                    <div className="p-3 bg-muted rounded-lg">
+                        <dt className="text-sm font-medium text-muted-foreground">هاتف الولي</dt>
+                        <dd className="font-semibold">{student.phone1}</dd>
+                    </div>
+                     <div className="p-3 bg-muted rounded-lg">
+                        <dt className="text-sm font-medium text-muted-foreground">الفوج</dt>
+                        <dd className="font-semibold">{student.groupName || 'غير محدد'}</dd>
+                    </div>
+                     <div className="p-3 bg-muted rounded-lg">
+                        <dt className="text-sm font-medium text-muted-foreground">الشيخ المشرف</dt>
+                        <dd className="font-semibold">{user?.displayName}</dd>
+                    </div>
+                     <div className="p-3 bg-muted rounded-lg">
+                        <dt className="text-sm font-medium text-muted-foreground">المستوى الحالي</dt>
+                        <dd className="font-semibold">{student.subscriptionTier}</dd>
+                    </div>
+                </div>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>المؤشرات الذكية</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                         <TooltipProvider>
+                         <Tooltip>
+                            <TooltipTrigger>
+                                <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md">
+                                    <Award className="h-5 w-5 text-blue-600"/>
+                                    <div>
+                                        <p className="text-xs text-blue-800">الترتيب الشهري الحالي</p>
+                                         <p className="font-bold">{rank !== 'N/A' ? `المركز ${rank}`: 'خارج الترتيب'}</p>
                                     </div>
                                 </div>
-                            )
-                        })}
-                    </div>
-                </CardContent>
-            </Card>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>ترتيب مستحق بناءً على محرك النقاط - آخر تحديث: {format(new Date(), 'd MMMM yyyy', { locale: ar })}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                        </TooltipProvider>
+
+                         <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-md">
+                            <FolderKanban className="h-5 w-5 text-orange-600"/>
+                            <div>
+                                <p className="text-xs text-orange-800">ميزان الالتزام</p>
+                                <p className="font-bold">{commitmentBalance > 0 ? `مدين بـ ${commitmentBalance} حصص` : "لا يوجد دين"}</p>
+                            </div>
+                        </div>
+                         <div className="flex items-center gap-2 p-2 bg-yellow-50 rounded-md">
+                            <ShieldAlert className="h-5 w-5 text-yellow-600"/>
+                            <div>
+                                <p className="text-xs text-yellow-800">المواثيق النشطة</p>
+                                <p className="font-bold">{activeCovenant ? activeCovenant.card : "لا يوجد"}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex justify-between items-center">
+                            <span>حصاد الأوسمة السنوي ({getYear(new Date())})</span>
+                             <div className="flex items-center gap-2 text-base">
+                                <span className="font-bold text-amber-500">{medalHistory.goldCount} 🥇</span>
+                            </div>
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-12 gap-2 text-center">
+                            {medalHistory.history.map((medal, index) => {
+                                const monthName = format(new Date(2024, index, 1), 'MMM', {locale: ar});
+                                return (
+                                    <div key={index} className="flex flex-col items-center gap-1">
+                                        <span className="text-xs text-muted-foreground">{monthName}</span>
+                                        <div className={cn("h-8 w-8 rounded-full flex items-center justify-center text-lg",
+                                            medal === 'gold' ? 'bg-medal-gold' :
+                                            medal === 'silver' ? 'bg-medal-silver' :
+                                            medal === 'bronze' ? 'bg-medal-bronze' :
+                                            'bg-gray-200 dark:bg-gray-700'
+                                        )}>
+                                            {medal === 'gold' ? '🥇' : medal === 'silver' ? '🥈' : medal === 'bronze' ? '🥉' : ''}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
              <DialogFooter>
                 <Button variant="secondary" onClick={onViewStats}>عرض الإحصائيات</Button>
                 <Button onClick={onEdit}>تعديل البيانات</Button>
