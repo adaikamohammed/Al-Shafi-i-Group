@@ -153,8 +153,8 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
     return (
         <DialogContent className="sm:max-w-3xl p-0 flex flex-col max-h-[90vh]">
             <DialogHeader>
-              <DialogTitle className="sr-only">ملف الطالب: {student.fullName}</DialogTitle>
-              <DialogDescription className="sr-only">عرض تفصيلي لبيانات وأداء الطالب.</DialogDescription>
+                <DialogTitle className="sr-only">ملف الطالب: {student.fullName}</DialogTitle>
+                <DialogDescription className="sr-only">عرض تفصيلي لبيانات وأداء الطالب.</DialogDescription>
             </DialogHeader>
             <div className="p-6 border-b flex flex-col items-center">
                 <Avatar className="w-24 h-24 mb-4 border-4 border-primary">
