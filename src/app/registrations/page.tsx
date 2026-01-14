@@ -30,6 +30,19 @@ import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 
+// 1. قائمة المشايخ الرسمية مرتبة (المرجع الأساسي)
+const SHEIKHS_LIST = [
+  { id: 1, name: "الشيخ زياد درويش", email: "admin1@gmail.com" },
+  { id: 2, name: "الشيخ عبد الحميد", email: "admin2@gmail.com" },
+  { id: 3, name: "الشيخ فؤاد بن عمر", email: "admin3@gmail.com" },
+  { id: 4, name: "الشيخ أحمد بن عمر", email: "admin4@gmail.com" },
+  { id: 5, name: "الشيخ إبراهيم مراد", email: "admin5@gmail.com" },
+  { id: 6, name: "الشيخ سفيان نصيرة", email: "admin6@gmail.com" },
+  { id: 7, name: "الشيخ محمد منصور", email: "admin7@gmail.com" },
+  { id: 8, name: "الشيخ عبد الحق نصيرة", email: "admin8@gmail.com" },
+  { id: 9, name: "الشيخ صهيب نصيب", email: "admin9@gmail.com" }
+];
+
 
 const statusColors: Record<PreRegistrationStatus, string> = {
     "تم الإنضمام": "bg-green-100 dark:bg-green-900/30",
@@ -88,8 +101,11 @@ const StudentProfileCard = ({ student, onPromote, onEdit, isLocked, sheikhs }: {
 
     return (
         <DialogContent className="sm:max-w-2xl p-0">
-             <DialogHeader className={cn("p-6 rounded-t-lg text-white", headerColor)}>
+            <DialogHeader>
                 <DialogTitle className="sr-only">بطاقة الطالب: {student.fullName}</DialogTitle>
+                <DialogDescription className="sr-only">عرض تفصيلي لبيانات الطالب.</DialogDescription>
+            </DialogHeader>
+            <div className={cn("p-6 rounded-t-lg text-white", headerColor)}>
                 <div className="flex items-center gap-4">
                      <Avatar className="w-20 h-20 border-4 border-white/50">
                         <AvatarImage src={student.photoURL} />
@@ -105,7 +121,7 @@ const StudentProfileCard = ({ student, onPromote, onEdit, isLocked, sheikhs }: {
                         </div>
                     </div>
                 </div>
-             </DialogHeader>
+            </div>
              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <h3 className="font-semibold mb-2 border-b pb-1">المعلومات الشخصية والتعليمية</h3>
@@ -660,7 +676,7 @@ export default function PreRegistrationPage() {
 
         addStudent(newStudentData);
 
-        updatePreRegistration(reg.id, { status: 'تم الإنضمام', ownerId }, true);
+        updatePreRegistration(reg.id, { ...reg, status: 'تم الإنضمام', ownerId }, true);
 
         toast({
             title: '✅ تم النقل بنجاح!',
