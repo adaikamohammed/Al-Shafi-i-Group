@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban, UserRound, Filter, ArrowUpDown, BookOpen, Shield } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban, UserRound, Filter, ArrowUpDown, BookOpen, Shield, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -308,6 +308,105 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
     );
 };
 
+const PrintableWeeklyLog = ({ students, adminName }: { students: Student[], adminName?: string | null }) => {
+    return (
+        <div id="weekly-log-print" className="print-only">
+            <style jsx global>{`
+                @media print {
+                    body {
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    @page {
+                        size: A4 landscape;
+                        margin: 0.5cm;
+                    }
+                    .print-only {
+                        display: block !important;
+                    }
+                    .no-print {
+                        display: none !important;
+                    }
+                    .print-container {
+                        border: none !important;
+                        box-shadow: none !important;
+                    }
+                    .print-header {
+                        text-align: center;
+                        font-weight: bold;
+                        font-size: 1.2rem;
+                        margin-bottom: 1rem;
+                    }
+                    .print-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 0.8rem;
+                    }
+                    .print-table th, .print-table td {
+                        border: 1px solid black;
+                        padding: 4px;
+                        text-align: center;
+                    }
+                    .print-table th {
+                        background-color: #f2f2f2;
+                    }
+                    .student-row {
+                        height: 40px; /* Ensure space for handwriting */
+                    }
+                    .sub-col {
+                        width: 25px;
+                        min-width: 25px;
+                    }
+                }
+            `}</style>
+            <div className="print-header">
+                المدرسة القرآنية للإمام الشافعي / الشيخ: {adminName || '..........'} / الأسبوع: .......... / الشهر: ..........
+            </div>
+            <table className="print-table">
+                <thead>
+                    <tr>
+                        <th rowSpan={2}>#</th>
+                        <th rowSpan={2}>الاسم الكامل</th>
+                        <th rowSpan={2}>المستوى الدراسي</th>
+                        <th colSpan={4}>السبت</th>
+                        <th colSpan={4}>الأحد</th>
+                        <th colSpan={4}>الاثنين</th>
+                        <th colSpan={4}>الثلاثاء</th>
+                        <th colSpan={4}>الأربعاء</th>
+                    </tr>
+                    <tr>
+                        <th className="sub-col">ح</th><th className="sub-col">ت</th><th className="sub-col">م</th><th className="sub-col">س</th>
+                        <th className="sub-col">ح</th><th className="sub-col">ت</th><th className="sub-col">م</th><th className="sub-col">س</th>
+                        <th className="sub-col">ح</th><th className="sub-col">ت</th><th className="sub-col">م</th><th className="sub-col">س</th>
+                        <th className="sub-col">ح</th><th className="sub-col">ت</th><th className="sub-col">م</th><th className="sub-col">س</th>
+                        <th className="sub-col">ح</th><th className="sub-col">ت</th><th className="sub-col">م</th><th className="sub-col">س</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {students.map((student, index) => (
+                        <tr key={student.id} className="student-row">
+                            <td>{index + 1}</td>
+                            <td style={{textAlign: 'right', paddingRight: '8px'}}>{student.fullName}</td>
+                            <td>{student.educationalLevel || ''}</td>
+                            {/* Saturday */}
+                            <td></td><td></td><td></td><td></td>
+                            {/* Sunday */}
+                            <td></td><td></td><td></td><td></td>
+                            {/* Monday */}
+                            <td></td><td></td><td></td><td></td>
+                            {/* Tuesday */}
+                            <td></td><td></td><td></td><td></td>
+                            {/* Wednesday */}
+                            <td></td><td></td><td></td><td></td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+};
+
+
 export default function StudentManagementPage() {
   const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings, addStudent } = useStudentContext();
   const { user, isSuperAdmin } = useAuth();
@@ -488,6 +587,9 @@ export default function StudentManagementPage() {
       return student.covenants.find(c => c.status === 'نشط') || null;
   };
 
+  const handlePrintWeeklyLog = () => {
+    window.print();
+  };
 
   if (loading) {
     return (
@@ -523,7 +625,7 @@ export default function StudentManagementPage() {
 
   return (
     <TooltipProvider>
-    <div className="space-y-6">
+    <div className="space-y-6 no-print">
        <DailyInspiration />
        
       <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
@@ -589,6 +691,10 @@ export default function StudentManagementPage() {
             </Select>
          </div>
          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={handlePrintWeeklyLog} disabled={(students ?? []).length === 0}>
+                <Printer className="ml-2 h-4 w-4" />
+                دفتر المتابعة الأسبوعي
+            </Button>
             <Button variant="outline" onClick={handleExportStudents} disabled={(students ?? []).length === 0}>
                 <Download className="ml-2 h-4 w-4" />
                 تصدير الطلبة (Excel)
@@ -820,6 +926,9 @@ export default function StudentManagementPage() {
                 </div>
             </div>
         )}
+        <div className="print-only" style={{ display: 'none' }}>
+            <PrintableWeeklyLog students={filteredStudents} adminName={user?.displayName} />
+        </div>
     </div>
     </TooltipProvider>
   );
@@ -1284,3 +1393,4 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
 
     
     
+
