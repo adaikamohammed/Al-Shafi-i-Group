@@ -287,7 +287,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const studentRef = ref(db, `users/${ownerId}/students/${studentId}`);
     set(studentRef, {
         ...newStudent, 
-        birthDate: newStudent.birthDate.toISOString(), 
+        birthDate: newStudent.birthDate ? newStudent.birthDate.toISOString() : null, 
         registrationDate: newStudent.registrationDate.toISOString(), 
         updatedAt: newStudent.updatedAt.toISOString(),
         covenants: newStudent.covenants || null // Use null for empty array
@@ -318,7 +318,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const finalData: Partial<PreRegistration> = {
         ...restOfData,
         photoURL: finalPhotoURL === undefined ? null : finalPhotoURL,
-        birthDate: data.birthDate instanceof Date ? data.birthDate.toISOString() : data.birthDate,
+        birthDate: data.birthDate instanceof Date ? data.birthDate.toISOString() : (data.birthDate || null),
     };
     
     if (isEditing) {
@@ -420,7 +420,7 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
 
     set(studentRef, {
         ...finalData,
-        birthDate: finalData.birthDate.toISOString(),
+        birthDate: finalData.birthDate ? finalData.birthDate.toISOString() : null,
         registrationDate: finalData.registrationDate.toISOString(),
         updatedAt: finalData.updatedAt.toISOString(),
         covenants: Object.keys(covenantsObject).length > 0 ? covenantsObject : null
@@ -630,3 +630,6 @@ export const useStudentContext = () => {
 
 
 
+
+
+    
