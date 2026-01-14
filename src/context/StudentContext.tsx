@@ -317,12 +317,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     
     const finalData: Partial<PreRegistration> = {
         ...restOfData,
-        photoURL: finalPhotoURL || null,
+        photoURL: finalPhotoURL === undefined ? null : finalPhotoURL,
         birthDate: data.birthDate instanceof Date ? data.birthDate.toISOString() : data.birthDate,
     };
     
     if (isEditing) {
-        finalData.requestedAt = data.requestedAt instanceof Date ? data.requestedAt.toISOString() : data.requestedAt;
+        finalData.requestedAt = data.requestedAt instanceof Date ? data.requestedAt.toISOString() : (data.requestedAt || null);
     } else {
         finalData.requestedAt = new Date().toISOString();
         finalData.status = 'مرشح';
@@ -626,6 +626,7 @@ export const useStudentContext = () => {
     
 
     
+
 
 
 
