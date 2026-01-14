@@ -258,7 +258,7 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
                         </Select>
                     </div>
                     <div className="space-y-2">
-                        <Label>تاريخ الميلاد *</Label>
+                        <Label>تاريخ الميلاد</Label>
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !birthDate && "text-muted-foreground")}>
@@ -564,8 +564,8 @@ export default function PreRegistrationPage() {
     }
 
     const handleSaveRegistration = (data: Partial<PreRegistration> & { photoFile?: File | null }) => {
-        if (!data.fullName || !data.birthDate || !data.phone1) {
-            toast({ title: "خطأ", description: "الرجاء ملء جميع الحقول الإلزامية.", variant: "destructive" });
+        if (!data.fullName || !data.phone1) {
+            toast({ title: "خطأ", description: "الرجاء ملء جميع الحقول الإلزامية (الاسم الكامل والهاتف).", variant: "destructive" });
             return;
         }
 

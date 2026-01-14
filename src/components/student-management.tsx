@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -901,8 +902,8 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries()) as any;
 
-    if (!birthDate || !registrationDate) {
-      toast({ title: 'خطأ', description: 'تاريخ الميلاد وتاريخ التسجيل حقول إلزامية.', variant: 'destructive' });
+    if (!registrationDate) {
+      toast({ title: 'خطأ', description: 'تاريخ التسجيل حقل إلزامي.', variant: 'destructive' });
       return;
     }
     
@@ -1230,4 +1231,5 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
 
