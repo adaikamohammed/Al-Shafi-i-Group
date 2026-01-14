@@ -167,6 +167,59 @@ const StudentProfileCard = ({ student, onEdit, isLocked }: { student: PreRegistr
     );
 };
 
+const QuickEduLevelSelector = ({ value, onChange }: { value: string, onChange: (value: string) => void }) => {
+    const [mainCategory, setMainCategory] = useState<string | null>(null);
+
+    const handleMainCategoryClick = (category: string) => {
+        setMainCategory(category === mainCategory ? null : category);
+    };
+
+    const handleYearClick = (year: string) => {
+        onChange(`${year} ${mainCategory}`);
+    };
+    
+    const handleOtherClick = (level: string) => {
+        onChange(level);
+    }
+
+    const categories: Record<string, string[]> = {
+        'ابتدائي': ['1', '2', '3', '4', '5'],
+        'متوسط': ['1', '2', '3', '4'],
+        'ثانوي': ['1', '2', '3', 'بكالوريا'],
+    };
+    
+    const otherLevels = ['روضة', 'تحضيري', 'جامعي', 'متوقف عن الدراسة'];
+
+    return (
+        <div className="space-y-2">
+             <div className="grid grid-cols-4 gap-2">
+                {Object.keys(categories).map(cat => (
+                    <Button key={cat} type="button" variant={mainCategory === cat ? "default" : "outline"} onClick={() => handleMainCategoryClick(cat)}>
+                        {cat}
+                    </Button>
+                ))}
+             </div>
+             {mainCategory && categories[mainCategory] && (
+                <div className="grid grid-cols-5 gap-2 pt-2">
+                    {categories[mainCategory].map(year => (
+                         <Button key={year} type="button" variant="outline" onClick={() => handleYearClick(year)}>
+                             {year}
+                         </Button>
+                    ))}
+                </div>
+             )}
+             <div className="grid grid-cols-4 gap-2 pt-2">
+                {otherLevels.map(level => (
+                    <Button key={level} type="button" variant="outline" onClick={() => handleOtherClick(level)}>
+                        {level}
+                    </Button>
+                ))}
+             </div>
+             {value && <p className="text-sm font-semibold text-center pt-2 text-primary">المستوى المحدد: {value}</p>}
+        </div>
+    );
+};
+
 
 function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: (data: Partial<PreRegistration> & { photoFile?: File | null }) => void, onCancel: () => void, existingRegistration?: PreRegistration | null }) {
     const [birthDate, setBirthDate] = useState<Date | undefined>(existingRegistration?.birthDate && isValid(new Date(existingRegistration.birthDate)) ? new Date(existingRegistration.birthDate) : undefined);
@@ -176,7 +229,6 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
     const [photoPreview, setPhotoPreview] = useState<string | null>(existingRegistration?.photoURL || null);
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [eduLevel, setEduLevel] = useState(existingRegistration?.educationalLevel || "");
-    const [isEduLevelPopoverOpen, setEduLevelPopoverOpen] = useState(false);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const {toast} = useToast();
 
@@ -316,46 +368,9 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
 
                 <h4 className="font-semibold text-lg border-b pb-2 pt-4">التواصل والدراسة</h4>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="educationalLevel">المستوى الدراسي</Label>
-                        <Popover open={isEduLevelPopoverOpen} onOpenChange={setEduLevelPopoverOpen}>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    aria-expanded={isEduLevelPopoverOpen}
-                                    className="w-full justify-between"
-                                >
-                                    {eduLevel ? eduLevel : "اختر المستوى الدراسي..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                <Command>
-                                    <CommandInput placeholder="ابحث عن مستوى..."/>
-                                    <CommandList>
-                                        <CommandEmpty>لم يتم العثور على المستوى.</CommandEmpty>
-                                        {Object.entries(educationalLevels).map(([group, levels]) => (
-                                            <CommandGroup key={group} heading={group}>
-                                                {levels.map(level => (
-                                                    <CommandItem
-                                                        key={level}
-                                                        value={level}
-                                                        onSelect={(currentValue) => {
-                                                            setEduLevel(currentValue === eduLevel ? "" : currentValue);
-                                                            setEduLevelPopoverOpen(false);
-                                                        }}
-                                                    >
-                                                        <Check className={cn("mr-2 h-4 w-4", eduLevel === level ? "opacity-100" : "opacity-0")}/>
-                                                        {level}
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                        ))}
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
+                     <div className="space-y-2 md:col-span-2">
+                         <Label htmlFor="educationalLevel">المستوى الدراسي</Label>
+                         <QuickEduLevelSelector value={eduLevel} onChange={setEduLevel} />
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="guardianName">اسم الولي</Label>
@@ -494,25 +509,25 @@ export default function PreRegistrationPage() {
     const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const [columnVisibility, setColumnVisibility] = useState(() => {
+        const initialVisibility: { [key: string]: { label: string; visible: boolean } } = { ...ALL_COLUMNS };
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('preRegColumnVisibility');
             try {
                 if (saved) {
                     const parsed = JSON.parse(saved);
                     // Merge with ALL_COLUMNS to ensure all keys are present and have a 'visible' property
-                    const merged = { ...ALL_COLUMNS };
-                    for (const key in parsed) {
-                        if (key in merged) {
-                            merged[key as keyof typeof ALL_COLUMNS].visible = parsed[key].visible;
+                    for (const key in initialVisibility) {
+                        if (parsed[key] !== undefined) {
+                            initialVisibility[key].visible = parsed[key].visible;
                         }
                     }
-                    return merged;
+                    return initialVisibility;
                 }
             } catch (e) {
                 console.error("Failed to parse column visibility from localStorage", e);
             }
         }
-        return ALL_COLUMNS;
+        return initialVisibility;
     });
 
     const isLocked = accessLevel !== 'unlocked';
@@ -555,7 +570,16 @@ export default function PreRegistrationPage() {
     };
     
     const handlePrint = () => {
-        window.print();
+        const originalTitle = document.title;
+        document.title = "التسجيلات الأولية - " + new Date().toLocaleString('ar-DZ', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12: false}).replace(',', '');
+        
+        const onAfterPrint = () => {
+            document.title = originalTitle;
+            window.removeEventListener('afterprint', onAfterPrint);
+        };
+        window.addEventListener('afterprint', onAfterPrint);
+
+        setTimeout(() => window.print(), 100);
     };
 
 
@@ -909,7 +933,7 @@ export default function PreRegistrationPage() {
                                         {Object.entries(columnVisibility).map(([key, value]) => (
                                             <DropdownMenuCheckboxItem
                                                 key={key}
-                                                checked={(columnVisibility[key as keyof typeof columnVisibility])?.visible}
+                                                checked={(columnVisibility as any)[key].visible}
                                                 onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
                                             >
                                                 {value.label}
@@ -1105,9 +1129,9 @@ export default function PreRegistrationPage() {
                             <div key={key} className="flex items-center space-x-2 space-x-reverse">
                                 <Checkbox
                                     id={`print-col-${key}`}
-                                    checked={(columnVisibility[key as keyof typeof columnVisibility])?.visible}
+                                    checked={(columnVisibility as any)[key]?.visible}
                                     onCheckedChange={(checked) => {
-                                        setColumnVisibility(prev => ({...prev, [key as keyof typeof prev]: {...prev[key as keyof typeof prev], visible: !!checked}}));
+                                        setColumnVisibility(prev => ({...prev, [key as keyof typeof prev]: {...(prev as any)[key], visible: !!checked}}));
                                     }}
                                 />
                                 <label
@@ -1188,6 +1212,7 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
 
 
 
