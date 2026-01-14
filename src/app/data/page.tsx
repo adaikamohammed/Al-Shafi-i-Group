@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, Download, History, Loader2, CalendarClock, UserPlus, Trash2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { Student, DailyRecord, SessionType, DailySession, PreRegistration, PreRegistrationStatus, MemorizationAmount, SubscriptionTier } from '@/lib/types';
+import type { Student, DailyRecord, SessionType, DailySession, PreRegistration, PreRegistrationStatus, MemorizationAmount, SubscriptionTier, StudentStatus } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
 import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth, isValid, startOfYear, setYear, differenceInYears } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -484,28 +484,43 @@ export default function DataExchangePage() {
   }
 
   const handleDownloadStudentTemplate = () => {
-    const headers = ["الاسم الكامل", "الجنس", "اسم الولي", "المستوى الدراسي", "رقم الصفحة", "رقم الهاتف 1", "رقم الهاتف 2", "العمر", "تاريخ الميلاد", "تاريخ التسجيل", "حالة الطالب", "فئة الاشتراك", "مقدار الحفظ اليومي", "ملاحظات عامة"];
-    const exampleRow = {
-      "الاسم الكامل": "عبدالله بن محمد",
-      "الجنس": "ذكر",
-      "اسم الولي": "محمد الأحمد",
-      "المستوى الدراسي": "3 ابتدائي",
-      "رقم الصفحة": "15",
-      "رقم الهاتف 1": "0501234567",
-      "رقم الهاتف 2": "",
-      "العمر": 9,
-      "تاريخ الميلاد": "15/01/2015",
-      "تاريخ التسجيل": "01/09/2023",
-      "حالة الطالب": "نشط",
-      "فئة الاشتراك": "فئة الأصاغر",
-      "مقدار الحفظ اليومي": "صفحة",
-      "ملاحظات عامة": "طالب مستجد"
+    const headers = [
+        "الاسم الكامل", "الجنس", "اسم الولي", "المستوى الدراسي", "رقم الصفحة", 
+        "رقم الهاتف 1", "رقم الهاتف 2", "العمر", "تاريخ الميلاد", "تاريخ التسجيل", 
+        "حالة الطالب", "فئة الاشتراك", "مقدار الحفظ اليومي", "ملاحظات عامة"
+    ];
+    
+    // Create an empty worksheet
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    
+    // Set column widths
+    ws['!cols'] = [ 
+        { wch: 20 }, { wch: 10 }, { wch: 20 }, { wch: 15 }, { wch: 10 }, 
+        { wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 15 }, { wch: 15 }, 
+        { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 30 }
+    ];
+
+    // Add Data Validation for dropdowns
+    ws['!dataValidation'] = [
+        { sqref: 'B2:B999', type: 'list', formula1: '"ذكر,أنثى"' },
+        { sqref: 'K2:K999', type: 'list', formula1: '"نشط,غائب طويل,مطرود"' },
+        { sqref: 'L2:L999', type: 'list', formula1: '"فئة الأصاغر,فئة الأكابر"' },
+        { sqref: 'M2:M999', type: 'list', formula1: '"نصف صفحة,صفحة,ثمن,ربع,أكثر"' },
+    ];
+    
+    // Add example row
+     const exampleRow = {
+      "الاسم الكامل": "عبدالله بن محمد", "الجنس": "ذكر", "اسم الولي": "محمد الأحمد",
+      "المستوى الدراسي": "3 ابتدائي", "رقم الصفحة": "15", "رقم الهاتف 1": "0501234567",
+      "رقم الهاتف 2": "", "العمر": 9, "تاريخ الميلاد": "15/01/2015",
+      "تاريخ التسجيل": "01/09/2023", "حالة الطالب": "نشط", "فئة الاشتراك": "فئة الأصاغر",
+      "مقدار الحفظ اليومي": "صفحة", "ملاحظات عامة": "طالب مستجد"
     };
-    const ws = XLSX.utils.json_to_sheet([exampleRow], { header: headers });
-    ws['!cols'] = [ { wch: 20 }, { wch: 10 }, { wch: 20 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, {wch: 15}, {wch: 15}, { wch: 30 }];
+    XLSX.utils.sheet_add_json(ws, [exampleRow], { skipHeader: true, origin: 'A2' });
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "نموذج الطلبة");
-    XLSX.writeFile(wb, "نموذج_استيراد_الطلبة.xlsx");
+    XLSX.writeFile(wb, "نموذج_استيراد_الطلبة_الذكي.xlsx");
   };
 
   const handleDownloadPreRegTemplate = () => {
@@ -542,7 +557,7 @@ export default function DataExchangePage() {
       'رقم الحصة': 1,
       'نوع الحصة': 'حصة أساسية',
       'اسم الطالب': student.fullName,
-      'الحضور': '', 'التقييم': '', 'السلوك': '',
+      'الحاضر': '', 'التقييم': '', 'السلوك': '',
       'مراجعة': 'لا', 'ملاحظات': ''
     }));
 
@@ -593,7 +608,7 @@ export default function DataExchangePage() {
                             'رقم الحصة': session.sessionNumber,
                             'نوع الحصة': session.sessionType,
                             'اسم الطالب': student?.fullName || 'غير معروف',
-                            'الحضور': record.attendance || '',
+                            'الحاضر': record.attendance || '',
                             'التقييم': record.memorization || '',
                             'السلوك': record.behavior || '',
                             'مراجعة': record.review ? 'نعم' : 'لا',
@@ -787,4 +802,5 @@ export default function DataExchangePage() {
   
 
     
+
 
