@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -421,13 +420,9 @@ export default function PreRegistrationPage() {
     const [isBulkEditOpen, setBulkEditOpen] = useState(false);
     const router = useRouter();
 
-    const [isLocked, setIsLocked] = useState(true);
-    const [isUnlockModalOpen, setUnlockModalOpen] = useState(false);
-    const [adminCode, setAdminCode] = useState('');
-
-    const [isDataVisible, setIsDataVisible] = useState(false);
-    const [isVisibilityModalOpen, setIsVisibilityModalOpen] = useState(false);
-    const [visibilityCode, setVisibilityCode] = useState('');
+    const [accessLevel, setAccessLevel] = useState<'hidden' | 'view_only' | 'unlocked'>('hidden');
+    const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+    const [accessCode, setAccessCode] = useState('');
     
     const [sortConfig, setSortConfig] = useState<{ key: keyof PreRegistration; direction: 'ascending' | 'descending' }>({ key: 'pageNumber', direction: 'ascending' });
     
@@ -441,6 +436,8 @@ export default function PreRegistrationPage() {
         }
         return ALL_COLUMNS;
     });
+
+    const isLocked = accessLevel !== 'unlocked';
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -456,33 +453,19 @@ export default function PreRegistrationPage() {
         };
     }, []);
 
-    const handleUnlock = () => {
-        if (adminCode === 'admin8888') {
-            setIsLocked(false);
-            setUnlockModalOpen(false);
-            setAdminCode('');
-            toast({ title: '✅ تم فتح وضع التعديل', description: 'يمكنك الآن إجراء التعديلات.' });
-        } else {
-            toast({ title: '❌ خطأ', description: 'كود الإدارة غير صحيح.', variant: 'destructive' });
-        }
-    };
-    
-    const handleVisibilityToggle = () => {
-        if (visibilityCode === 'adaika8888') {
-            setIsDataVisible(true);
-            setIsVisibilityModalOpen(false);
-            setVisibilityCode('');
-            toast({ title: '✅ تم عرض البيانات', description: 'البيانات الآن ظاهرة. وضع التعديل لا يزال مقفلاً.' });
-        } else if (visibilityCode === 'admin8888') {
-            setIsDataVisible(true);
-            setIsLocked(false);
-            setIsVisibilityModalOpen(false);
-            setVisibilityCode('');
+    const handleAccessCodeSubmit = () => {
+        if (accessCode === 'admin8888') {
+            setAccessLevel('unlocked');
             toast({ title: '✅ تم الدخول بصلاحيات المدير', description: 'تم عرض البيانات وفتح وضع التعديل.' });
+        } else if (accessCode === 'adaika8888') {
+            setAccessLevel('view_only');
+            toast({ title: '✅ تم عرض البيانات', description: 'البيانات الآن ظاهرة. وضع التعديل مقفل.' });
         } else {
             toast({ title: '❌ خطأ', description: 'كود الوصول غير صحيح.', variant: 'destructive' });
         }
-    }
+        setIsAccessModalOpen(false);
+        setAccessCode('');
+    };
 
     const toggleColumn = (key: keyof typeof ALL_COLUMNS) => {
         setColumnVisibility((prev: any) => ({
@@ -676,84 +659,67 @@ export default function PreRegistrationPage() {
         );
     }
 
+    const accessLevelConfig = {
+        hidden: {
+            color: "bg-gray-100 border-gray-300",
+            icon: <EyeOff className="h-5 w-5" />,
+            text: ""
+        },
+        view_only: {
+            color: "bg-yellow-100 border-yellow-300",
+            icon: <Lock className="h-5 w-5 text-yellow-700"/>,
+            text: "الصفحة مقفلة - عرض فقط"
+        },
+        unlocked: {
+            color: "bg-green-100 border-green-300",
+            icon: <Unlock className="h-5 w-5 text-green-700"/>,
+            text: "تم فتح وضع التعديل"
+        }
+    }
+    const currentAccess = accessLevelConfig[accessLevel];
+
     return (
         <div className="space-y-6">
-             <Card className={cn("sticky top-0 z-40 transition-colors", isDataVisible ? (isLocked ? "bg-yellow-100 border-yellow-300" : "bg-green-100 border-green-300") : "bg-gray-100 border-gray-300")}>
+             <Card className={cn("sticky top-0 z-40 transition-colors", currentAccess.color)}>
                 <CardContent className="p-3 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="icon" onClick={() => setIsVisibilityModalOpen(true)}>
-                           {isDataVisible ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        <Button variant="ghost" size="icon" onClick={() => setIsAccessModalOpen(true)}>
+                           {currentAccess.icon}
                         </Button>
-
-                         <div className="flex items-center gap-2 font-semibold">
-                            {isLocked ? (
-                                <>
-                                    <Lock className="h-5 w-5 text-yellow-700"/>
-                                    <span className="text-yellow-800 hidden sm:inline">⚠️ الصفحة مقفلة - لا يمكن التعديل.</span>
-                                </>
-                            ) : (
-                                 <>
-                                    <Unlock className="h-5 w-5 text-green-700"/>
-                                    <span className="text-green-800 hidden sm:inline">تم فتح وضع التعديل.</span>
-                                </>
-                            )}
-                        </div>
+                        <div className="font-semibold hidden sm:inline">{currentAccess.text}</div>
                     </div>
-                    {isLocked ? (
-                        <Button onClick={() => setUnlockModalOpen(true)}>فتح التعديل</Button>
+                    {accessLevel === 'unlocked' ? (
+                        <Button variant="secondary" onClick={() => setAccessLevel('view_only')}>إعادة قفل التعديل</Button>
                     ) : (
-                        <Button variant="secondary" onClick={() => setIsLocked(true)}>إعادة قفل الصفحة</Button>
+                        <Button onClick={() => setIsAccessModalOpen(true)}>فتح الصلاحيات</Button>
                     )}
                 </CardContent>
             </Card>
             
-             <Dialog open={isVisibilityModalOpen} onOpenChange={setIsVisibilityModalOpen}>
+             <Dialog open={isAccessModalOpen} onOpenChange={setIsAccessModalOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>إظهار البيانات</DialogTitle>
+                        <DialogTitle>الوصول إلى البيانات</DialogTitle>
                         <DialogDescription>
-                            البيانات محمية. يرجى إدخال كود الوصول لعرضها.
+                            البيانات محمية. يرجى إدخال كود الوصول المناسب.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-2 py-4">
-                        <Label htmlFor="visibility-code">كود الوصول</Label>
+                        <Label htmlFor="access-code">كود الوصول</Label>
                         <Input 
-                            id="visibility-code" 
+                            id="access-code" 
                             type="password"
-                            value={visibilityCode}
-                            onChange={(e) => setVisibilityCode(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleVisibilityToggle()}
+                            value={accessCode}
+                            onChange={(e) => setAccessCode(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAccessCodeSubmit()}
                         />
+                         <p className="text-xs text-muted-foreground pt-2">
+                            استخدم كود العرض لإظهار البيانات، أو كود الإدارة للوصول الكامل.
+                        </p>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsVisibilityModalOpen(false)}>إلغاء</Button>
-                        <Button onClick={handleVisibilityToggle}>تأكيد</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-
-            <Dialog open={isUnlockModalOpen} onOpenChange={setUnlockModalOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>فتح وضع التعديل</DialogTitle>
-                        <DialogDescription>
-                            لإجراء أي تعديلات على هذه الصفحة، يرجى إدخال كود الإدارة.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-2 py-4">
-                        <Label htmlFor="admin-code">كود الإدارة</Label>
-                        <Input 
-                            id="admin-code" 
-                            type="password"
-                            value={adminCode}
-                            onChange={(e) => setAdminCode(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
-                        />
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setUnlockModalOpen(false)}>إلغاء</Button>
-                        <Button onClick={handleUnlock}>تأكيد</Button>
+                        <Button variant="outline" onClick={() => setIsAccessModalOpen(false)}>إلغاء</Button>
+                        <Button onClick={handleAccessCodeSubmit}>تأكيد</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -799,7 +765,7 @@ export default function PreRegistrationPage() {
                 onSave={handleBulkEditSave}
             />
 
-            {isDataVisible ? (
+            {accessLevel !== 'hidden' ? (
                 <>
                     <Card>
                         <CardContent className="p-4 space-y-4">
@@ -1020,7 +986,7 @@ export default function PreRegistrationPage() {
                         <CardDescription>لدواعي الخصوصية، يرجى إدخال كود الوصول لعرض البيانات.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Button onClick={() => setIsVisibilityModalOpen(true)}>
+                        <Button onClick={() => setIsAccessModalOpen(true)}>
                             <Eye className="ml-2 h-4 w-4" />
                             إظهار البيانات
                         </Button>
@@ -1028,7 +994,7 @@ export default function PreRegistrationPage() {
                 </Card>
             )}
             
-            {isDataVisible && selectedRows.length > 0 && (
+            {accessLevel === 'unlocked' && selectedRows.length > 0 && (
                 <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 border-t shadow-lg z-50">
                     <div className="container mx-auto flex justify-between items-center">
                         <p className="font-semibold">{selectedRows.length} طلاب محددون</p>
@@ -1067,5 +1033,6 @@ export default function PreRegistrationPage() {
     
 
     
+
 
 
