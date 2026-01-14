@@ -319,29 +319,25 @@ const PrintableWeeklyLog = ({ students, adminName, weekDates }: { students: Stud
                 @media print {
                     @page {
                         size: A4 landscape;
-                        margin: 0.5cm;
+                        margin: 5mm;
                     }
-                    .print-only {
-                        display: block !important;
-                    }
-                    .no-print {
-                        display: none !important;
-                    }
+                    .print-only { display: block !important; }
+                    .no-print { display: none !important; }
                     body {
-                       background: white !important;
-                       color: black !important;
+                        background: white !important;
+                        color: black !important;
                     }
                     .print-header {
                         text-align: center;
                         font-weight: bold;
-                        font-size: 16pt;
+                        font-size: 18pt;
                         margin-bottom: 1rem;
                     }
                     .print-table {
-                        width: 100% !important;
+                        width: 100%;
                         border-collapse: collapse;
                         font-size: 8pt;
-                        table-layout: auto !important;
+                        table-layout: auto;
                     }
                     .print-table, .print-table th, .print-table td {
                         border: 0.5pt solid black !important;
@@ -349,24 +345,27 @@ const PrintableWeeklyLog = ({ students, adminName, weekDates }: { students: Stud
                          color: black !important;
                     }
                     .print-table th, .print-table td {
-                        padding: 4px !important;
+                        padding: 4px;
                         text-align: center;
                     }
                     .print-table thead {
                         display: table-header-group !important;
                     }
                     .print-table tr {
-                        page-break-inside: avoid !important;
-                        break-inside: avoid !important;
+                        page-break-inside: avoid;
+                        break-inside: avoid;
                     }
                     .student-row {
-                        height: 2.5rem;
+                        height: 35px;
                     }
                     .student-name-col {
                         width: 15%;
                         text-align: right;
                         padding-right: 8px !important;
                     }
+                    .serial-col { width: 3%; }
+                    .level-col { width: 7%; }
+                    .sub-col { width: 3.75%; }
                     .sub-col-header {
                         font-size: 7pt;
                     }
@@ -378,9 +377,9 @@ const PrintableWeeklyLog = ({ students, adminName, weekDates }: { students: Stud
             <table className="print-table">
                 <thead>
                     <tr>
-                        <th rowSpan={2}>ت</th>
+                        <th rowSpan={2} className="serial-col">ت</th>
                         <th rowSpan={2} className="student-name-col">اسم الطالب</th>
-                        <th rowSpan={2}>المستوى</th>
+                        <th rowSpan={2} className="level-col">المستوى</th>
                         {weekDates.slice(0, 5).map(date => (
                             <th key={date.toISOString()} colSpan={4}>{format(date, 'EEEE (dd/MM)', { locale: ar })}</th>
                         ))}
@@ -402,7 +401,6 @@ const PrintableWeeklyLog = ({ students, adminName, weekDates }: { students: Stud
                             <td>{index + 1}</td>
                             <td className="student-name-col">{student.fullName}</td>
                             <td>{student.educationalLevel || ''}</td>
-                            {/* Saturday to Wednesday cells */}
                             {Array(20).fill(0).map((_, i) => <td key={i} className="sub-col"></td>)}
                         </tr>
                     ))}
@@ -597,7 +595,7 @@ export default function StudentManagementPage() {
   
     const weekDatesForPrint = useMemo(() => {
         const start = startOfWeek(weekForPrint, { weekStartsOn: 6 }); // Saturday
-        return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
+        return Array.from({ length: 5 }).map((_, i) => addDays(start, i)); // Sat to Wed
     }, [weekForPrint]);
 
   const handlePrintWeeklyLog = () => {
@@ -894,8 +892,6 @@ export default function StudentManagementPage() {
                 rankingData={rankingData}
                 onEdit={() => { setEditStudentDialogOpen(true); }}
                 onViewStats={() => {
-                     // This should navigate to the student report page
-                     // For now, we can just log it or close the dialog
                      setSelectedStudent(null);
                 }}
             />
@@ -952,7 +948,7 @@ export default function StudentManagementPage() {
                 </div>
             </div>
         )}
-        <div className="print-only" style={{ display: 'none' }}>
+        <div className="print-only">
             <PrintableWeeklyLog students={filteredStudents} adminName={user?.displayName} weekDates={weekDatesForPrint} />
         </div>
     </div>
@@ -1418,11 +1414,3 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
 }
 
     
-    
-
-
-
-
-
-    
-
