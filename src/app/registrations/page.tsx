@@ -168,56 +168,29 @@ const StudentProfileCard = ({ student, onEdit, isLocked }: { student: PreRegistr
 };
 
 const QuickEduLevelSelector = ({ value, onChange }: { value: string, onChange: (value: string) => void }) => {
-    const [mainCategory, setMainCategory] = useState<string | null>(null);
-
-    const handleMainCategoryClick = (category: string) => {
-        setMainCategory(category === mainCategory ? null : category);
-    };
-
-    const handleYearClick = (year: string) => {
-        onChange(`${year} ${mainCategory}`);
-    };
-    
-    const handleOtherClick = (level: string) => {
-        onChange(level);
-    }
-
-    const categories: Record<string, string[]> = {
-        'ابتدائي': ['1', '2', '3', '4', '5'],
-        'متوسط': ['1', '2', '3', '4'],
-        'ثانوي': ['1', '2', '3', 'بكالوريا'],
-    };
-    
-    const otherLevels = ['روضة', 'تحضيري', 'جامعي', 'متوقف عن الدراسة'];
-
-    return (
-        <div className="space-y-2">
-             <div className="grid grid-cols-4 gap-2">
-                {Object.keys(categories).map(cat => (
-                    <Button key={cat} type="button" variant={mainCategory === cat ? "default" : "outline"} onClick={() => handleMainCategoryClick(cat)}>
-                        {cat}
-                    </Button>
-                ))}
-             </div>
-             {mainCategory && categories[mainCategory] && (
-                <div className="grid grid-cols-5 gap-2 pt-2">
-                    {categories[mainCategory].map(year => (
-                         <Button key={year} type="button" variant="outline" onClick={() => handleYearClick(year)}>
-                             {year}
-                         </Button>
-                    ))}
-                </div>
-             )}
-             <div className="grid grid-cols-4 gap-2 pt-2">
-                {otherLevels.map(level => (
-                    <Button key={level} type="button" variant="outline" onClick={() => handleOtherClick(level)}>
-                        {level}
-                    </Button>
-                ))}
-             </div>
-             {value && <p className="text-sm font-semibold text-center pt-2 text-primary">المستوى المحدد: {value}</p>}
+  return (
+    <div className="space-y-3 rounded-lg border p-3">
+      {Object.entries(educationalLevels).map(([phase, levels]) => (
+        <div key={phase}>
+          <Label className="text-xs font-semibold text-muted-foreground">{phase}</Label>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {levels.map((level) => (
+              <Button
+                key={level}
+                type="button"
+                variant={value === level ? "default" : "outline"}
+                size="sm"
+                onClick={() => onChange(level)}
+                className="flex-grow"
+              >
+                {level}
+              </Button>
+            ))}
+          </div>
         </div>
-    );
+      ))}
+    </div>
+  );
 };
 
 
@@ -457,15 +430,41 @@ const BulkEditModal = ({ open, onOpenChange, selectedCount, onSave }: { open: bo
                     </div>
                     <div className="flex items-center gap-4">
                         <Checkbox id="update-level" checked={!!fieldsToUpdate.educationalLevel} onCheckedChange={() => handleFieldToggle('educationalLevel')} />
-                        <div className="grid gap-1.5 leading-none w-full">
-                             <Label htmlFor="level-select" className={cn(!fieldsToUpdate.educationalLevel && "text-muted-foreground")}>المستوى الدراسي</Label>
-                             <Select dir="rtl" name="educationalLevel" disabled={!fieldsToUpdate.educationalLevel} onValueChange={(val) => handleInputChange('educationalLevel', val)}>
-                                <SelectTrigger id="level-select"><SelectValue placeholder="اختر المستوى الجديد" /></SelectTrigger>
-                                <SelectContent>
-                                    {allEducationalLevels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                         <div className="grid gap-1.5 leading-none w-full">
+                            <Label htmlFor="edu-level-combobox" className={cn(!fieldsToUpdate.educationalLevel && "text-muted-foreground")}>المستوى الدراسي</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" className="w-full justify-between" disabled={!fieldsToUpdate.educationalLevel}>
+                                    {updateData.educationalLevel ? allEducationalLevels.find(level => level === updateData.educationalLevel) : "اختر المستوى..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                <Command>
+                                    <CommandInput placeholder="ابحث عن مستوى..." />
+                                    <CommandEmpty>لم يتم العثور على مستوى.</CommandEmpty>
+                                    <CommandList>
+                                        {Object.entries(educationalLevels).map(([group, levels]) => (
+                                             <CommandGroup key={group} heading={group}>
+                                                {levels.map(level => (
+                                                    <CommandItem
+                                                    key={level}
+                                                    value={level}
+                                                    onSelect={(currentValue) => {
+                                                        handleInputChange('educationalLevel', currentValue === updateData.educationalLevel ? "" : currentValue);
+                                                    }}
+                                                    >
+                                                    <Check className={cn("mr-2 h-4 w-4", updateData.educationalLevel === level ? "opacity-100" : "opacity-0")} />
+                                                    {level}
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        ))}
+                                    </CommandList>
+                                </Command>
+                                </PopoverContent>
+                            </Popover>
+                         </div>
                     </div>
                      <div className="flex items-center gap-4">
                         <Checkbox id="update-notes" checked={!!fieldsToUpdate.notes} onCheckedChange={() => handleFieldToggle('notes')} />
@@ -518,7 +517,7 @@ export default function PreRegistrationPage() {
                     // Merge with ALL_COLUMNS to ensure all keys are present and have a 'visible' property
                     for (const key in initialVisibility) {
                         if (parsed[key] !== undefined) {
-                            initialVisibility[key].visible = parsed[key].visible;
+                            initialVisibility[key as keyof typeof initialVisibility].visible = parsed[key].visible;
                         }
                     }
                     return initialVisibility;
@@ -563,10 +562,13 @@ export default function PreRegistrationPage() {
     };
 
     const toggleColumn = (key: keyof typeof ALL_COLUMNS) => {
-        setColumnVisibility((prev: any) => ({
-            ...prev,
-            [key]: { ...prev[key], visible: !prev[key].visible }
-        }));
+        setColumnVisibility((prev) => {
+            const newVisibility = { ...prev };
+            if (newVisibility[key]) {
+                newVisibility[key] = { ...newVisibility[key], visible: !newVisibility[key].visible };
+            }
+            return newVisibility;
+        });
     };
     
     const handlePrint = () => {
@@ -587,7 +589,10 @@ export default function PreRegistrationPage() {
         const quickViewCols: (keyof typeof ALL_COLUMNS)[] = ['fullName', 'educationalLevel', 'status'];
         const newVisibility = { ...columnVisibility };
         Object.keys(newVisibility).forEach(key => {
-            newVisibility[key as keyof typeof ALL_COLUMNS].visible = quickViewCols.includes(key as keyof typeof ALL_COLUMNS);
+            const columnKey = key as keyof typeof ALL_COLUMNS;
+            if (newVisibility[columnKey]) {
+                newVisibility[columnKey] = { ...newVisibility[columnKey], visible: quickViewCols.includes(columnKey) };
+            }
         });
         setColumnVisibility(newVisibility);
     };
@@ -595,7 +600,10 @@ export default function PreRegistrationPage() {
     const setAllView = () => {
         const newVisibility = { ...columnVisibility };
         Object.keys(newVisibility).forEach(key => {
-            newVisibility[key as keyof typeof ALL_COLUMNS].visible = true;
+             const columnKey = key as keyof typeof ALL_COLUMNS;
+            if (newVisibility[columnKey]) {
+                newVisibility[columnKey] = { ...newVisibility[columnKey], visible: true };
+            }
         });
         setColumnVisibility(newVisibility);
     };
@@ -933,7 +941,7 @@ export default function PreRegistrationPage() {
                                         {Object.entries(columnVisibility).map(([key, value]) => (
                                             <DropdownMenuCheckboxItem
                                                 key={key}
-                                                checked={(columnVisibility as any)[key].visible}
+                                                checked={columnVisibility[key as keyof typeof columnVisibility].visible}
                                                 onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
                                             >
                                                 {value.label}
@@ -1125,11 +1133,14 @@ export default function PreRegistrationPage() {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid grid-cols-2 gap-4 py-4">
-                        {Object.entries(ALL_COLUMNS).map(([key, { label }]) => (
+                        {Object.entries(ALL_COLUMNS).map(([key, { label }]) => {
+                            const column = columnVisibility[key as keyof typeof columnVisibility];
+                            if (!column) return null; // Defensive check
+                            return (
                             <div key={key} className="flex items-center space-x-2 space-x-reverse">
                                 <Checkbox
                                     id={`print-col-${key}`}
-                                    checked={(columnVisibility as any)[key]?.visible}
+                                    checked={column.visible}
                                     onCheckedChange={(checked) => {
                                         setColumnVisibility(prev => ({...prev, [key as keyof typeof prev]: {...(prev as any)[key], visible: !!checked}}));
                                     }}
@@ -1141,7 +1152,7 @@ export default function PreRegistrationPage() {
                                     {label}
                                 </label>
                             </div>
-                        ))}
+                        )})}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setPrintModalOpen(false)}>إلغاء</Button>
@@ -1212,6 +1223,7 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
 
 
 
