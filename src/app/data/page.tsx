@@ -109,6 +109,7 @@ export default function DataExchangePage() {
         const newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[] = [];
         let skippedCount = 0;
         let invalidDateCount = 0;
+        let errorList: string[] = [];
 
         json.forEach((row, index) => {
            const fullName = (row['الاسم الكامل'] || '').trim();
@@ -120,57 +121,58 @@ export default function DataExchangePage() {
            }
            
            let birthDate = parseDate(row['تاريخ الميلاد'], row['العمر']);
-           let registrationDate = parseDate(row['تاريخ التسجيل']);
+           let registrationDate = parseDate(row['تاريخ التسجيل']) || new Date();
 
            if (!birthDate) {
                 birthDate = new Date(); // Default to today if both are invalid
                 invalidDateCount++;
            }
-           if (!registrationDate) {
-                registrationDate = new Date();
-           }
+           
+           const statusMap: { [key: string]: StudentStatus } = { "نشط": "نشط", "غائب طويل": "غائب طويل", "مطرود": "مطرود" };
+           const status = statusMap[(row['حالة الطالب'] || 'نشط').trim()] || "نشط";
 
-           const status = row['حالة الطالب'] || 'نشط';
-           if (!["نشط", "غائب طويل", "مطرود"].includes(status)) {
-             throw new Error(`حالة الطالب "${status}" في الصف ${index + 2} غير صالحة. يجب أن تكون واحدة من: نشط، غائب طويل، مطرود.`);
-           }
-
-           const subscriptionTier = row['فئة الاشتراك'] || 'فئة الأصاغر';
-           if (!['فئة الأصاغر', 'فئة الأكابر'].includes(subscriptionTier)) {
-               throw new Error(`فئة الاشتراك "${subscriptionTier}" في الصف ${index+2} غير صالحة.`);
-           }
-
-           const dailyMemorizationAmount = row['مقدار الحفظ اليومي'] || 'صفحة';
-            if (!['نصف صفحة', 'صفحة', 'ثمن', 'ربع', 'أكثر'].includes(dailyMemorizationAmount)) {
-                 throw new Error(`مقدار الحفظ "${dailyMemorizationAmount}" في الصف ${index+2} غير صالح.`);
+           const subscriptionTierMap: { [key: string]: SubscriptionTier } = { 'فئة الأصاغر': 'فئة الأصاغر', 'فئة الأكابر': 'فئة الأكابر' };
+           const subscriptionTier = subscriptionTierMap[(row['فئة الاشتراك'] || 'فئة الأصاغر').trim()] || 'فئة الأصاغر';
+          
+           const dailyMemorizationMap: { [key: string]: MemorizationAmount } = { 'نصف صفحة': 'نصف', 'صفحة': 'صفحة', 'ثمن': 'ثمن', 'ربع': 'ربع', 'أكثر': 'أكثر' };
+           const dailyMemorizationAmount = dailyMemorizationMap[(row['مقدار الحفظ اليومي'] || 'صفحة').trim()] || 'صفحة';
+           
+           const gender = (row['الجنس'] || 'ذكر').trim();
+            if (!['ذكر', 'أنثى'].includes(gender)) {
+                errorList.push(`الصف ${index + 2}: القيمة '${gender}' في عمود الجنس غير صالحة.`);
+                return; // Skip this student
             }
 
-           
            const studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> = {
               fullName: fullName,
-              gender: row['الجنس'] || 'ذكر',
-              guardianName: row['اسم الولي'] || 'N/A',
-              educationalLevel: row['المستوى الدراسي'] || 'غير محدد',
-              pageNumber: row['رقم الصفحة']?.toString() || '',
-              phone1: row['رقم الهاتف 1']?.toString() || 'N/A',
-              phone2: row['رقم الهاتف 2']?.toString() || '',
+              gender: gender as 'ذكر' | 'أنثى',
+              guardianName: (row['اسم الولي'] || 'N/A').trim(),
+              educationalLevel: (row['المستوى الدراسي'] || 'غير محدد').trim(),
+              pageNumber: (row['رقم الصفحة']?.toString() || '').trim(),
+              phone1: (row['رقم الهاتف 1']?.toString() || 'N/A').trim(),
+              phone2: (row['رقم الهاتف 2']?.toString() || '').trim(),
               birthDate: birthDate,
               registrationDate: registrationDate,
-              status: status as StudentStatus,
-              subscriptionTier: subscriptionTier as SubscriptionTier,
-              dailyMemorizationAmount: dailyMemorizationAmount as MemorizationAmount,
-              notes: row['ملاحظات عامة'] || '',
+              status: status,
+              subscriptionTier: subscriptionTier,
+              dailyMemorizationAmount: dailyMemorizationAmount,
+              notes: (row['ملاحظات عامة'] || '').trim(),
            };
            
            newStudents.push(studentData);
            existingStudentNames.add(fullName.toLowerCase());
         });
         
+        if (errorList.length > 0) {
+            throw new Error(`تم العثور على أخطاء في الملف:\n- ${errorList.join('\n- ')}`);
+        }
+        
         if (newStudents.length > 0) {
             importStudents(newStudents);
         }
         
-        let description = `تم استيراد ${newStudents.length} طالبًا جديدًا بنجاح. وتم تخطي ${skippedCount} طالبًا لوجودهم مسبقًا.`;
+        let description = `تم استيراد ${newStudents.length} طالبًا جديدًا بنجاح.`;
+        if (skippedCount > 0) description += ` وتم تخطي ${skippedCount} طالبًا لوجودهم مسبقًا.`
         if (invalidDateCount > 0) {
             description += ` تم العثور على ${invalidDateCount} تواريخ ميلاد غير صالحة وتم تعيينها إلى تاريخ اليوم مؤقتًا.`
         }
@@ -800,3 +802,5 @@ export default function DataExchangePage() {
     </div>
   );
 }
+
+    
