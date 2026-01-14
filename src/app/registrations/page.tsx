@@ -453,7 +453,15 @@ export default function PreRegistrationPage() {
     const [columnVisibility, setColumnVisibility] = useState(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('preRegColumnVisibility');
-            return saved ? JSON.parse(saved) : ALL_COLUMNS;
+            try {
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    // Merge with ALL_COLUMNS to ensure all keys are present
+                    return { ...ALL_COLUMNS, ...parsed };
+                }
+            } catch (e) {
+                console.error("Failed to parse column visibility from localStorage", e);
+            }
         }
         return ALL_COLUMNS;
     });
@@ -1043,9 +1051,9 @@ export default function PreRegistrationPage() {
                             <div key={key} className="flex items-center space-x-2 space-x-reverse">
                                 <Checkbox
                                     id={`print-col-${key}`}
-                                    checked={(columnVisibility as any)[key].visible}
+                                    checked={(columnVisibility as any)[key]?.visible ?? false}
                                     onCheckedChange={(checked) => {
-                                        setColumnVisibility(prev => ({...prev, [key]: {...prev[key as keyof typeof prev], visible: checked}}));
+                                        setColumnVisibility(prev => ({...prev, [key]: {...prev[key as keyof typeof prev], visible: !!checked}}));
                                     }}
                                 />
                                 <label
@@ -1072,7 +1080,7 @@ export default function PreRegistrationPage() {
                 @media print {
                     body {
                         font-size: 10pt;
-                        color: #000;
+                        color: #000 !important;
                     }
                     body * {
                         visibility: hidden;
@@ -1126,5 +1134,6 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
 
 
