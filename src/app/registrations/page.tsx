@@ -909,7 +909,7 @@ export default function PreRegistrationPage() {
                                         {Object.entries(columnVisibility).map(([key, value]) => (
                                             <DropdownMenuCheckboxItem
                                                 key={key}
-                                                checked={value.visible}
+                                                checked={(columnVisibility[key as keyof typeof columnVisibility])?.visible}
                                                 onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
                                             >
                                                 {value.label}
@@ -1105,7 +1105,7 @@ export default function PreRegistrationPage() {
                             <div key={key} className="flex items-center space-x-2 space-x-reverse">
                                 <Checkbox
                                     id={`print-col-${key}`}
-                                    checked={columnVisibility[key as keyof typeof ALL_COLUMNS]?.visible ?? false}
+                                    checked={(columnVisibility[key as keyof typeof columnVisibility])?.visible}
                                     onCheckedChange={(checked) => {
                                         setColumnVisibility(prev => ({...prev, [key as keyof typeof prev]: {...prev[key as keyof typeof prev], visible: !!checked}}));
                                     }}
@@ -1134,16 +1134,15 @@ export default function PreRegistrationPage() {
                 @media print {
                     body {
                         font-size: 10pt;
-                        color: #000 !important;
                     }
                     body * {
                         visibility: hidden;
-                        background-color: transparent !important;
-                        box-shadow: none !important;
-                        color: #000 !important;
                     }
                     .print-container, .print-container * {
                         visibility: visible;
+                        background-color: #ffffff !important;
+                        color: #000000 !important;
+                        box-shadow: none !important;
                     }
                     .print-container {
                         position: absolute;
@@ -1166,6 +1165,7 @@ export default function PreRegistrationPage() {
                     #print-table th, #print-table td {
                         border: 0.5pt solid black !important;
                         padding: 4px 6px !important;
+                        background-color: #ffffff !important;
                     }
                     #print-table th {
                         font-weight: bold;
@@ -1176,7 +1176,7 @@ export default function PreRegistrationPage() {
                     }
                     #print-table .badge {
                         background-color: transparent !important;
-                        color: #000 !important;
+                        color: #000000 !important;
                         border: 0.5pt solid black !important;
                     }
                 }
@@ -1188,6 +1188,7 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
 
 
 
