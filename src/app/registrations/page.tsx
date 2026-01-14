@@ -222,7 +222,7 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
              <DialogHeader>
                 <DialogTitle>{existingRegistration ? `تعديل طلب: ${existingRegistration.fullName}`: 'استمارة تسجيل أولي جديدة'}</DialogTitle>
                 <DialogDescription>
-                    {existingRegistration ? 'قم بتحديث بيانات الطالب هنا.' : 'املأ بيانات الطالب الجديد. الحقول المعلمة بـ * إلزامية.'}
+                    {existingRegistration ? 'قم بتحديث بيانات الطالب هنا.' : 'املأ بيانات الطالب الجديد. حقل رقم الهاتف إلزامي.'}
                 </DialogDescription>
             </DialogHeader>
             <div className="max-h-[60vh] overflow-y-auto p-4 space-y-4">
@@ -257,19 +257,25 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="space-y-2">
-                        <Label>تاريخ الميلاد</Label>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !birthDate && "text-muted-foreground")}>
-                                    <CalendarIcon className="ml-2 h-4 w-4" />
-                                    {birthDate ? format(birthDate, "PPP", { locale: ar }) : <span>اختر تاريخًا</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={birthDate} onSelect={setBirthDate} captionLayout="dropdown-buttons" fromYear={1990} toYear={new Date().getFullYear()} initialFocus />
-                            </PopoverContent>
-                        </Popover>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-2">
+                            <Label>العمر (تقريبي)</Label>
+                            <Input id="age-input" type="number" value={age} onChange={handleAgeChange} placeholder="مثال: 12"/>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>تاريخ الميلاد</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !birthDate && "text-muted-foreground")}>
+                                        <CalendarIcon className="ml-2 h-4 w-4" />
+                                        {birthDate ? format(birthDate, "PPP", { locale: ar }) : <span>اختر تاريخًا</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                    <Calendar mode="single" selected={birthDate} onSelect={setBirthDate} captionLayout="dropdown-buttons" fromYear={1990} toYear={new Date().getFullYear()} initialFocus />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
                     </div>
                 </div>
 
@@ -550,7 +556,7 @@ export default function PreRegistrationPage() {
             
             if(isNaN(dateA) || isNaN(dateB)) return 0;
             
-            return sortConfig.direction === 'ascending' ? dateB - a : dateA - b;
+            return sortConfig.direction === 'ascending' ? dateB - dateA : dateA - dateB;
         });
 
     }, [preRegistrations, searchTerm, levelFilter, statusFilter, genderFilter, sortConfig, pendingDeletion]);
@@ -1049,3 +1055,4 @@ export default function PreRegistrationPage() {
 
 
     
+

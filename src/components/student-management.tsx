@@ -21,7 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, isAfter } from 'date-fns';
+import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, isAfter, setYear, startOfYear, differenceInYears } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
@@ -371,7 +371,7 @@ export default function StudentManagementPage() {
         "اسم الولي": s.guardianName,
         "رقم الهاتف 1": s.phone1,
         "رقم الهاتف 2": s.phone2 || '',
-        "تاريخ الميلاد": format(s.birthDate, 'dd/MM/yyyy'),
+        "تاريخ الميلاد": s.birthDate ? format(s.birthDate, 'dd/MM/yyyy') : '',
         "تاريخ التسجيل": format(s.registrationDate, 'dd/MM/yyyy'),
         "الحالة": s.status,
         "فئة الاشتراك": s.subscriptionTier,
@@ -868,12 +868,29 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
   const { user, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const [birthDate, setBirthDate] = useState<Date | undefined>(student?.birthDate ? new Date(student.birthDate) : undefined);
+  const [age, setAge] = useState<number | string>(student && student.birthDate ? differenceInYears(new Date(), student.birthDate) : '');
   const [registrationDate, setRegistrationDate] = useState<Date | undefined>(student?.registrationDate ? new Date(student.registrationDate) : new Date());
   const [covenants, setCovenants] = useState<Covenant[]>(student?.covenants || []);
   const [originalCovenants, setOriginalCovenants] = useState<Covenant[]>(student?.covenants || []);
   const [photoPreview, setPhotoPreview] = useState<string | null>(student?.photoURL || null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (birthDate) {
+        setAge(differenceInYears(new Date(), birthDate));
+    }
+  }, [birthDate]);
+
+  const handleAgeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newAge = e.target.value;
+    setAge(newAge);
+    if (newAge && !isNaN(Number(newAge))) {
+        const birthYear = getYear(new Date()) - Number(newAge);
+        setBirthDate(startOfYear(setYear(new Date(), birthYear)));
+    }
+  };
+
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -901,11 +918,6 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries()) as any;
-
-    if (!registrationDate) {
-      toast({ title: 'خطأ', description: 'تاريخ التسجيل حقل إلزامي.', variant: 'destructive' });
-      return;
-    }
     
     // Check for status change from "نشط" to "تم الوفاء به"
     covenants.forEach((newCovenant, index) => {
@@ -928,7 +940,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         phone1: data.phone1,
         phone2: data.phone2,
         birthDate: birthDate,
-        registrationDate: registrationDate,
+        registrationDate: registrationDate || new Date(),
         status: data.status,
         subscriptionTier: data.subscriptionTier,
         dailyMemorizationAmount: data.memorizationAmount,
@@ -1060,8 +1072,12 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
             <Input name="phone2" id="phone2" type="tel" defaultValue={student?.phone2} />
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div className="space-y-2">
+                <Label>العمر (تقريبي)</Label>
+                <Input id="age-input" type="number" value={age} onChange={handleAgeChange} placeholder="مثال: 12"/>
+            </div>
+            <div className="space-y-2 md:col-span-2">
                 <Label>تاريخ الميلاد</Label>
                 <Popover>
                     <PopoverTrigger asChild>
@@ -1086,29 +1102,29 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
                     </PopoverContent>
                 </Popover>
             </div>
-            <div className="space-y-2">
-                <Label>تاريخ التسجيل</Label>
-                <Popover>
-                    <PopoverTrigger asChild>
-                    <Button
-                        variant={"outline"}
-                        className={cn("w-full justify-start text-right font-normal", !registrationDate && "text-muted-foreground")}
-                    >
-                        <CalendarIcon className="ml-2 h-4 w-4" />
-                        {registrationDate ? format(registrationDate, "PPP", { locale: ar }) : <span>اختر تاريخًا</span>}
-                    </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                    <Calendar
-                        mode="single"
-                        selected={registrationDate}
-                        onSelect={setRegistrationDate}
-                        initialFocus
-                    />
-                    </PopoverContent>
-                </Popover>
-            </div>
         </div>
+        <div className="space-y-2">
+             <Label>تاريخ التسجيل</Label>
+             <Popover>
+                 <PopoverTrigger asChild>
+                 <Button
+                     variant={"outline"}
+                     className={cn("w-full justify-start text-right font-normal", !registrationDate && "text-muted-foreground")}
+                 >
+                     <CalendarIcon className="ml-2 h-4 w-4" />
+                     {registrationDate ? format(registrationDate, "PPP", { locale: ar }) : <span>اختر تاريخًا</span>}
+                 </Button>
+                 </PopoverTrigger>
+                 <PopoverContent className="w-auto p-0">
+                 <Calendar
+                     mode="single"
+                     selected={registrationDate}
+                     onSelect={setRegistrationDate}
+                     initialFocus
+                 />
+                 </PopoverContent>
+             </Popover>
+         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
                 <Label htmlFor="status">حالة الطالب</Label>
@@ -1231,5 +1247,6 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
 
 
