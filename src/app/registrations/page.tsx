@@ -88,10 +88,8 @@ const StudentProfileCard = ({ student, onPromote, onEdit, isLocked, sheikhs }: {
 
     return (
         <DialogContent className="sm:max-w-2xl p-0">
-             <DialogHeader>
+             <DialogHeader className={cn("p-6 rounded-t-lg text-white", headerColor)}>
                 <DialogTitle className="sr-only">بطاقة الطالب: {student.fullName}</DialogTitle>
-             </DialogHeader>
-             <div className={cn("p-6 rounded-t-lg text-white", headerColor)}>
                 <div className="flex items-center gap-4">
                      <Avatar className="w-20 h-20 border-4 border-white/50">
                         <AvatarImage src={student.photoURL} />
@@ -107,7 +105,7 @@ const StudentProfileCard = ({ student, onPromote, onEdit, isLocked, sheikhs }: {
                         </div>
                     </div>
                 </div>
-             </div>
+             </DialogHeader>
              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <h3 className="font-semibold mb-2 border-b pb-1">المعلومات الشخصية والتعليمية</h3>
@@ -140,7 +138,7 @@ const StudentProfileCard = ({ student, onPromote, onEdit, isLocked, sheikhs }: {
                 <Button variant="secondary" onClick={onEdit} disabled={isLocked}>تعديل</Button>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                         <Button disabled={student.status === 'تم الإنضمام' || isLocked}>نقل إلى فوج</Button>
+                         <Button disabled={isLocked}>نقل إلى فوج</Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
                         <DropdownMenuLabel>اختر فوج الشيخ</DropdownMenuLabel>
@@ -259,14 +257,14 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-2">
-                            <Label>العمر (اختياري)</Label>
+                            <Label htmlFor="age-input">العمر (اختياري)</Label>
                             <Input id="age-input" type="number" value={age} onChange={handleAgeChange} placeholder="مثال: 12"/>
                         </div>
                         <div className="space-y-2">
-                            <Label>تاريخ الميلاد (اختياري)</Label>
+                            <Label htmlFor="birthDate-popover">تاريخ الميلاد (اختياري)</Label>
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !birthDate && "text-muted-foreground")}>
+                                    <Button variant="outline" id="birthDate-popover" className={cn("w-full justify-start text-left font-normal", !birthDate && "text-muted-foreground")}>
                                         <CalendarIcon className="ml-2 h-4 w-4" />
                                         {birthDate ? format(birthDate, "PPP", { locale: ar }) : <span>اختر تاريخًا</span>}
                                     </Button>
@@ -330,8 +328,8 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
                         <Input id="address" name="address" defaultValue={existingRegistration?.address}/>
                     </div>
                      <div className="space-y-2">
-                        <Label htmlFor="notes">ملاحظات عامة</Label>
-                        <Textarea name="notes" defaultValue={existingRegistration?.notes} />
+                        <Label htmlFor="notes-general">ملاحظات عامة</Label>
+                        <Textarea id="notes-general" name="notes" defaultValue={existingRegistration?.notes} />
                     </div>
                  </div>
 
@@ -642,7 +640,7 @@ export default function PreRegistrationPage() {
             return;
         }
         
-        const newStudentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'pageNumber'> & {ownerId: string, groupName: string} = {
+        const newStudentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & {ownerId: string, groupName: string} = {
             ownerId,
             groupName,
             fullName: reg.fullName,
@@ -1055,5 +1053,6 @@ export default function PreRegistrationPage() {
 
 
     
+
 
 

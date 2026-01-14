@@ -153,7 +153,8 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
 
     return (
         <DialogContent className="sm:max-w-3xl p-0 flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b flex flex-col items-center">
+            <DialogHeader className="p-6 border-b flex flex-col items-center">
+                 <DialogTitle className="sr-only">الملف الشخصي للطالب {student.fullName}</DialogTitle>
                 <Avatar className="w-24 h-24 mb-4 border-4 border-primary">
                     <AvatarImage src={student.photoURL} alt={student.fullName} />
                     <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
@@ -177,7 +178,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
                     <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
                     <p className="text-sm text-muted-foreground">الشيخ: {user?.displayName}</p>
                 </div>
-            </div>
+            </DialogHeader>
 
             <div className="overflow-y-auto px-6 pb-6 space-y-4">
                  <Card>
@@ -415,7 +416,7 @@ export default function StudentManagementPage() {
     const statusOrder: { [key in StudentStatus]: number } = { "نشط": 1, "غائب طويل": 2, "مطرود": 3, "محذوف": 4, };
     
     // The students state is already filtered by the StudentContext based on the user's role
-    let sortableStudents = (students ?? []);
+    let sortableStudents = isSuperAdmin ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
         
     sortableStudents = sortableStudents.filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -450,7 +451,7 @@ export default function StudentManagementPage() {
 
     return sortableStudents;
 
-  }, [students, searchTerm, statusFilter, levelFilter, sortConfig]);
+  }, [students, searchTerm, statusFilter, levelFilter, user, isSuperAdmin, sortConfig]);
   
   const getActiveCovenant = (student: Student): Covenant | null => {
       if (!student.covenants || student.covenants.length === 0) return null;
@@ -560,7 +561,7 @@ export default function StudentManagementPage() {
                 <Download className="ml-2 h-4 w-4" />
                 تصدير الطلبة (Excel)
             </Button>
-            {!isSuperAdmin && <AlertDialog>
+            {isSuperAdmin && <AlertDialog>
                 <AlertDialogTrigger asChild>
                     <Button variant="destructive" disabled={(students ?? []).length === 0}>
                         <Trash2 className="ml-2 h-4 w-4" />
@@ -1247,6 +1248,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     </form>
   );
 }
+
 
 
 
