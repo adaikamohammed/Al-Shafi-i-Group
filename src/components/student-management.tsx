@@ -1,8 +1,9 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban, UserRound, Filter, ArrowUpDown } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban, UserRound, Filter, ArrowUpDown, BookOpen, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -152,7 +153,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
 
     return (
         <DialogContent className="sm:max-w-3xl p-0 flex flex-col max-h-[90vh]">
-            <DialogHeader>
+             <DialogHeader>
                 <DialogTitle className="sr-only">ملف الطالب: {student.fullName}</DialogTitle>
                 <DialogDescription className="sr-only">عرض تفصيلي لبيانات وأداء الطالب.</DialogDescription>
             </DialogHeader>
@@ -187,12 +188,26 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
                     <CardHeader>
                         <CardTitle className="text-base">مؤشرات الأداء</CardTitle>
                     </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                          <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
                              <GraduationCap className="h-5 w-5 text-muted-foreground"/>
                              <div>
                                 <p className="text-xs text-muted-foreground">المستوى الدراسي</p>
                                  <p className="font-bold">{student.educationalLevel || 'غير محدد'}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                             <Shield className="h-5 w-5 text-muted-foreground"/>
+                             <div>
+                                <p className="text-xs text-muted-foreground">فئة الاشتراك</p>
+                                 <p className="font-bold">{student.subscriptionTier || 'غير محدد'}</p>
+                            </div>
+                        </div>
+                         <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                             <BookOpen className="h-5 w-5 text-muted-foreground"/>
+                             <div>
+                                <p className="text-xs text-muted-foreground">مقدار الحفظ</p>
+                                 <p className="font-bold">{student.dailyMemorizationAmount || 'غير محدد'}</p>
                             </div>
                         </div>
                         <TooltipProvider>
@@ -237,10 +252,19 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
                          <div className="flex items-center gap-2 p-2">
                              <Phone className="h-5 w-5 text-muted-foreground"/>
                              <div>
-                                <p className="text-xs text-muted-foreground">رقم هاتف الولي</p>
+                                <p className="text-xs text-muted-foreground">رقم هاتف الولي 1</p>
                                  <p className="font-bold">{student.phone1}</p>
                             </div>
                         </div>
+                        {student.phone2 && (
+                             <div className="flex items-center gap-2 p-2">
+                                 <Phone className="h-5 w-5 text-muted-foreground"/>
+                                 <div>
+                                    <p className="text-xs text-muted-foreground">رقم هاتف الولي 2</p>
+                                     <p className="font-bold">{student.phone2}</p>
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
                 
@@ -1258,3 +1282,5 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
     </form>
   );
 }
+
+    
