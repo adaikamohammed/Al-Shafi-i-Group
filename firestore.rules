@@ -32,19 +32,6 @@ service firebase.storage {
       ".read": "auth !== null",
       ".write": "auth != null && root.child('users').child(auth.uid).child('profile').hasChild('role')",
       ".indexOn": ["status", "full_name", "phone_1"]
-    },
-
-    "students": {
-      ".read": "auth != null", 
-      // السماح بالكتابة إذا كان المستخدم مسجلاً ولديه دور شيخ في قاعدة البيانات
-      ".write": "auth != null && root.child('users').child(auth.uid).child('profile').child('role').val() === 'sheikh'"
-    },
-
-    "dailyReports": {
-      ".read": "auth != null", 
-      ".write": "auth != null && root.child('users').child(auth.uid).child('profile').child('role').val() === 'sheikh'",
-      ".indexOn": ["studentId"] 
     }
   }
 }
-
