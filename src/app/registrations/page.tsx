@@ -32,15 +32,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 // 1. قائمة المشايخ الرسمية مرتبة (المرجع الأساسي)
 const SHEIKHS_LIST = [
-  { id: 1, name: "الشيخ زياد درويش", email: "admin1@gmail.com" },
-  { id: 2, name: "الشيخ عبد الحميد", email: "admin2@gmail.com" },
-  { id: 3, name: "الشيخ فؤاد بن عمر", email: "admin3@gmail.com" },
-  { id: 4, name: "الشيخ أحمد بن عمر", email: "admin4@gmail.com" },
-  { id: 5, name: "الشيخ إبراهيم مراد", email: "admin5@gmail.com" },
-  { id: 6, name: "الشيخ سفيان نصيرة", email: "admin6@gmail.com" },
-  { id: 7, name: "الشيخ محمد منصور", email: "admin7@gmail.com" },
-  { id: 8, name: "الشيخ عبد الحق نصيرة", email: "admin8@gmail.com" },
-  { id: 9, name: "الشيخ صهيب نصيب", email: "admin9@gmail.com" }
+  { id: 1, name: "الشيخ زياد درويش", email: "admin1@gmail.com", group: "فوج الشيخ زياد درويش" },
+  { id: 2, name: "الشيخ عبد الحميد", email: "admin2@gmail.com", group: "فوج الشيخ عبد الحميد" },
+  { id: 3, name: "الشيخ فؤاد بن عمر", email: "admin3@gmail.com", group: "فوج الشيخ فؤاد بن عمر" },
+  { id: 4, name: "الشيخ أحمد بن عمر", email: "admin4@gmail.com", group: "فوج الشيخ أحمد بن عمر" },
+  { id: 5, name: "الشيخ إبراهيم مراد", email: "admin5@gmail.com", group: "فوج الشيخ إبراهيم مراد" },
+  { id: 6, name: "الشيخ سفيان نصيرة", email: "admin6@gmail.com", group: "فوج الشيخ سفيان نصيرة" },
+  { id: 7, name: "الشيخ محمد منصور", email: "admin7@gmail.com", group: "فوج الشيخ محمد منصور" },
+  { id: 8, name: "الشيخ عبد الحق نصيرة", email: "admin8@gmail.com", group: "فوج الشيخ عبد الحق نصيرة" },
+  { id: 9, name: "الشيخ صهيب نصيب", email: "admin9@gmail.com", group: "فوج الشيخ صهيب نصيب" }
 ];
 
 
@@ -74,7 +74,7 @@ const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ا
 const ALL_COLUMNS = {
     fullName: { label: "الإسم الكامل", visible: true },
     gender: { label: "الجنس", visible: false },
-    birthDate: { label: "تاريخ الميلاد", visible: true },
+    birthDate: { label: "تاريخ الميلاد (اختياري)", visible: true },
     educationalLevel: { label: "المستوى الدراسي", visible: true },
     guardianName: { label: "إسم الولي", visible: false },
     phone1: { label: "رقم الهاتف 1", visible: true },
@@ -96,12 +96,12 @@ const calculateAge = (birthDate?: Date | string) => {
     }
 };
 
-const StudentProfileCard = ({ student, onPromote, onEdit, isLocked, sheikhs }: { student: PreRegistration, onPromote: (ownerId: string, groupName: string) => void, onEdit: () => void, isLocked: boolean, sheikhs: AppUser[] }) => {
+const StudentProfileCard = ({ student, onPromote, onEdit, isLocked, sheikhs }: { student: PreRegistration, onPromote: (sheikhEmail: string) => void, onEdit: () => void, isLocked: boolean, sheikhs: AppUser[] }) => {
     const headerColor = statusHeaderColors[student.status] || 'bg-gray-500';
 
     return (
         <DialogContent className="sm:max-w-2xl p-0">
-            <DialogHeader>
+             <DialogHeader>
                 <DialogTitle className="sr-only">بطاقة الطالب: {student.fullName}</DialogTitle>
                 <DialogDescription className="sr-only">عرض تفصيلي لبيانات الطالب.</DialogDescription>
             </DialogHeader>
@@ -159,9 +159,9 @@ const StudentProfileCard = ({ student, onPromote, onEdit, isLocked, sheikhs }: {
                     <DropdownMenuContent>
                         <DropdownMenuLabel>اختر فوج الشيخ</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {sheikhs.map(sheikh => (
-                            <DropdownMenuItem key={sheikh.uid} onSelect={() => onPromote(sheikh.uid, sheikh.group || 'فوج غير محدد')}>
-                                {sheikh.group}
+                        {SHEIKHS_LIST.map(sheikh => (
+                            <DropdownMenuItem key={sheikh.id} onSelect={() => onPromote(sheikh.email)}>
+                                {sheikh.name}
                             </DropdownMenuItem>
                         ))}
                     </DropdownMenuContent>
@@ -645,7 +645,7 @@ export default function PreRegistrationPage() {
         setSelectedRows([]);
     };
 
-    const handlePromoteStudent = (reg: PreRegistration, ownerId: string, groupName: string) => {
+    const handlePromoteStudent = (reg: PreRegistration, sheikhEmail: string) => {
         if (!reg.birthDate || !isValid(new Date(reg.birthDate))) {
              toast({
                 title: 'خطأ في تاريخ الميلاد',
@@ -656,9 +656,15 @@ export default function PreRegistrationPage() {
             return;
         }
         
+        const chosenSheikh = allUsers.find(u => u.email === sheikhEmail);
+        if (!chosenSheikh) {
+            toast({ title: 'خطأ', description: 'لم يتم العثور على الشيخ المختار.', variant: 'destructive'});
+            return;
+        }
+
         const newStudentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & {ownerId: string, groupName: string} = {
-            ownerId,
-            groupName,
+            ownerId: chosenSheikh.uid,
+            groupName: chosenSheikh.group || 'فوج غير محدد',
             fullName: reg.fullName,
             gender: reg.gender,
             guardianName: reg.guardianName || 'غير محدد',
@@ -676,11 +682,11 @@ export default function PreRegistrationPage() {
 
         addStudent(newStudentData);
 
-        updatePreRegistration(reg.id, { ...reg, status: 'تم الإنضمام', ownerId }, true);
+        updatePreRegistration(reg.id, { ...reg, status: 'تم الإنضمام', ownerId: chosenSheikh.uid }, true);
 
         toast({
             title: '✅ تم النقل بنجاح!',
-            description: `تم نقل الطالب ${reg.fullName} إلى ${groupName}.`,
+            description: `تم نقل الطالب ${reg.fullName} إلى ${chosenSheikh.group}.`,
         });
         setSelectedStudent(null);
         router.push('/');
@@ -786,7 +792,7 @@ export default function PreRegistrationPage() {
                  <Dialog open={!!selectedStudent} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}>
                     <StudentProfileCard 
                         student={selectedStudent} 
-                        onPromote={(ownerId, groupName) => handlePromoteStudent(selectedStudent, ownerId, groupName)}
+                        onPromote={(sheikhEmail) => handlePromoteStudent(selectedStudent, sheikhEmail)}
                         onEdit={() => handleEdit(selectedStudent)}
                         isLocked={isLocked}
                         sheikhs={sheikhs}

@@ -277,7 +277,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       ...(restOfStudentData as any),
       id: studentId,
       ownerId: ownerId,
-      groupName: isSuperAdmin ? studentData.groupName : (authContextUser.group || 'غير محدد'),
+      groupName: studentData.groupName,
       memorizedSurahsCount: 0,
       subscriptionTier: studentData.subscriptionTier || 'فئة الأصاغر',
       updatedAt: new Date(),
@@ -613,4 +613,3 @@ export const useStudentContext = () => {
   }
   return context;
 };
-
