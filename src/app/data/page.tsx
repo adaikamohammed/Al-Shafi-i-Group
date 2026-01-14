@@ -41,7 +41,7 @@ export default function DataExchangePage() {
 
   const [isImportingStudents, setIsImportingStudents] = useState(false);
   const [isImportingSessions, setIsImportingSessions] = useState(false);
-  const [isImportingMonthly, setIsImportingMonthly = useState(false);
+  const [isImportingMonthly, setIsImportingMonthly] = useState(false);
   const [isImportingPreRegs, setIsImportingPreRegs] = useState(false);
 
 
@@ -800,5 +800,3 @@ export default function DataExchangePage() {
     </div>
   );
 }
-
-    
