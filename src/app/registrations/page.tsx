@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -534,7 +535,7 @@ export default function PreRegistrationPage() {
             
             if(isNaN(dateA) || isNaN(dateB)) return 0;
             
-            return sortConfig.direction === 'ascending' ? dateB - dateA : dateA - b;
+            return sortConfig.direction === 'ascending' ? dateB - a : dateA - b;
         });
 
     }, [preRegistrations, searchTerm, levelFilter, statusFilter, genderFilter, sortConfig, pendingDeletion]);
@@ -620,12 +621,11 @@ export default function PreRegistrationPage() {
             return;
         }
         
-        const newStudentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & {ownerId: string, groupName: string} = {
+        const newStudentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'pageNumber'> & {ownerId: string, groupName: string} = {
             ownerId,
             groupName,
             fullName: reg.fullName,
             gender: reg.gender,
-            pageNumber: reg.pageNumber,
             guardianName: reg.guardianName || 'غير محدد',
             educationalLevel: reg.educationalLevel || 'غير محدد',
             phone1: reg.phone1,
