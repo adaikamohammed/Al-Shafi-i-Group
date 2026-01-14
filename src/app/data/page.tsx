@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Upload, Download, History, Loader2, CalendarClock, UserPlus, Trash2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { Student, DailyRecord, SessionType, DailySession, PreRegistration, PreRegistrationStatus } from '@/lib/types';
+import type { Student, DailyRecord, SessionType, DailySession, PreRegistration, PreRegistrationStatus, MemorizationAmount, SubscriptionTier } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
-import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth, isValid, startOfYear, setYear } from 'date-fns';
+import { format, parse, startOfMonth, endOfMonth, parseISO, getDaysInMonth, isValid, startOfYear, setYear, differenceInYears } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/navigation';
@@ -45,36 +45,40 @@ export default function DataExchangePage() {
   const [isImportingPreRegs, setIsImportingPreRegs] = useState(false);
 
 
- const parseDate = (dateInput: any): Date | string | null => {
-    if (!dateInput || (typeof dateInput === 'string' && dateInput.trim() === '/')) return null;
-    if (dateInput instanceof Date && isValid(dateInput)) return dateInput;
-    if (typeof dateInput === 'string') {
-        // Handle DD/MM/YYYY or MM/DD/YYYY or YYYY
-        const parts = dateInput.split(/[/.-]/);
-        if (parts.length === 3) {
-            const day = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) - 1;
-            let year = parseInt(parts[2], 10);
-            if(year < 100) year += 2000;
-            const newDate = new Date(year, month, day);
-            if (isValid(newDate)) return newDate;
+ const parseDate = (dateInput: any, age?: number): Date | string | null => {
+    if (dateInput) {
+        if (dateInput instanceof Date && isValid(dateInput)) return dateInput;
+        if (typeof dateInput === 'string') {
+            const parts = dateInput.split(/[/.-]/);
+            if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1;
+                let year = parseInt(parts[2], 10);
+                if(year < 100) year += 2000;
+                const newDate = new Date(year, month, day);
+                if (isValid(newDate)) return newDate;
+            }
+             if(parts.length === 1 && /^\d{4}$/.test(parts[0])) {
+                 return dateInput;
+             }
         }
-         if(parts.length === 1 && /^\d{4}$/.test(parts[0])) {
-             const year = parseInt(parts[0], 10);
-             // Return just the year string to be handled later
-             return dateInput;
-         }
-        // Handle ISO date string
+        if (typeof dateInput === 'number') {
+            const parsedFromExcel = XLSX.SSF.parse_date_code(dateInput);
+            if(parsedFromExcel) return new Date(parsedFromExcel.y, parsedFromExcel.m - 1, parsedFromExcel.d);
+        }
         try {
             const parsed = parseISO(dateInput);
             if(isValid(parsed)) return parsed;
         } catch(e) { /* ignore parse error */ }
     }
-    if (typeof dateInput === 'number') {
-        const parsedFromExcel = XLSX.SSF.parse_date_code(dateInput);
-        if(parsedFromExcel) return new Date(parsedFromExcel.y, parsedFromExcel.m - 1, parsedFromExcel.d);
+    
+    // Fallback to age if birthdate is invalid or missing
+    if (age && !isNaN(age)) {
+        const birthYear = getYear(new Date()) - age;
+        return startOfYear(setYear(new Date(), birthYear));
     }
-    return dateInput.toString(); // Return raw string if parsing fails
+    
+    return dateInput ? dateInput.toString() : null; // Return raw string or null if parsing fails
  };
 
 
@@ -92,13 +96,13 @@ export default function DataExchangePage() {
         const worksheet = workbook.Sheets[sheetName];
         
         const headers: string[] = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
-        const requiredHeaders = ["الاسم الكامل", "تاريخ الميلاد", "تاريخ التسجيل"];
+        const requiredHeaders = ["الاسم الكامل"];
         const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
         if(missingHeaders.length > 0) {
-            throw new Error(`ملف غير متوافق. الأعمدة المطلوبة مفقودة: ${missingHeaders.join(', ')}. الرجاء استخدام النموذج الرسمي.`);
+            throw new Error(`ملف غير متوافق. العمود المطلوب مفقود: ${missingHeaders.join(', ')}. الرجاء استخدام النموذج الرسمي.`);
         }
 
-        const json = XLSX.utils.sheet_to_json<any>(worksheet, { raw: false });
+        const json = XLSX.utils.sheet_to_json<any>(worksheet, { raw: false, defval: null });
 
         const existingStudentNames = new Set((students ?? []).map(s => s.fullName.trim().toLowerCase()));
         const newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[] = [];
@@ -114,36 +118,51 @@ export default function DataExchangePage() {
                return; // Skip duplicate student
            }
            
-           let birthDate = parseDate(row['تاريخ الميلاد']);
+           let birthDate = parseDate(row['تاريخ الميلاد'], row['العمر']);
            let registrationDate = parseDate(row['تاريخ التسجيل']);
 
            if (!birthDate || typeof birthDate === 'string' || !isValid(birthDate as Date)) {
-                birthDate = new Date();
+                birthDate = new Date(); // Default to today if both are invalid
                 invalidDateCount++;
            }
            if (!registrationDate || typeof registrationDate === 'string' || !isValid(registrationDate as Date)) {
                 registrationDate = new Date();
-                invalidDateCount++;
            }
 
            const status = row['حالة الطالب'] || 'نشط';
            if (!["نشط", "غائب طويل", "مطرود"].includes(status)) {
              throw new Error(`حالة الطالب "${status}" في الصف ${index + 2} غير صالحة. يجب أن تكون واحدة من: نشط، غائب طويل، مطرود.`);
            }
+
+           const subscriptionTier = row['فئة الاشتراك'] || 'فئة الأصاغر';
+           if (!['فئة الأصاغر', 'فئة الأكابر'].includes(subscriptionTier)) {
+               throw new Error(`فئة الاشتراك "${subscriptionTier}" في الصف ${index+2} غير صالحة.`);
+           }
+
+           const dailyMemorizationAmount = row['مقدار الحفظ اليومي'] || 'صفحة';
+            if (!['نصف صفحة', 'صفحة', 'ثمن', 'ربع', 'أكثر'].includes(dailyMemorizationAmount)) {
+                 throw new Error(`مقدار الحفظ "${dailyMemorizationAmount}" في الصف ${index+2} غير صالح.`);
+            }
+
            
            const studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> = {
               fullName: fullName,
+              gender: row['الجنس'] || 'ذكر',
               guardianName: row['اسم الولي'] || 'N/A',
-              phone1: row['رقم الهاتف']?.toString() || 'N/A',
+              educationalLevel: row['المستوى الدراسي'] || 'غير محدد',
+              pageNumber: row['رقم الصفحة']?.toString() || '',
+              phone1: row['رقم الهاتف 1']?.toString() || 'N/A',
+              phone2: row['رقم الهاتف 2']?.toString() || '',
               birthDate: birthDate as Date,
               registrationDate: registrationDate as Date,
-              status: status,
-              dailyMemorizationAmount: 'صفحة',
-              notes: row['ملاحظات'] || '',
+              status: status as StudentStatus,
+              subscriptionTier: subscriptionTier as SubscriptionTier,
+              dailyMemorizationAmount: dailyMemorizationAmount as MemorizationAmount,
+              notes: row['ملاحظات عامة'] || '',
            };
            
            newStudents.push(studentData);
-           existingStudentNames.add(fullName.toLowerCase()); // Add to set to prevent duplicates within the same file
+           existingStudentNames.add(fullName.toLowerCase());
         });
         
         if (newStudents.length > 0) {
@@ -152,7 +171,7 @@ export default function DataExchangePage() {
         
         let description = `تم استيراد ${newStudents.length} طالبًا جديدًا بنجاح. وتم تخطي ${skippedCount} طالبًا لوجودهم مسبقًا.`;
         if (invalidDateCount > 0) {
-            description += ` تم العثور على ${invalidDateCount} تواريخ غير صالحة وتم تعيينها إلى تاريخ اليوم مؤقتًا.`
+            description += ` تم العثور على ${invalidDateCount} تواريخ ميلاد غير صالحة وتم تعيينها إلى تاريخ اليوم مؤقتًا.`
         }
 
         toast({
@@ -465,18 +484,25 @@ export default function DataExchangePage() {
   }
 
   const handleDownloadStudentTemplate = () => {
-    const headers = ["الاسم الكامل", "اسم الولي", "رقم الهاتف", "تاريخ الميلاد", "تاريخ التسجيل", "حالة الطالب", "ملاحظات"];
+    const headers = ["الاسم الكامل", "الجنس", "اسم الولي", "المستوى الدراسي", "رقم الصفحة", "رقم الهاتف 1", "رقم الهاتف 2", "العمر", "تاريخ الميلاد", "تاريخ التسجيل", "حالة الطالب", "فئة الاشتراك", "مقدار الحفظ اليومي", "ملاحظات عامة"];
     const exampleRow = {
       "الاسم الكامل": "عبدالله بن محمد",
+      "الجنس": "ذكر",
       "اسم الولي": "محمد الأحمد",
-      "رقم الهاتف": "0501234567",
-      "تاريخ الميلاد": "15/01/2012",
+      "المستوى الدراسي": "3 ابتدائي",
+      "رقم الصفحة": "15",
+      "رقم الهاتف 1": "0501234567",
+      "رقم الهاتف 2": "",
+      "العمر": 9,
+      "تاريخ الميلاد": "15/01/2015",
       "تاريخ التسجيل": "01/09/2023",
       "حالة الطالب": "نشط",
-      "ملاحظات": "طالب مستجد"
+      "فئة الاشتراك": "فئة الأصاغر",
+      "مقدار الحفظ اليومي": "صفحة",
+      "ملاحظات عامة": "طالب مستجد"
     };
     const ws = XLSX.utils.json_to_sheet([exampleRow], { header: headers });
-    ws['!cols'] = [ { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 30 }];
+    ws['!cols'] = [ { wch: 20 }, { wch: 10 }, { wch: 20 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, {wch: 15}, {wch: 15}, { wch: 30 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "نموذج الطلبة");
     XLSX.writeFile(wb, "نموذج_استيراد_الطلبة.xlsx");
@@ -761,3 +787,4 @@ export default function DataExchangePage() {
   
 
     
+
