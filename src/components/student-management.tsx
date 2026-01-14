@@ -20,7 +20,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, isAfter, setYear, startOfYear, differenceInYears } from 'date-fns';
+import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, isAfter, setYear, startOfYear, differenceInYears, startOfWeek, addDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
@@ -308,7 +308,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
     );
 };
 
-const PrintableWeeklyLog = ({ students, adminName }: { students: Student[], adminName?: string | null }) => {
+const PrintableWeeklyLog = ({ students, adminName, weekDates }: { students: Student[], adminName?: string | null, weekDates: Date[] }) => {
     return (
         <div id="weekly-log-print" className="print-only">
             <style jsx global>{`
@@ -348,7 +348,7 @@ const PrintableWeeklyLog = ({ students, adminName }: { students: Student[], admi
                         text-align: center;
                     }
                     .print-table th {
-                        background-color: #f2f2f2;
+                        background-color: #f2f2f2 !important;
                     }
                     .student-row {
                         height: 40px; /* Ensure space for handwriting */
@@ -360,7 +360,7 @@ const PrintableWeeklyLog = ({ students, adminName }: { students: Student[], admi
                 }
             `}</style>
             <div className="print-header">
-                المدرسة القرآنية للإمام الشافعي / الشيخ: {adminName || '..........'} / الأسبوع: .......... / الشهر: ..........
+                المدرسة القرآنية للإمام الشافعي / الشيخ: {adminName || '..........'} / الأسبوع من: {format(weekDates[0], 'dd/MM/yyyy')} إلى: {format(weekDates[6], 'dd/MM/yyyy')}
             </div>
             <table className="print-table">
                 <thead>
@@ -368,18 +368,20 @@ const PrintableWeeklyLog = ({ students, adminName }: { students: Student[], admi
                         <th rowSpan={2}>#</th>
                         <th rowSpan={2}>الاسم الكامل</th>
                         <th rowSpan={2}>المستوى الدراسي</th>
-                        <th colSpan={4}>السبت</th>
-                        <th colSpan={4}>الأحد</th>
-                        <th colSpan={4}>الاثنين</th>
-                        <th colSpan={4}>الثلاثاء</th>
-                        <th colSpan={4}>الأربعاء</th>
+                        {weekDates.slice(0, 5).map(date => (
+                            <th key={date.toISOString()} colSpan={4}>
+                                {format(date, 'EEEE', { locale: ar })}
+                                <br/>
+                                {format(date, 'dd/MM')}
+                            </th>
+                        ))}
                     </tr>
                     <tr>
-                        <th className="sub-col">ح</th><th className="sub-col">ت</th><th className="sub-col">م</th><th className="sub-col">س</th>
-                        <th className="sub-col">ح</th><th className="sub-col">ت</th><th className="sub-col">م</th><th className="sub-col">س</th>
-                        <th className="sub-col">ح</th><th className="sub-col">ت</th><th className="sub-col">م</th><th className="sub-col">س</th>
-                        <th className="sub-col">ح</th><th className="sub-col">ت</th><th className="sub-col">م</th><th className="sub-col">س</th>
-                        <th className="sub-col">ح</th><th className="sub-col">ت</th><th className="sub-col">م</th><th className="sub-col">س</th>
+                        {Array(5).fill(0).map((_, i) => (
+                            <React.Fragment key={i}>
+                                <th className="sub-col">ح</th><th className="sub-col">ت</th><th className="sub-col">م</th><th className="sub-col">س</th>
+                            </React.Fragment>
+                        ))}
                     </tr>
                 </thead>
                 <tbody>
@@ -388,16 +390,8 @@ const PrintableWeeklyLog = ({ students, adminName }: { students: Student[], admi
                             <td>{index + 1}</td>
                             <td style={{textAlign: 'right', paddingRight: '8px'}}>{student.fullName}</td>
                             <td>{student.educationalLevel || ''}</td>
-                            {/* Saturday */}
-                            <td></td><td></td><td></td><td></td>
-                            {/* Sunday */}
-                            <td></td><td></td><td></td><td></td>
-                            {/* Monday */}
-                            <td></td><td></td><td></td><td></td>
-                            {/* Tuesday */}
-                            <td></td><td></td><td></td><td></td>
-                            {/* Wednesday */}
-                            <td></td><td></td><td></td><td></td>
+                            {/* Saturday to Wednesday cells */}
+                            {Array(20).fill(0).map((_, i) => <td key={i}></td>)}
                         </tr>
                     ))}
                 </tbody>
@@ -418,6 +412,7 @@ export default function StudentManagementPage() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: keyof Student | 'pageNumber'; direction: 'ascending' | 'descending' }>({ key: 'fullName', direction: 'ascending' });
+  const [logbookDate, setLogbookDate] = useState<Date | undefined>(new Date());
 
     const rankingData = useMemo(() => {
         const pointsConfig = settings.points;
@@ -591,6 +586,12 @@ export default function StudentManagementPage() {
     window.print();
   };
 
+  const logbookWeekDates = useMemo(() => {
+    if (!logbookDate) return [];
+    const start = startOfWeek(logbookDate, { weekStartsOn: 6 }); // Saturday
+    return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
+  }, [logbookDate]);
+
   if (loading) {
     return (
         <div className="flex items-center justify-center h-full">
@@ -691,10 +692,26 @@ export default function StudentManagementPage() {
             </Select>
          </div>
          <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={handlePrintWeeklyLog} disabled={(students ?? []).length === 0}>
-                <Printer className="ml-2 h-4 w-4" />
-                دفتر المتابعة الأسبوعي
-            </Button>
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button variant="secondary" className="w-full sm:w-auto">
+                        <Printer className="ml-2 h-4 w-4" />
+                        دفتر المتابعة
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-4 space-y-4">
+                    <p className="text-sm font-medium">اختر الأسبوع للطباعة</p>
+                    <Calendar
+                        mode="single"
+                        selected={logbookDate}
+                        onSelect={setLogbookDate}
+                        initialFocus
+                    />
+                    <Button className="w-full" onClick={handlePrintWeeklyLog} disabled={!logbookDate}>
+                        طباعة دفتر الأسبوع المحدد
+                    </Button>
+                </PopoverContent>
+            </Popover>
             <Button variant="outline" onClick={handleExportStudents} disabled={(students ?? []).length === 0}>
                 <Download className="ml-2 h-4 w-4" />
                 تصدير الطلبة (Excel)
@@ -927,7 +944,7 @@ export default function StudentManagementPage() {
             </div>
         )}
         <div className="print-only" style={{ display: 'none' }}>
-            <PrintableWeeklyLog students={filteredStudents} adminName={user?.displayName} />
+            <PrintableWeeklyLog students={filteredStudents} adminName={user?.displayName} weekDates={logbookWeekDates} />
         </div>
     </div>
     </TooltipProvider>
@@ -1393,4 +1410,5 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
 
     
     
+
 
