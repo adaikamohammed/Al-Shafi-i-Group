@@ -81,7 +81,7 @@ const allEducationalLevels = Object.values(educationalLevels).flat();
 
 
 const ALL_COLUMNS = {
-    pageNumber: { label: "رقم الصفحة", visible: false, printOrder: 1 },
+    pageNumber: { label: "رقم الصفحة", visible: true, printOrder: 1 },
     fullName: { label: "الإسم الكامل", visible: true, printOrder: 2 },
     gender: { label: "الجنس", visible: false, printOrder: 10 },
     birthDate: { label: "تاريخ الميلاد", visible: true, printOrder: 5 },
@@ -93,7 +93,7 @@ const ALL_COLUMNS = {
     status: { label: "الحالة", visible: true, printOrder: 9 },
     notes: { label: "ملاحظات", visible: true, printOrder: 11 },
     requestedAt: { label: "تاريخ التسجيل", visible: false, printOrder: 12 },
-    manualActions: { label: "عمود الإجراءات", visible: false, printOrder: 99 },
+    manualActions: { label: "الإجراءات / ملاحظات الإدارة", visible: false, printOrder: 99 },
 };
 
 const calculateAge = (birthDate?: Date | string) => {
@@ -515,8 +515,9 @@ export default function PreRegistrationPage() {
             try {
                 const parsed = JSON.parse(saved);
                  Object.keys(initialVisibility).forEach(key => {
-                    if (parsed[key] && typeof parsed[key].visible === 'boolean') {
-                        initialVisibility[key as keyof typeof initialVisibility].visible = parsed[key].visible;
+                    const savedColumn = parsed[key as keyof typeof ALL_COLUMNS];
+                    if (savedColumn && typeof savedColumn.visible === 'boolean') {
+                        (initialVisibility[key as keyof typeof ALL_COLUMNS] as any).visible = savedColumn.visible;
                     }
                 });
             } catch (e) {
@@ -559,13 +560,10 @@ export default function PreRegistrationPage() {
     };
 
     const toggleColumn = (key: keyof typeof ALL_COLUMNS) => {
-        setColumnVisibility((prev) => {
-            const newVisibility = { ...prev };
-            if (newVisibility[key]) {
-                newVisibility[key] = { ...newVisibility[key], visible: !newVisibility[key].visible };
-            }
-            return newVisibility;
-        });
+        setColumnVisibility((prev) => ({
+            ...prev,
+            [key]: { ...prev[key as keyof typeof prev], visible: !prev[key as keyof typeof prev]?.visible },
+        }));
     };
     
     const handlePrint = () => {
@@ -892,26 +890,21 @@ export default function PreRegistrationPage() {
                         </CardContent>
                     </Card>
                     
-                    <Card className="print-hidden">
+                     <Card className="print-hidden">
                         <CardHeader>
                             <CardTitle>عرض الأعمدة</CardTitle>
                         </CardHeader>
                          <CardContent>
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                                {Object.keys(ALL_COLUMNS).map((key) => (
-                                <div key={key} className="flex items-center space-x-2 space-x-reverse">
-                                    <Checkbox
-                                        id={`col-${key}`}
-                                        checked={columnVisibility[key as keyof typeof columnVisibility]?.visible || false}
-                                        onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
-                                    />
-                                    <label
-                                        htmlFor={`col-${key}`}
-                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                    >
-                                        {ALL_COLUMNS[key as keyof typeof ALL_COLUMNS].label}
-                                    </label>
-                                </div>
+                                <Button
+                                    key={key}
+                                    variant={columnVisibility[key as keyof typeof columnVisibility]?.visible ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
+                                >
+                                    {ALL_COLUMNS[key as keyof typeof ALL_COLUMNS].label}
+                                </Button>
                                ))}
                             </div>
                         </CardContent>
@@ -947,7 +940,12 @@ export default function PreRegistrationPage() {
                                                 </Button>
                                             </TableHead>
                                             {columnsToRender.map(([key, { label }]) => (
-                                                <TableHead key={key} className="text-center">{label}</TableHead>
+                                                <TableHead key={key} className="text-center">
+                                                    <Button variant="ghost" onClick={() => requestSort(key as keyof PreRegistration)}>
+                                                        {label}
+                                                        <ArrowUpDown className="mr-2 h-4 w-4" />
+                                                    </Button>
+                                                </TableHead>
                                             ))}
                                             <TableHead className="text-center print-hidden">إجراءات</TableHead>
                                         </TableRow>
@@ -1150,6 +1148,7 @@ export default function PreRegistrationPage() {
                     #print-table th, #print-table td {
                         border: 0.5pt solid black !important;
                         padding: 4px 6px !important;
+                        background-color: #ffffff !important;
                     }
                     #print-table th {
                         font-weight: bold;
@@ -1160,6 +1159,8 @@ export default function PreRegistrationPage() {
                     }
                     #print-table .badge {
                         border: 0.5pt solid black !important;
+                        background-color: #ffffff !important;
+                        color: #000000 !important;
                     }
                 }
                  @page {
@@ -1170,5 +1171,6 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
 
 
