@@ -630,9 +630,9 @@ export default function StudentManagementPage() {
                 <TableHead className="text-center">الحالة</TableHead>
                 <TableHead className="text-center">فئة الاشتراك</TableHead>
                 <TableHead className="hidden md:table-cell text-center">السور المحفوظة</TableHead>
-                {!isSuperAdmin && <TableHead className="text-center">
+                <TableHead className="text-center">
                   <span className="sr-only">إجراءات</span>
-                </TableHead>}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -707,15 +707,15 @@ export default function StudentManagementPage() {
                                 <Badge variant="outline">{student.subscriptionTier}</Badge>
                             </TableCell>
                             <TableCell className="hidden md:table-cell text-center">{student.memorizedSurahsCount || 0}</TableCell>
-                            {!isSuperAdmin && <TableCell className="text-center">
-                                <StudentActions student={student} onStatusChange={handleStatusChange} onEdit={() => { setSelectedStudent(student); setEditStudentDialogOpen(true); }}/>
-                            </TableCell>}
+                            <TableCell className="text-center">
+                                <StudentActions student={student} onStatusChange={handleStatusChange} onEdit={() => { setSelectedStudent(student); setEditStudentDialogOpen(true); }} isSuperAdmin={isSuperAdmin} />
+                            </TableCell>
                         </TableRow>
                     )
                 })
              ) : (
                 <TableRow>
-                    <TableCell colSpan={isSuperAdmin ? 9 : 8} className="h-24 text-center">
+                    <TableCell colSpan={isSuperAdmin ? 10 : 9} className="h-24 text-center">
                        {searchTerm ? "لم يتم العثور على طلاب مطابقين للبحث." : "لا يوجد طلبة حاليًا. قم بإضافة طالب جديد."}
                     </TableCell>
                 </TableRow>
@@ -791,7 +791,7 @@ export default function StudentManagementPage() {
   );
 }
 
-function StudentActions({ student, onStatusChange, onEdit }: { student: Student, onStatusChange: (student: Student, status: StudentStatus, reason?: string) => void, onEdit: () => void }) {
+function StudentActions({ student, onStatusChange, onEdit, isSuperAdmin }: { student: Student, onStatusChange: (student: Student, status: StudentStatus, reason?: string) => void, onEdit: () => void, isSuperAdmin?: boolean }) {
   const [actionReason, setActionReason] = useState('');
 
   return (
@@ -809,55 +809,59 @@ function StudentActions({ student, onStatusChange, onEdit }: { student: Student,
             تعديل
         </DropdownMenuItem>
 
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => { e.preventDefault(); setActionReason('') }}>
-              <Trash2 className="ml-2 h-4 w-4" />
-              حذف
-            </DropdownMenuItem>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>هل أنت متأكد من حذف الطالب {student.fullName}؟</AlertDialogTitle>
-              <AlertDialogDescription>
-                سيؤدي هذا إلى حذف بيانات الطالب نهائيًا. هذا الإجراء لا يمكن التراجع عنه.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>إلغاء</AlertDialogCancel>
-              <AlertDialogAction onClick={() => onStatusChange(student, 'محذوف')}>تأكيد الحذف</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => { e.preventDefault(); setActionReason('') }}>
-              <UserX className="ml-2 h-4 w-4" />
-              طرد
-            </DropdownMenuItem>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>طرد الطالب {student.fullName}</AlertDialogTitle>
-              <AlertDialogDescription>
-                سيؤدي هذا إلى تغيير حالة الطالب إلى "مطرود". الرجاء إدخال سبب الطرد.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="py-4">
-              <Label htmlFor="expel-reason">سبب الطرد</Label>
-              <Textarea 
-                id="expel-reason" 
-                placeholder="مثال: غياب متكرر بدون عذر..." 
-                value={actionReason}
-                onChange={(e) => setActionReason(e.target.value)}
-              />
-            </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setActionReason('')}>إلغاء</AlertDialogCancel>
-              <AlertDialogAction onClick={() => onStatusChange(student, 'مطرود', actionReason)}>تأكيد الطرد</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {!isSuperAdmin && (
+            <>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => { e.preventDefault(); setActionReason('') }}>
+                  <Trash2 className="ml-2 h-4 w-4" />
+                  حذف
+                </DropdownMenuItem>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>هل أنت متأكد من حذف الطالب {student.fullName}؟</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    سيؤدي هذا إلى حذف بيانات الطالب نهائيًا. هذا الإجراء لا يمكن التراجع عنه.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => onStatusChange(student, 'محذوف')}>تأكيد الحذف</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => { e.preventDefault(); setActionReason('') }}>
+                  <UserX className="ml-2 h-4 w-4" />
+                  طرد
+                </DropdownMenuItem>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>طرد الطالب {student.fullName}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    سيؤدي هذا إلى تغيير حالة الطالب إلى "مطرود". الرجاء إدخال سبب الطرد.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="py-4">
+                  <Label htmlFor="expel-reason">سبب الطرد</Label>
+                  <Textarea 
+                    id="expel-reason" 
+                    placeholder="مثال: غياب متكرر بدون عذر..." 
+                    value={actionReason}
+                    onChange={(e) => setActionReason(e.target.value)}
+                  />
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setActionReason('')}>إلغاء</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => onStatusChange(student, 'مطرود', actionReason)}>تأكيد الطرد</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -924,7 +928,7 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
         gender: data.gender,
         pageNumber: data.pageNumber,
         educationalLevel: data.educationalLevel,
-        groupName: isSuperAdmin ? data.groupName : user?.group,
+        groupName: isSuperAdmin ? data.groupName : (student?.groupName || user?.group),
         guardianName: data.guardianName,
         phone1: data.phone1,
         phone2: data.phone2,
@@ -941,9 +945,9 @@ function StudentForm({ student, onSuccess, onCancel }: { student?: Student, onSu
     if (student) {
         // Update existing student
         updateStudent(student.id, studentData, student.ownerId);
-    } else {
+    } else if (user) {
         // Add new student
-        addStudent(studentData as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> & { photoFile?: File | null, ownerId: string, groupName: string });
+        addStudent({...studentData, ownerId: user.uid, groupName: user.group || 'غير محدد' } as Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string });
     }
     
     onSuccess();
