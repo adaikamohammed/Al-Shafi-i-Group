@@ -349,7 +349,7 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
     );
 };
 
-export default function StudentManagementPage() {
+export default function StudentManagement() {
   const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings, addStudent } = useStudentContext();
   const { user, isSuperAdmin } = useAuth();
   const { toast } = useToast();
@@ -1005,7 +1005,7 @@ function StudentActions({ student, onStatusChange, onEdit, isSuperAdmin }: { stu
 }
 
 
-function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }: { student?: Student, onSuccess: () => void, onCancel: () => void, addStudent: (data: any) => void, updateStudent: (id: string, data: any, ownerId: string) => void }) {
+function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }: { student?: Student, onSuccess: () => void, onCancel: () => void, addStudent: (data: any) => void, updateStudent?: (id: string, data: any, ownerId: string) => void }) {
   const { settings } = useStudentContext();
   const { user, isSuperAdmin } = useAuth();
   const { toast } = useToast();
@@ -1091,7 +1091,7 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
         photoFile: photoFile,
     };
 
-    if (student) {
+    if (student && updateStudent) {
         // Update existing student
         updateStudent(student.id, studentData, student.ownerId);
     } else if (user) {
