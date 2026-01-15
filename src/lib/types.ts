@@ -45,8 +45,8 @@ export interface Student {
   notes?: string;
   updatedAt: Date;
   covenants?: Covenant[];
-  expulsionDate?: string; // ISO String
-  expulsionReason?: string;
+  expulsionDate?: string | null;
+  expulsionReason?: string | null;
   expulsionHistory?: ExpulsionRecord[];
 }
 
