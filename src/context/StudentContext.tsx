@@ -516,9 +516,8 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
        return filteredSessions;
   }
   
-  const saveDailyReport = async (reportData: Partial<DailyReport>, reportIdToUpdate?: string) => {
+ const saveDailyReport = async (reportData: Partial<DailyReport>, reportIdToUpdate?: string) => {
     const reportId = reportIdToUpdate || Date.now().toString();
-    // Try to find the existing report to get its date if not provided
     const existingReport = reportIdToUpdate ? 
         Object.values(dailyReports).flatMap(day => Object.values(day)).find(r => r.id === reportIdToUpdate) 
         : undefined;
@@ -530,12 +529,10 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
 
     const reportRef = ref(db, `users/${authorId}/dailyReports/${date}/${reportId}`);
     
-    // Fetch the current state of the report from DB to merge, ensuring no data is lost
     const snapshot = await get(reportRef);
     const dbReport = snapshot.val();
 
     const fullReportData: DailyReport = {
-        // Defaults from DB or new data
         id: reportId,
         date: date,
         authorId: authorId,
@@ -546,7 +543,6 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
         status: dbReport?.status || 'pending',
         isPinned: dbReport?.isPinned ?? false,
         adminNotes: dbReport?.adminNotes,
-        // Overwrite with any new data provided
         ...reportData,
     };
     
@@ -639,3 +635,4 @@ export const useStudentContext = () => {
   return context;
 };
 
+    

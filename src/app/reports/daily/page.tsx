@@ -172,7 +172,7 @@ export default function DailyReportPage() {
     const unpinnedReports = useMemo(() => {
          if (filterStatus === 'all') return monthlyReports.filter(r => !r.isPinned);
         if (filterStatus === 'pinned') return [];
-        return monthlyReports.filter(r => !r.isPinned && r.status === filterStatus);
+        return monthlyReports.filter(r => !r.isPinned && (filterStatus === 'all' || r.status === filterStatus));
     }, [monthlyReports, filterStatus]);
 
 
@@ -237,7 +237,7 @@ export default function DailyReportPage() {
 
     const handleTogglePin = async (report: DailyReport) => {
         try {
-            await saveDailyReport({ ...report, isPinned: !report.isPinned }, report.id);
+            await saveDailyReport({ isPinned: !report.isPinned }, report.id);
             toast({ title: "✅ تم التحديث", description: report.isPinned ? "تم إلغاء تثبيت التقرير." : "تم تثبيت التقرير للمتابعة." });
         } catch (error) {
              toast({ title: "خطأ", description: "فشل تحديث حالة التثبيت.", variant: "destructive" });
@@ -399,3 +399,5 @@ export default function DailyReportPage() {
         </div>
     );
 }
+
+    
