@@ -968,7 +968,7 @@ export default function PreRegistrationPage() {
                                                 </Button>
                                             </TableHead>
                                             {columnsToRender.map(([key, { label }]) => (
-                                                <TableHead key={key} className="text-center">
+                                                <TableHead key={key} className="text-center p-2">
                                                     <Button variant="ghost" onClick={() => requestSort(key as keyof PreRegistration)}>
                                                         {label}
                                                         <ArrowUpDown className="mr-2 h-4 w-4" />
@@ -1025,7 +1025,7 @@ export default function PreRegistrationPage() {
                                                     } else if (key === 'manualActions') {
                                                         content = <div className="print-only-td"></div>
                                                     }
-                                                    return <TableCell key={key} className="text-center">{content}</TableCell>;
+                                                    return <TableCell key={key} className="text-center p-2">{content}</TableCell>;
                                                 })}
                                                 <TableCell className="text-center print-hidden" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu>
@@ -1207,6 +1207,7 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
 
 
 
