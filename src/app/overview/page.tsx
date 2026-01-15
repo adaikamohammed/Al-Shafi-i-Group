@@ -22,9 +22,9 @@ export default function OverviewPage() {
     const { students, dailySessions, dailyReports, payments, loading, settings } = useStudentContext();
     const { user, isSuperAdmin } = useAuth();
     
-    const TIER_PRICES = settings?.prices || {
-        firstPayment: { 'فئة الأكابر': 2500, 'فئة الأصاغر': 2000 },
-        renewal: { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 },
+    const TIER_PRICES = {
+        firstPayment: settings?.prices?.firstPayment || { 'فئة الأكابر': 2500, 'فئة الأصاغر': 2000 },
+        renewal: settings?.prices?.renewal || { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 },
     };
     
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
