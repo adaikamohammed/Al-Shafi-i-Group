@@ -17,6 +17,12 @@ export interface Covenant {
   date: string; // ISO String
 }
 
+export interface ExpulsionRecord {
+  date: string; // ISO String
+  reason: string;
+}
+
+
 export interface Student {
   id: string;
   ownerId: string; // UID of the user who owns this student record
@@ -39,6 +45,9 @@ export interface Student {
   notes?: string;
   updatedAt: Date;
   covenants?: Covenant[];
+  expulsionDate?: string; // ISO String
+  expulsionReason?: string;
+  expulsionHistory?: ExpulsionRecord[];
 }
 
 export type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "تعويض";

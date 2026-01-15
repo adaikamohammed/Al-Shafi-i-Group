@@ -1,8 +1,9 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban, UserRound, Filter, ArrowUpDown, BookOpen, Shield, Printer } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban, UserRound, Filter, ArrowUpDown, BookOpen, Shield, Printer, Archive, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -14,13 +15,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { Student, StudentStatus, MemorizationAmount, SubscriptionTier, Covenant, CovenantCard, CovenantStatus, CovenantType, DailySession } from '@/lib/types';
+import type { Student, StudentStatus, MemorizationAmount, SubscriptionTier, Covenant, CovenantCard, CovenantStatus, CovenantType, DailySession, ExpulsionRecord } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, isAfter, setYear, startOfYear, differenceInYears, startOfWeek, addDays, getDay } from 'date-fns';
+import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, isAfter, setYear, startOfYear, differenceInYears, startOfWeek, addDays, getDay, formatDistanceToNowStrict } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
@@ -34,7 +35,7 @@ import { Separator } from '@/components/ui/separator';
 
 const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
 
-const statusVariant: { [key in StudentStatus]: "default" | "destructive" | "secondary" | "outline" } = {
+const statusVariant: { [key in Exclude<StudentStatus, 'غائب طويل'>]: "default" | "destructive" | "secondary" | "outline" } = {
   "نشط": "default",
   "مطرود": "destructive",
   "محذوف": "outline"
@@ -182,6 +183,20 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
             </div>
 
             <div className="overflow-y-auto px-6 pb-6 space-y-4">
+                {student.status === 'مطرود' && student.expulsionDate && (
+                    <Card className="bg-red-50 border-red-200 dark:bg-red-900/30 dark:border-red-700">
+                        <CardHeader>
+                            <CardTitle className="text-base text-red-800 dark:text-red-200 flex items-center gap-2">
+                                <UserX />
+                                حالة الطرد
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm text-red-700 dark:text-red-300">
+                            <p><strong>تاريخ الطرد:</strong> {format(parseISO(student.expulsionDate), 'd MMMM yyyy', { locale: ar })}</p>
+                            <p><strong>السبب:</strong> {student.expulsionReason || 'لم يحدد سبب'}</p>
+                        </CardContent>
+                    </Card>
+                )}
                  <Card>
                     <CardHeader>
                         <CardTitle className="text-base">مؤشرات الأداء</CardTitle>
@@ -298,6 +313,33 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
                         </div>
                     </CardContent>
                 </Card>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2"><Archive /> السجل التأديبي</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {student.expulsionHistory && student.expulsionHistory.length > 0 ? (
+                             <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>تاريخ الطرد</TableHead>
+                                        <TableHead>السبب</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {student.expulsionHistory.map((record, index) => (
+                                        <TableRow key={index}>
+                                            <TableCell>{format(parseISO(record.date), 'd MMMM yyyy', { locale: ar })}</TableCell>
+                                            <TableCell>{record.reason}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">لا يوجد سجل تأديبي سابق لهذا الطالب.</p>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
              <DialogFooter className="border-t p-6">
                 <Button variant="secondary" onClick={onViewStats}>عرض الإحصائيات</Button>
@@ -379,6 +421,26 @@ export default function StudentManagementPage() {
   const handleStatusChange = (student: Student, status: StudentStatus, reason?: string) => {
     if (status === 'محذوف') {
         deleteStudent(student.id, student.ownerId);
+    } else if (status === 'مطرود') {
+        const expulsionData: Partial<Student> = { 
+            status: 'مطرود', 
+            expulsionDate: new Date().toISOString(),
+            expulsionReason: reason
+        };
+        updateStudent(student.id, expulsionData, student.ownerId);
+    } else if (status === 'نشط' && student.status === 'مطرود') {
+        // Reactivating a student
+        const newHistory: ExpulsionRecord[] = [...(student.expulsionHistory || [])];
+        if (student.expulsionDate && student.expulsionReason) {
+            newHistory.push({ date: student.expulsionDate, reason: student.expulsionReason });
+        }
+        const reactivationData: Partial<Student> = { 
+            status: 'نشط',
+            expulsionDate: undefined,
+            expulsionReason: undefined,
+            expulsionHistory: newHistory
+        };
+        updateStudent(student.id, reactivationData, student.ownerId);
     } else {
         updateStudent(student.id, { status, actionReason: reason }, student.ownerId);
     }
@@ -664,7 +726,7 @@ export default function StudentManagementPage() {
                       
                     let rowClass = '';
                     if (student.status === 'مطرود') {
-                        rowClass = 'bg-red-100 dark:bg-red-900/30 opacity-60 line-through';
+                        rowClass = 'bg-red-100/60 dark:bg-red-900/30 opacity-60 line-through';
                     } else if (activeCovenant?.card === 'بطاقة حمراء') {
                         rowClass = 'bg-red-50 dark:bg-red-900/20';
                     } else if (activeCovenant?.card === 'بطاقة صفراء') {
@@ -701,17 +763,27 @@ export default function StudentManagementPage() {
                             </TableCell>
                             <TableCell className="font-medium">
                                 <div className="flex items-center gap-2">
-                                     {activeCovenant && (
-                                        <Tooltip>
-                                            <TooltipTrigger>
-                                                <ShieldAlert className={cn("h-5 w-5", activeCovenant.card === 'بطاقة صفراء' ? 'text-yellow-500' : 'text-red-500')} />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p className="font-bold">الطالب تحت التعهد ({activeCovenant.card}):</p>
-                                                <p>{activeCovenant.text}</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                     )}
+                                     <Tooltip>
+                                        <TooltipTrigger>
+                                             {student.status === 'مطرود' ? <div className="w-5 h-5 flex items-center justify-center">🟥</div>
+                                                : activeCovenant ? <ShieldAlert className={cn("h-5 w-5", activeCovenant.card === 'بطاقة صفراء' ? 'text-yellow-500' : 'text-red-500')} />
+                                                : <div className="w-5 h-5"></div>
+                                             }
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            {student.status === 'مطرود' ? (
+                                                <>
+                                                    <p className="font-bold text-red-600">طرد بتاريخ: {student.expulsionDate ? format(parseISO(student.expulsionDate), 'd MMM yyyy', { locale: ar }) : 'غير محدد'}</p>
+                                                    <p>السبب: {student.expulsionReason || 'لم يحدد'}</p>
+                                                </>
+                                            ) : activeCovenant ? (
+                                                <>
+                                                    <p className="font-bold">الطالب تحت "{activeCovenant.type}" ({activeCovenant.card}):</p>
+                                                    <p>{activeCovenant.text}</p>
+                                                </>
+                                            ) : null}
+                                        </TooltipContent>
+                                    </Tooltip>
                                      <span>{student.fullName}</span>
                                 </div>
                             </TableCell>
@@ -719,7 +791,10 @@ export default function StudentManagementPage() {
                             <TableCell className="hidden md:table-cell text-center">{student.educationalLevel || 'غير محدد'}</TableCell>
                             <TableCell className="hidden lg:table-cell text-center">{student.guardianName}</TableCell>
                             <TableCell className="text-center">
-                                <Badge variant={statusVariant[student.status]}>{student.status}</Badge>
+                                <Badge variant={statusVariant[student.status as Exclude<StudentStatus, 'غائب طويل'>]}>{student.status}</Badge>
+                                {student.status === 'مطرود' && student.expulsionDate && 
+                                    <p className="text-xs text-muted-foreground">({formatDistanceToNowStrict(parseISO(student.expulsionDate), {locale: ar, addSuffix: true})})</p>
+                                }
                             </TableCell>
                             <TableCell className="text-center">
                                 <Badge variant="outline">{student.subscriptionTier}</Badge>
@@ -916,7 +991,7 @@ function StudentActions({ student, onStatusChange, onEdit, isSuperAdmin }: { stu
                 </>
             ) : (
                 <DropdownMenuItem onSelect={handleReactivate}>
-                    <UserX className="ml-2 h-4 w-4" />
+                    <History className="ml-2 h-4 w-4" />
                     إعادة تفعيل
                 </DropdownMenuItem>
             )}
@@ -1308,3 +1383,4 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
     </form>
   );
 }
+
