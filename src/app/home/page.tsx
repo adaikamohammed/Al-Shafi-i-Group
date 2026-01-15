@@ -48,7 +48,7 @@ export default function HomePage() {
 
     setIsSaving(true);
     try {
-      await updateUserProfile({ photoFile: file, backgroundURL: '' }); // Pass empty string to trigger logic
+      await updateUserProfile({ photoFile: file });
       toast({
         title: "✅ تم التحديث",
         description: "تم تحديث صورة الخلفية بنجاح.",
@@ -71,7 +71,7 @@ export default function HomePage() {
   return (
     <div 
         className="min-h-screen w-full bg-cover bg-center bg-no-repeat relative flex flex-col items-center justify-center p-4"
-        style={{backgroundImage: `url(${user?.backgroundURL || '/default-bg.jpg'})`}}
+        style={{backgroundImage: `url(${user?.photoURL || '/default-bg.jpg'})`}}
     >
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-black/30" />
         
@@ -96,11 +96,13 @@ export default function HomePage() {
         
          <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 w-full max-w-6xl">
             {navItems.map((item) => (
-                <Link href={item.href} key={item.href} legacyBehavior>
-                    <a className="group bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg p-4 flex flex-col items-center justify-center gap-2 text-white text-center transition-all duration-300 hover:bg-white/20 hover:scale-105 hover:shadow-lg">
-                        <item.icon className={cn("h-8 w-8 transition-colors", item.color)} />
-                        <span className="text-sm font-semibold">{item.label}</span>
-                    </a>
+                <Link
+                    href={item.href}
+                    key={item.href}
+                    className="group bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg p-4 flex flex-col items-center justify-center gap-2 text-white text-center transition-all duration-300 hover:bg-white/20 hover:scale-105 hover:shadow-lg"
+                >
+                    <item.icon className={cn("h-8 w-8 transition-colors", item.color)} />
+                    <span className="text-sm font-semibold">{item.label}</span>
                 </Link>
             ))}
              <button onClick={logout} className="group bg-red-800/50 backdrop-blur-sm border border-red-400/30 rounded-lg p-4 flex flex-col items-center justify-center gap-2 text-white text-center transition-all duration-300 hover:bg-red-700/80 hover:scale-105 hover:shadow-lg">
@@ -117,5 +119,7 @@ export default function HomePage() {
     </div>
   );
 }
+
+    
 
     

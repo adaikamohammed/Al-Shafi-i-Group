@@ -64,12 +64,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const isParentPortal = pathname.startsWith('/parent-portal');
-        const isHomePage = pathname === '/home';
         if (!authLoading && !user && pathname !== '/login' && !isParentPortal) {
             router.push('/login');
-        }
-         if (!authLoading && user && pathname === '/login') {
-             router.push('/home');
         }
     }, [user, authLoading, router, pathname]);
 
@@ -215,5 +211,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
           </SidebarProvider>
     )
 }
+
+    
 
     
