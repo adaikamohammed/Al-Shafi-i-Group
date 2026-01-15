@@ -135,21 +135,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     try {
         const { photoFile, ...profileData } = data;
-        const updates: { [key: string]: any } = {};
         let newPhotoURL = user?.photoURL || null;
 
         if (photoFile) {
-            const imageRef = storageRef(storage, `sheikh_profiles/${auth.currentUser.uid}`);
+            const imageRef = storageRef(storage, `user_backgrounds/${auth.currentUser.uid}`);
             await uploadBytes(imageRef, photoFile);
             newPhotoURL = await getDownloadURL(imageRef);
-            updates[`users/${auth.currentUser.uid}/profile/photoURL`] = newPhotoURL;
         }
 
-        // Prepare updates for all provided data
+        const updates: { [key: string]: any } = {};
+        // Prepare updates for all provided data for RTDB
         for (const key in profileData) {
             if (Object.prototype.hasOwnProperty.call(profileData, key)) {
                 updates[`users/${auth.currentUser.uid}/profile/${key}`] = (profileData as any)[key];
             }
+        }
+        if (newPhotoURL) {
+          updates[`users/${auth.currentUser.uid}/profile/photoURL`] = newPhotoURL;
         }
 
         if (Object.keys(updates).length > 0) {
@@ -160,7 +162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (profileData.displayName && profileData.displayName !== auth.currentUser.displayName) {
               authUpdates.displayName = profileData.displayName;
             }
-            if (newPhotoURL && newPhotoURL !== auth.currentUser.photoURL) {
+             if (newPhotoURL && newPhotoURL !== auth.currentUser.photoURL) {
               authUpdates.photoURL = newPhotoURL;
             }
 
