@@ -186,7 +186,6 @@ export interface BadgeConfig {
 export interface AppSettings {
     seasonStartDate?: string; // ISO date string
     prices: {
-        firstPayment: { 'فئة الأكابر': number; 'فئة الأصاغر': number; };
         renewal: { 'فئة الأكابر': number; 'فئة الأصاغر': number; };
     };
     points: PointsConfig;

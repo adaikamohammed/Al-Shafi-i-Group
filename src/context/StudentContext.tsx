@@ -33,7 +33,6 @@ const DEFAULT_BADGES: BadgeConfig[] = [
 ];
 
 const TIER_PRICES = {
-    firstPayment: { 'فئة الأكابر': 2500, 'فئة الأصاغر': 2000 },
     renewal: { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 },
 };
 
