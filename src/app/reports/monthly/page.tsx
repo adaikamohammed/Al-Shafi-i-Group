@@ -33,10 +33,6 @@ interface RevenueChartData {
     'الإيرادات المتوقعة': number;
 }
 
-const TIER_PRICES = {
-    firstPayment: { 'فئة الأكابر': 2500, 'فئة الأصاغر': 2000 },
-    renewal: { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 },
-};
 
 export default function MonthlyStatisticsPage() {
     const { students, dailySessions, dailyReports, payments, settings, loading } = useStudentContext();
@@ -46,7 +42,7 @@ export default function MonthlyStatisticsPage() {
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
-    const prices = settings?.prices || TIER_PRICES;
+    const prices = settings?.prices?.renewal || { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 };
 
     const monthlyData = useMemo(() => {
         const today = startOfToday();
@@ -159,9 +155,9 @@ export default function MonthlyStatisticsPage() {
         }
         
         const financialStats = {
-            totalRevenue: paymentsInQuarter.reduce((sum, p) => sum + p.amount, 0),
+            totalRevenue: paymentsInQuarter.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0),
             expectedRevenue: 0,
-            paidStudentsCount: new Set(paymentsInQuarter.map(p => p.studentId)).size,
+            paidStudentsCount: new Set(paymentsInQuarter.filter(p => p.status === 'paid').map(p => p.studentId)).size,
             unpaidStudentsCount: 0,
         };
         
@@ -171,26 +167,34 @@ export default function MonthlyStatisticsPage() {
             return registrationYear < selectedYear || (registrationYear === selectedYear && registrationQuarter <= currentQuarter);
         });
         
-        const studentsWhoPaidInQuarter = new Set(paymentsInQuarter.map(p => p.studentId));
+        const paymentsByStudentForQuarter: Record<string, Payment[]> = {};
+        paymentsInQuarter.forEach(p => {
+            if (!paymentsByStudentForQuarter[p.studentId]) {
+                paymentsByStudentForQuarter[p.studentId] = [];
+            }
+            paymentsByStudentForQuarter[p.studentId].push(p);
+        });
 
         financialStats.expectedRevenue = studentsDueForQuarter.reduce((total, student) => {
-            if (studentsWhoPaidInQuarter.has(student.id)) {
-                return total; // Already paid this quarter
+            const studentPayments = paymentsByStudentForQuarter[student.id];
+            const hasPaid = studentPayments?.some(p => p.status === 'paid');
+            const isExempt = studentPayments?.some(p => p.status === 'exempted');
+            
+            if (hasPaid || isExempt) {
+                return total;
             }
             
-            const registrationYear = getYear(student.registrationDate);
-            const registrationQuarter = getQuarter(student.registrationDate);
-            const isFirstEverPayment = (payments ?? []).filter(p => p.studentId === student.id).length === 0;
-
-            const isFirstPaymentForThisStudent = registrationYear === selectedYear && registrationQuarter === currentQuarter && isFirstEverPayment;
-            
             const tier = student.subscriptionTier || 'فئة الأصاغر';
-            const amountDue = isFirstPaymentForThisStudent ? prices.firstPayment[tier] : prices.renewal[tier];
+            const amountDue = prices[tier] || 0;
 
             return total + amountDue;
         }, 0);
         
-        const unpaidStudents = studentsDueForQuarter.filter(s => !studentsWhoPaidInQuarter.has(s.id));
+        const unpaidStudents = studentsDueForQuarter.filter(s => {
+            const studentPayments = paymentsByStudentForQuarter[s.id];
+            return !studentPayments || studentPayments.every(p => p.status === 'unpaid');
+        });
+
         financialStats.unpaidStudentsCount = unpaidStudents.length;
 
         const activeCovenantsCount = activeStudents.reduce((count, student) => {
@@ -200,7 +204,7 @@ export default function MonthlyStatisticsPage() {
 
         return { ...stats, daysPassed, recordedDaysCount: recordedDays.size, unrecordedPastDays: unrecordedDaysInPast, studentSpecificRecords, financialStats, activeCovenantsCount };
 
-    }, [dailySessions, dailyReports, payments, settings, selectedMonth, selectedYear, selectedStudentId, students]);
+    }, [dailySessions, dailyReports, payments, settings, selectedMonth, selectedYear, selectedStudentId, students, prices]);
     
     
      const renderStudentCalendar = () => {

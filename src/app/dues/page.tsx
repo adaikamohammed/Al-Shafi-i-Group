@@ -19,6 +19,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import type { Payment, PaymentStatus } from '@/lib/types';
 
 
+type QuarterStatusFilter = 'all' | 'paid' | 'unpaid' | 'exempted';
+
 export default function DuesPage() {
     const { students, payments, addPayment, updatePaymentStatus, loading, settings } = useStudentContext();
     const { isSuperAdmin } = useAuth();
