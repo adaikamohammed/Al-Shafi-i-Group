@@ -90,7 +90,7 @@ export function DailyChecklist() {
         const isThursday = getDay(today) === 4;
         if (isThursday) {
             const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 6 });
-            const weeklySessions = Object.values(dailySessions).flatMap(d => Object.values(d)).filter(s => parseISO(s.date) >= startOfCurrentWeek);
+            const weeklySessions = Object.values(dailySessions ?? {}).flatMap(d => Object.values(d)).filter(s => s && s.date && parseISO(s.date) >= startOfCurrentWeek);
             let lowPerformingStudents = 0;
             const studentStats: {[key: string]: {absent: number, undisciplined: number}} = {};
             activeStudents.forEach(s => studentStats[s.id] = {absent: 0, undisciplined: 0});
