@@ -19,13 +19,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import type { Payment, PaymentStatus } from '@/lib/types';
 
 
-const TIER_PRICES: Record<string, number> = {
-    'فئة الأكابر': 2000,
-    'فئة الأصاغر': 1500,
-};
-
-type QuarterStatusFilter = 'all' | 'paid' | 'unpaid' | 'exempted';
-
 export default function DuesPage() {
     const { students, payments, addPayment, updatePaymentStatus, loading, settings } = useStudentContext();
     const { isSuperAdmin } = useAuth();
@@ -37,7 +30,7 @@ export default function DuesPage() {
     
     const [registrationFees, setRegistrationFees] = useState<Record<number, number>>({ 1: 0, 2: 0, 3: 0, 4: 0 });
 
-    const prices = settings?.prices?.renewal || TIER_PRICES;
+    const prices = settings?.prices?.renewal || { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 };
 
     const studentsWithDues = useMemo(() => {
         return (students ?? [])
@@ -68,7 +61,7 @@ export default function DuesPage() {
                 };
             });
 
-    }, [students, payments, settings, currentYear]);
+    }, [students, payments, settings, currentYear, prices]);
     
      const filteredStudents = useMemo(() => {
         return studentsWithDues.filter(student => {
@@ -359,14 +352,14 @@ export default function DuesPage() {
                                 ))}
                                 <TableCell></TableCell>
                             </TableRow>
-                            <TableRow className="bg-muted/50 font-bold text-base">
+                            <TableRow className="bg-amber-100 dark:bg-amber-800/20 font-bold text-base border-t-2 border-amber-300">
                                 <TableCell colSpan={isSuperAdmin ? 3 : 2}>الإجمالي النهائي للفصل</TableCell>
                                 {[1, 2, 3, 4].map(q => (
-                                    <TableCell key={`total-footer-${q}`} className="text-center">
+                                    <TableCell key={`total-footer-${q}`} className="text-center text-lg text-amber-800 dark:text-amber-200 transition-colors">
                                        {totalsByQuarter[q].revenue.toLocaleString()} د.ج
                                     </TableCell>
                                 ))}
-                                <TableCell className="text-lg">{totalRevenue.toLocaleString()} د.ج</TableCell>
+                                <TableCell className="text-xl text-amber-900 dark:text-amber-100 transition-colors">{totalRevenue.toLocaleString()} د.ج</TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>
@@ -376,5 +369,3 @@ export default function DuesPage() {
         </div>
     );
 }
-
-    
