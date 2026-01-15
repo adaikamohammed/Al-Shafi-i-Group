@@ -955,12 +955,12 @@ export default function PreRegistrationPage() {
                                     </SelectContent>
                                 </Select>
                                  <Button variant="outline" onClick={() => setPrintModalOpen(true)}>
-                                    <Printer className="ml-2 h-4 w-4" /> طباعة التقرير المفلتر
+                                    <Printer className="ml-2 h-4 w-4" /> استخراج تقرير PDF
                                 </Button>
                             </div>
                         </CardContent>
                     </Card>
-                    
+
                     <Card>
                         <CardHeader>
                             <CardTitle>عرض الأعمدة</CardTitle>
@@ -1154,9 +1154,9 @@ export default function PreRegistrationPage() {
             <Dialog open={isPrintModalOpen} onOpenChange={setPrintModalOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>إعدادات طباعة التقرير</DialogTitle>
+                        <DialogTitle>إعدادات تقرير PDF</DialogTitle>
                         <DialogDescription>
-                            اختر الأعمدة التي ترغب في تضمينها في التقرير المطبوع. سيتم طباعة الصفوف المفلترة حاليًا فقط.
+                            اختر الأعمدة التي ترغب في تضمينها في التقرير. سيتم تصدير الصفوف المفلترة حاليًا فقط.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid grid-cols-2 gap-4 py-4">
@@ -1185,7 +1185,7 @@ export default function PreRegistrationPage() {
                         <Button variant="outline" onClick={() => setPrintModalOpen(false)}>إلغاء</Button>
                         <Button onClick={handleGeneratePdf}>
                             <Printer className="ml-2 h-4 w-4" />
-                            اطبع الآن
+                            توليد وحفظ
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -1194,3 +1194,4 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
