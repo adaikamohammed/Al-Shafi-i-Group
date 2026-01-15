@@ -11,11 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle, Undo2, Download, Search, FileX, PlusCircle, MinusCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle, Undo2, Download, Search, FileX, PlusCircle, MinusCircle, MoreHorizontal } from 'lucide-react';
 import { format, parseISO, getYear, getQuarter } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Payment, PaymentStatus } from '@/lib/types';
 
 
@@ -297,28 +298,21 @@ export default function DuesPage() {
                                                 )}
                                                 {payment?.status === 'unpaid' && (
                                                     !isSuperAdmin ? (
-                                                        <AlertDialog>
-                                                            <AlertDialogTrigger asChild>
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
                                                                 <Button variant="outline" size="sm"><PlusCircle className="ml-1 h-4 w-4" /> إضافة</Button>
-                                                            </AlertDialogTrigger>
-                                                            <AlertDialogContent>
-                                                                <AlertDialogHeader>
-                                                                    <AlertDialogTitle>تسجيل دفعة للفصل {q}</AlertDialogTitle>
-                                                                    <AlertDialogDescription>
-                                                                        اختر الإجراء المناسب للطالب <span className="font-bold">{student.fullName}</span>.
-                                                                    </AlertDialogDescription>
-                                                                </AlertDialogHeader>
-                                                                <AlertDialogFooter>
-                                                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                                                    <AlertDialogAction onClick={() => handlePaymentAction(student, q, 'exempted')} className="bg-blue-600 hover:bg-blue-700">
-                                                                        <FileX className="ml-2 h-4 w-4" /> إعفاء من الدفع
-                                                                    </AlertDialogAction>
-                                                                    <AlertDialogAction onClick={() => handlePaymentAction(student, q, 'paid')}>
-                                                                        <CheckCircle className="ml-2 h-4 w-4"/> تأكيد الدفع ({prices[student.subscriptionTier || 'فئة الأصاغر']} د.ج)
-                                                                    </AlertDialogAction>
-                                                                </AlertDialogFooter>
-                                                            </AlertDialogContent>
-                                                        </AlertDialog>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent>
+                                                                <DropdownMenuItem onSelect={() => handlePaymentAction(student, q, 'paid')}>
+                                                                    <CheckCircle className="ml-2 h-4 w-4 text-green-500"/>
+                                                                    <span>تأكيد الدفع ({prices[student.subscriptionTier || 'فئة الأصاغر']} د.ج)</span>
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onSelect={() => handlePaymentAction(student, q, 'exempted')}>
+                                                                     <FileX className="ml-2 h-4 w-4 text-blue-500" />
+                                                                     <span>إعفاء من الدفع</span>
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
                                                     ) : (
                                                         <XCircle className="mx-auto h-5 w-5 text-red-500" />
                                                     )
@@ -371,3 +365,5 @@ export default function DuesPage() {
         </div>
     );
 }
+
+    
