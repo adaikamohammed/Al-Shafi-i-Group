@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle, Undo2, Download, Search, FileX, PlusCircle, MinusCircle, MoreHorizontal } from 'lucide-react';
+import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle, Undo2, Download, Search, FileX, PlusCircle, MinusCircle, MoreHorizontal, Save } from 'lucide-react';
 import { format, parseISO, getYear, getQuarter, formatDistanceToNowStrict } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -32,7 +32,7 @@ const statusVariant: { [key in 'نشط' | 'مطرود']: "default" | "destructiv
 
 
 export default function DuesPage() {
-    const { students, payments, addPayment, updatePaymentStatus, loading, settings } = useStudentContext();
+    const { students, payments, addPayment, updatePaymentStatus, loading, settings, saveSettings } = useStudentContext();
     const { isSuperAdmin } = useAuth();
     const { toast } = useToast();
     const [currentYear, setCurrentYear] = useState(getYear(new Date()));
@@ -40,8 +40,36 @@ export default function DuesPage() {
     const [quarterFilter, setQuarterFilter] = useState('all');
     const [quarterStatusFilter, setQuarterStatusFilter] = useState<QuarterStatusFilter>('all');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('نشط');
+    const [isSaving, setIsSaving] = useState(false);
     
-    const [registrationFees, setRegistrationFees] = useState<Record<number, number>>({ 1: 0, 2: 0, 3: 0, 4: 0 });
+    const [registrationFees, setRegistrationFees] = useState<Record<number, number>>({});
+
+    useEffect(() => {
+        if (settings.registrationFees && settings.registrationFees[currentYear]) {
+            setRegistrationFees(settings.registrationFees[currentYear]);
+        } else {
+            setRegistrationFees({});
+        }
+    }, [currentYear, settings.registrationFees]);
+    
+    const handleSaveFees = async () => {
+        setIsSaving(true);
+        const newSettings = {
+            ...settings,
+            registrationFees: {
+                ...settings.registrationFees,
+                [currentYear]: registrationFees,
+            }
+        };
+        try {
+            await saveSettings(newSettings);
+            toast({ title: "✅ تم الحفظ", description: "تم حفظ حقوق التسجيل بنجاح." });
+        } catch (e) {
+            toast({ title: "❌ خطأ", description: "فشل حفظ حقوق التسجيل.", variant: "destructive" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const prices = settings?.prices?.renewal || { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 };
 
@@ -211,14 +239,20 @@ export default function DuesPage() {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                  <h1 className="text-3xl font-headline font-bold">المستحقات المالية الفصلية</h1>
-                 <Select dir="rtl" value={currentYear.toString()} onValueChange={(value) => setCurrentYear(parseInt(value))}>
-                    <SelectTrigger className="w-full md:w-[200px]">
-                        <SelectValue placeholder="اختر السنة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {yearOptions.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
-                    </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                    <Button onClick={handleSaveFees} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
+                        حفظ
+                    </Button>
+                    <Select dir="rtl" value={currentYear.toString()} onValueChange={(value) => setCurrentYear(parseInt(value))}>
+                        <SelectTrigger className="w-full md:w-[200px]">
+                            <SelectValue placeholder="اختر السنة" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {yearOptions.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                 </div>
             </div>
             
             <Card>
@@ -367,7 +401,7 @@ export default function DuesPage() {
                                         <Input 
                                             type="number" 
                                             className="w-24 mx-auto text-center h-8" 
-                                            placeholder="أضف مبلغ"
+                                            placeholder="أدخل مبلغًا"
                                             value={registrationFees[q] || ''}
                                             onChange={(e) => setRegistrationFees(prev => ({...prev, [q]: Number(e.target.value)}))}
                                         />

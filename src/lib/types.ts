@@ -191,6 +191,7 @@ export interface AppSettings {
     points: PointsConfig;
     rewards: Reward[];
     badges: BadgeConfig[];
+    registrationFees?: { [year: number]: { [quarter: number]: number } };
 }
 
 export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "مرشح";

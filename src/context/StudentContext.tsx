@@ -41,7 +41,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     prices: TIER_PRICES,
     points: DEFAULT_POINTS_CONFIG,
     rewards: DEFAULT_REWARDS,
-    badges: DEFAULT_BADGES
+    badges: DEFAULT_BADGES,
+    registrationFees: {}
 };
 
 
@@ -613,6 +614,3 @@ export const useStudentContext = () => {
   }
   return context;
 };
-
-
-      
