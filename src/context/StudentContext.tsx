@@ -518,31 +518,34 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
   
  const saveDailyReport = async (reportData: Partial<DailyReport>, reportIdToUpdate?: string) => {
     const reportId = reportIdToUpdate || Date.now().toString();
-    const existingReport = reportIdToUpdate ? 
+    
+    // Find the original report to get its date and authorId
+    const originalReport = reportIdToUpdate ? 
         Object.values(dailyReports).flatMap(day => Object.values(day)).find(r => r.id === reportIdToUpdate) 
         : undefined;
 
-    const date = reportData.date || existingReport?.date || new Date().toISOString().split('T')[0];
-    const authorId = reportData.authorId || existingReport?.authorId || authContextUser?.uid;
+    const date = originalReport?.date || reportData.date || new Date().toISOString().split('T')[0];
+    const authorId = originalReport?.authorId || authContextUser?.uid;
     
     if (!authorId) throw new Error("User not authenticated");
 
     const reportRef = ref(db, `users/${authorId}/dailyReports/${date}/${reportId}`);
     
+    // Fetch the existing report from DB to merge, ensuring no data is lost
     const snapshot = await get(reportRef);
-    const dbReport = snapshot.val();
+    const existingData = snapshot.val() || {};
 
     const fullReportData: DailyReport = {
         id: reportId,
         date: date,
         authorId: authorId,
-        authorName: dbReport?.authorName || authContextUser?.displayName || 'Unknown',
-        category: dbReport?.category || 'ملاحظة عامة',
-        note: dbReport?.note || '',
-        timestamp: dbReport?.timestamp || new Date().toISOString(),
-        status: dbReport?.status || 'pending',
-        isPinned: dbReport?.isPinned ?? false,
-        adminNotes: dbReport?.adminNotes,
+        authorName: existingData.authorName || authContextUser?.displayName || 'Unknown',
+        category: existingData.category || 'ملاحظة عامة',
+        note: existingData.note || '',
+        timestamp: existingData.timestamp || new Date().toISOString(),
+        status: existingData.status || 'pending',
+        isPinned: existingData.isPinned ?? false,
+        adminNotes: existingData.adminNotes,
         ...reportData,
     };
     
@@ -636,3 +639,5 @@ export const useStudentContext = () => {
 };
 
     
+
+  
