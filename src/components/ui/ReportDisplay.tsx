@@ -50,10 +50,10 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                     </Card>
                 </section>
                 
-                 <section className="grid md:grid-cols-2 gap-6 avoid-break">
+                 <section className="grid md:grid-cols-2 gap-4 avoid-break">
                      <Card className="bg-white shadow-none border border-gray-300">
-                        <CardHeader><CardTitle className="text-lg text-gray-800">🎯 ملخص تقييم المهارات</CardTitle></CardHeader>
-                        <CardContent>
+                        <CardHeader><CardTitle className="text-base text-gray-800">🎯 ملخص تقييم المهارات</CardTitle></CardHeader>
+                        <CardContent className="p-3">
                            <table className="w-full text-sm text-center border-collapse border border-gray-300">
                                 <thead>
                                     <tr className="border-b border-gray-300 bg-gray-50">
@@ -64,8 +64,8 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                                 <tbody>
                                     {reportData.radarData.map((item: { subject: string, score: number }) => (
                                         <tr key={item.subject}>
-                                            <td className="p-2 border border-gray-300 font-medium">{item.subject}</td>
-                                            <td className="p-2 border border-gray-300 font-bold">{item.score.toFixed(1)} / 10</td>
+                                            <td className="p-1 border border-gray-300 font-medium">{item.subject}</td>
+                                            <td className="p-1 border border-gray-300 font-bold">{item.score.toFixed(1)} / 10</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -73,108 +73,84 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-white shadow-none border border-gray-300">
-                        <CardHeader><CardTitle className="text-lg text-gray-800">{`📊 إحصائيات الحضور`}</CardTitle></CardHeader>
-                        <CardContent>
-                            <table className="w-full text-sm text-center border-collapse border border-gray-300">
-                                <thead>
-                                    <tr className="border-b border-gray-300 bg-gray-50">
-                                        <th className="p-2 border border-gray-300">الحالة</th>
-                                        <th className="p-2 border border-gray-300">العدد (حصص)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr><td className="p-2 border border-gray-300 font-medium">حاضر</td><td className="border border-gray-300">{reportData.stats.present}</td></tr>
-                                    <tr><td className="p-2 border border-gray-300 font-medium">غائب</td><td className="border border-gray-300">{reportData.stats.absent}</td></tr>
-                                    <tr><td className="p-2 border border-gray-300 font-medium">متأخر</td><td className="border border-gray-300">{reportData.stats.late}</td></tr>
-                                </tbody>
-                                <tfoot>
-                                    <tr className="border-t border-gray-300 font-bold bg-gray-100">
-                                        <td className="p-2 border border-gray-300">إجمالي الحصص</td>
-                                        <td className="border border-gray-300">{reportData.totalSessionsHeld} حصة</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </CardContent>
-                    </Card>
+                    <div className="space-y-4">
+                        <Card className="bg-white shadow-none border border-gray-300">
+                            <CardHeader><CardTitle className="text-base text-gray-800">{`📊 إحصائيات الحضور`}</CardTitle></CardHeader>
+                            <CardContent className="p-3">
+                                <table className="w-full text-sm text-center border-collapse border border-gray-300">
+                                    <thead>
+                                        <tr className="border-b border-gray-300 bg-gray-50">
+                                            <th className="p-2 border border-gray-300">الحالة</th>
+                                            <th className="p-2 border border-gray-300">العدد</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td className="p-1 border border-gray-300 font-medium">حاضر</td><td className="border border-gray-300">{reportData.stats.present}</td></tr>
+                                        <tr><td className="p-1 border border-gray-300 font-medium">غائب</td><td className="border border-gray-300">{reportData.stats.absent}</td></tr>
+                                        <tr><td className="p-1 border border-gray-300 font-medium">متأخر</td><td className="border border-gray-300">{reportData.stats.late}</td></tr>
+                                    </tbody>
+                                </table>
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-white shadow-none border border-gray-300">
+                             <CardHeader><CardTitle className="text-base text-gray-800">⚖️ ميزان الالتزام</CardTitle></CardHeader>
+                            <CardContent className="p-3">
+                                 <table className="w-full text-sm text-center border-collapse border border-gray-300">
+                                    <tbody>
+                                        <tr><td className="p-1 border border-gray-300 font-medium">رصيد الغياب</td><td className="border border-gray-300">{reportData.stats.absent}</td></tr>
+                                        <tr><td className="p-1 border border-gray-300 font-medium">رصيد التعويض</td><td className="border border-gray-300">{reportData.stats.compensationBalance}</td></tr>
+                                        <tr className="font-bold bg-gray-50">
+                                            <td className="p-1 border border-gray-300">صافي الرصيد</td>
+                                            <td className="border border-gray-300">
+                                                 {(reportData.stats.absent - reportData.stats.compensationBalance) > 0 ? (
+                                                    <span className="text-red-600">مطلوب {reportData.stats.absent - reportData.stats.compensationBalance} حصص</span>
+                                                ) : (
+                                                    <span className="text-green-600">مستوفٍ</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </section>
-
+                
                 <section className="avoid-break">
                     <Card className="bg-white shadow-none border border-gray-300">
-                        <CardHeader><CardTitle className="text-lg text-gray-800">⚖️ ميزان الالتزام</CardTitle></CardHeader>
-                        <CardContent>
-                             <table className="w-full text-sm text-center border-collapse border border-gray-300">
-                                <thead>
-                                    <tr className="border-b border-gray-300 bg-gray-50">
-                                        <th className="p-2 border border-gray-300">البيان</th>
-                                        <th className="p-2 border border-gray-300">الرصيد</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr><td className="p-2 border border-gray-300 font-medium">رصيد الغياب</td><td className="border border-gray-300">{reportData.stats.absent}</td></tr>
-                                    <tr><td className="p-2 border border-gray-300 font-medium">رصيد التعويض</td><td className="border border-gray-300">{reportData.stats.compensationBalance}</td></tr>
-                                </tbody>
-                                <tfoot>
-                                    <tr className="border-t border-gray-300 font-bold bg-gray-100">
-                                        <td className="p-2 border border-gray-300">صافي الرصيد</td>
-                                        <td className="border border-gray-300">
-                                            {(reportData.stats.absent - reportData.stats.compensationBalance) > 0 ? (
-                                                <Badge variant="destructive">مطلوب تعويض {reportData.stats.absent - reportData.stats.compensationBalance} حصص</Badge>
-                                            ) : (
-                                                <Badge className="bg-green-600 text-white">تم استيفاء جميع الحصص</Badge>
-                                            )}
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </CardContent>
-                    </Card>
-                </section>
-
-                <section className="avoid-break">
-                    <Card className="bg-white shadow-none border border-gray-300">
-                        <CardHeader>
-                            <CardTitle className="text-lg text-gray-800">📚 متابعة حفظ السور ({reportData.memorizedSurahsCount} / 114)</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {reportData.memorizedSurahsCount > 0 ? (
-                                <p className="text-gray-600 text-center">
-                                    أتم الطالب حفظ {reportData.memorizedSurahsCount} سورة من القرآن الكريم.
-                                </p>
-                            ) : (
-                                <p className="text-gray-500 text-center">لم يحفظ الطالب أي سورة بعد.</p>
+                         <CardContent className="p-4 space-y-3">
+                            <div>
+                                <h3 className="font-bold text-gray-800">📚 متابعة حفظ السور ({reportData.memorizedSurahsCount} / 114)</h3>
+                                {reportData.memorizedSurahsCount > 0 ? (
+                                    <p className="text-gray-600 text-sm">
+                                        أتم الطالب حفظ {reportData.memorizedSurahsCount} سورة من القرآن الكريم.
+                                    </p>
+                                ) : (
+                                    <p className="text-gray-500 text-sm">لم يحفظ الطالب أي سورة بعد.</p>
+                                )}
+                            </div>
+                           
+                            {reportData.activeCovenant && (
+                                <div className="border-t pt-3">
+                                    <h3 className="font-bold text-red-700 flex items-center gap-2">
+                                        <ShieldAlert /> وثيقة ميثاق نشطة
+                                    </h3>
+                                    <div className="space-y-2 mt-2 text-sm">
+                                        <p><span className="font-semibold">نوع الميثاق:</span> {reportData.activeCovenant.type} ({reportData.activeCovenant.card})</p>
+                                        <blockquote className="p-2 bg-gray-100 border-r-4 border-gray-300 italic text-xs">
+                                            "{reportData.activeCovenant.text}"
+                                        </blockquote>
+                                    </div>
+                                </div>
                             )}
                         </CardContent>
                     </Card>
                 </section>
-
-                {reportData.activeCovenant && (
-                     <section className="avoid-break">
-                        <Card className="bg-white shadow-none border-2 border-red-400">
-                             <CardHeader>
-                                <CardTitle className="text-lg text-red-700 flex items-center gap-2">
-                                    <ShieldAlert /> وثيقة ميثاق نشطة
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4 text-center">
-                                 <p className="text-gray-600">
-                                    يشهد الشيخ <span className="font-bold">{user?.displayName || "المسؤول"}</span>، أن الطالب:
-                                </p>
-                                <p className="text-xl font-bold text-gray-800">{reportData.student.fullName}</p>
-                                <p>قد وضع تحت <span className="font-bold">"{reportData.activeCovenant.type}"</span> بتاريخ <span className="font-bold">{format(parseISO(reportData.activeCovenant.date), 'dd MMMM yyyy', { locale: ar })}</span>.</p>
-                                <blockquote className="p-4 bg-gray-100 border-r-4 border-gray-300">
-                                    <p className="font-semibold italic">"{reportData.activeCovenant.text}"</p>
-                                </blockquote>
-                                <p className="text-sm text-gray-500">نأمل من ولي الأمر المتابعة وحث الابن على الالتزام بالعهد.</p>
-                            </CardContent>
-                        </Card>
-                    </section>
-                )}
                 
                  <section className="avoid-break">
                         <Card className="bg-white shadow-none border border-gray-300">
                             <CardHeader><CardTitle className="text-lg text-gray-800">🖊️ ملاحظات وتوصيات الشيخ</CardTitle></CardHeader>
-                            <CardContent>
+                            <CardContent className="min-h-[100px]">
                                 {reportData.autoNote && <p className="whitespace-pre-wrap text-sm font-bold mb-2 p-2 bg-amber-100 text-amber-800 rounded-md">التوصية الآلية: {reportData.autoNote}</p>}
                                 <p className="whitespace-pre-wrap text-sm">{teacherNote ? teacherNote : (reportData.autoNote ? '' : 'لا توجد ملاحظات إضافية.')}</p>
                             </CardContent>
@@ -208,10 +184,14 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                     padding: 0;
                     border: none;
                     box-shadow: none;
+                    font-size: 10pt; /* Smaller font for printing */
                   }
                   .avoid-break {
                     page-break-inside: avoid;
                   }
+                   h1, h2, h3, h4 {
+                     font-size: inherit; /* Reset heading sizes for print */
+                   }
                 }
             `}</style>
         </Card>
