@@ -16,7 +16,6 @@ import { cn } from '@/lib/utils';
 
 
 const navItems = [
-    { href: '/overview', label: 'نظرة عامة', icon: LayoutDashboard, color: 'text-purple-400' },
     { href: '/', label: 'إدارة الطلبة', icon: Users, color: 'text-blue-400' },
     { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus, color: 'text-teal-400' },
     { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList, color: 'text-sky-400' },

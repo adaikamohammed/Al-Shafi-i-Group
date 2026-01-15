@@ -17,7 +17,6 @@ import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 
 const allNavItems = [
   { href: '/home', label: 'البوابة الرئيسية', icon: Home },
-  { href: '/overview', label: 'نظرة عامة', icon: LayoutDashboard },
   { href: '/', label: 'إدارة الطلبة', icon: Users },
   { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus },
   { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList },
