@@ -308,109 +308,6 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
     );
 };
 
-const PrintableWeeklyLog = ({ students, adminName, weekDates }: { students: Student[], adminName?: string | null, weekDates: Date[] }) => {
-    const startDate = weekDates[0] ? format(weekDates[0], 'dd/MM') : '...';
-    const endDate = weekDates[4] ? format(weekDates[4], 'dd/MM') : '...';
-    const monthName = weekDates[0] ? format(weekDates[0], 'MMMM yyyy', { locale: ar }) : '...';
-    
-    return (
-        <div id="weekly-log-print" className="print-only">
-            <style jsx global>{`
-                @media print {
-                    @page {
-                        size: A4 landscape;
-                        margin: 5mm;
-                    }
-                    .print-only { display: block !important; }
-                    .no-print { display: none !important; }
-                    body {
-                        background: white !important;
-                        color: black !important;
-                    }
-                    .print-header {
-                        text-align: center;
-                        font-weight: bold;
-                        font-size: 18pt;
-                        margin-bottom: 1rem;
-                    }
-                    .print-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        font-size: 8pt;
-                        table-layout: auto;
-                    }
-                    .print-table, .print-table th, .print-table td {
-                        border: 0.5pt solid black !important;
-                         background: white !important;
-                         color: black !important;
-                    }
-                    .print-table th, .print-table td {
-                        padding: 4px;
-                        text-align: center;
-                    }
-                    .print-table thead {
-                        display: table-header-group !important;
-                    }
-                    .print-table tr {
-                        page-break-inside: avoid;
-                        break-inside: avoid;
-                    }
-                    .student-row {
-                        height: 35px;
-                    }
-                    .student-name-col {
-                        width: 15%;
-                        text-align: right;
-                        padding-right: 8px !important;
-                    }
-                    .serial-col { width: 3%; }
-                    .level-col { width: 7%; }
-                    .sub-col { width: 3.75%; }
-                    .sub-col-header {
-                        font-size: 7pt;
-                    }
-                }
-            `}</style>
-            <div className="print-header">
-                المدرسة القرآنية للإمام الشافعي / الشيخ: {adminName || '..........'} / الأسبوع من: {startDate} إلى {endDate} / الشهر: {monthName}
-            </div>
-            <table className="print-table">
-                <thead>
-                    <tr>
-                        <th rowSpan={2} className="serial-col">ت</th>
-                        <th rowSpan={2} className="student-name-col">اسم الطالب</th>
-                        <th rowSpan={2} className="level-col">المستوى</th>
-                        {weekDates.slice(0, 5).map(date => (
-                            <th key={date.toISOString()} colSpan={4}>{format(date, 'EEEE (dd/MM)', { locale: ar })}</th>
-                        ))}
-                    </tr>
-                    <tr>
-                        {Array(5).fill(0).map((_, i) => (
-                            <React.Fragment key={i}>
-                                <th className="sub-col sub-col-header">ح</th>
-                                <th className="sub-col sub-col-header">ت</th>
-                                <th className="sub-col sub-col-header">م</th>
-                                <th className="sub-col sub-col-header">س</th>
-                            </React.Fragment>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {students.map((student, index) => (
-                        <tr key={student.id} className="student-row">
-                            <td>{index + 1}</td>
-                            <td className="student-name-col">{student.fullName}</td>
-                            <td>{student.educationalLevel || ''}</td>
-                            {Array(20).fill(0).map((_, i) => <td key={i} className="sub-col"></td>)}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    );
-};
-
-
 export default function StudentManagementPage() {
   const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings, addStudent } = useStudentContext();
   const { user, isSuperAdmin } = useAuth();
@@ -423,8 +320,7 @@ export default function StudentManagementPage() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: keyof Student | 'pageNumber'; direction: 'ascending' | 'descending' }>({ key: 'fullName', direction: 'ascending' });
-  const [weekForPrint, setWeekForPrint] = useState<Date>(new Date());
-
+  
     const rankingData = useMemo(() => {
         const pointsConfig = settings.points;
         if (!pointsConfig || !students) return [];
@@ -593,15 +489,6 @@ export default function StudentManagementPage() {
       return student.covenants.find(c => c.status === 'نشط') || null;
   };
   
-    const weekDatesForPrint = useMemo(() => {
-        const start = startOfWeek(weekForPrint, { weekStartsOn: 6 }); // Saturday
-        return Array.from({ length: 5 }).map((_, i) => addDays(start, i)); // Sat to Wed
-    }, [weekForPrint]);
-
-  const handlePrintWeeklyLog = () => {
-    window.print();
-  }
-
   if (loading) {
     return (
         <div className="flex items-center justify-center h-full">
@@ -702,23 +589,6 @@ export default function StudentManagementPage() {
             </Select>
          </div>
          <div className="flex items-center gap-2">
-            <Popover>
-                <PopoverTrigger asChild>
-                    <Button variant="secondary" className="w-full sm:w-auto">
-                        <Printer className="ml-2 h-4 w-4" />
-                        دفتر المتابعة
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={weekForPrint} onSelect={(date) => date && setWeekForPrint(date)} initialFocus />
-                    <div className="p-2 border-t">
-                        <Button className="w-full" onClick={handlePrintWeeklyLog}>
-                            طباعة أسبوع {format(startOfWeek(weekForPrint, { weekStartsOn: 6 }), 'dd/MM')}
-                        </Button>
-                    </div>
-                </PopoverContent>
-            </Popover>
-
             <Button variant="outline" onClick={handleExportStudents} disabled={(students ?? []).length === 0}>
                 <Download className="ml-2 h-4 w-4" />
                 تصدير
@@ -948,9 +818,6 @@ export default function StudentManagementPage() {
                 </div>
             </div>
         )}
-        <div className="print-only">
-            <PrintableWeeklyLog students={filteredStudents} adminName={user?.displayName} weekDates={weekDatesForPrint} />
-        </div>
     </div>
     </TooltipProvider>
   );
