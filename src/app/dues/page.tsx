@@ -97,8 +97,8 @@ export default function DuesPage() {
     const totalsByQuarter = useMemo(() => {
         const quarterTotals: Record<number, { revenue: number, paidCount: number, exemptedCount: number }> = { 1: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 2: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 3: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 4: { revenue: 0, paidCount: 0, exemptedCount: 0 }};
 
-        // Only include active students in financial calculations
-        filteredStudents.filter(s => s.status === 'نشط').forEach(student => {
+        // Calculate revenue from all students (active and expelled) who have paid.
+        filteredStudents.forEach(student => {
             for (let q = 1; q <= 4; q++) {
                 const payment = student.paymentStatus[q];
                 if (payment?.status === 'paid') {
