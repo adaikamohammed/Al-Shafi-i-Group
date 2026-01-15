@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, Swords, User, Calendar, Cake, Crown, ShieldCheck, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, Swords, User, Calendar, Cake, Crown, ShieldCheck, CheckCircle, XCircle, ChevronsUpDown, Check } from 'lucide-react';
 import { format, getMonth, getYear, setMonth, startOfYear, endOfYear, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -14,6 +14,10 @@ import { Badge } from '@/components/ui/badge';
 import type { Student, DailySession } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
+
 
 const calculateAge = (birthDate?: Date) => {
   if (!birthDate) return 'N/A';
@@ -22,28 +26,60 @@ const calculateAge = (birthDate?: Date) => {
   return Math.abs(ageDate.getUTCFullYear() - 1970);
 };
 
-const StudentCard = ({ student, onSelectStudent, studentList, disabledStudentId }: { student: Student | null, onSelectStudent: (id: string) => void, studentList: Student[], disabledStudentId?: string }) => {
+const StudentCard = ({ student, onSelectStudent, studentList, disabledStudentId }: { student: Student | null, onSelectStudent: (id: string | null) => void, studentList: Student[], disabledStudentId?: string | null }) => {
+    const [open, setOpen] = useState(false);
+
     return (
-        <Card className="flex-1">
+        <Card className="flex-1 min-w-[300px]">
             <CardHeader>
-                <Select dir="rtl" value={student?.id || ''} onValueChange={onSelectStudent}>
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder="اختر طالبًا..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {studentList.map(s => (
-                            <SelectItem key={s.id} value={s.id} disabled={s.id === disabledStudentId}>
-                                {s.fullName}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                 <Popover open={open} onOpenChange={setOpen}>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={open}
+                            className="w-full justify-between"
+                        >
+                            {student
+                                ? studentList.find((s) => s.id === student.id)?.fullName
+                                : "اختر طالبًا..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                        <Command>
+                            <CommandInput placeholder="ابحث عن اسم الطالب..." />
+                            <CommandEmpty>لم يتم العثور على طالب.</CommandEmpty>
+                            <CommandGroup>
+                                {studentList.map((s) => (
+                                    <CommandItem
+                                        key={s.id}
+                                        value={s.fullName}
+                                        disabled={s.id === disabledStudentId}
+                                        onSelect={() => {
+                                            onSelectStudent(s.id === student?.id ? null : s.id);
+                                            setOpen(false);
+                                        }}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "mr-2 h-4 w-4",
+                                                student?.id === s.id ? "opacity-100" : "opacity-0"
+                                            )}
+                                        />
+                                        {s.fullName}
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        </Command>
+                    </PopoverContent>
+                </Popover>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center text-center p-6 min-h-[200px]">
                 {student ? (
                     <>
                         <Avatar className="w-24 h-24 mb-4">
-                            <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${student.fullName}`} alt={student.fullName} />
+                            <AvatarImage src={student.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${student.fullName}`} alt={student.fullName} />
                             <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <h3 className="text-xl font-bold">{student.fullName}</h3>
@@ -83,11 +119,11 @@ const ComparisonStat = ({ title, value1, value2, suffix = '', higherIsBetter = t
             <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 w-1/4 justify-start">
                     {isWinner1 && <Crown className="h-4 w-4 text-yellow-500" />}
-                    <span className="font-bold">{value1} {suffix}</span>
+                    <span className="font-bold">{value1.toLocaleString()} {suffix}</span>
                 </div>
                 <Progress value={percentage1} className="flex-1 h-3" />
                 <div className="flex items-center gap-1 w-1/4 justify-end">
-                    <span className="font-bold">{value2} {suffix}</span>
+                    <span className="font-bold">{value2.toLocaleString()} {suffix}</span>
                     {isWinner2 && <Crown className="h-4 w-4 text-yellow-500" />}
                 </div>
             </div>
@@ -285,9 +321,9 @@ export default function ComparisonPage() {
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-4 items-start">
                 <StudentCard 
                     student={student1}
-                    onSelectStudent={(id) => setStudent1Id(id)}
+                    onSelectStudent={setStudent1Id}
                     studentList={activeStudents}
-                    disabledStudentId={student2Id || undefined}
+                    disabledStudentId={student2Id}
                 />
                 
                 <div className="flex items-center justify-center h-full pt-20">
@@ -296,9 +332,9 @@ export default function ComparisonPage() {
 
                 <StudentCard 
                     student={student2}
-                    onSelectStudent={(id) => setStudent2Id(id)}
+                    onSelectStudent={setStudent2Id}
                     studentList={activeStudents}
-                    disabledStudentId={student1Id || undefined}
+                    disabledStudentId={student1Id}
                 />
             </div>
             
