@@ -30,7 +30,16 @@ import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { AmiriFont } from '@/lib/AmiriFont';
 
+// Extend jsPDF with autoTable
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
 
 // 1. قائمة المشايخ الرسمية مرتبة (المرجع الأساسي)
 const SHEIKHS_LIST = [
@@ -81,19 +90,18 @@ const allEducationalLevels = Object.values(educationalLevels).flat();
 
 
 const ALL_COLUMNS = {
+    pageNumber: { label: "رقم الصفحة", visible: true, printOrder: 1 },
     fullName: { label: "الإسم الكامل", visible: true, printOrder: 2 },
-    gender: { label: "الجنس", visible: false, printOrder: 10 },
-    birthDate: { label: "تاريخ الميلاد", visible: true, printOrder: 5 },
-    educationalLevel: { label: "المستوى الدراسي", visible: true, printOrder: 4 },
-    guardianName: { label: "إسم الولي", visible: false, printOrder: 6 },
     phone1: { label: "رقم الهاتف 1", visible: true, printOrder: 3 },
+    educationalLevel: { label: "المستوى الدراسي", visible: true, printOrder: 4 },
+    birthDate: { label: "تاريخ الميلاد", visible: true, printOrder: 5 },
+    guardianName: { label: "إسم الولي", visible: false, printOrder: 6 },
     phone2: { label: "رقم الهاتف 2", visible: false, printOrder: 7 },
     address: { label: "مقر السكن", visible: false, printOrder: 8 },
     status: { label: "الحالة", visible: true, printOrder: 9 },
+    gender: { label: "الجنس", visible: false, printOrder: 10 },
     notes: { label: "ملاحظات", visible: true, printOrder: 11 },
     requestedAt: { label: "تاريخ التسجيل", visible: false, printOrder: 12 },
-    pageNumber: { label: "رقم الصفحة", visible: true, printOrder: 1 },
-    manualActions: { label: "الإجراءات / ملاحظات الإدارة", visible: false, printOrder: 99 },
 };
 
 const calculateAge = (birthDate?: Date | string) => {
@@ -487,6 +495,7 @@ const BulkEditModal = ({ open, onOpenChange, selectedCount, onSave }: { open: bo
 
 export default function PreRegistrationPage() {
     const { toast } = useToast();
+    const { user } = useAuth();
     const { addStudent, preRegistrations, loading, updatePreRegistration, deleteMultiplePreRegistrations, bulkUpdatePreRegistrations, allUsers } = useStudentContext();
     const [isFormOpen, setFormOpen] = useState(false);
     const [editingRegistration, setEditingRegistration] = useState<PreRegistration | null>(null);
@@ -570,17 +579,65 @@ export default function PreRegistrationPage() {
         });
     };
     
-    const handlePrint = () => {
-        const originalTitle = document.title;
-        document.title = "التسجيلات الأولية - " + new Date().toLocaleString('ar-DZ', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12: false}).replace(',', '');
+    const handleGeneratePdf = () => {
+        const doc = new jsPDF();
         
-        const onAfterPrint = () => {
-            document.title = originalTitle;
-            window.removeEventListener('afterprint', onAfterPrint);
-        };
-        window.addEventListener('afterprint', onAfterPrint);
+        // Add the Amiri font
+        doc.addFileToVFS("Amiri-Regular.ttf", AmiriFont);
+        doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
+        doc.setFont("Amiri");
 
-        setTimeout(() => window.print(), 100);
+        // Header
+        doc.setFontSize(16);
+        doc.text("قائمة طلبات التسجيل", doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
+        doc.setFontSize(10);
+        doc.text(`تاريخ الاستخراج: ${format(new Date(), 'yyyy/MM/dd')}`, doc.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
+
+        const visibleColumns = Object.entries(columnVisibility)
+            .filter(([, { visible }]) => visible)
+            .sort(([, a], [, b]) => (a.printOrder || 99) - (b.printOrder || 99));
+
+        const headers = visibleColumns.map(([, { label }]) => label);
+        
+        const body = filteredRegistrations.map(reg => {
+            return visibleColumns.map(([key]) => {
+                const value = reg[key as keyof PreRegistration];
+                 if (key === 'birthDate' || key === 'requestedAt') {
+                    return value instanceof Date && isValid(value) ? format(value, 'yyyy/MM/dd') : (value ? value.toString() : '');
+                }
+                return value ? value.toString() : '';
+            });
+        });
+
+        doc.autoTable({
+            startY: 30,
+            head: [headers],
+            body: body,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [60, 100, 25], // Olive Green
+                textColor: 255,
+                halign: 'center',
+                font: 'Amiri'
+            },
+            styles: {
+                font: 'Amiri',
+                halign: 'center',
+                cellPadding: 2,
+            },
+            didDrawPage: function (data) {
+                // Footer
+                doc.setFontSize(10);
+                doc.text(
+                    'Page ' + doc.internal.pages.length,
+                    data.settings.margin.left,
+                    doc.internal.pageSize.getHeight() - 10
+                );
+            }
+        });
+
+        doc.save(`تقرير_التسجيلات_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+        setPrintModalOpen(false);
     };
 
     const filteredRegistrations = useMemo(() => {
@@ -702,21 +759,16 @@ export default function PreRegistrationPage() {
     
     const columnsToRender = useMemo(() => {
         const forcedOrder = ['pageNumber', 'fullName'];
-        const manualActionsKey = 'manualActions';
-
-        // Filter visible columns and separate forced, manual, and others
+        
+        // Filter visible columns and separate forced, and others
         const visibleEntries = Object.entries(columnVisibility).filter(([, { visible }]) => visible);
 
         const forced = forcedOrder.map(key => visibleEntries.find(([k]) => k === key)).filter(Boolean) as [string, { label: string; visible: boolean; printOrder: number }][];
-        const manualActions = visibleEntries.find(([k]) => k === manualActionsKey);
         const others = visibleEntries
-            .filter(([k]) => !forcedOrder.includes(k) && k !== manualActionsKey)
+            .filter(([k]) => !forcedOrder.includes(k))
             .sort(([, a], [, b]) => (a.printOrder || 99) - (b.printOrder || 99));
 
         let finalOrder = [...forced, ...others];
-        if (manualActions) {
-            finalOrder.push(manualActions);
-        }
         
         return finalOrder;
     }, [columnVisibility]);
@@ -753,7 +805,7 @@ export default function PreRegistrationPage() {
 
     return (
         <div className="space-y-6">
-             <Card className={cn("sticky top-0 z-40 transition-colors print-hidden", currentAccess.color)}>
+             <Card className={cn("sticky top-0 z-40 transition-colors", currentAccess.color)}>
                 <CardContent className="p-3 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Button variant="ghost" size="icon" onClick={() => setIsAccessModalOpen(true)}>
@@ -797,7 +849,7 @@ export default function PreRegistrationPage() {
                 </DialogContent>
             </Dialog>
 
-            <Card className="print-hidden">
+            <Card>
                 <CardHeader>
                     <CardTitle className="text-3xl font-headline font-bold">إدارة التسجيلات الجديدة</CardTitle>
                     <CardDescription>
@@ -839,7 +891,7 @@ export default function PreRegistrationPage() {
 
             {accessLevel !== 'hidden' ? (
                 <>
-                    <Card className="print-hidden">
+                    <Card>
                         <CardHeader>
                             <CardTitle>أدوات الفلترة والبحث</CardTitle>
                         </CardHeader>
@@ -909,7 +961,7 @@ export default function PreRegistrationPage() {
                         </CardContent>
                     </Card>
                     
-                    <Card className="print-hidden">
+                    <Card>
                         <CardHeader>
                             <CardTitle>عرض الأعمدة</CardTitle>
                         </CardHeader>
@@ -938,16 +990,16 @@ export default function PreRegistrationPage() {
                         </CardContent>
                     </Card>
 
-                    <Card className={cn('transition-all print-container', !isLocked && 'border-green-500 ring-2 ring-green-500/20')}>
-                        <CardHeader className="print-header">
+                    <Card className={cn('transition-all', !isLocked && 'border-green-500 ring-2 ring-green-500/20')}>
+                        <CardHeader>
                             <CardTitle>قائمة طلبات التسجيل ({filteredRegistrations.length})</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="relative w-full overflow-x-auto">
-                                <Table id="print-table">
+                                <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[50px] px-2 print-hidden">
+                                            <TableHead className="w-[50px] px-2">
                                                 <Checkbox
                                                     checked={selectedRows.length > 0 && selectedRows.length === filteredRegistrations.length && filteredRegistrations.length > 0}
                                                     onCheckedChange={(checked) => {
@@ -961,7 +1013,7 @@ export default function PreRegistrationPage() {
                                                     disabled={isLocked}
                                                 />
                                             </TableHead>
-                                            <TableHead className="w-[80px] p-2 print-hidden">
+                                            <TableHead className="w-[80px] p-2">
                                                 <Button variant="ghost" onClick={() => requestSort('pageNumber')} className="px-2">
                                                     الهوية
                                                     <ArrowUpDown className="mr-2 h-4 w-4" />
@@ -975,7 +1027,7 @@ export default function PreRegistrationPage() {
                                                     </Button>
                                                 </TableHead>
                                             ))}
-                                            <TableHead className="text-center print-hidden">إجراءات</TableHead>
+                                            <TableHead className="text-center">إجراءات</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -986,7 +1038,7 @@ export default function PreRegistrationPage() {
                                                 onClick={() => setSelectedStudent(reg)}
                                                 data-state={selectedRows.includes(reg.id) && "selected"}
                                             >
-                                                <TableCell className="px-2 print-hidden" onClick={(e) => e.stopPropagation()}>
+                                                <TableCell className="px-2" onClick={(e) => e.stopPropagation()}>
                                                     <Checkbox
                                                         checked={selectedRows.includes(reg.id)}
                                                         onCheckedChange={(checked) => {
@@ -1000,7 +1052,7 @@ export default function PreRegistrationPage() {
                                                         disabled={isLocked}
                                                     />
                                                 </TableCell>
-                                                <TableCell className="p-2 print-hidden">
+                                                <TableCell className="p-2">
                                                     <div className="flex flex-col items-center gap-1">
                                                         <Avatar className="w-10 h-10">
                                                             <AvatarImage src={reg.photoURL} />
@@ -1022,12 +1074,10 @@ export default function PreRegistrationPage() {
                                                         content = <span className="font-medium">{value as string}</span>;
                                                     } else if (key === 'notes') {
                                                         content = <span className="max-w-[200px] truncate block">{value as string}</span>;
-                                                    } else if (key === 'manualActions') {
-                                                        content = <div className="print-only-td"></div>
                                                     }
                                                     return <TableCell key={key} className="text-center p-2">{content}</TableCell>;
                                                 })}
-                                                <TableCell className="text-center print-hidden" onClick={(e) => e.stopPropagation()}>
+                                                <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
                                                             <Button variant="ghost" size="icon" disabled={isLocked}><MoreHorizontal className="h-4 w-4" /></Button>
@@ -1057,7 +1107,7 @@ export default function PreRegistrationPage() {
                     </Card>
                 </>
             ) : (
-                <Card className="flex flex-col items-center justify-center min-h-[300px] border-dashed print-hidden">
+                <Card className="flex flex-col items-center justify-center min-h-[300px] border-dashed">
                     <CardHeader className="text-center">
                         <EyeOff className="mx-auto h-12 w-12 text-muted-foreground" />
                         <CardTitle>البيانات مخفية</CardTitle>
@@ -1073,7 +1123,7 @@ export default function PreRegistrationPage() {
             )}
             
             {accessLevel === 'unlocked' && selectedRows.length > 0 && (
-                <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 border-t shadow-lg z-50 print-hidden">
+                <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 border-t shadow-lg z-50">
                     <div className="container mx-auto flex justify-between items-center">
                         <p className="font-semibold">{selectedRows.length} طلاب محددون</p>
                         <div className="flex gap-2">
@@ -1101,7 +1151,6 @@ export default function PreRegistrationPage() {
                 </div>
             )}
             
-             {/* Print Modal */}
             <Dialog open={isPrintModalOpen} onOpenChange={setPrintModalOpen}>
                 <DialogContent>
                     <DialogHeader>
@@ -1134,7 +1183,7 @@ export default function PreRegistrationPage() {
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setPrintModalOpen(false)}>إلغاء</Button>
-                        <Button onClick={() => { handlePrint(); setPrintModalOpen(false); }}>
+                        <Button onClick={handleGeneratePdf}>
                             <Printer className="ml-2 h-4 w-4" />
                             اطبع الآن
                         </Button>
@@ -1142,75 +1191,6 @@ export default function PreRegistrationPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Print Styles */}
-            <style jsx global>{`
-                @page {
-                    size: A4 landscape;
-                    margin: 1cm;
-                }
-                @media print {
-                    body {
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
-                    }
-                    .print-container {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                        border: none !important;
-                        box-shadow: none !important;
-                        ring-width: 0 !important;
-                    }
-                    .print-header {
-                        display: block !important;
-                        text-align: center;
-                        margin-bottom: 1rem;
-                    }
-                    .print-hidden {
-                        display: none !important;
-                    }
-                     .print-only-td {
-                        display: table-cell !important;
-                        width: 3cm !important;
-                        min-width: 3cm !important;
-                    }
-                    #print-table {
-                        width: 100% !important;
-                        table-layout: auto !important;
-                        border-collapse: collapse;
-                        background-color: white !important;
-                    }
-                    #print-table th, #print-table td {
-                        border: 0.5pt solid black !important;
-                        padding: 4px 6px !important;
-                        background-color: white !important;
-                        color: black !important;
-                        box-shadow: none !important;
-                    }
-                    #print-table thead {
-                        display: table-header-group !important;
-                    }
-                     #print-table tbody {
-                        display: table-row-group !important;
-                    }
-                    #print-table tr {
-                        page-break-inside: avoid !important;
-                        break-inside: avoid !important;
-                    }
-                    #print-table th {
-                        font-weight: bold;
-                        background-color: #f2f2f2 !important;
-                    }
-                }
-            `}</style>
         </div>
     );
 }
-
-
-
-
-
-
-
