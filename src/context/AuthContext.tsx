@@ -143,40 +143,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             newPhotoURL = await getDownloadURL(imageRef);
         }
 
-        const updates: { [key: string]: any } = {};
+        const dbUpdates: { [key: string]: any } = {};
+        const authUpdates: { displayName?: string; photoURL?: string } = {};
+
         // Prepare updates for all provided data for RTDB
         for (const key in profileData) {
             if (Object.prototype.hasOwnProperty.call(profileData, key)) {
-                updates[`users/${auth.currentUser.uid}/profile/${key}`] = (profileData as any)[key];
+                dbUpdates[`users/${auth.currentUser.uid}/profile/${key}`] = (profileData as any)[key];
             }
-        }
-        if (newPhotoURL) {
-          updates[`users/${auth.currentUser.uid}/profile/photoURL`] = newPhotoURL;
-        }
-
-        if (Object.keys(updates).length > 0) {
-            await update(ref(db), updates);
-            
-            // Update Firebase Auth profile if displayName or photoURL changed
-            const authUpdates: { displayName?: string; photoURL?: string } = {};
-            if (profileData.displayName && profileData.displayName !== auth.currentUser.displayName) {
-              authUpdates.displayName = profileData.displayName;
-            }
-             if (newPhotoURL && newPhotoURL !== auth.currentUser.photoURL) {
-              authUpdates.photoURL = newPhotoURL;
-            }
-
-            if (Object.keys(authUpdates).length > 0) {
-              await updateProfile(auth.currentUser, authUpdates);
-            }
-            
-            setUser(prevUser => prevUser ? { ...prevUser, ...profileData, photoURL: newPhotoURL } : null);
         }
         
-        toast({
-            title: `✅ تم الحفظ بنجاح!`,
-            description: `تم تحديث ملفك الشخصي يا شيخ ${profileData.displayName || user?.displayName}.`,
+        if (newPhotoURL && newPhotoURL !== user?.photoURL) {
+          dbUpdates[`users/${auth.currentUser.uid}/profile/photoURL`] = newPhotoURL;
+          authUpdates.photoURL = newPhotoURL;
+        }
+
+        if (profileData.displayName && profileData.displayName !== user?.displayName) {
+            authUpdates.displayName = profileData.displayName;
+        }
+
+        if (Object.keys(dbUpdates).length > 0) {
+            await update(ref(db), dbUpdates);
+        }
+
+        if (Object.keys(authUpdates).length > 0) {
+            await updateProfile(auth.currentUser, authUpdates);
+        }
+            
+        setUser(prevUser => {
+            if (!prevUser) return null;
+            const updatedUser = { ...prevUser, ...profileData };
+            if (newPhotoURL) {
+                updatedUser.photoURL = newPhotoURL;
+            }
+            return updatedUser;
         });
+        
+        if (photoFile) { // Only show toast if a file was uploaded, otherwise it's just a background data sync
+            toast({
+                title: `✅ تم تحديث الخلفية`,
+                description: `تم تحديث الخلفية بنجاح يا شيخ ${profileData.displayName || user?.displayName}.`,
+            });
+        }
 
     } catch (error) {
         console.error("Error updating profile:", error);
