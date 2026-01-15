@@ -136,11 +136,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
         const { photoFile, ...profileData } = data;
         let newPhotoURL = user?.photoURL || null;
+        let wasPhotoUploaded = false;
 
         if (photoFile) {
             const imageRef = storageRef(storage, `user_backgrounds/${auth.currentUser.uid}`);
             await uploadBytes(imageRef, photoFile);
             newPhotoURL = await getDownloadURL(imageRef);
+            wasPhotoUploaded = true;
         }
 
         const dbUpdates: { [key: string]: any } = {};
@@ -179,7 +181,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return updatedUser;
         });
         
-        if (photoFile) { // Only show toast if a file was uploaded, otherwise it's just a background data sync
+        if (wasPhotoUploaded) {
             toast({
                 title: `✅ تم تحديث الخلفية`,
                 description: `تم تحديث الخلفية بنجاح يا شيخ ${profileData.displayName || user?.displayName}.`,
