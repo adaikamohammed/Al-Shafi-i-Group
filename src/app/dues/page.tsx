@@ -35,7 +35,6 @@ export default function DuesPage() {
     const [quarterFilter, setQuarterFilter] = useState('all');
     const [quarterStatusFilter, setQuarterStatusFilter] = useState<QuarterStatusFilter>('all');
     
-    // State for total registration fees per quarter
     const [registrationFees, setRegistrationFees] = useState<Record<number, number>>({ 1: 0, 2: 0, 3: 0, 4: 0 });
 
     const prices = settings?.prices?.renewal || TIER_PRICES;
@@ -87,15 +86,33 @@ export default function DuesPage() {
         });
     }, [studentsWithDues, searchTerm, quarterFilter, quarterStatusFilter]);
     
-    const totals = useMemo(() => {
-        const totalRevenue = filteredStudents.reduce((sum, student) => sum + student.totalPaid, 0);
-        const totalRegistrationFees = Object.values(registrationFees).reduce((sum, fee) => sum + fee, 0);
-        return {
-            totalRevenue: totalRevenue + totalRegistrationFees,
-            totalSubscriptionRevenue: totalRevenue,
-            totalRegistrationFees: totalRegistrationFees,
+    const totalsByQuarter = useMemo(() => {
+        const quarterTotals: Record<number, { revenue: number, paidCount: number, exemptedCount: number }> = { 1: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 2: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 3: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 4: { revenue: 0, paidCount: 0, exemptedCount: 0 }};
+
+        filteredStudents.forEach(student => {
+            for (let q = 1; q <= 4; q++) {
+                const payment = student.paymentStatus[q];
+                if (payment?.status === 'paid') {
+                    const tier = student.subscriptionTier || 'فئة الأصاغر';
+                    quarterTotals[q].revenue += prices[tier] || 0;
+                    quarterTotals[q].paidCount++;
+                }
+                if (payment?.status === 'exempted') {
+                    quarterTotals[q].exemptedCount++;
+                }
+            }
+        });
+        
+        for (let q = 1; q <= 4; q++) {
+            quarterTotals[q].revenue += registrationFees[q] || 0;
         }
-    }, [filteredStudents, registrationFees]);
+        
+        return quarterTotals;
+    }, [filteredStudents, registrationFees, prices]);
+
+    const totalRevenue = useMemo(() => {
+        return Object.values(totalsByQuarter).reduce((sum, q) => sum + q.revenue, 0);
+    }, [totalsByQuarter]);
 
 
     const handlePaymentAction = async (student: typeof studentsWithDues[0], quarter: number, status: PaymentStatus) => {
@@ -110,10 +127,8 @@ export default function DuesPage() {
 
         try {
             if (existingPayment) {
-                // Update status of existing payment
                 await updatePaymentStatus(existingPayment.id, status, status === 'paid' ? amount : 0);
             } else {
-                // Add new payment record
                  await addPayment({
                     studentId: student.id,
                     amount: status === 'paid' ? amount : 0,
@@ -242,14 +257,15 @@ export default function DuesPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Table>
+                    <div className="w-full overflow-x-auto">
+                    <Table className="min-w-full">
                         <TableHeader>
                             <TableRow>
-                                <TableHead>اسم الطالب</TableHead>
+                                <TableHead className="w-1/4">اسم الطالب</TableHead>
                                 {isSuperAdmin && <TableHead>الفوج</TableHead>}
                                 <TableHead>الفئة</TableHead>
                                 {[1, 2, 3, 4].map(q => <TableHead key={q} className="text-center">{quarterNames[q.toString()]}</TableHead>)}
-                                <TableHead>الإجمالي المدفوع</TableHead>
+                                <TableHead>الإجمالي السنوي</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -328,25 +344,37 @@ export default function DuesPage() {
                             )}
                         </TableBody>
                          <TableFooter>
-                            <TableRow className="bg-muted/50 font-bold">
-                                <TableCell colSpan={isSuperAdmin ? 3 : 2}>الإجماليات</TableCell>
+                            <TableRow className="bg-muted/30">
+                                <TableCell colSpan={isSuperAdmin ? 3 : 2} className="font-semibold">حقوق التسجيل الإجمالية للفصل</TableCell>
                                 {[1, 2, 3, 4].map(q => (
-                                    <TableCell key={`footer-${q}`} className="text-center">
+                                    <TableCell key={`reg-fee-${q}`} className="text-center p-1">
                                         <Input 
                                             type="number" 
-                                            className="w-24 mx-auto text-center" 
-                                            placeholder="حقوق التسجيل"
+                                            className="w-24 mx-auto text-center h-8" 
+                                            placeholder="أضف مبلغ"
                                             value={registrationFees[q] || ''}
                                             onChange={(e) => setRegistrationFees(prev => ({...prev, [q]: Number(e.target.value)}))}
                                         />
                                     </TableCell>
                                 ))}
-                                <TableCell>{totals.totalRevenue.toLocaleString()} د.ج</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                            <TableRow className="bg-muted/50 font-bold text-base">
+                                <TableCell colSpan={isSuperAdmin ? 3 : 2}>الإجمالي النهائي للفصل</TableCell>
+                                {[1, 2, 3, 4].map(q => (
+                                    <TableCell key={`total-footer-${q}`} className="text-center">
+                                       {totalsByQuarter[q].revenue.toLocaleString()} د.ج
+                                    </TableCell>
+                                ))}
+                                <TableCell className="text-lg">{totalRevenue.toLocaleString()} د.ج</TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>
+                    </div>
                 </CardContent>
             </Card>
         </div>
     );
 }
+
+    
