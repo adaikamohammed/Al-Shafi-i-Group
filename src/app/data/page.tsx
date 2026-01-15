@@ -16,6 +16,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 export default function DataExchangePage() {
@@ -634,120 +635,59 @@ export default function DataExchangePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <input type="file" ref={fileInputRef} onChange={handleStudentFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingStudents}/>
       <input type="file" ref={sessionFileInputRef} onChange={handleSessionFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingSessions}/>
       <input type="file" ref={monthlySessionFileInputRef} onChange={handleMonthlySessionUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingMonthly}/>
       <input type="file" ref={preRegFileInputRef} onChange={handlePreRegFileUpload} accept=".xlsx, .xls" className="hidden" disabled={isImportingPreRegs}/>
-
       
-      <h1 className="text-3xl font-headline font-bold">استيراد وتصدير البيانات</h1>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-3xl font-headline font-bold">استيراد وتصدير البيانات</CardTitle>
+          <CardDescription>
+            استخدم هذه الأدوات لإدارة بيانات المدرسة بشكل جماعي عبر ملفات Excel.
+          </CardDescription>
+        </CardHeader>
+      </Card>
       
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>📥 بيانات الطلبة</CardTitle>
-            <CardDescription>
-              رفع ملف Excel يحتوي على بيانات الطلبة لبدء العام الدراسي أو إضافة طلبة جدد إلى فوجك الرسمي.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              لن يتم إضافة طالب إذا كان اسمه الكامل موجودًا بالفعل في النظام. استخدم النموذج الرسمي.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button className="flex-grow" onClick={() => fileInputRef.current?.click()} disabled={isImportingStudents}>
-                {isImportingStudents ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Upload className="ml-2 h-4 w-4" />}
-                {isImportingStudents ? 'جاري الاستيراد...' : 'رفع ملف الطلبة'}
-              </Button>
-               <Button variant="outline" onClick={handleDownloadStudentTemplate}>
-                <Download className="ml-2 h-4 w-4" /> تحميل نموذج الطلبة
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>📥 استيراد التسجيلات الأولية</CardTitle>
-            <CardDescription>
-              رفع ملف Excel يحتوي على طلبات التسجيل الجديدة لتظهر في صفحة "التسجيلات الجديدة" لمراجعتها.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-             <p className="text-sm text-muted-foreground">
-              سيتم رفع كل الصفوف في الملف إلى قائمة التسجيلات الأولية المشتركة بين جميع المشايخ.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button className="flex-grow" onClick={() => preRegFileInputRef.current?.click()} disabled={isImportingPreRegs}>
-                {isImportingPreRegs ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <UserPlus className="ml-2 h-4 w-4" />}
-                {isImportingPreRegs ? 'جاري الاستيراد...' : 'رفع ملف التسجيلات'}
-              </Button>
-               <Button variant="outline" onClick={handleDownloadPreRegTemplate}>
-                <Download className="ml-2 h-4 w-4" /> تحميل نموذج التسجيلات
-              </Button>
-            </div>
-             <Separator className="my-4" />
-                <div className="space-y-2 p-4 border-l-4 border-destructive rounded-r-lg bg-destructive/10">
-                    <h4 className="font-bold text-destructive">منطقة الخطر</h4>
-                    <div className="flex justify-between items-center">
-                        <p className="text-sm text-destructive/80">
-                            سيؤدي هذا إلى حذف جميع التسجيلات الأولية نهائياً.
-                        </p>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm">
-                                    <Trash2 className="ml-2 h-4 w-4" />
-                                    مسح كل التسجيلات
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        سيتم حذف جميع طلبات التسجيل الأولية نهائياً. هذا الإجراء لا يمكن التراجع عنه.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                    <AlertDialogAction onClick={deleteAllPreRegistrations}>تأكيد الحذف</AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </div>
-                </div>
-          </CardContent>
-        </Card>
-      </div>
-
-       <Card className="col-span-1 md:col-span-2 lg:col-span-3">
-          <CardHeader>
-            <CardTitle>🗓️ بيانات الحصص</CardTitle>
-            <CardDescription>
-              استيراد أو تصدير بيانات الحصص ليوم واحد أو لشهر كامل.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-4 md:col-span-1">
-                 <h4 className="font-semibold">بيانات حصة اليوم</h4>
-                 <p className="text-sm text-muted-foreground">
-                    تنزيل نموذج ليوم واحد أو رفع سجل حصة ليوم واحد تم تعبئته مسبقًا.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-2">
-                   <Button className="flex-grow" onClick={() => sessionFileInputRef.current?.click()} disabled={isImportingSessions}>
-                    {isImportingSessions ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
-                    {isImportingSessions ? 'جاري الاستيراد...' : 'رفع سجل اليوم'}
-                  </Button>
-                  <Button variant="outline" onClick={handleDownloadSessionTemplate} disabled={activeStudents.length === 0}>
-                    <Download className="ml-2 h-4 w-4" /> تحميل نموذج اليوم
-                  </Button>
-                </div>
-                 {activeStudents.length === 0 && <p className="text-xs text-destructive text-center mt-2">يجب إضافة طلبة نشطين أولاً.</p>}
-            </div>
-
-            <div className="space-y-4 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                    <h4 className="font-semibold">استيراد بيانات شهر كامل</h4>
+      <Tabs defaultValue="import" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="import">استيراد البيانات</TabsTrigger>
+          <TabsTrigger value="export">تصدير البيانات والنماذج</TabsTrigger>
+          <TabsTrigger value="danger">منطقة الخطر</TabsTrigger>
+        </TabsList>
+        <TabsContent value="import" className="mt-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <DataCard
+              title="بيانات الطلبة"
+              description="رفع ملف Excel يحتوي على بيانات الطلبة لبدء العام الدراسي أو إضافة طلبة جدد إلى فوجك الرسمي."
+              buttonText={isImportingStudents ? 'جاري الاستيراد...' : 'رفع ملف الطلبة'}
+              onButtonClick={() => fileInputRef.current?.click()}
+              loading={isImportingStudents}
+              icon={<Upload className="ml-2 h-4 w-4" />}
+            />
+            <DataCard
+              title="التسجيلات الأولية"
+              description="رفع ملف Excel يحتوي على طلبات التسجيل الجديدة لتظهر في صفحة 'التسجيلات الجديدة' لمراجعتها."
+              buttonText={isImportingPreRegs ? 'جاري الاستيراد...' : 'رفع ملف التسجيلات'}
+              onButtonClick={() => preRegFileInputRef.current?.click()}
+              loading={isImportingPreRegs}
+              icon={<UserPlus className="ml-2 h-4 w-4" />}
+            />
+            <DataCard
+              title="سجل حصة اليوم"
+              description="رفع سجل حصة ليوم واحد تم تعبئته مسبقًا. تأكد من تطابق أسماء الطلبة وصيغة التاريخ."
+              buttonText={isImportingSessions ? 'جاري الاستيراد...' : 'رفع سجل اليوم'}
+              onButtonClick={() => sessionFileInputRef.current?.click()}
+              loading={isImportingSessions}
+              icon={<History className="ml-2 h-4 w-4" />}
+            />
+             <Card>
+                <CardHeader>
+                    <CardTitle>استيراد بيانات شهر كامل</CardTitle>
+                    <CardDescription>رفع ملف Excel يحتوي على سجلات حصص لشهر كامل.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                      <div className="flex gap-2">
                         <Select dir="rtl" value={importMonth.toString()} onValueChange={(val) => setImportMonth(parseInt(val))}>
                             <SelectTrigger><SelectValue placeholder="اختر الشهر" /></SelectTrigger>
@@ -770,37 +710,132 @@ export default function DataExchangePage() {
                         {isImportingMonthly ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CalendarClock className="ml-2 h-4 w-4" />}
                         {isImportingMonthly ? 'جاري الاستيراد...' : 'رفع ملف الشهر'}
                      </Button>
-                </div>
-                 <div className="space-y-4">
-                    <h4 className="font-semibold">تصدير بيانات شهر كامل</h4>
-                    <div className="flex gap-2">
-                        <Select dir="rtl" value={exportMonth.toString()} onValueChange={(val) => setExportMonth(parseInt(val))}>
-                            <SelectTrigger><SelectValue placeholder="اختر الشهر" /></SelectTrigger>
-                            <SelectContent>
-                                {Array.from({length: 12}, (_, i) => (
-                                    <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Select dir="rtl" value={exportYear.toString()} onValueChange={(val) => setExportYear(parseInt(val))}>
-                            <SelectTrigger><SelectValue placeholder="اختر السنة" /></SelectTrigger>
-                            <SelectContent>
-                                {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
-                                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <Button className="w-full" onClick={handleExportMonthlyReport}>
-                        <Download className="ml-2 h-4 w-4" />
-                        تصدير تقرير الشهر المحدد (Excel)
-                    </Button>
-                </div>
+                </CardContent>
+             </Card>
+          </div>
+        </TabsContent>
+        <TabsContent value="export" className="mt-6">
+            <div className="grid gap-6 md:grid-cols-2">
+                <DataCard
+                  title="نموذج الطلبة الذكي"
+                  description="تنزيل نموذج Excel جاهز مع قوائم منسدلة لتسهيل عملية إضافة الطلبة الجدد."
+                  buttonText="تحميل نموذج الطلبة"
+                  onButtonClick={handleDownloadStudentTemplate}
+                  icon={<Download className="ml-2 h-4 w-4" />}
+                />
+                 <DataCard
+                  title="نموذج التسجيلات الأولية"
+                  description="تنزيل نموذج Excel جاهز لجمع بيانات المرشحين الجدد قبل إضافتهم للنظام."
+                  buttonText="تحميل نموذج التسجيلات"
+                  onButtonClick={handleDownloadPreRegTemplate}
+                  icon={<Download className="ml-2 h-4 w-4" />}
+                />
+                 <DataCard
+                  title="نموذج حصة اليوم"
+                  description="تنزيل نموذج Excel يحتوي على قائمة الطلبة النشطين لتسجيل بيانات الحصة يدويًا."
+                  buttonText="تحميل نموذج اليوم"
+                  onButtonClick={handleDownloadSessionTemplate}
+                  disabled={activeStudents.length === 0}
+                  icon={<Download className="ml-2 h-4 w-4" />}
+                />
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>تصدير بيانات شهر كامل</CardTitle>
+                        <CardDescription>تصدير ملف Excel يحتوي على جميع سجلات الحصص للشهر المحدد.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex gap-2">
+                            <Select dir="rtl" value={exportMonth.toString()} onValueChange={(val) => setExportMonth(parseInt(val))}>
+                                <SelectTrigger><SelectValue placeholder="اختر الشهر" /></SelectTrigger>
+                                <SelectContent>
+                                    {Array.from({length: 12}, (_, i) => (
+                                        <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select dir="rtl" value={exportYear.toString()} onValueChange={(val) => setExportYear(parseInt(val))}>
+                                <SelectTrigger><SelectValue placeholder="اختر السنة" /></SelectTrigger>
+                                <SelectContent>
+                                    {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <Button className="w-full" onClick={handleExportMonthlyReport}>
+                            <Download className="ml-2 h-4 w-4" />
+                            تصدير تقرير الشهر المحدد
+                        </Button>
+                    </CardContent>
+                </Card>
             </div>
-          </CardContent>
-        </Card>
+        </TabsContent>
+         <TabsContent value="danger" className="mt-6">
+              <Card className="border-destructive">
+                <CardHeader>
+                    <CardTitle className="text-destructive">منطقة الخطر</CardTitle>
+                    <CardDescription>الإجراءات في هذا القسم لا يمكن التراجع عنها. يرجى توخي الحذر.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex justify-between items-center p-4 border rounded-lg bg-destructive/10">
+                        <div>
+                            <h4 className="font-bold text-destructive">مسح جميع التسجيلات الأولية</h4>
+                            <p className="text-sm text-destructive/80">
+                                سيؤدي هذا إلى حذف جميع طلبات التسجيل الأولية نهائياً من قاعدة البيانات المشتركة.
+                            </p>
+                        </div>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive">
+                                    <Trash2 className="ml-2 h-4 w-4" />
+                                    مسح كل التسجيلات
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        سيتم حذف جميع طلبات التسجيل الأولية نهائياً. هذا الإجراء لا يمكن التراجع عنه.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                    <AlertDialogAction onClick={deleteAllPreRegistrations}>تأكيد الحذف</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
+                </CardContent>
+              </Card>
+         </TabsContent>
+      </Tabs>
     </div>
   );
 }
+
+const DataCard = ({ title, description, buttonText, onButtonClick, loading, icon, disabled }: {
+    title: string;
+    description: string;
+    buttonText: string;
+    onButtonClick: () => void;
+    loading?: boolean;
+    icon: React.ReactNode;
+    disabled?: boolean;
+}) => (
+    <Card>
+        <CardHeader>
+            <CardTitle>{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Button className="w-full" onClick={onButtonClick} disabled={loading || disabled}>
+                {loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : icon}
+                {buttonText}
+            </Button>
+             {disabled && <p className="text-xs text-destructive text-center mt-2">يجب إضافة طلبة نشطين أولاً.</p>}
+        </CardContent>
+    </Card>
+)
+    
 
     
