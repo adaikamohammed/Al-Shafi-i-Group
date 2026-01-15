@@ -439,7 +439,7 @@ export default function StudentManagementPage() {
     }
 
   const filteredStudents = useMemo(() => {
-    const statusOrder: { [key in StudentStatus]: number } = { "نشط": 1, "غائب طويل": 2, "مطرود": 3, "محذوف": 4, };
+    const statusOrder: { [key in StudentStatus]: number } = { "نشط": 1, "مطرود": 2, "غائب طويل": 3, "محذوف": 4 };
     
     let sortableStudents = isSuperAdmin ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
         
@@ -583,7 +583,6 @@ export default function StudentManagementPage() {
                 <SelectContent>
                     <SelectItem value="all">كل الحالات</SelectItem>
                     <SelectItem value="نشط">نشط</SelectItem>
-                    <SelectItem value="غائب طويل">غائب طويل</SelectItem>
                     <SelectItem value="مطرود">مطرود</SelectItem>
                 </SelectContent>
             </Select>
@@ -823,10 +822,60 @@ export default function StudentManagementPage() {
   );
 }
 
+function ExpulsionDialog({ student, open, onOpenChange, onConfirm }: { student: Student, open: boolean, onOpenChange: (open: boolean) => void, onConfirm: (reason: string, notes: string) => void }) {
+    const [reason, setReason] = useState("سلوك");
+    const [notes, setNotes] = useState("");
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>طرد الطالب: {student.fullName}</DialogTitle>
+                    <DialogDescription>
+                        يرجى تحديد سبب الطرد. سيتم تسجيل هذا السبب في سجل الطالب.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="expel-reason-select">السبب الرئيسي</Label>
+                        <Select dir="rtl" value={reason} onValueChange={setReason}>
+                            <SelectTrigger id="expel-reason-select">
+                                <SelectValue placeholder="اختر سببًا..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="سلوك">سلوك غير لائق</SelectItem>
+                                <SelectItem value="غيابات">غيابات متكررة</SelectItem>
+                                <SelectItem value="عدم حفظ">عدم الالتزام بالحفظ</SelectItem>
+                                <SelectItem value="أخرى">أخرى (يرجى التوضيح)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="expel-notes">ملاحظات إضافية</Label>
+                        <Textarea id="expel-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="أضف تفاصيل إضافية حول سبب الطرد..." />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+                    <Button variant="destructive" onClick={() => onConfirm(reason, notes)}>تأكيد الطرد</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+
 function StudentActions({ student, onStatusChange, onEdit, isSuperAdmin }: { student: Student, onStatusChange: (student: Student, status: StudentStatus, reason?: string) => void, onEdit: () => void, isSuperAdmin?: boolean }) {
-  const [actionReason, setActionReason] = useState('');
+  const [isExpelDialogOpen, setExpelDialogOpen] = useState(false);
+  
+  const handleExpulsion = (reason: string, notes: string) => {
+    const fullReason = `${reason}: ${notes}`;
+    onStatusChange(student, 'مطرود', fullReason);
+    setExpelDialogOpen(false);
+  };
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button aria-haspopup="true" size="icon" variant="ghost" onClick={(e) => e.stopPropagation()}>
@@ -845,7 +894,7 @@ function StudentActions({ student, onStatusChange, onEdit, isSuperAdmin }: { stu
             <>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => { e.preventDefault(); setActionReason('') }}>
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
                   <Trash2 className="ml-2 h-4 w-4" />
                   حذف
                 </DropdownMenuItem>
@@ -863,39 +912,16 @@ function StudentActions({ student, onStatusChange, onEdit, isSuperAdmin }: { stu
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => { e.preventDefault(); setActionReason('') }}>
-                  <UserX className="ml-2 h-4 w-4" />
-                  طرد
-                </DropdownMenuItem>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>طرد الطالب {student.fullName}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    سيؤدي هذا إلى تغيير حالة الطالب إلى "مطرود". الرجاء إدخال سبب الطرد.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="py-4">
-                  <Label htmlFor="expel-reason">سبب الطرد</Label>
-                  <Textarea 
-                    id="expel-reason" 
-                    placeholder="مثال: غياب متكرر بدون عذر..." 
-                    value={actionReason}
-                    onChange={(e) => setActionReason(e.target.value)}
-                  />
-                </div>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setActionReason('')}>إلغاء</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onStatusChange(student, 'مطرود', actionReason)}>تأكيد الطرد</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => {e.preventDefault(); setExpelDialogOpen(true)}}>
+                <UserX className="ml-2 h-4 w-4" />
+                طرد
+            </DropdownMenuItem>
             </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+    <ExpulsionDialog student={student} open={isExpelDialogOpen} onOpenChange={setExpelDialogOpen} onConfirm={handleExpulsion} />
+    </>
   );
 }
 
@@ -1166,7 +1192,6 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="نشط">✅ نشط</SelectItem>
-                        <SelectItem value="غائب طويل">⚠️ غائب طويل</SelectItem>
                         <SelectItem value="مطرود">❌ مطرود</SelectItem>
                     </SelectContent>
                 </Select>
@@ -1279,5 +1304,3 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
     </form>
   );
 }
-
-    

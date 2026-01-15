@@ -1,6 +1,6 @@
 
 
-export type StudentStatus = "نشط" | "مطرود" | "غائب طويل" | "محذوف";
+export type StudentStatus = "نشط" | "مطرود" | "محذوف";
 export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "أكثر";
 export type SubscriptionTier = "فئة الأكابر" | "فئة الأصاغر";
 
