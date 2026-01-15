@@ -201,16 +201,10 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                             </kbd>
                         </Button>
                     </div>
-                    <div className="max-w-full mx-auto">
-                       {children}
-                    </div>
+                    {children}
                 </main>
               </>
             )}
           </SidebarProvider>
     )
 }
-
-    
-
-    
