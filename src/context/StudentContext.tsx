@@ -72,7 +72,7 @@ interface StudentContextType {
   bulkUpdatePreRegistrations: (ids: string[], data: Partial<PreRegistration>) => void;
   deleteAllPreRegistrations: () => void;
   deleteMultiplePreRegistrations: (ids: string[]) => void;
-  saveDailyReport: (report: Partial<DailyReport>, reportIdToUpdate?: string) => Promise<void>;
+  saveDailyReport: (reportData: Partial<DailyReport>, reportIdToUpdate?: string) => Promise<void>;
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
   addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
@@ -545,7 +545,7 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
         timestamp: existingData.timestamp || new Date().toISOString(),
         status: existingData.status || 'pending',
         isPinned: existingData.isPinned ?? false,
-        adminNotes: existingData.adminNotes,
+        adminNotes: existingData.adminNotes || null,
         ...reportData,
     };
     

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -195,14 +196,8 @@ export default function DailyReportPage() {
         
         try {
             const reportData: Partial<DailyReport> = {
-                date: editingReport?.date || format(new Date(), 'yyyy-MM-dd'),
                 note: note,
-                timestamp: editingReport?.timestamp || new Date().toISOString(),
-                authorId: user.uid,
-                authorName: user.displayName || "شيخ غير مسمى",
                 category: category,
-                status: editingReport?.status || 'pending',
-                isPinned: editingReport?.isPinned || false,
             };
 
             await saveDailyReport(reportData, editingReport?.id);

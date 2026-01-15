@@ -85,8 +85,8 @@ export interface DailyReport {
   authorId: string;
   category: string;
   status: 'pending' | 'reviewed';
-  adminNotes?: string;
-  isPinned?: boolean;
+  adminNotes: string | null;
+  isPinned: boolean;
 }
 
 
@@ -221,3 +221,4 @@ export interface PreRegistration {
     
 
     
+
