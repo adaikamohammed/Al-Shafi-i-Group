@@ -24,7 +24,6 @@ const allNavItems = [
   { href: '/stats', label: 'المتابعة الأسبوعية', icon: Calendar },
   { href: '/comparison', label: 'ساحة المقارنة', icon: Swords },
   { href: '/dues', label: 'المستحقات المالية', icon: DollarSign },
-  { href: '/reports/monthly', label: 'الإحصائيات الشهرية', icon: BarChart3 },
   { href: '/reports/daily', label: 'التقرير اليومي', icon: Edit },
   { href: '/reports/student', label: 'تقرير الطالب', icon: FileText },
   { href: '/ranking', label: 'ترتيب الطلبة', icon: Award },

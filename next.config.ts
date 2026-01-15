@@ -18,6 +18,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/reports/monthly',
+        destination: '/dues',
+        permanent: true,
+      },
+    ]
+  },
 };
 
 export default nextConfig;
