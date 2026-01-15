@@ -50,7 +50,7 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                     </Card>
                 </section>
                 
-                <section className="avoid-break">
+                 <section className="grid md:grid-cols-2 gap-6 avoid-break">
                      <Card className="bg-white shadow-none border border-gray-300">
                         <CardHeader><CardTitle className="text-lg text-gray-800">🎯 ملخص تقييم المهارات</CardTitle></CardHeader>
                         <CardContent>
@@ -72,11 +72,9 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                             </table>
                         </CardContent>
                     </Card>
-                </section>
 
-                <section className="avoid-break">
                     <Card className="bg-white shadow-none border border-gray-300">
-                        <CardHeader><CardTitle className="text-lg text-gray-800">{`📊 إحصائيات ${reportData.reportTitle}`}</CardTitle></CardHeader>
+                        <CardHeader><CardTitle className="text-lg text-gray-800">{`📊 إحصائيات الحضور`}</CardTitle></CardHeader>
                         <CardContent>
                             <table className="w-full text-sm text-center border-collapse border border-gray-300">
                                 <thead>
@@ -92,7 +90,7 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                                 </tbody>
                                 <tfoot>
                                     <tr className="border-t border-gray-300 font-bold bg-gray-100">
-                                        <td className="p-2 border border-gray-300">إجمالي الحصص الدراسية</td>
+                                        <td className="p-2 border border-gray-300">إجمالي الحصص</td>
                                         <td className="border border-gray-300">{reportData.totalSessionsHeld} حصة</td>
                                     </tr>
                                 </tfoot>
@@ -100,7 +98,7 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                         </CardContent>
                     </Card>
                 </section>
-                
+
                 <section className="avoid-break">
                     <Card className="bg-white shadow-none border border-gray-300">
                         <CardHeader><CardTitle className="text-lg text-gray-800">⚖️ ميزان الالتزام</CardTitle></CardHeader>
