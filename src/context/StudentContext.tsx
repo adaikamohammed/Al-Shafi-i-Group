@@ -8,7 +8,7 @@ import { isWithinInterval, parseISO, isValid } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { db, storage } from '@/lib/firebase';
-import { ref, set, onValue, off, remove, DatabaseReference, update } from 'firebase/database';
+import { ref, set, onValue, off, remove, DatabaseReference, update, get } from 'firebase/database';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
 
@@ -518,34 +518,29 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
   
   const saveDailyReport = async (reportData: Partial<DailyReport>, reportIdToUpdate?: string) => {
     const reportId = reportIdToUpdate || Date.now().toString();
-    const date = reportData.date || new Date().toISOString().split('T')[0];
+    const date = reportData.date || (reportIdToUpdate ? Object.values(dailyReports).flat().find(r => r.id === reportIdToUpdate)?.date : null) || new Date().toISOString().split('T')[0];
     const authorId = reportData.authorId || authContextUser?.uid;
     
     if (!authorId) throw new Error("User not authenticated");
 
-    let existingReport: DailyReport | undefined;
-    if(reportIdToUpdate){
-        const dailyReportsForDate = dailyReports[date] || {};
-        existingReport = dailyReportsForDate[reportIdToUpdate];
-    }
+    const reportRef = ref(db, `users/${authorId}/dailyReports/${date}/${reportId}`);
+    const snapshot = await get(reportRef);
+    const existingReport = snapshot.val();
     
     const fullReportData: DailyReport = {
         id: reportId,
         date: date,
         authorId: authorId,
-        note: reportData.note || existingReport?.note || '',
-        timestamp: reportData.timestamp || existingReport?.timestamp || new Date().toISOString(),
         authorName: reportData.authorName || existingReport?.authorName || 'Unknown',
         category: reportData.category || existingReport?.category || 'ملاحظة عامة',
+        note: reportData.note || existingReport?.note || '',
+        timestamp: reportData.timestamp || existingReport?.timestamp || new Date().toISOString(),
         status: reportData.status || existingReport?.status || 'pending',
         isPinned: reportData.isPinned ?? existingReport?.isPinned ?? false,
-        adminNotes: reportData.adminNotes || existingReport?.adminNotes,
+        adminNotes: reportData.adminNotes === undefined ? existingReport?.adminNotes : reportData.adminNotes,
     };
     
-    const dbRef = ref(db);
-    await update(dbRef, {
-        [`/users/${authorId}/dailyReports/${date}/${reportId}`]: fullReportData
-    });
+    await set(reportRef, fullReportData);
   }
 
   const deleteDailyReport = async (reportId: string, date: string) => {
@@ -633,7 +628,3 @@ export const useStudentContext = () => {
   }
   return context;
 };
-
-    
-
-    
