@@ -40,7 +40,7 @@ export default function OverviewPage() {
         const sessionsToday = dailySessions?.[todayStr] ? Object.values(dailySessions[todayStr]) : [];
         let attendancePercentage = 0;
         if (sessionsToday.length > 0) {
-            const allRecords = sessionsToday.flatMap(s => s.records ?? []);
+            const allRecords = sessionsToday.flatMap(s => (s.records ?? []).filter(r => activeStudents.some(as => as.id === r.studentId)));
             if (allRecords.length > 0) {
                 const presentCount = allRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
                 attendancePercentage = (presentCount / allRecords.length) * 100;
@@ -163,7 +163,7 @@ export default function OverviewPage() {
              <SmartAlerts students={activeStudents} sessions={dailySessions} />
 
              <GroupEvaluationCard 
-                students={students ?? []} 
+                students={activeStudents} 
                 sessions={dailySessions} 
                 reports={Object.values(dailyReports).flatMap(day => Object.values(day))}
                 groupName={isSuperAdmin ? "كل الأفواج" : user?.group} 

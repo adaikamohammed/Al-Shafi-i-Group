@@ -10,11 +10,12 @@ import { format, startOfWeek, endOfWeek, subDays, parseISO, isValid } from 'date
 export const SmartAlerts = ({ students, sessions }: { students: Student[], sessions: Record<string, Record<string, DailySession>> }) => {
     const today = new Date();
     const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 6 }); // Saturday
-    const endOfCurrentWeek = endOfWeek(today, { weekStartsOn: 6 }); // Friday
+    const endOfCurrentWeek = endOfWeek(today, { weekStartsOn: 6 });
+    const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
 
     const weeklyAttendance = useMemo(() => {
         const attendanceMap: Record<string, number> = {};
-        (students ?? []).forEach(s => attendanceMap[s.id] = 0);
+        (activeStudents ?? []).forEach(s => attendanceMap[s.id] = 0);
 
         Object.values(sessions ?? {}).flatMap(day => Object.values(day)).forEach(session => {
             if (!session || !session.date) return; // Defensive check
@@ -35,11 +36,11 @@ export const SmartAlerts = ({ students, sessions }: { students: Student[], sessi
             .sort((a, b) => b.count - a.count)
             .slice(0, 3)
             .map(item => {
-                const student = students.find(s => s.id === item.studentId);
+                const student = activeStudents.find(s => s.id === item.studentId);
                 return { ...item, name: student?.fullName || 'طالب غير معروف' };
             });
 
-    }, [students, sessions, startOfCurrentWeek, endOfCurrentWeek]);
+    }, [activeStudents, sessions, startOfCurrentWeek, endOfCurrentWeek]);
 
     const consecutiveAbsences = useMemo(() => {
         const absenceMap: Record<string, number> = {};
@@ -77,9 +78,9 @@ export const SmartAlerts = ({ students, sessions }: { students: Student[], sessi
         
         return Object.entries(absenceMap)
             .filter(([, count]) => count >= 3)
-            .map(([studentId]) => students.find(s => s.id === studentId)?.fullName)
+            .map(([studentId]) => activeStudents.find(s => s.id === studentId)?.fullName)
             .filter(Boolean);
-    }, [students, sessions]);
+    }, [activeStudents, sessions]);
 
     const isEndOfMonth = today.getDate() > 20;
 

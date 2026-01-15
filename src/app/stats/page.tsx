@@ -193,7 +193,7 @@ export default function WeeklyFollowUpPage() {
         );
     }
     
-     if ((students ?? []).filter(s => s.status === 'نشط').length === 0 && !loading) {
+     if (activeStudents.length === 0 && !loading) {
         return (
             <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
                 <AlertTriangle className="h-16 w-16 text-yellow-400" />

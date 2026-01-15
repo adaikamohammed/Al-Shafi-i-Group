@@ -338,7 +338,7 @@ export default function StudentManagementPage() {
         );
 
         const studentScores: any = {};
-        (students ?? []).forEach(student => {
+        (students ?? []).filter(s => s.status === 'نشط').forEach(student => {
              studentScores[student.id] = {
                 id: student.id,
                 points: 0,
@@ -438,15 +438,17 @@ export default function StudentManagementPage() {
     }
 
   const filteredStudents = useMemo(() => {
-    const statusOrder: { [key in StudentStatus]: number } = { "نشط": 1, "مطرود": 2, "محذوف": 4 };
-    
     let sortableStudents = isSuperAdmin ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
         
     sortableStudents = sortableStudents.filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
 
     if (statusFilter !== 'all') {
         sortableStudents = sortableStudents.filter(s => s.status === statusFilter);
+    } else {
+        // Default to showing only active students if filter is "all"
+        sortableStudents = sortableStudents.filter(s => s.status === 'نشط');
     }
+    
     if (levelFilter.length > 0) {
         sortableStudents = sortableStudents.filter(s => s.educationalLevel && levelFilter.includes(s.educationalLevel));
     }
@@ -461,9 +463,7 @@ export default function StudentManagementPage() {
              else if (!isNaN(pageNumB)) { comparison = 1; }
              return sortConfig.direction === 'ascending' ? comparison : -comparison;
         }
-        if (a.status !== b.status) {
-            return statusOrder[a.status] - statusOrder[b.status];
-        }
+        
         const valA = a[sortConfig.key as keyof Student];
         const valB = b[sortConfig.key as keyof Student];
 
@@ -483,6 +483,10 @@ export default function StudentManagementPage() {
 
   }, [students, searchTerm, statusFilter, levelFilter, user, isSuperAdmin, sortConfig]);
   
+  const allStudents = useMemo(() => isSuperAdmin ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid), [students, user, isSuperAdmin]);
+  const activeStudentCount = useMemo(() => allStudents.filter(s => s.status === 'نشط').length, [allStudents]);
+
+  
   const getActiveCovenant = (student: Student): Covenant | null => {
       if (!student.covenants || student.covenants.length === 0) return null;
       return student.covenants.find(c => c.status === 'نشط') || null;
@@ -496,7 +500,7 @@ export default function StudentManagementPage() {
     );
   }
   
-   if ((students ?? []).length === 0 && !loading) {
+   if (allStudents.length === 0 && !loading) {
       return (
         <div className="flex flex-col items-center justify-center h-full">
             <h1 className="text-2xl font-bold mb-4">لا يوجد طلاب بعد</h1>
@@ -580,9 +584,8 @@ export default function StudentManagementPage() {
                     <SelectValue placeholder="الحالة" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">كل الحالات</SelectItem>
-                    <SelectItem value="نشط">نشط</SelectItem>
-                    <SelectItem value="مطرود">مطرود</SelectItem>
+                    <SelectItem value="all">الطلاب النشطون</SelectItem>
+                    <SelectItem value="مطرود">الطلاب المطرودون</SelectItem>
                 </SelectContent>
             </Select>
          </div>
@@ -617,7 +620,7 @@ export default function StudentManagementPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>قائمة الطلبة ({filteredStudents.length})</CardTitle>
+          <CardTitle>قائمة الطلبة ({statusFilter === 'all' ? activeStudentCount : filteredStudents.length})</CardTitle>
           <CardDescription>{isSuperAdmin ? 'عرض شامل لجميع الطلبة في كل الأفواج' : (user?.group || 'فوج غير محدد')}</CardDescription>
         </CardHeader>
         <CardContent>
@@ -852,7 +855,7 @@ function ExpulsionDialog({ student, open, onOpenChange, onConfirm }: { student: 
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
-                    <Button variant="destructive" onClick={() => onConfirm(reason, notes)}>تأكيد الطرد</Button>
+                    <Button variant="destructive" onClick={() => {onConfirm(reason, notes); onOpenChange(false);}}>تأكيد الطرد</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -867,6 +870,10 @@ function StudentActions({ student, onStatusChange, onEdit, isSuperAdmin }: { stu
     const fullReason = `${reason}: ${notes}`;
     onStatusChange(student, 'مطرود', fullReason);
     setExpelDialogOpen(false);
+  };
+
+  const handleReactivate = () => {
+    onStatusChange(student, 'نشط', student.actionReason);
   };
 
   return (
@@ -887,30 +894,39 @@ function StudentActions({ student, onStatusChange, onEdit, isSuperAdmin }: { stu
 
         {!isSuperAdmin && (
             <>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
-                  <Trash2 className="ml-2 h-4 w-4" />
-                  حذف
+            {student.status === 'نشط' ? (
+                <>
+                    <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
+                        <Trash2 className="ml-2 h-4 w-4" />
+                        حذف
+                        </DropdownMenuItem>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد من حذف الطالب {student.fullName}؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            سيؤدي هذا إلى حذف بيانات الطالب نهائيًا. هذا الإجراء لا يمكن التراجع عنه.
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onStatusChange(student, 'محذوف')}>تأكيد الحذف</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                    </AlertDialog>
+                    <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => {e.preventDefault(); setExpelDialogOpen(true)}}>
+                        <UserX className="ml-2 h-4 w-4" />
+                        طرد
+                    </DropdownMenuItem>
+                </>
+            ) : (
+                <DropdownMenuItem onSelect={handleReactivate}>
+                    <UserX className="ml-2 h-4 w-4" />
+                    إعادة تفعيل
                 </DropdownMenuItem>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>هل أنت متأكد من حذف الطالب {student.fullName}؟</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    سيؤدي هذا إلى حذف بيانات الطالب نهائيًا. هذا الإجراء لا يمكن التراجع عنه.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onStatusChange(student, 'محذوف')}>تأكيد الحذف</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => {e.preventDefault(); setExpelDialogOpen(true)}}>
-                <UserX className="ml-2 h-4 w-4" />
-                طرد
-            </DropdownMenuItem>
+            )}
             </>
         )}
       </DropdownMenuContent>
@@ -1299,4 +1315,3 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
     </form>
   );
 }
-

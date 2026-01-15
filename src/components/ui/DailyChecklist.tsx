@@ -5,7 +5,7 @@ import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useStudentContext } from '@/context/StudentContext';
-import { format, subDays, startOfMonth, parseISO, getDate, getMonth, getYear, getDay, startOfWeek } from 'date-fns';
+import { format, subDays, startOfMonth, parseISO, getDate, getMonth, getYear, getDay, startOfWeek, getQuarter } from 'date-fns';
 import { ClipboardCheck, DollarSign, ArrowRight, PartyPopper, AlertTriangle, BookOpenCheck } from 'lucide-react';
 import Link from 'next/link';
 
@@ -19,6 +19,7 @@ interface Task {
 
 export function DailyChecklist() {
     const { dailySessions, students, payments } = useStudentContext();
+    const activeStudents = useMemo(() => (students || []).filter(s => s.status === 'نشط'), [students]);
 
     const tasks = useMemo(() => {
         const incompleteTasks: Task[] = [];
@@ -38,9 +39,9 @@ export function DailyChecklist() {
         }
         
         // Task 2: Memorization Evaluation
-        const todaysSession = dailySessions[todayStr];
+        const todaysSession = dailySessions[todayStr] ? Object.values(dailySessions[todayStr])[0] : undefined;
         if(todaysSession && todaysSession.sessionType === 'حصة أساسية') {
-            const unevaluatedCount = todaysSession.records.filter(r => r.attendance === 'حاضر' && !r.memorization).length;
+            const unevaluatedCount = (todaysSession.records ?? []).filter(r => r.attendance === 'حاضر' && !r.memorization).length;
             if (unevaluatedCount > 0) {
                  incompleteTasks.push({
                     id: 'evaluation',
@@ -55,24 +56,24 @@ export function DailyChecklist() {
         // Task 3: Financial Dues
         const isBeginningOfMonth = getDate(today) <= 5;
         if (isBeginningOfMonth) {
-            const currentQuarter = Math.floor(getMonth(today) / 3) + 1;
+            const currentQuarter = getQuarter(today);
             const currentYear = getYear(today);
             
-            const activeStudents = (students ?? []).filter(s => s.status === 'نشط' && getYear(s.registrationDate) <= currentYear);
+            const studentsWithDues = activeStudents.filter(s => {
+                const regYear = getYear(s.registrationDate);
+                const regQuarter = getQuarter(s.registrationDate);
+                return regYear < currentYear || (regYear === currentYear && regQuarter <= currentQuarter);
+            });
+
             const studentPaymentsThisQuarter = new Set(
                 (payments ?? [])
                     .filter(p => {
                         const paymentDate = parseISO(p.date);
-                        return getYear(paymentDate) === currentYear && Math.floor(getMonth(paymentDate) / 3) + 1 === currentQuarter;
+                        return getYear(paymentDate) === currentYear && getQuarter(paymentDate) === currentQuarter;
                     })
                     .map(p => p.studentId)
             );
-            const unpaidCount = activeStudents.filter(s => {
-                const regQuarter = getQuarter(s.registrationDate);
-                const regYear = getYear(s.registrationDate);
-                const isDue = regYear < currentYear || (regYear === currentYear && regQuarter <= currentQuarter);
-                return isDue && !studentPaymentsThisQuarter.has(s.id);
-            }).length;
+            const unpaidCount = studentsWithDues.filter(s => !studentPaymentsThisQuarter.has(s.id)).length;
 
             if (unpaidCount > 0) {
                  incompleteTasks.push({
@@ -89,10 +90,10 @@ export function DailyChecklist() {
         const isThursday = getDay(today) === 4;
         if (isThursday) {
             const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 6 });
-            const weeklySessions = Object.values(dailySessions).filter(s => parseISO(s.date) >= startOfCurrentWeek);
+            const weeklySessions = Object.values(dailySessions).flatMap(d => Object.values(d)).filter(s => parseISO(s.date) >= startOfCurrentWeek);
             let lowPerformingStudents = 0;
             const studentStats: {[key: string]: {absent: number, undisciplined: number}} = {};
-            (students ?? []).forEach(s => studentStats[s.id] = {absent: 0, undisciplined: 0});
+            activeStudents.forEach(s => studentStats[s.id] = {absent: 0, undisciplined: 0});
 
             weeklySessions.forEach(session => {
                 (session.records ?? []).forEach(record => {
@@ -121,7 +122,7 @@ export function DailyChecklist() {
         }
         
         return incompleteTasks;
-    }, [dailySessions, students, payments]);
+    }, [dailySessions, activeStudents, payments]);
 
     if (tasks.length === 0) {
         return (

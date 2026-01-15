@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -20,13 +21,12 @@ const POSITIVE_REPORT_CATEGORIES = ["شكر", "اقتراح"];
 const NEGATIVE_REPORT_CATEGORIES = ["شكوى"];
 
 const calculateSentimentForWeek = (
-    students: Student[], 
+    activeStudents: Student[], 
     sessions: Record<string, Record<string, DailySession>>, 
     reports: DailyReport[], 
     weekStartDate: Date, 
     weekEndDate: Date
 ) => {
-    const activeStudents = (students ?? []).filter(s => s.status === 'نشط');
     if (activeStudents.length === 0) return { score: 0, attendanceRate: 0, badBehaviorCount: 0 };
     
     const weeklySessions = Object.values(sessions).flatMap(s => Object.values(s)).filter(s => {
@@ -69,13 +69,14 @@ const calculateSentimentForWeek = (
 
 
 export function GroupEvaluationCard({ students, sessions, reports, groupName }: GroupEvaluationCardProps) {
+    const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
 
     const weeklySentiments = useMemo(() => {
         const data = Array.from({ length: 4 }).map((_, i) => {
             const weekEndDate = endOfWeek(subWeeks(new Date(), i), { weekStartsOn: 6 });
             const weekStartDate = startOfWeek(weekEndDate, { weekStartsOn: 6 });
             
-            const { score } = calculateSentimentForWeek(students, sessions, reports, weekStartDate, weekEndDate);
+            const { score } = calculateSentimentForWeek(activeStudents, sessions, reports, weekStartDate, weekEndDate);
             
             return {
                 name: format(weekStartDate, 'dd/MM', { locale: ar }),
@@ -83,21 +84,21 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
             };
         }).reverse();
         return data;
-    }, [students, sessions, reports]);
+    }, [activeStudents, sessions, reports]);
 
     const currentSentimentData = useMemo(() => {
         const today = new Date();
         const weekStartDate = startOfWeek(today, { weekStartsOn: 6 });
         const weekEndDate = endOfWeek(today, { weekStartsOn: 6 });
 
-        const { score, attendanceRate, badBehaviorCount } = calculateSentimentForWeek(students, sessions, reports, weekStartDate, weekEndDate);
+        const { score, attendanceRate, badBehaviorCount } = calculateSentimentForWeek(activeStudents, sessions, reports, weekStartDate, weekEndDate);
 
         return {
             sentimentIndex: score,
             attendanceRate,
             badBehaviorCount
         };
-    }, [students, sessions, reports]);
+    }, [activeStudents, sessions, reports]);
 
     const evaluateGroupPerformance = (sentimentIndex: number, attendanceRate: number, badBehaviorCount: number) => {
         let rating: string;
@@ -149,7 +150,7 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
         }
     }
     
-    if (Object.keys(sessions).length === 0) {
+    if (Object.keys(sessions).length === 0 || activeStudents.length === 0) {
         return (
             <Card className="md:col-span-2 lg:col-span-4">
                  <CardHeader>
@@ -161,7 +162,7 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
                 <CardContent className="flex flex-col items-center justify-center text-center p-8">
                      <AlertTriangle className="h-12 w-12 text-yellow-500 mb-2"/>
                     <p className="font-bold">لا توجد بيانات كافية</p>
-                    <p className="text-sm text-muted-foreground">لا يمكن حساب التقييم بدون سجلات حضور.</p>
+                    <p className="text-sm text-muted-foreground">لا يمكن حساب التقييم بدون طلاب نشطين أو سجلات حضور.</p>
                 </CardContent>
             </Card>
         );
