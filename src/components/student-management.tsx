@@ -436,8 +436,8 @@ export default function StudentManagementPage() {
         }
         const reactivationData: Partial<Student> = { 
             status: 'نشط',
-            expulsionDate: undefined,
-            expulsionReason: undefined,
+            expulsionDate: null,
+            expulsionReason: null,
             expulsionHistory: newHistory
         };
         updateStudent(student.id, reactivationData, student.ownerId);
@@ -1383,4 +1383,5 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
     </form>
   );
 }
+
 

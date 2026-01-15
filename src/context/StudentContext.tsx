@@ -408,7 +408,6 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
     
     const { photoFile, ...restOfUpdatedData } = updatedData;
 
-    const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
     const finalData = { ...originalStudent, ...restOfUpdatedData, photoURL: finalPhotoURL, updatedAt: new Date() };
 
     const covenantsObject = (finalData.covenants || []).reduce((acc, cov) => {
@@ -416,6 +415,14 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
       return acc;
     }, {} as Record<string, Covenant>);
 
+    // Clean up undefined values before sending to Firebase
+    Object.keys(finalData).forEach(key => {
+        if (finalData[key as keyof typeof finalData] === undefined) {
+            (finalData as any)[key] = null;
+        }
+    });
+
+    const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
     set(studentRef, {
         ...finalData,
         birthDate: finalData.birthDate ? finalData.birthDate.toISOString() : null,
