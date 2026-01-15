@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useStudentContext } from '@/context/StudentContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, User, KeyRound, Edit, Save, Users, CheckCircle, BookCopy, BookHeart, Lock } from 'lucide-react';
+import { Loader2, User, KeyRound, Edit, Save, Users, CheckCircle, BookCopy, BookHeart, Lock, UserX, CalendarX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, parseISO, isWithinInterval } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 
 export default function ProfilePage() {
@@ -49,20 +49,20 @@ export default function ProfilePage() {
 
     const performanceStats = useMemo(() => {
         if (!user || !students || !dailySessions) {
-            return { studentCount: 0, attendanceRate: 0, khatmeenCount: 0, totalMasteredSurahs: 0 };
+            return { studentCount: 0, attendanceRate: 0, khatmeenCount: 0, totalMasteredSurahs: 0, expelledStudentsCount: 0, sheikhAbsenceDays: 0 };
         }
         
         const groupName = isSuperAdmin ? undefined : user.group;
 
-        const groupStudents = students.filter(s => {
-            if (s.status !== 'نشط') return false;
-            return groupName ? s.groupName === groupName : true;
-        });
-        
-        const studentCount = groupStudents.length;
+        const groupStudents = students.filter(s => groupName ? s.groupName === groupName : true);
+
+        const activeStudents = groupStudents.filter(s => s.status === 'نشط');
+        const expelledStudentsCount = groupStudents.filter(s => s.status === 'مطرود').length;
+
+        const studentCount = activeStudents.length;
 
         let totalMasteredSurahs = 0;
-        const khatmeenCount = groupStudents.filter(student => {
+        const khatmeenCount = activeStudents.filter(student => {
              const studentProgress = surahProgress ? (surahProgress[student.id] || {}) : {};
              const masteredCount = Object.values(studentProgress).filter(status => status === 2).length;
              totalMasteredSurahs += masteredCount;
@@ -74,18 +74,34 @@ export default function ProfilePage() {
 
         const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(day => Object.values(day)).filter(session => {
             if(!session.date) return false;
-            const sessionDate = parseISO(session.date);
-            return sessionDate >= currentMonthStart && sessionDate <= currentMonthEnd;
+            try {
+                const sessionDate = parseISO(session.date);
+                return isWithinInterval(sessionDate, { start: currentMonthStart, end: currentMonthEnd });
+            } catch (e) {
+                return false;
+            }
         });
+        
+        let sheikhAbsenceDays = 0;
+        const uniqueAbsenceDates = new Set();
+        sessionsInMonth.forEach(session => {
+            if (session.sessionType === 'غياب الشيخ') {
+                if(!uniqueAbsenceDates.has(session.date)) {
+                    sheikhAbsenceDays++;
+                    uniqueAbsenceDates.add(session.date);
+                }
+            }
+        });
+
 
         let totalPresent = 0;
         let totalHeld = 0;
         
         const scheduledSessions = sessionsInMonth.filter(s => s.sessionType === 'حصة أساسية' || s.sessionType === 'حصة تعويضية' || (s.sessionType === 'غياب الشيخ' && s.substituteTeacher));
         
-        totalHeld = groupStudents.length * scheduledSessions.length;
+        totalHeld = activeStudents.length * scheduledSessions.length;
 
-        groupStudents.forEach(student => {
+        activeStudents.forEach(student => {
             scheduledSessions.forEach(session => {
                 const record = (session.records ?? []).find(r => r.studentId === student.id);
                 if (record && (record.attendance === 'حاضر' || record.attendance === 'متأخر')) {
@@ -96,7 +112,7 @@ export default function ProfilePage() {
         
         const attendanceRate = totalHeld > 0 ? (totalPresent / totalHeld) * 100 : 0;
 
-        return { studentCount, attendanceRate, khatmeenCount, totalMasteredSurahs };
+        return { studentCount, attendanceRate, khatmeenCount, totalMasteredSurahs, expelledStudentsCount, sheikhAbsenceDays };
 
     }, [user, students, dailySessions, isSuperAdmin, surahProgress]);
 
@@ -240,7 +256,7 @@ export default function ProfilePage() {
                     <CardTitle>بطاقات إحصائية سريعة</CardTitle>
                     <CardDescription>نظرة عامة على أداء فوجك هذا الشهر.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="flex items-center p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
                         <Users className="h-8 w-8 text-blue-500 mr-4" />
                         <div>
@@ -267,6 +283,20 @@ export default function ProfilePage() {
                         <div>
                             <p className="text-sm text-yellow-700 dark:text-yellow-200">إجمالي السور المتقنة</p>
                             <p className="text-2xl font-bold">{performanceStats.totalMasteredSurahs}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center p-4 bg-orange-50 dark:bg-orange-900/30 rounded-lg">
+                        <UserX className="h-8 w-8 text-orange-500 mr-4" />
+                        <div>
+                            <p className="text-sm text-orange-700 dark:text-orange-200">الطلبة المطرودون</p>
+                            <p className="text-2xl font-bold">{performanceStats.expelledStudentsCount}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center p-4 bg-gray-100 dark:bg-gray-700/30 rounded-lg">
+                        <CalendarX className="h-8 w-8 text-gray-500 mr-4" />
+                        <div>
+                            <p className="text-sm text-gray-700 dark:text-gray-200">أيام غياب الشيخ (شهرياً)</p>
+                            <p className="text-2xl font-bold">{performanceStats.sheikhAbsenceDays}</p>
                         </div>
                     </div>
                 </CardContent>
@@ -420,5 +450,3 @@ export default function ProfilePage() {
         </div>
     )
 }
-
-    
