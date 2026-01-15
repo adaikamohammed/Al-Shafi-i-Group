@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
@@ -41,7 +41,13 @@ export default function MonthlyStatisticsPage() {
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     
-    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
+    const studentsToShow = useMemo(() => {
+        if (selectedStudentId === 'all') {
+            return (students ?? []);
+        }
+        return (students ?? []).filter(s => s.id === selectedStudentId);
+    }, [students, selectedStudentId]);
+
     const prices = settings?.prices?.renewal || { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 };
 
     const monthlyData = useMemo(() => {
@@ -101,7 +107,7 @@ export default function MonthlyStatisticsPage() {
         const applicableSessions = sessionsInMonth.filter(s => s.sessionType !== 'يوم عطلة' && !(s.sessionType === 'غياب الشيخ' && !s.substituteTeacher));
 
         let recordsSource = selectedStudentId === 'all' 
-            ? applicableSessions.flatMap(s => s.records ?? [])
+            ? applicableSessions.flatMap(s => s.records ?? []).filter(r => (studentsToShow.find(st => st.id === r.studentId) as Student)?.status === 'نشط')
             : applicableSessions.flatMap(s => (s.records ?? []).filter(r => r.studentId === selectedStudentId));
 
         const stats = {
@@ -161,7 +167,9 @@ export default function MonthlyStatisticsPage() {
             unpaidStudentsCount: 0,
         };
         
-        const studentsDueForQuarter = activeStudents.filter(s => {
+        const activeStudentsForFinance = (students ?? []).filter(s => s.status === 'نشط');
+
+        const studentsDueForQuarter = activeStudentsForFinance.filter(s => {
             const registrationYear = getYear(s.registrationDate);
             const registrationQuarter = getQuarter(s.registrationDate);
             return registrationYear < selectedYear || (registrationYear === selectedYear && registrationQuarter <= currentQuarter);
@@ -197,14 +205,14 @@ export default function MonthlyStatisticsPage() {
 
         financialStats.unpaidStudentsCount = unpaidStudents.length;
 
-        const activeCovenantsCount = activeStudents.reduce((count, student) => {
+        const activeCovenantsCount = activeStudentsForFinance.reduce((count, student) => {
             const hasActiveCovenant = (student.covenants || []).some(c => c.status === 'نشط');
             return hasActiveCovenant ? count + 1 : count;
         }, 0);
 
         return { ...stats, daysPassed, recordedDaysCount: recordedDays.size, unrecordedPastDays: unrecordedDaysInPast, studentSpecificRecords, financialStats, activeCovenantsCount };
 
-    }, [dailySessions, dailyReports, payments, settings, selectedMonth, selectedYear, selectedStudentId, students, prices]);
+    }, [dailySessions, dailyReports, payments, settings, selectedMonth, selectedYear, selectedStudentId, students, prices, studentsToShow]);
     
     
      const renderStudentCalendar = () => {
@@ -303,13 +311,13 @@ export default function MonthlyStatisticsPage() {
         );
     }
     
-     if ((students ?? []).filter(s => s.status === 'نشط').length === 0 && !loading) {
+     if ((students ?? []).length === 0 && !loading) {
         return (
             <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
                 <AlertTriangle className="h-16 w-16 text-yellow-400" />
                 <h1 className="text-3xl font-headline font-bold text-center">لا توجد بيانات لعرضها</h1>
                 <p className="text-muted-foreground text-center">
-                    يرجى إضافة طلبة نشطين أولاً من صفحة "إدارة الطلبة".
+                    يرجى إضافة طلبة أولاً من صفحة "إدارة الطلبة".
                 </p>
             </div>
         );
@@ -328,8 +336,8 @@ export default function MonthlyStatisticsPage() {
                             <SelectValue placeholder="اختر طالبًا" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">كل الطلبة النشطين</SelectItem>
-                            {activeStudents.map(student => (
+                            <SelectItem value="all">كل الطلبة</SelectItem>
+                            {students.map(student => (
                                 <SelectItem key={student.id} value={student.id}>
                                     {student.fullName}
                                 </SelectItem>
@@ -413,7 +421,7 @@ export default function MonthlyStatisticsPage() {
 
                  {selectedStudentId === 'all' ? (
                     <GroupEvaluationCard
-                        students={students ?? []}
+                        students={studentsToShow}
                         sessions={dailySessions}
                         reports={monthlyData.reports}
                         groupName={user?.group}
@@ -563,3 +571,4 @@ export default function MonthlyStatisticsPage() {
 }
 
     
+

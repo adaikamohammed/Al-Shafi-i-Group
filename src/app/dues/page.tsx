@@ -12,15 +12,22 @@ import { Input } from '@/components/ui/input';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle, Undo2, Download, Search, FileX, PlusCircle, MinusCircle, MoreHorizontal } from 'lucide-react';
-import { format, parseISO, getYear, getQuarter } from 'date-fns';
+import { format, parseISO, getYear, getQuarter, formatDistanceToNowStrict } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import type { Payment, PaymentStatus } from '@/lib/types';
+import type { Payment, PaymentStatus, Student } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 
 type QuarterStatusFilter = 'all' | 'paid' | 'unpaid' | 'exempted';
+
+const statusVariant: { [key in 'نشط' | 'مطرود']: "default" | "destructive" } = {
+  "نشط": "default",
+  "مطرود": "destructive",
+};
+
 
 export default function DuesPage() {
     const { students, payments, addPayment, updatePaymentStatus, loading, settings } = useStudentContext();
@@ -37,7 +44,7 @@ export default function DuesPage() {
 
     const studentsWithDues = useMemo(() => {
         return (students ?? [])
-            .filter(s => s.status === 'نشط' && getYear(s.registrationDate) <= currentYear)
+            .filter(s => getYear(s.registrationDate) <= currentYear) // Include all students regardless of status initially
             .map(student => {
                 const studentPayments = (payments ?? [])
                     .filter(p => p.studentId === student.id && getYear(parseISO(p.date)) === currentYear);
@@ -64,7 +71,7 @@ export default function DuesPage() {
                 };
             });
 
-    }, [students, payments, settings, currentYear, prices]);
+    }, [students, payments, currentYear]);
     
      const filteredStudents = useMemo(() => {
         return studentsWithDues.filter(student => {
@@ -85,7 +92,8 @@ export default function DuesPage() {
     const totalsByQuarter = useMemo(() => {
         const quarterTotals: Record<number, { revenue: number, paidCount: number, exemptedCount: number }> = { 1: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 2: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 3: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 4: { revenue: 0, paidCount: 0, exemptedCount: 0 }};
 
-        filteredStudents.forEach(student => {
+        // Only include active students in financial calculations
+        filteredStudents.filter(s => s.status === 'نشط').forEach(student => {
             for (let q = 1; q <= 4; q++) {
                 const payment = student.paymentStatus[q];
                 if (payment?.status === 'paid') {
@@ -106,12 +114,13 @@ export default function DuesPage() {
         return quarterTotals;
     }, [filteredStudents, registrationFees, prices]);
 
+
     const totalRevenue = useMemo(() => {
         return Object.values(totalsByQuarter).reduce((sum, q) => sum + q.revenue, 0);
     }, [totalsByQuarter]);
 
 
-    const handlePaymentAction = async (student: typeof studentsWithDues[0], quarter: number, status: PaymentStatus) => {
+    const handlePaymentAction = async (student: Student, quarter: number, status: PaymentStatus) => {
         if (isSuperAdmin) return;
         
         const tier = student.subscriptionTier || 'فئة الأصاغر';
@@ -154,6 +163,7 @@ export default function DuesPage() {
     const handleExport = () => {
         const dataToExport = filteredStudents.map(s => ({
                 "اسم الطالب": s.fullName,
+                "الحالة": s.status,
                 "الفئة": s.subscriptionTier,
                 "فصل 1": s.paymentStatus[1]?.status || 'unpaid',
                 "فصل 2": s.paymentStatus[2]?.status || 'unpaid',
@@ -177,13 +187,13 @@ export default function DuesPage() {
         );
     }
     
-     if ((students ?? []).filter(s => s.status === 'نشط').length === 0) {
+     if ((students ?? []).length === 0) {
         return (
             <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
                 <AlertTriangle className="h-16 w-16 text-yellow-400" />
                 <h1 className="text-3xl font-headline font-bold text-center">لا يوجد طلبة لعرض مستحقاتهم</h1>
                 <p className="text-muted-foreground text-center">
-                    يرجى إضافة طلبة نشطين أولاً من صفحة "إدارة الطلبة".
+                    يرجى إضافة طلبة أولاً من صفحة "إدارة الطلبة".
                 </p>
             </div>
         );
@@ -259,6 +269,7 @@ export default function DuesPage() {
                             <TableRow>
                                 <TableHead className="w-1/4">اسم الطالب</TableHead>
                                 {isSuperAdmin && <TableHead>الفوج</TableHead>}
+                                <TableHead>الحالة</TableHead>
                                 <TableHead>الفئة</TableHead>
                                 {[1, 2, 3, 4].map(q => <TableHead key={q} className="text-center">{quarterNames[q.toString()]}</TableHead>)}
                                 <TableHead>الإجمالي السنوي</TableHead>
@@ -266,9 +277,15 @@ export default function DuesPage() {
                         </TableHeader>
                         <TableBody>
                             {filteredStudents.length > 0 ? filteredStudents.map(student => (
-                                <TableRow key={student.id}>
+                                <TableRow key={student.id} className={cn(student.status === 'مطرود' && 'opacity-50')}>
                                     <TableCell className="font-medium">{student.fullName}</TableCell>
                                     {isSuperAdmin && <TableCell><Badge variant="outline">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
+                                    <TableCell>
+                                         <Badge variant={statusVariant[student.status] || 'secondary'}>{student.status}</Badge>
+                                        {student.status === 'مطرود' && student.expulsionDate && 
+                                            <p className="text-xs text-muted-foreground">({formatDistanceToNowStrict(parseISO(student.expulsionDate), {locale: ar, addSuffix: true})})</p>
+                                        }
+                                    </TableCell>
                                     <TableCell>
                                         <Badge variant="secondary">{student.subscriptionTier || 'فئة الأصاغر'}</Badge>
                                     </TableCell>
@@ -279,7 +296,7 @@ export default function DuesPage() {
                                                 {payment?.status === 'paid' && (
                                                     <div className="flex items-center justify-center gap-2">
                                                         <CheckCircle className="h-5 w-5 text-green-500" />
-                                                        {!isSuperAdmin && (
+                                                        {!isSuperAdmin && student.status === 'نشط' && (
                                                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handlePaymentAction(student, q, 'unpaid')}>
                                                                 <Undo2 className="h-4 w-4 text-muted-foreground" />
                                                             </Button>
@@ -289,7 +306,7 @@ export default function DuesPage() {
                                                  {payment?.status === 'exempted' && (
                                                     <div className="flex items-center justify-center gap-2">
                                                         <FileX className="h-5 w-5 text-blue-500" />
-                                                         {!isSuperAdmin && (
+                                                         {!isSuperAdmin && student.status === 'نشط' && (
                                                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handlePaymentAction(student, q, 'unpaid')}>
                                                                 <Undo2 className="h-4 w-4 text-muted-foreground" />
                                                             </Button>
@@ -297,7 +314,7 @@ export default function DuesPage() {
                                                     </div>
                                                 )}
                                                 {payment?.status === 'unpaid' && (
-                                                    !isSuperAdmin ? (
+                                                    !isSuperAdmin && student.status === 'نشط' ? (
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
                                                                 <Button variant="outline" size="sm"><PlusCircle className="ml-1 h-4 w-4" /> إضافة</Button>
@@ -334,7 +351,7 @@ export default function DuesPage() {
                         </TableBody>
                          <TableFooter>
                             <TableRow className="bg-muted/30">
-                                <TableCell colSpan={isSuperAdmin ? 3 : 2} className="font-semibold">حقوق التسجيل الإجمالية للفصل</TableCell>
+                                <TableCell colSpan={isSuperAdmin ? 4 : 3} className="font-semibold">حقوق التسجيل الإجمالية للفصل</TableCell>
                                 {[1, 2, 3, 4].map(q => (
                                     <TableCell key={`reg-fee-${q}`} className="text-center p-1">
                                         <Input 
@@ -349,7 +366,7 @@ export default function DuesPage() {
                                 <TableCell></TableCell>
                             </TableRow>
                             <TableRow className="bg-amber-100 dark:bg-amber-800/20 font-bold text-base border-t-2 border-amber-300">
-                                <TableCell colSpan={isSuperAdmin ? 3 : 2}>الإجمالي النهائي للفصل</TableCell>
+                                <TableCell colSpan={isSuperAdmin ? 4 : 3}>الإجمالي النهائي للفصل</TableCell>
                                 {[1, 2, 3, 4].map(q => (
                                     <TableCell key={`total-footer-${q}`} className="text-center text-lg text-amber-800 dark:text-amber-200 transition-colors">
                                        {totalsByQuarter[q].revenue.toLocaleString()} د.ج
@@ -365,5 +382,3 @@ export default function DuesPage() {
         </div>
     );
 }
-
-    

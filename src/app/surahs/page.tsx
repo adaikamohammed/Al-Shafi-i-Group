@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -18,11 +19,11 @@ export default function SurahProgressPage() {
     const { students, surahProgress, toggleSurahStatus, loading } = useStudentContext();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
 
-    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
+    const studentsToShow = useMemo(() => (students ?? []), [students]);
 
     const selectedStudent = useMemo(() => {
-        return activeStudents.find(s => s.id === selectedStudentId);
-    }, [activeStudents, selectedStudentId]);
+        return studentsToShow.find(s => s.id === selectedStudentId);
+    }, [studentsToShow, selectedStudentId]);
 
     const studentProgress = useMemo(() => {
         if (!selectedStudentId || !surahProgress) return {};
@@ -45,7 +46,7 @@ export default function SurahProgressPage() {
     }, [progressCounts]);
     
     const leaderboard = useMemo(() => {
-        return activeStudents.map(student => {
+        return studentsToShow.map(student => {
              const progress = surahProgress ? (surahProgress[student.id] || {}) : {};
              const memorizedCount = Object.values(progress).filter(status => status === 1).length;
              const masteredCount = Object.values(progress).filter(status => status === 2).length;
@@ -58,7 +59,7 @@ export default function SurahProgressPage() {
                 masteredCount
             }
         }).sort((a,b) => b.masteryScore - a.masteryScore);
-    }, [activeStudents, surahProgress]);
+    }, [studentsToShow, surahProgress]);
 
 
     const handleSurahClick = (surahId: number) => {
@@ -67,10 +68,11 @@ export default function SurahProgressPage() {
     };
     
     React.useEffect(() => {
-        if(activeStudents.length > 0 && !selectedStudentId) {
-            setSelectedStudentId(activeStudents[0].id);
+        if(studentsToShow.length > 0 && !selectedStudentId) {
+            const firstActive = studentsToShow.find(s => s.status === 'نشط');
+            setSelectedStudentId(firstActive ? firstActive.id : studentsToShow[0].id);
         }
-    }, [activeStudents, selectedStudentId]);
+    }, [studentsToShow, selectedStudentId]);
 
 
     if (loading) {
@@ -81,13 +83,13 @@ export default function SurahProgressPage() {
         );
     }
 
-    if (activeStudents.length === 0) {
+    if (studentsToShow.length === 0) {
         return (
             <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
                 <AlertTriangle className="h-16 w-16 text-yellow-400" />
                 <h1 className="text-3xl font-headline font-bold text-center">لا يوجد طلبة لعرض بياناتهم</h1>
                 <p className="text-muted-foreground text-center">
-                    يرجى إضافة طلبة نشطين أولاً من صفحة "إدارة الطلبة".
+                    يرجى إضافة طلبة أولاً من صفحة "إدارة الطلبة".
                 </p>
             </div>
         );
@@ -112,7 +114,7 @@ export default function SurahProgressPage() {
                                         <SelectValue placeholder="اختر طالبًا..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {activeStudents.map(student => (
+                                        {studentsToShow.map(student => (
                                             <SelectItem key={student.id} value={student.id}>
                                                 {student.fullName}
                                             </SelectItem>
@@ -158,24 +160,27 @@ export default function SurahProgressPage() {
                                         <TableHead>الترتيب</TableHead>
                                         <TableHead>الطالب</TableHead>
                                         <TableHead>النقاط</TableHead>
+                                        <TableHead>الحالة</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                 {leaderboard.map((student, index) => {
                                      const rank = index + 1;
                                      let rankClass = "";
-                                     if (rank === 1) rankClass = "bg-yellow-100 dark:bg-yellow-900/50 hover:bg-yellow-100/80";
-                                     else if (rank === 2) rankClass = "bg-gray-200 dark:bg-gray-700/50 hover:bg-gray-200/80";
-                                     else if (rank === 3) rankClass = "bg-orange-100 dark:bg-orange-900/50 hover:bg-orange-100/80";
+                                     if (student.status === 'نشط') {
+                                         if (rank === 1) rankClass = "bg-yellow-100 dark:bg-yellow-900/50 hover:bg-yellow-100/80";
+                                         else if (rank === 2) rankClass = "bg-gray-200 dark:bg-gray-700/50 hover:bg-gray-200/80";
+                                         else if (rank === 3) rankClass = "bg-orange-100 dark:bg-orange-900/50 hover:bg-orange-100/80";
+                                     }
                                      
                                       const totalSurahs = student.memorizedCount + student.masteredCount;
                                       const memorizedPercent = (student.memorizedCount / allSurahs.length) * 100;
                                       const masteredPercent = (student.masteredCount / allSurahs.length) * 100;
 
                                     return (
-                                    <TableRow key={student.id} className={rankClass}>
+                                    <TableRow key={student.id} className={cn(rankClass, student.status === 'مطرود' && 'opacity-50')}>
                                         <TableCell className="font-bold text-lg">
-                                           {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}
+                                           {student.status === 'نشط' ? (rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank) : '-'}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex flex-col">
@@ -207,7 +212,10 @@ export default function SurahProgressPage() {
                                             </div>
                                         </TableCell>
                                         <TableCell className="font-bold">
-                                            {student.masteryScore}
+                                            {student.status === 'نشط' ? student.masteryScore : '-'}
+                                        </TableCell>
+                                        <TableCell>
+                                          <Badge variant={student.status === 'مطرود' ? 'destructive' : 'default'}>{student.status}</Badge>
                                         </TableCell>
                                     </TableRow>
                                 )})}
@@ -237,7 +245,7 @@ export default function SurahProgressPage() {
                                                 <Button
                                                     variant="outline"
                                                     onClick={() => handleSurahClick(surah.id)}
-                                                    disabled={!selectedStudentId}
+                                                    disabled={!selectedStudentId || selectedStudent?.status === 'مطرود'}
                                                     className={cn("h-auto justify-between transition-colors duration-300", buttonClass)}
                                                 >
                                                     <div className="flex items-center gap-2">

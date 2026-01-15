@@ -10,7 +10,7 @@ import { useStudentContext } from '@/context/StudentContext';
 import { Loader2, AlertTriangle, Medal, BookOpenCheck, ShieldCheck, UserCheck, CheckCircle, XCircle, Crown } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import type { Student, DailySession, BadgeConfig } from '@/lib/types';
+import type { Student, DailySession, BadgeConfig, StudentStatus } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,7 @@ interface StudentScore {
     id: string;
     name: string;
     photoURL?: string;
+    status: StudentStatus;
     points: number;
     pointsBreakdown: {
         hifz: number;
@@ -50,8 +51,6 @@ export default function RankingPage() {
     
     const pointsConfig = settings.points;
 
-    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
-
     const rankingData: StudentScore[] = useMemo(() => {
         if (!pointsConfig || !students) return [];
         
@@ -70,33 +69,24 @@ export default function RankingPage() {
 
         const studentScores: Record<string, StudentScore> = {};
 
-        activeStudents.forEach(student => {
+        // Initialize all students, active or not
+        (students ?? []).forEach(student => {
             studentScores[student.id] = {
                 id: student.id,
                 name: student.fullName,
                 photoURL: student.photoURL,
+                status: student.status,
                 points: 0,
                 pointsBreakdown: { hifz: 0, attendance: 0, behavior: 0 },
                 stats: { present: 0, absent: 0, late: 0, makeup: 0, excellent: 0, good: 0, average: 0, calm: 0, medium: 0, undisciplined: 0, reviewed: 0, commitmentBalance: 0 }
             };
-            
-            // Add bonus points for fulfilled covenants in the selected month
-            (student.covenants || []).forEach(covenant => {
-                if (covenant.status === 'تم الوفاء به') {
-                     try {
-                        const covenantDate = parseISO(covenant.date);
-                        if(getMonth(covenantDate) === selectedMonth && getYear(covenantDate) === selectedYear) {
-                           studentScores[student.id].pointsBreakdown.hifz += pointsConfig.covenantCompleted;
-                        }
-                     } catch(e) { console.error("Invalid covenant date", covenant.date); }
-                }
-            })
         });
 
+        // Only calculate points for active students
         sessionsInMonth.forEach(session => {
             (session.records ?? []).forEach(record => {
                 const studentId = record.studentId;
-                if (studentScores[studentId]) {
+                if (studentScores[studentId] && studentScores[studentId].status === 'نشط') {
                     if (record.attendance && pointsConfig.attendance) {
                         const attendancePoints = pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] ?? 0;
                         studentScores[studentId].pointsBreakdown.attendance += attendancePoints;
@@ -128,15 +118,27 @@ export default function RankingPage() {
         });
         
         Object.values(studentScores).forEach(score => {
-            score.stats.commitmentBalance = (score.stats.present + score.stats.makeup) - score.stats.absent;
-            score.points = score.pointsBreakdown.hifz + score.pointsBreakdown.attendance + score.pointsBreakdown.behavior;
+             if (score.status === 'نشط') {
+                (students.find(s => s.id === score.id)?.covenants || []).forEach(covenant => {
+                    if (covenant.status === 'تم الوفاء به') {
+                         try {
+                            const covenantDate = parseISO(covenant.date);
+                            if(getMonth(covenantDate) === selectedMonth && getYear(covenantDate) === selectedYear) {
+                               score.pointsBreakdown.hifz += pointsConfig.covenantCompleted;
+                            }
+                         } catch(e) { console.error("Invalid covenant date", covenant.date); }
+                    }
+                })
+                score.stats.commitmentBalance = (score.stats.present + score.stats.makeup) - score.stats.absent;
+                score.points = score.pointsBreakdown.hifz + score.pointsBreakdown.attendance + score.pointsBreakdown.behavior;
+            }
         });
 
         return Object.values(studentScores).sort((a, b) => b.points - a.points);
-    }, [activeStudents, dailySessions, selectedMonth, selectedYear, pointsConfig, students]);
+    }, [students, dailySessions, selectedMonth, selectedYear, pointsConfig]);
 
 
-    const topStudents = rankingData.slice(0, 3);
+    const topStudents = rankingData.filter(s => s.status === 'نشط').slice(0, 3);
     const masteryKingBadge = settings.badges.find(b => b.id === 'mastery_king');
 
     const getMedalStatus = (student: StudentScore, rank: number) => {
@@ -151,10 +153,11 @@ export default function RankingPage() {
     };
     
     const specialBadges = useMemo(() => {
-        if(rankingData.length === 0) return {};
-        const mostExcellent = rankingData.reduce((prev, current) => (prev.stats.excellent > current.stats.excellent) ? prev : current);
-        const mostCalm = rankingData.reduce((prev, current) => (prev.stats.calm > current.stats.calm) ? prev : current);
-        const mostReviewed = rankingData.reduce((prev, current) => (prev.stats.reviewed > current.stats.reviewed) ? prev : current);
+        const activeRankingData = rankingData.filter(s => s.status === 'نشط');
+        if(activeRankingData.length === 0) return {};
+        const mostExcellent = activeRankingData.reduce((prev, current) => (prev.stats.excellent > current.stats.excellent) ? prev : current);
+        const mostCalm = activeRankingData.reduce((prev, current) => (prev.stats.calm > current.stats.calm) ? prev : current);
+        const mostReviewed = activeRankingData.reduce((prev, current) => (prev.stats.reviewed > current.stats.reviewed) ? prev : current);
         return { mostExcellent, mostCalm, mostReviewed };
     }, [rankingData]);
 
@@ -166,13 +169,13 @@ export default function RankingPage() {
             </div>
         );
     }
-     if (activeStudents.length === 0) {
+     if ((students ?? []).length === 0) {
         return (
             <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
                 <AlertTriangle className="h-16 w-16 text-yellow-400" />
                 <h1 className="text-3xl font-headline font-bold text-center">لا يوجد طلبة لعرض ترتيبهم</h1>
                 <p className="text-muted-foreground text-center">
-                    يرجى إضافة طلبة نشطين أولاً من صفحة "إدارة الطلبة".
+                    يرجى إضافة طلبة أولاً من صفحة "إدارة الطلبة".
                 </p>
             </div>
         );
@@ -334,6 +337,7 @@ export default function RankingPage() {
                                     <TableRow>
                                         <TableHead>الترتيب</TableHead>
                                         <TableHead>الاسم</TableHead>
+                                        <TableHead>الحالة</TableHead>
                                         <TableHead className="text-center">حضور</TableHead>
                                         <TableHead className="text-center">غياب</TableHead>
                                         <TableHead className="text-center">ممتاز</TableHead>
@@ -353,11 +357,16 @@ export default function RankingPage() {
                                             bronze: 'bg-medal-bronze/30',
                                             none: ''
                                         }[medal];
+                                        
+                                        const isExpelled = student.status === 'مطرود';
 
                                         return (
-                                        <TableRow key={student.id} className={cn(medalClass)}>
-                                            <TableCell className="font-bold text-lg">{index + 1}</TableCell>
+                                        <TableRow key={student.id} className={cn(medalClass, isExpelled && 'opacity-50')}>
+                                            <TableCell className="font-bold text-lg">{isExpelled ? '-' : index + 1}</TableCell>
                                             <TableCell className="font-medium">{student.name}</TableCell>
+                                            <TableCell>
+                                                 <Badge variant={isExpelled ? 'destructive' : 'default'}>{student.status}</Badge>
+                                            </TableCell>
                                             <TableCell className="text-center">{student.stats.present}</TableCell>
                                             <TableCell className="text-center">{student.stats.absent}</TableCell>
                                             <TableCell className="text-center">{student.stats.excellent}</TableCell>
