@@ -518,26 +518,36 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
   
   const saveDailyReport = async (reportData: Partial<DailyReport>, reportIdToUpdate?: string) => {
     const reportId = reportIdToUpdate || Date.now().toString();
-    const date = reportData.date || (reportIdToUpdate ? Object.values(dailyReports).flat().find(r => r.id === reportIdToUpdate)?.date : null) || new Date().toISOString().split('T')[0];
-    const authorId = reportData.authorId || authContextUser?.uid;
+    // Try to find the existing report to get its date if not provided
+    const existingReport = reportIdToUpdate ? 
+        Object.values(dailyReports).flatMap(day => Object.values(day)).find(r => r.id === reportIdToUpdate) 
+        : undefined;
+
+    const date = reportData.date || existingReport?.date || new Date().toISOString().split('T')[0];
+    const authorId = reportData.authorId || existingReport?.authorId || authContextUser?.uid;
     
     if (!authorId) throw new Error("User not authenticated");
 
     const reportRef = ref(db, `users/${authorId}/dailyReports/${date}/${reportId}`);
-    const snapshot = await get(reportRef);
-    const existingReport = snapshot.val();
     
+    // Fetch the current state of the report from DB to merge, ensuring no data is lost
+    const snapshot = await get(reportRef);
+    const dbReport = snapshot.val();
+
     const fullReportData: DailyReport = {
+        // Defaults from DB or new data
         id: reportId,
         date: date,
         authorId: authorId,
-        authorName: reportData.authorName || existingReport?.authorName || 'Unknown',
-        category: reportData.category || existingReport?.category || 'ملاحظة عامة',
-        note: reportData.note || existingReport?.note || '',
-        timestamp: reportData.timestamp || existingReport?.timestamp || new Date().toISOString(),
-        status: reportData.status || existingReport?.status || 'pending',
-        isPinned: reportData.isPinned ?? existingReport?.isPinned ?? false,
-        adminNotes: reportData.adminNotes === undefined ? existingReport?.adminNotes : reportData.adminNotes,
+        authorName: dbReport?.authorName || authContextUser?.displayName || 'Unknown',
+        category: dbReport?.category || 'ملاحظة عامة',
+        note: dbReport?.note || '',
+        timestamp: dbReport?.timestamp || new Date().toISOString(),
+        status: dbReport?.status || 'pending',
+        isPinned: dbReport?.isPinned ?? false,
+        adminNotes: dbReport?.adminNotes,
+        // Overwrite with any new data provided
+        ...reportData,
     };
     
     await set(reportRef, fullReportData);
@@ -628,3 +638,4 @@ export const useStudentContext = () => {
   }
   return context;
 };
+
