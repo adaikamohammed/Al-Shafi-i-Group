@@ -314,7 +314,7 @@ export default function StudentManagementPage() {
   const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setEditStudentDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'نشط' | 'مطرود'>('نشط');
   const [levelFilter, setLevelFilter] = useState<string[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
@@ -444,9 +444,6 @@ export default function StudentManagementPage() {
 
     if (statusFilter !== 'all') {
         sortableStudents = sortableStudents.filter(s => s.status === statusFilter);
-    } else {
-        // Default to showing only active students if filter is "all"
-        sortableStudents = sortableStudents.filter(s => s.status === 'نشط');
     }
     
     if (levelFilter.length > 0) {
@@ -579,15 +576,11 @@ export default function StudentManagementPage() {
                     ))}
                 </DropdownMenuContent>
             </DropdownMenu>
-             <Select dir="rtl" value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full flex-grow sm:w-[180px]">
-                    <SelectValue placeholder="الحالة" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">الطلاب النشطون</SelectItem>
-                    <SelectItem value="مطرود">الطلاب المطرودون</SelectItem>
-                </SelectContent>
-            </Select>
+             <div className="flex items-center space-x-1 rounded-lg bg-muted p-1">
+                <Button variant={statusFilter === 'all' ? 'secondary' : 'ghost'} onClick={() => setStatusFilter('all')} className="h-8 px-3">الكل</Button>
+                <Button variant={statusFilter === 'نشط' ? 'secondary' : 'ghost'} onClick={() => setStatusFilter('نشط')} className="h-8 px-3">النشطون فقط</Button>
+                <Button variant={statusFilter === 'مطرود' ? 'secondary' : 'ghost'} onClick={() => setStatusFilter('مطرود')} className="h-8 px-3">المطرودون</Button>
+             </div>
          </div>
          <div className="flex items-center gap-2">
             <Button variant="outline" onClick={handleExportStudents} disabled={(students ?? []).length === 0}>
@@ -620,7 +613,7 @@ export default function StudentManagementPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>قائمة الطلبة ({statusFilter === 'all' ? activeStudentCount : filteredStudents.length})</CardTitle>
+          <CardTitle>قائمة الطلبة ({filteredStudents.length})</CardTitle>
           <CardDescription>{isSuperAdmin ? 'عرض شامل لجميع الطلبة في كل الأفواج' : (user?.group || 'فوج غير محدد')}</CardDescription>
         </CardHeader>
         <CardContent>
@@ -671,7 +664,7 @@ export default function StudentManagementPage() {
                       
                     let rowClass = '';
                     if (student.status === 'مطرود') {
-                        rowClass = 'bg-red-100 dark:bg-red-900/30 line-through opacity-60';
+                        rowClass = 'bg-red-100 dark:bg-red-900/30 opacity-60 line-through';
                     } else if (activeCovenant?.card === 'بطاقة حمراء') {
                         rowClass = 'bg-red-50 dark:bg-red-900/20';
                     } else if (activeCovenant?.card === 'بطاقة صفراء') {
