@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,6 +42,7 @@ export default function DuesPage() {
     const [isSaving, setIsSaving] = useState(false);
     
     const [registrationFees, setRegistrationFees] = useState<Record<number, number>>({});
+    const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (settings.registrationFees && settings.registrationFees[currentYear]) {
@@ -51,21 +51,37 @@ export default function DuesPage() {
             setRegistrationFees({});
         }
     }, [currentYear, settings.registrationFees]);
+
+    const handleFeeChange = (quarter: number, value: string) => {
+        const newFees = { ...registrationFees, [quarter]: Number(value) || 0 };
+        setRegistrationFees(newFees);
+        
+        if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+
+        debounceTimeout.current = setTimeout(() => {
+            handleSaveFees(newFees, true); // Auto-save silently
+        }, 1500); // 1.5 second delay
+    };
     
-    const handleSaveFees = async () => {
+    const handleSaveFees = async (feesToSave?: Record<number, number>, isSilent: boolean = false) => {
         setIsSaving(true);
+        const fees = feesToSave || registrationFees;
         const newSettings = {
             ...settings,
             registrationFees: {
                 ...settings.registrationFees,
-                [currentYear]: registrationFees,
+                [currentYear]: fees,
             }
         };
         try {
             await saveSettings(newSettings);
-            toast({ title: "✅ تم الحفظ", description: "تم حفظ حقوق التسجيل بنجاح." });
+            if (!isSilent) {
+                toast({ title: "✅ تم الحفظ", description: "تم حفظ حقوق التسجيل بنجاح." });
+            }
         } catch (e) {
-            toast({ title: "❌ خطأ", description: "فشل حفظ حقوق التسجيل.", variant: "destructive" });
+            if (!isSilent) {
+                toast({ title: "❌ خطأ", description: "فشل حفظ حقوق التسجيل.", variant: "destructive" });
+            }
         } finally {
             setIsSaving(false);
         }
@@ -75,7 +91,6 @@ export default function DuesPage() {
 
     const studentsWithDues = useMemo(() => {
         return (students ?? [])
-            .filter(s => getYear(s.registrationDate) <= currentYear) // Include all students regardless of status initially
             .map(student => {
                 const studentPayments = (payments ?? [])
                     .filter(p => p.studentId === student.id && getYear(parseISO(p.date)) === currentYear);
@@ -125,7 +140,6 @@ export default function DuesPage() {
     const totalsByQuarter = useMemo(() => {
         const quarterTotals: Record<number, { revenue: number, paidCount: number, exemptedCount: number }> = { 1: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 2: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 3: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 4: { revenue: 0, paidCount: 0, exemptedCount: 0 }};
 
-        // Calculate revenue from all students (active and expelled) who have paid.
         filteredStudents.forEach(student => {
             for (let q = 1; q <= 4; q++) {
                 const payment = student.paymentStatus[q];
@@ -240,7 +254,7 @@ export default function DuesPage() {
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                  <h1 className="text-3xl font-headline font-bold">المستحقات المالية الفصلية</h1>
                 <div className="flex items-center gap-2">
-                    <Button onClick={handleSaveFees} disabled={isSaving}>
+                    <Button onClick={() => handleSaveFees()} disabled={isSaving}>
                         {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
                         حفظ
                     </Button>
@@ -400,10 +414,10 @@ export default function DuesPage() {
                                     <TableCell key={`reg-fee-${q}`} className="text-center p-1">
                                         <Input 
                                             type="number" 
-                                            className="w-24 mx-auto text-center h-8" 
+                                            className="w-24 mx-auto text-center h-8 bg-blue-50 dark:bg-blue-900/20" 
                                             placeholder="أدخل مبلغًا"
                                             value={registrationFees[q] || ''}
-                                            onChange={(e) => setRegistrationFees(prev => ({...prev, [q]: Number(e.target.value)}))}
+                                            onChange={(e) => handleFeeChange(q, e.target.value)}
                                         />
                                     </TableCell>
                                 ))}
@@ -426,3 +440,4 @@ export default function DuesPage() {
         </div>
     );
 }
+
