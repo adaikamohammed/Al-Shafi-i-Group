@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Camera, LogOut, Users, ClipboardList, Calendar, Swords, DollarSign, Edit, FileText, Award, BookCheck, Gavel, ArrowRightLeft, HelpCircle, UserCog, Settings, UserPlus } from 'lucide-react';
+import { Loader2, Camera, LogOut, Users, ClipboardList, Calendar, Swords, DollarSign, Edit, FileText, Award, BookCheck, Gavel, ArrowRightLeft, HelpCircle, UserCog, Settings, UserPlus, LayoutDashboard } from 'lucide-react';
 import Link from 'next/link';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { DailyChecklist } from '@/components/ui/DailyChecklist';
@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 
 
 const navItems = [
+    { href: '/overview', label: 'نظرة عامة', icon: LayoutDashboard, color: 'text-purple-400' },
     { href: '/', label: 'إدارة الطلبة', icon: Users, color: 'text-blue-400' },
     { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus, color: 'text-teal-400' },
     { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList, color: 'text-sky-400' },
@@ -119,4 +120,6 @@ export default function HomePage() {
     </div>
   );
 }
+    
+
     
