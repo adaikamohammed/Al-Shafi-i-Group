@@ -13,26 +13,125 @@ import { useAuth } from '@/context/AuthContext';
 import { format, parseISO, getMonth, getYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, MoreVertical, Edit, Trash2, Eye, CheckCircle } from 'lucide-react';
+import { Loader2, Save, MoreVertical, Edit, Trash2, Eye, CheckCircle, Pin, PinOff } from 'lucide-react';
 import type { DailyReport } from '@/lib/types';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-
+import { Separator } from '@/components/ui/separator';
 
 const defaultCategories = ["اقتراح", "شكوى", "ملاحظة عامة", "شكر", "طلب", "إذن غياب", "طلب صيانة", "إنجاز استثنائي", "حالة طارئة"];
 
 const categoryColors: { [key: string]: string } = {
-    "حالة طارئة": "border-red-500 bg-red-50",
-    "شكوى": "border-red-500 bg-red-50",
-    "إنجاز استثنائي": "border-green-500 bg-green-50",
-    "شكر": "border-green-500 bg-green-50",
-    "إذن غياب": "border-blue-500 bg-blue-50",
-    "طلب صيانة": "border-blue-500 bg-blue-50",
-    "طلب": "border-blue-500 bg-blue-50",
-    "اقتراح": "border-gray-300 bg-gray-50",
-    "ملاحظة عامة": "border-gray-300 bg-gray-50",
+    "حالة طارئة": "border-red-500 bg-red-50 dark:bg-red-900/30",
+    "شكوى": "border-red-500 bg-red-50 dark:bg-red-900/30",
+    "إنجاز استثنائي": "border-green-500 bg-green-50 dark:bg-green-900/30",
+    "شكر": "border-green-500 bg-green-50 dark:bg-green-900/30",
+    "إذن غياب": "border-blue-500 bg-blue-50 dark:bg-blue-900/30",
+    "طلب صيانة": "border-blue-500 bg-blue-50 dark:bg-blue-900/30",
+    "طلب": "border-blue-500 bg-blue-50 dark:bg-blue-900/30",
+    "اقتراح": "border-gray-300 bg-gray-50 dark:bg-gray-800/30",
+    "ملاحظة عامة": "border-gray-300 bg-gray-50 dark:bg-gray-800/30",
+};
+
+type FilterStatus = 'all' | 'pending' | 'reviewed' | 'pinned';
+
+const ReportCard = ({ report, isSuperAdmin, onEdit, onDelete, onTogglePin, onReview }: {
+    report: DailyReport;
+    isSuperAdmin: boolean;
+    onEdit: (report: DailyReport) => void;
+    onDelete: (reportId: string, date: string) => void;
+    onTogglePin: (report: DailyReport) => void;
+    onReview: (report: DailyReport, adminReply: string) => void;
+}) => {
+    const [adminReply, setAdminReply] = useState('');
+
+    return (
+        <Card key={report.id} className={cn(
+            "overflow-hidden border-l-4",
+            report.isPinned ? 'border-yellow-400 ring-2 ring-yellow-400/20' : (categoryColors[report.category] || 'border-gray-300')
+        )}>
+           <CardHeader className="p-4 flex-row justify-between items-start">
+             <div>
+                <div className="flex items-center gap-2">
+                    {report.isPinned && <Pin className="h-4 w-4 text-yellow-500" />}
+                    <p><span className="font-semibold">التصنيف:</span> {report.category}</p>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                    {report.authorName} - {format(parseISO(report.timestamp), 'd MMM yyyy, h:mm a', { locale: ar })}
+                </p>
+             </div>
+             <div className="flex items-center gap-2">
+              <Badge variant={report.status === 'reviewed' ? 'default' : 'secondary'} className={cn(report.status === 'reviewed' && "bg-green-100 text-green-800 border border-green-300")}>
+                <Eye className="ml-1 h-3 w-3" /> {report.status === 'reviewed' ? 'شوهد من الإدارة' : 'لم يراجع بعد'}
+              </Badge>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => onTogglePin(report)}>
+                        {report.isPinned ? <PinOff className="ml-2 h-4 w-4"/> : <Pin className="ml-2 h-4 w-4"/>}
+                        <span>{report.isPinned ? 'إلغاء تثبيت' : 'تثبيت للمتابعة'}</span>
+                    </DropdownMenuItem>
+                    {!isSuperAdmin && (
+                        <>
+                        <DropdownMenuItem onClick={() => onEdit(report)}>
+                            <Edit className="ml-2 h-4 w-4" />
+                            <span>تعديل</span>
+                        </DropdownMenuItem>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
+                                    <Trash2 className="ml-2 h-4 w-4" />
+                                    <span>حذف</span>
+                                </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                             <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
+                                    <AlertDialogDescription>سيؤدي هذا إلى حذف التقرير نهائيًا. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => onDelete(report.id, report.date)}>تأكيد الحذف</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                        </>
+                    )}
+                </DropdownMenuContent>
+            </DropdownMenu>
+             </div>
+           </CardHeader>
+           <CardContent className="p-4 pt-0">
+            <p className="mt-2 whitespace-pre-wrap border-t pt-2">{report.note}</p>
+            
+            {isSuperAdmin && report.status !== 'reviewed' && (
+                 <div className="mt-4 pt-4 border-t border-dashed space-y-2">
+                    <Label htmlFor={`admin-reply-${report.id}`}>إضافة رد إداري (اختياري)</Label>
+                    <Textarea
+                        id={`admin-reply-${report.id}`}
+                        placeholder="مثال: بارك الله فيك، تم اتخاذ الإجراء..."
+                        value={adminReply}
+                        onChange={(e) => setAdminReply(e.target.value)}
+                    />
+                    <Button onClick={() => onReview(report, adminReply)}>
+                        <CheckCircle className="ml-2 h-4 w-4" /> تأكيد المراجعة
+                    </Button>
+                </div>
+            )}
+            
+            {report.status === 'reviewed' && report.adminNotes && (
+                 <div className="mt-4 pt-4 border-t bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md">
+                    <p className="font-semibold text-blue-800 dark:text-blue-200">رد الإدارة:</p>
+                    <p className="text-sm whitespace-pre-wrap">{report.adminNotes}</p>
+                </div>
+            )}
+            </CardContent>
+        </Card>
+    );
 };
 
 
@@ -45,12 +144,12 @@ export default function DailyReportPage() {
     const [category, setCategory] = useState(defaultCategories[0]);
     const [isSaving, setIsSaving] = useState(false);
     const [editingReport, setEditingReport] = useState<DailyReport | null>(null);
-    const [adminReplies, setAdminReplies] = useState<Record<string, string>>({});
     
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+    const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
 
-    const filteredReports = useMemo(() => {
+    const monthlyReports = useMemo(() => {
         return Object.values(dailyReports)
             .flatMap(dayReports => Object.values(dayReports))
             .filter(report => {
@@ -60,8 +159,22 @@ export default function DailyReportPage() {
                     return getMonth(reportDate) === selectedMonth && getYear(reportDate) === selectedYear;
                 } catch(e) { return false; }
             })
-            .sort((a, b) => b.id.localeCompare(a.id));
+            .sort((a, b) => (b.isPinned ? 1 : -1) - (a.isPinned ? 1 : -1) || b.id.localeCompare(a.id));
     }, [dailyReports, selectedMonth, selectedYear]);
+
+    const filteredReports = useMemo(() => {
+        if (filterStatus === 'all') return monthlyReports;
+        if (filterStatus === 'pinned') return monthlyReports.filter(r => r.isPinned);
+        return monthlyReports.filter(r => r.status === filterStatus);
+    }, [monthlyReports, filterStatus]);
+    
+    const pinnedReports = useMemo(() => monthlyReports.filter(r => r.isPinned), [monthlyReports]);
+    const unpinnedReports = useMemo(() => {
+         if (filterStatus === 'all') return monthlyReports.filter(r => !r.isPinned);
+        if (filterStatus === 'pinned') return [];
+        return monthlyReports.filter(r => !r.isPinned && r.status === filterStatus);
+    }, [monthlyReports, filterStatus]);
+
 
     const resetForm = () => {
         setNote('');
@@ -89,6 +202,7 @@ export default function DailyReportPage() {
                 authorName: user.displayName || "شيخ غير مسمى",
                 category: category,
                 status: editingReport?.status || 'pending',
+                isPinned: editingReport?.isPinned || false,
             };
 
             await saveDailyReport(reportData, editingReport?.id);
@@ -121,11 +235,19 @@ export default function DailyReportPage() {
         }
     }
 
-    const handleReview = async (report: DailyReport) => {
-        const adminReply = adminReplies[report.id] || '';
+    const handleTogglePin = async (report: DailyReport) => {
+        try {
+            await saveDailyReport({ ...report, isPinned: !report.isPinned }, report.id);
+            toast({ title: "✅ تم التحديث", description: report.isPinned ? "تم إلغاء تثبيت التقرير." : "تم تثبيت التقرير للمتابعة." });
+        } catch (error) {
+             toast({ title: "خطأ", description: "فشل تحديث حالة التثبيت.", variant: "destructive" });
+        }
+    }
+
+    const handleReview = async (report: DailyReport, adminReply: string) => {
         const updatedReport: Partial<DailyReport> = {
             status: 'reviewed',
-            adminNotes: adminReply || report.adminNotes, // Keep old notes if new reply is empty
+            adminNotes: adminReply || report.adminNotes || 'تمت المراجعة.', // Keep old notes if new reply is empty, default to seen
         };
         try {
             await saveDailyReport(updatedReport, report.id);
@@ -190,108 +312,88 @@ export default function DailyReportPage() {
             
             <Card>
                 <CardHeader>
-                    <CardTitle>📂 سجل تقارير الفوج ({filteredReports.length})</CardTitle>
-                    <CardDescription>هنا يمكنك تصفح جميع التقارير المحفوظة حسب الشهر والسنة.</CardDescription>
+                    <CardTitle>📂 سجل تقارير الفوج ({monthlyReports.length})</CardTitle>
+                    <CardDescription>هنا يمكنك تصفح جميع التقارير المحفوظة حسب الشهر والسنة وحالتها.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                     <div className="flex flex-wrap gap-2">
-                        <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
-                            <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
-                            <SelectContent>
-                                {Array.from({length: 12}, (_, i) => (
-                                    <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
-                            <SelectTrigger className="w-full md:w-[120px]"><SelectValue placeholder="السنة" /></SelectTrigger>
-                            <SelectContent>
-                                {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
-                                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                     <div className="flex flex-col md:flex-row gap-2 justify-between">
+                         <div className="flex gap-2">
+                             <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
+                                <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
+                                <SelectContent>
+                                    {Array.from({length: 12}, (_, i) => (
+                                        <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
+                                <SelectTrigger className="w-full md:w-[120px]"><SelectValue placeholder="السنة" /></SelectTrigger>
+                                <SelectContent>
+                                    {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                         </div>
+                         <div className="flex items-center space-x-1 rounded-lg bg-muted p-1">
+                           <Button variant={filterStatus === 'all' ? 'secondary' : 'ghost'} onClick={() => setFilterStatus('all')} className="h-8 px-2">الكل</Button>
+                           <Button variant={filterStatus === 'pending' ? 'secondary' : 'ghost'} onClick={() => setFilterStatus('pending')} className="h-8 px-2">لم يراجع</Button>
+                           <Button variant={filterStatus === 'reviewed' ? 'secondary' : 'ghost'} onClick={() => setFilterStatus('reviewed')} className="h-8 px-2">تمت المراجعة</Button>
+                           <Button variant={filterStatus === 'pinned' ? 'secondary' : 'ghost'} onClick={() => setFilterStatus('pinned')} className="h-8 px-2">المثبتة</Button>
+                        </div>
                     </div>
 
-                    {filteredReports.length > 0 ? (
-                        filteredReports.map(report => (
-                            <Card key={report.id} className={cn("overflow-hidden border-l-4", categoryColors[report.category] || 'border-gray-300')}>
-                               <CardHeader className="p-4 flex-row justify-between items-start">
-                                 <div>
-                                    <p><span className="font-semibold">التصنيف:</span> {report.category}</p>
-                                    <p className="text-sm text-muted-foreground">
-                                        {report.authorName} - {format(parseISO(report.timestamp), 'd MMM yyyy, h:mm a', { locale: ar })}
-                                    </p>
-                                 </div>
-                                 <div className="flex items-center gap-2">
-                                  <Badge variant={report.status === 'reviewed' ? 'default' : 'secondary'} className={cn(report.status === 'reviewed' && "bg-green-100 text-green-800 border border-green-300")}>
-                                    <Eye className="ml-1 h-3 w-3" /> {report.status === 'reviewed' ? 'شوهد من الإدارة' : 'لم يراجع بعد'}
-                                  </Badge>
-                                  {!isSuperAdmin && (
-                                  <AlertDialog>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent>
-                                            <DropdownMenuItem onClick={() => handleEditClick(report)}>
-                                                <Edit className="ml-2 h-4 w-4" />
-                                                <span>تعديل</span>
-                                            </DropdownMenuItem>
-                                            <AlertDialogTrigger asChild>
-                                                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
-                                                    <Trash2 className="ml-2 h-4 w-4" />
-                                                    <span>حذف</span>
-                                                </DropdownMenuItem>
-                                            </AlertDialogTrigger>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                     <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                سيؤدي هذا إلى حذف التقرير نهائيًا. لا يمكن التراجع عن هذا الإجراء.
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDeleteClick(report.id, report.date)}>تأكيد الحذف</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                  )}
-                                 </div>
-                               </CardHeader>
-                               <CardContent className="p-4 pt-0">
-                                <p className="mt-2 whitespace-pre-wrap border-t pt-2">{report.note}</p>
-                                
-                                {isSuperAdmin && report.status !== 'reviewed' && (
-                                     <div className="mt-4 pt-4 border-t border-dashed space-y-2">
-                                        <Label htmlFor={`admin-reply-${report.id}`}>إضافة رد إداري (اختياري)</Label>
-                                        <Textarea
-                                            id={`admin-reply-${report.id}`}
-                                            placeholder="مثال: بارك الله فيك، تم اتخاذ الإجراء..."
-                                            value={adminReplies[report.id] || ''}
-                                            onChange={(e) => setAdminReplies(prev => ({...prev, [report.id]: e.target.value}))}
+                    <div className="space-y-4">
+                         {pinnedReports.length > 0 && filterStatus !== 'pending' && filterStatus !== 'reviewed' && (
+                             <>
+                                <Separator />
+                                <h3 className="font-semibold">تقارير هامة قيد المتابعة ({pinnedReports.length})</h3>
+                                <div className="space-y-4">
+                                     {pinnedReports.map(report => (
+                                        <ReportCard 
+                                            key={report.id}
+                                            report={report}
+                                            isSuperAdmin={isSuperAdmin}
+                                            onEdit={handleEditClick}
+                                            onDelete={handleDeleteClick}
+                                            onTogglePin={handleTogglePin}
+                                            onReview={handleReview}
                                         />
-                                        <Button onClick={() => handleReview(report)}>
-                                            <CheckCircle className="ml-2 h-4 w-4" /> تأكيد المراجعة
-                                        </Button>
-                                    </div>
+                                    ))}
+                                </div>
+                             </>
+                         )}
+                         
+                         {unpinnedReports.length > 0 && (
+                             <>
+                               {pinnedReports.length > 0 && filterStatus === 'all' && (
+                                    <>
+                                        <Separator />
+                                        <h3 className="font-semibold pt-4">التقارير الأخرى</h3>
+                                    </>
                                 )}
-                                
-                                {report.status === 'reviewed' && report.adminNotes && (
-                                     <div className="mt-4 pt-4 border-t bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md">
-                                        <p className="font-semibold text-blue-800 dark:text-blue-200">رد الإدارة:</p>
-                                        <p className="text-sm whitespace-pre-wrap">{report.adminNotes}</p>
-                                    </div>
-                                )}
-                                </CardContent>
-                            </Card>
-                        ))
-                    ) : (
-                        <p className="text-center text-muted-foreground p-8">لا توجد تقارير محفوظة لهذا الشهر.</p>
-                    )}
+                                <div className="space-y-4">
+                                     {unpinnedReports.map(report => (
+                                        <ReportCard 
+                                            key={report.id}
+                                            report={report}
+                                            isSuperAdmin={isSuperAdmin}
+                                            onEdit={handleEditClick}
+                                            onDelete={handleDeleteClick}
+                                            onTogglePin={handleTogglePin}
+                                            onReview={handleReview}
+                                        />
+                                    ))}
+                                </div>
+                             </>
+                         )}
+
+                         {filteredReports.length === 0 && (
+                            <p className="text-center text-muted-foreground p-8">
+                                {monthlyReports.length > 0 ? 'لا توجد تقارير تطابق هذا الفلتر.' : 'لا توجد تقارير محفوظة لهذا الشهر.'}
+                            </p>
+                         )}
+                    </div>
                 </CardContent>
             </Card>
         </div>

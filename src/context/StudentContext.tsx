@@ -518,12 +518,29 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
   
   const saveDailyReport = async (reportData: Partial<DailyReport>, reportIdToUpdate?: string) => {
     const reportId = reportIdToUpdate || Date.now().toString();
-    const date = reportData.date || format(new Date(), 'yyyy-MM-dd');
+    const date = reportData.date || new Date().toISOString().split('T')[0];
     const authorId = reportData.authorId || authContextUser?.uid;
     
     if (!authorId) throw new Error("User not authenticated");
 
-    const fullReportData = { ...reportData, id: reportId, date, authorId };
+    let existingReport: DailyReport | undefined;
+    if(reportIdToUpdate){
+        const dailyReportsForDate = dailyReports[date] || {};
+        existingReport = dailyReportsForDate[reportIdToUpdate];
+    }
+    
+    const fullReportData: DailyReport = {
+        id: reportId,
+        date: date,
+        authorId: authorId,
+        note: reportData.note || existingReport?.note || '',
+        timestamp: reportData.timestamp || existingReport?.timestamp || new Date().toISOString(),
+        authorName: reportData.authorName || existingReport?.authorName || 'Unknown',
+        category: reportData.category || existingReport?.category || 'ملاحظة عامة',
+        status: reportData.status || existingReport?.status || 'pending',
+        isPinned: reportData.isPinned ?? existingReport?.isPinned ?? false,
+        adminNotes: reportData.adminNotes || existingReport?.adminNotes,
+    };
     
     const dbRef = ref(db);
     await update(dbRef, {
