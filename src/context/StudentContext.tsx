@@ -519,9 +519,8 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
  const saveDailyReport = async (reportData: Partial<DailyReport>, reportIdToUpdate?: string) => {
     const reportId = reportIdToUpdate || Date.now().toString();
     
-    // Find the original report to get its date and authorId
-    const originalReport = reportIdToUpdate ? 
-        Object.values(dailyReports).flatMap(day => Object.values(day)).find(r => r.id === reportIdToUpdate) 
+    const originalReport = reportIdToUpdate 
+        ? Object.values(dailyReports).flatMap(day => Object.values(day)).find(r => r.id === reportIdToUpdate) 
         : undefined;
 
     const date = originalReport?.date || reportData.date || new Date().toISOString().split('T')[0];
@@ -531,7 +530,6 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
 
     const reportRef = ref(db, `users/${authorId}/dailyReports/${date}/${reportId}`);
     
-    // Fetch the existing report from DB to merge, ensuring no data is lost
     const snapshot = await get(reportRef);
     const existingData = snapshot.val() || {};
 
