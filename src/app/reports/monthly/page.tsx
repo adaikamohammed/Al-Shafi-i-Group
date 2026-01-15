@@ -155,7 +155,7 @@ export default function MonthlyStatisticsPage() {
                  const record = (session.records ?? []).find(r => r.studentId === selectedStudentId);
                  if (record) {
                      studentSpecificRecords[session.date].push({...record, sessionType: session.sessionType, sessionNumber: session.sessionNumber});
-                 } else if (session.sessionType === 'يوم عطلة' || (session.sessionType === 'غياب الشيخ' && !session.substituteTeacher)) {
+                 } else if (session.sessionType === 'يوم عطلة' || (session.sessionType === 'غياب الشيخ' && !s.substituteTeacher)) {
                      studentSpecificRecords[session.date].push({ studentId: selectedStudentId, attendance: 'يوم عطلة', behavior: null, memorization: null, review: null, notes: session.sessionType, sessionType: session.sessionType, sessionNumber: session.sessionNumber });
                  }
             });
@@ -168,9 +168,9 @@ export default function MonthlyStatisticsPage() {
             unpaidStudentsCount: 0,
         };
         
-        const activeStudentsForFinance = (students ?? []).filter(s => s.status === 'نشط');
+        const studentsForFinance = (students ?? []);
 
-        const studentsDueForQuarter = activeStudentsForFinance.filter(s => {
+        const studentsDueForQuarter = studentsForFinance.filter(s => {
             const registrationYear = getYear(s.registrationDate);
             const registrationQuarter = getQuarter(s.registrationDate);
             return registrationYear < selectedYear || (registrationYear === selectedYear && registrationQuarter <= currentQuarter);
@@ -185,6 +185,10 @@ export default function MonthlyStatisticsPage() {
         });
 
         financialStats.expectedRevenue = studentsDueForQuarter.reduce((total, student) => {
+            if(student.status === 'مطرود' && student.expulsionDate && isBefore(parseISO(student.expulsionDate), quarterStartDate)) {
+                return total;
+            }
+
             const studentPayments = paymentsByStudentForQuarter[student.id];
             const hasPaid = studentPayments?.some(p => p.status === 'paid');
             const isExempt = studentPayments?.some(p => p.status === 'exempted');
@@ -201,12 +205,19 @@ export default function MonthlyStatisticsPage() {
         
         const unpaidStudents = studentsDueForQuarter.filter(s => {
             const studentPayments = paymentsByStudentForQuarter[s.id];
-            return !studentPayments || studentPayments.every(p => p.status === 'unpaid');
+            const isExempt = studentPayments?.some(p => p.status === 'exempted');
+            const hasPaid = studentPayments?.some(p => p.status === 'paid');
+
+            if(s.status === 'مطرود' && s.expulsionDate && isBefore(parseISO(s.expulsionDate), quarterStartDate)) {
+                return false;
+            }
+
+            return !hasPaid && !isExempt;
         });
 
         financialStats.unpaidStudentsCount = unpaidStudents.length;
 
-        const activeCovenantsCount = activeStudentsForFinance.reduce((count, student) => {
+        const activeCovenantsCount = studentsForFinance.filter(s => s.status === 'نشط').reduce((count, student) => {
             const hasActiveCovenant = (student.covenants || []).some(c => c.status === 'نشط');
             return hasActiveCovenant ? count + 1 : count;
         }, 0);
@@ -328,7 +339,7 @@ export default function MonthlyStatisticsPage() {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="w-full">
-                    <h1 className="text-3xl font-headline font-bold">لوحة الإحصائيات</h1>
+                    <h1 className="text-3xl font-headline font-bold">الكشف المالي والتقييم الشهري</h1>
                     <p className="text-muted-foreground">{user?.group ? `نظرة عامة على ${user.group}` : 'نظرة عامة'}</p>
                 </div>
                  <div className="flex gap-2 w-full md:w-auto">
@@ -363,64 +374,9 @@ export default function MonthlyStatisticsPage() {
                     </Select>
                 </div>
             </div>
-
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">الإيرادات المحققة (الموسم)</CardTitle>
-                        <DollarSign className="h-4 w-4 text-green-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.financialStats.totalRevenue.toLocaleString()} د.ج</div>
-                        <p className="text-xs text-muted-foreground">للموسم الحالي</p>
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">مبالغ مستحقة (الموسم)</CardTitle>
-                        <DollarSign className="h-4 w-4 text-red-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.financialStats.expectedRevenue.toLocaleString()} د.ج</div>
-                        <p className="text-xs text-muted-foreground">المتبقية لهذا الموسم</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">الطلاب الذين دفعوا (الموسم)</CardTitle>
-                        <UserCheck className="h-4 w-4 text-blue-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.financialStats.paidStudentsCount}</div>
-                        <p className="text-xs text-muted-foreground">طالب</p>
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">الطلاب المتأخرون (الموسم)</CardTitle>
-                        <UserX className="h-4 w-4 text-yellow-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.financialStats.unpaidStudentsCount}</div>
-                         <p className="text-xs text-muted-foreground">طالب</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">المواثيق النشطة</CardTitle>
-                        <ShieldAlert className="h-4 w-4 text-orange-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyData.activeCovenantsCount}</div>
-                         <p className="text-xs text-muted-foreground">تعهدات نشطة حالياً</p>
-                    </CardContent>
-                </Card>
-            </div>
             
              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                 
-
-                 {selectedStudentId === 'all' ? (
+                {selectedStudentId === 'all' ? (
                     <GroupEvaluationCard
                         students={studentsToShow}
                         sessions={dailySessions}
@@ -598,5 +554,6 @@ export default function MonthlyStatisticsPage() {
 }
 
     
+
 
 
