@@ -42,10 +42,11 @@ export default function MonthlyStatisticsPage() {
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     
     const studentsToShow = useMemo(() => {
+        const allStudents = students ?? [];
         if (selectedStudentId === 'all') {
-            return (students ?? []);
+            return allStudents;
         }
-        return (students ?? []).filter(s => s.id === selectedStudentId);
+        return allStudents.filter(s => s.id === selectedStudentId);
     }, [students, selectedStudentId]);
 
     const prices = settings?.prices?.renewal || { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 };
@@ -444,8 +445,7 @@ export default function MonthlyStatisticsPage() {
                 )}
             </div>
 
-             {(monthlyData.totalRecords > 0 || monthlyData.financialStats.totalRevenue > 0) && selectedStudentId !== 'all' ? (
-                <>
+             {selectedStudentId === 'all' ? (
                 <div className="grid gap-6 md:grid-cols-2">
                      <Card className="md:col-span-2">
                          <CardHeader>
@@ -530,45 +530,73 @@ export default function MonthlyStatisticsPage() {
                         </CardContent>
                     </Card>
                 </div>
-                 <Card className="mt-6 border-dashed">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Info className="text-blue-500" />حالة الشهر الحالية</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                         <p className="text-muted-foreground">تم تسجيل <span className="font-bold text-foreground">{monthlyData.recordedDaysCount}</span> يوم من أصل <span className="font-bold text-foreground">{monthlyData.daysPassed}</span> يوم مضت من الشهر.</p>
-                        {monthlyData.unrecordedPastDays > 0 && (
-                            <div className="mt-2 p-3 bg-red-50 text-red-800 border-l-4 border-red-500 rounded-md">
-                                <p className="font-bold flex items-center gap-2"><AlertTriangle /> تنبيه: يوجد {monthlyData.unrecordedPastDays} أيام سابقة لم يتم تسجيل حضورها. يرجى مراجعة سجل الحصص.</p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-                </>
-            ) : (
-                <>
-                { selectedStudentId === 'all' && (
-                    <div className="space-y-6 flex flex-col items-center justify-center h-60 border border-dashed rounded-lg">
-                        <AlertTriangle className="h-16 w-16 text-muted-foreground" />
-                        <h2 className="text-xl font-headline font-bold text-center">الرجاء تحديد طالب لعرض إحصائياته</h2>
-                        <p className="text-muted-foreground text-center">
-                            الإحصائيات الفردية تظهر عند اختيار طالب معين من القائمة أعلاه.
-                        </p>
+                 ) : (
+                 <>
+                 { monthlyData.totalRecords > 0 ? (
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <Card>
+                          <CardHeader><CardTitle>📊 توزيع الحضور (شهري)</CardTitle></CardHeader>
+                          <CardContent>
+                              <ResponsiveContainer width="100%" height={300}>
+                                  <PieChart>
+                                      <Pie data={attendanceData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                                          {attendanceData.map((entry, index) => (
+                                              <Cell key={`cell-${index}`} fill={ATTENDANCE_COLORS[entry.name]} />
+                                          ))}
+                                      </Pie>
+                                      <Tooltip formatter={(value, name) => [`${value} حصة`, name]} />
+                                      <Legend />
+                                  </PieChart>
+                              </ResponsiveContainer>
+                          </CardContent>
+                      </Card>
+                       <Card>
+                          <CardHeader><CardTitle>😊 توزيع السلوك (شهري)</CardTitle></CardHeader>
+                          <CardContent>
+                              <ResponsiveContainer width="100%" height={300}>
+                                  <PieChart>
+                                      <Pie data={behaviorData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={100} label>
+                                          {behaviorData.map((entry, index) => (
+                                              <Cell key={`cell-${index}`} fill={BEHAVIOR_COLORS[entry.name]} />
+                                          ))}
+                                      </Pie>
+                                      <Tooltip formatter={(value, name) => [`${value} مرة`, name]} />
+                                      <Legend />
+                                  </PieChart>
+                              </ResponsiveContainer>
+                          </CardContent>
+                      </Card>
+                       <Card className="md:col-span-2">
+                           <CardHeader><CardTitle>📚 توزيع التقييم (شهري)</CardTitle></CardHeader>
+                           <CardContent>
+                               <ResponsiveContainer width="100%" height={300}>
+                                  <RechartsBarChart data={evaluationData}>
+                                      <CartesianGrid strokeDasharray="3 3" />
+                                      <XAxis dataKey="name" />
+                                      <YAxis allowDecimals={false} />
+                                      <Tooltip cursor={{fill: 'rgba(206, 206, 206, 0.2)'}} formatter={(value) => [`${value} مرة`, 'العدد']} />
+                                      <Bar dataKey="value">
+                                          {evaluationData.map((entry, index) => (
+                                              <Cell key={`cell-${index}`} fill={EVALUATION_COLORS[entry.name]} />
+                                          ))}
+                                      </Bar>
+                                  </RechartsBarChart>
+                              </ResponsiveContainer>
+                           </CardContent>
+                       </Card>
                     </div>
-                )}
-                 { selectedStudentId !== 'all' && monthlyData.totalRecords === 0 && (
-                     <div className="space-y-6 flex flex-col items-center justify-center h-60 border border-dashed rounded-lg">
+                 ) : (
+                    <div className="md:col-span-2 lg:col-span-3 space-y-6 flex flex-col items-center justify-center h-60 border border-dashed rounded-lg">
                         <AlertTriangle className="h-16 w-16 text-muted-foreground" />
-                        <h2 className="text-xl font-headline font-bold text-center">لا توجد بيانات مسجلة لهذا الشهر</h2>
-                        <p className="text-muted-foreground text-center">
-                            يرجى اختيار شهر آخر أو تسجيل بيانات في صفحة "الحصص اليومية".
-                        </p>
+                        <h2 className="text-xl font-headline font-bold text-center">لا توجد بيانات مسجلة لهذا الطالب في الشهر المحدد</h2>
                     </div>
                  )}
-                </>
-            )}
+                 </>
+             )}
         </div>
     );
 }
 
     
+
 

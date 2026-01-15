@@ -361,7 +361,7 @@ export default function RankingPage() {
                                         const isExpelled = student.status === 'مطرود';
 
                                         return (
-                                        <TableRow key={student.id} className={cn(medalClass, isExpelled && 'opacity-50')}>
+                                        <TableRow key={student.id} className={cn(medalClass, isExpelled && 'opacity-50 line-through')}>
                                             <TableCell className="font-bold text-lg">{isExpelled ? '-' : index + 1}</TableCell>
                                             <TableCell className="font-medium">{student.name}</TableCell>
                                             <TableCell>
@@ -412,3 +412,4 @@ export default function RankingPage() {
 
 
     
+

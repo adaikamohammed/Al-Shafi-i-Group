@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import '../../app/globals.css';
@@ -92,7 +93,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     }
     
     if (pathname.startsWith('/parent-portal') && !user) {
-      return <>{children}</>;
+      return <div className="max-w-full mx-auto">{children}</div>;
     }
 
     if (!user && pathname !== '/login') {
@@ -205,7 +206,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                             </kbd>
                         </Button>
                     </div>
-                    <div className="w-full mx-auto">
+                    <div className="max-w-full mx-auto">
                        {children}
                     </div>
                 </main>

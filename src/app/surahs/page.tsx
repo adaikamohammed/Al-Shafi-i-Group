@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { Loader2, AlertTriangle, CheckCircle, Award, Check } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 
 
 export default function SurahProgressPage() {

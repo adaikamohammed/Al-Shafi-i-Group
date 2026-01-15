@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -22,6 +23,7 @@ import { cn } from '@/lib/utils';
 
 
 type QuarterStatusFilter = 'all' | 'paid' | 'unpaid' | 'exempted';
+type StatusFilter = 'all' | 'نشط' | 'مطرود';
 
 const statusVariant: { [key in 'نشط' | 'مطرود']: "default" | "destructive" } = {
   "نشط": "default",
@@ -37,6 +39,7 @@ export default function DuesPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [quarterFilter, setQuarterFilter] = useState('all');
     const [quarterStatusFilter, setQuarterStatusFilter] = useState<QuarterStatusFilter>('all');
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>('نشط');
     
     const [registrationFees, setRegistrationFees] = useState<Record<number, number>>({ 1: 0, 2: 0, 3: 0, 4: 0 });
 
@@ -76,6 +79,8 @@ export default function DuesPage() {
      const filteredStudents = useMemo(() => {
         return studentsWithDues.filter(student => {
             const nameMatch = student.fullName.toLowerCase().includes(searchTerm.toLowerCase());
+            
+            const statusMatch = statusFilter === 'all' || student.status === statusFilter;
 
             let quarterMatch = true;
             if (quarterFilter !== 'all' && quarterStatusFilter !== 'all') {
@@ -85,9 +90,9 @@ export default function DuesPage() {
                 if (quarterStatusFilter === 'exempted') quarterMatch = student.paymentStatus[q]?.status === 'exempted';
             }
             
-            return nameMatch && quarterMatch;
+            return nameMatch && quarterMatch && statusMatch;
         });
-    }, [studentsWithDues, searchTerm, quarterFilter, quarterStatusFilter]);
+    }, [studentsWithDues, searchTerm, quarterFilter, quarterStatusFilter, statusFilter]);
     
     const totalsByQuarter = useMemo(() => {
         const quarterTotals: Record<number, { revenue: number, paidCount: number, exemptedCount: number }> = { 1: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 2: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 3: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 4: { revenue: 0, paidCount: 0, exemptedCount: 0 }};
@@ -251,6 +256,11 @@ export default function DuesPage() {
                             </SelectContent>
                         </Select>
                     </div>
+                     <div className="flex items-center space-x-1 rounded-lg bg-muted p-1">
+                        <Button variant={statusFilter === 'all' ? 'secondary' : 'ghost'} onClick={() => setStatusFilter('all')} className="h-8 px-3">الكل</Button>
+                        <Button variant={statusFilter === 'نشط' ? 'secondary' : 'ghost'} onClick={() => setStatusFilter('نشط')} className="h-8 px-3">النشطون فقط</Button>
+                        <Button variant={statusFilter === 'مطرود' ? 'secondary' : 'ghost'} onClick={() => setStatusFilter('مطرود')} className="h-8 px-3">المطرودون</Button>
+                     </div>
                     <Button onClick={handleExport}><Download className="ml-2 h-4 w-4"/> تصدير (Excel)</Button>
                 </CardContent>
             </Card>
