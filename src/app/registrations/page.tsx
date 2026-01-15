@@ -582,10 +582,16 @@ export default function PreRegistrationPage() {
     const handleGeneratePdf = () => {
         const doc = new jsPDF();
         
-        // Add the Amiri font
-        doc.addFileToVFS("Amiri-Regular.ttf", AmiriFont);
-        doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
-        doc.setFont("Amiri");
+        // This is a placeholder for a proper Arabic font.
+        // The Amiri font data should be loaded in AmiriFont.ts for this to work.
+        if (AmiriFont) {
+          doc.addFileToVFS("Amiri-Regular.ttf", AmiriFont);
+          doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
+          doc.setFont("Amiri");
+        } else {
+          // Fallback if font is not available
+          doc.setFont("Helvetica");
+        }
 
         // Header
         doc.setFontSize(16);
@@ -621,7 +627,7 @@ export default function PreRegistrationPage() {
                 font: 'Amiri'
             },
             styles: {
-                font: 'Amiri',
+                font: AmiriFont ? 'Amiri' : 'Helvetica',
                 halign: 'center',
                 cellPadding: 2,
             },
@@ -1194,4 +1200,5 @@ export default function PreRegistrationPage() {
         </div>
     );
 }
+
 
