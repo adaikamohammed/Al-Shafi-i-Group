@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { ShieldAlert } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
 
 const calculateAge = (birthDate?: Date) => {
   if (!birthDate) return 'N/A';
@@ -53,17 +52,24 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                 
                 <section className="avoid-break">
                      <Card className="bg-white shadow-none border border-gray-300">
-                        <CardHeader><CardTitle className="text-lg text-gray-800">🎯 رادار المهارات</CardTitle></CardHeader>
-                        <CardContent id="radar-chart-container" className="h-[350px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={reportData.radarData}>
-                                    <PolarGrid />
-                                    <PolarAngleAxis dataKey="subject" />
-                                    <PolarRadiusAxis angle={30} domain={[0, 10]}/>
-                                    <Radar name="التقييم" dataKey="score" stroke="#808000" fill="#808000" fillOpacity={0.6} />
-                                    <Legend />
-                                </RadarChart>
-                            </ResponsiveContainer>
+                        <CardHeader><CardTitle className="text-lg text-gray-800">🎯 ملخص تقييم المهارات</CardTitle></CardHeader>
+                        <CardContent>
+                           <table className="w-full text-sm text-center border-collapse border border-gray-300">
+                                <thead>
+                                    <tr className="border-b border-gray-300 bg-gray-50">
+                                        <th className="p-2 border border-gray-300">المهارة</th>
+                                        <th className="p-2 border border-gray-300">التقييم من 10</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {reportData.radarData.map((item: { subject: string, score: number }) => (
+                                        <tr key={item.subject}>
+                                            <td className="p-2 border border-gray-300 font-medium">{item.subject}</td>
+                                            <td className="p-2 border border-gray-300 font-bold">{item.score.toFixed(1)} / 10</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </CardContent>
                     </Card>
                 </section>
