@@ -21,7 +21,20 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 
-const defaultCategories = ["اقتراح", "شكوى", "ملاحظة عامة", "شكر", "طلب"];
+const defaultCategories = ["اقتراح", "شكوى", "ملاحظة عامة", "شكر", "طلب", "إذن غياب", "طلب صيانة", "إنجاز استثنائي", "حالة طارئة"];
+
+const categoryColors: { [key: string]: string } = {
+    "حالة طارئة": "border-red-500 bg-red-50",
+    "شكوى": "border-red-500 bg-red-50",
+    "إنجاز استثنائي": "border-green-500 bg-green-50",
+    "شكر": "border-green-500 bg-green-50",
+    "إذن غياب": "border-blue-500 bg-blue-50",
+    "طلب صيانة": "border-blue-500 bg-blue-50",
+    "طلب": "border-blue-500 bg-blue-50",
+    "اقتراح": "border-gray-300 bg-gray-50",
+    "ملاحظة عامة": "border-gray-300 bg-gray-50",
+};
+
 
 export default function DailyReportPage() {
     const { dailyReports, saveDailyReport, deleteDailyReport, loading } = useStudentContext();
@@ -177,7 +190,7 @@ export default function DailyReportPage() {
             
             <Card>
                 <CardHeader>
-                    <CardTitle>📂 سجل تقارير الفوج</CardTitle>
+                    <CardTitle>📂 سجل تقارير الفوج ({filteredReports.length})</CardTitle>
                     <CardDescription>هنا يمكنك تصفح جميع التقارير المحفوظة حسب الشهر والسنة.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -202,8 +215,8 @@ export default function DailyReportPage() {
 
                     {filteredReports.length > 0 ? (
                         filteredReports.map(report => (
-                            <Card key={report.id} className="p-4">
-                               <div className="flex justify-between items-start">
+                            <Card key={report.id} className={cn("overflow-hidden border-l-4", categoryColors[report.category] || 'border-gray-300')}>
+                               <CardHeader className="p-4 flex-row justify-between items-start">
                                  <div>
                                     <p><span className="font-semibold">التصنيف:</span> {report.category}</p>
                                     <p className="text-sm text-muted-foreground">
@@ -248,7 +261,8 @@ export default function DailyReportPage() {
                                   </AlertDialog>
                                   )}
                                  </div>
-                               </div>
+                               </CardHeader>
+                               <CardContent className="p-4 pt-0">
                                 <p className="mt-2 whitespace-pre-wrap border-t pt-2">{report.note}</p>
                                 
                                 {isSuperAdmin && report.status !== 'reviewed' && (
@@ -272,7 +286,7 @@ export default function DailyReportPage() {
                                         <p className="text-sm whitespace-pre-wrap">{report.adminNotes}</p>
                                     </div>
                                 )}
-
+                                </CardContent>
                             </Card>
                         ))
                     ) : (
