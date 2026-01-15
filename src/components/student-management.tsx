@@ -37,7 +37,6 @@ const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ا
 const statusVariant: { [key in StudentStatus]: "default" | "destructive" | "secondary" | "outline" } = {
   "نشط": "default",
   "مطرود": "destructive",
-  "غائب طويل": "secondary",
   "محذوف": "outline"
 };
 
@@ -439,7 +438,7 @@ export default function StudentManagementPage() {
     }
 
   const filteredStudents = useMemo(() => {
-    const statusOrder: { [key in StudentStatus]: number } = { "نشط": 1, "مطرود": 2, "غائب طويل": 3, "محذوف": 4 };
+    const statusOrder: { [key in StudentStatus]: number } = { "نشط": 1, "مطرود": 2, "محذوف": 4 };
     
     let sortableStudents = isSuperAdmin ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
         
@@ -666,19 +665,15 @@ export default function StudentManagementPage() {
              {filteredStudents.length > 0 ? (
                 filteredStudents.map((student, index) => {
                     const activeCovenant = getActiveCovenant(student);
-                     const medal = getMedalStatus(student.id, index);
-                      const medalClass = {
-                          gold: 'bg-medal-gold/30',
-                          silver: 'bg-medal-silver/30',
-                          bronze: 'bg-medal-bronze/30',
-                          none: ''
-                      }[medal];
                       
-                      let rowClass = medalClass;
-                      if (activeCovenant?.card === 'بطاقة حمراء') rowClass = 'bg-red-50 dark:bg-red-900/20';
-                      else if (activeCovenant?.card === 'بطاقة صفراء') rowClass = 'bg-yellow-50 dark:bg-yellow-900/20';
-                      else if (student.status === 'غائب طويل') rowClass = 'bg-gray-100 dark:bg-gray-800/20 opacity-70';
-                      else if (student.status === 'مطرود') rowClass = 'bg-red-100 dark:bg-red-900/30 line-through opacity-60';
+                    let rowClass = '';
+                    if (student.status === 'مطرود') {
+                        rowClass = 'bg-red-100 dark:bg-red-900/30 line-through opacity-60';
+                    } else if (activeCovenant?.card === 'بطاقة حمراء') {
+                        rowClass = 'bg-red-50 dark:bg-red-900/20';
+                    } else if (activeCovenant?.card === 'بطاقة صفراء') {
+                        rowClass = 'bg-yellow-50 dark:bg-yellow-900/20';
+                    }
 
                     return (
                         <TableRow 
@@ -1304,3 +1299,4 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
     </form>
   );
 }
+
