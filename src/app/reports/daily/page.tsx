@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -11,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, getMonth, getYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save, MoreVertical, Edit, Trash2 } from 'lucide-react';
@@ -27,20 +26,26 @@ export default function DailyReportPage() {
     const { user } = useAuth();
     const { toast } = useToast();
 
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
     const [note, setNote] = useState('');
     const [category, setCategory] = useState(defaultCategories[0]);
     const [isSaving, setIsSaving] = useState(false);
     const [editingReport, setEditingReport] = useState<DailyReport | null>(null);
     
+    const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+    const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
-    const todaysReports = useMemo(() => {
-        const reportsForToday = dailyReports?.[todayStr];
-        if (!reportsForToday) return [];
-        return Object.values(reportsForToday)
-            .filter(report => report && typeof report === 'object' && report.id) 
+    const filteredReports = useMemo(() => {
+        return Object.values(dailyReports)
+            .flatMap(dayReports => Object.values(dayReports))
+            .filter(report => {
+                if (!report || !report.date) return false;
+                try {
+                    const reportDate = parseISO(report.date);
+                    return getMonth(reportDate) === selectedMonth && getYear(reportDate) === selectedYear;
+                } catch(e) { return false; }
+            })
             .sort((a, b) => b.id.localeCompare(a.id));
-    }, [dailyReports, todayStr]);
+    }, [dailyReports, selectedMonth, selectedYear]);
 
     const resetForm = () => {
         setNote('');
@@ -61,7 +66,7 @@ export default function DailyReportPage() {
         
         try {
             const reportData: Omit<DailyReport, 'id'> = {
-                date: todayStr,
+                date: editingReport?.date || format(new Date(), 'yyyy-MM-dd'),
                 note: note,
                 timestamp: editingReport?.timestamp || new Date().toISOString(),
                 authorId: user.uid,
@@ -141,7 +146,7 @@ export default function DailyReportPage() {
                     <div className="flex items-center gap-2">
                         <Button onClick={handleSaveReport} disabled={isSaving}>
                             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                            {editingReport ? 'حفظ التعديلات' : 'حفظ التقرير'}
+                            {editingReport ? 'حفظ التعديلات' : 'إضافة تقرير'}
                         </Button>
                          {editingReport && (
                             <Button variant="outline" onClick={resetForm}>
@@ -154,18 +159,37 @@ export default function DailyReportPage() {
             
             <Card>
                 <CardHeader>
-                    <CardTitle>📂 التقارير المسجلة لهذا اليوم ({todaysReports.length})</CardTitle>
-                    <CardDescription>هنا يمكنك تصفح جميع التقارير التي تم حفظها لهذا اليوم وتعديلها أو حذفها.</CardDescription>
+                    <CardTitle>📂 سجل تقارير الفوج</CardTitle>
+                    <CardDescription>هنا يمكنك تصفح جميع التقارير المحفوظة حسب الشهر والسنة.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {todaysReports.length > 0 ? (
-                        todaysReports.map(report => (
+                     <div className="flex flex-wrap gap-2">
+                        <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
+                            <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
+                            <SelectContent>
+                                {Array.from({length: 12}, (_, i) => (
+                                    <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
+                            <SelectTrigger className="w-full md:w-[120px]"><SelectValue placeholder="السنة" /></SelectTrigger>
+                            <SelectContent>
+                                {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {filteredReports.length > 0 ? (
+                        filteredReports.map(report => (
                             <Card key={report.id} className="p-4">
                                <div className="flex justify-between items-start">
                                  <div>
                                     <p><span className="font-semibold">التصنيف:</span> {report.category}</p>
                                     <p className="text-sm text-muted-foreground">
-                                        {report.authorName} - {format(parseISO(report.timestamp), 'h:mm a', { locale: ar })}
+                                        {report.authorName} - {format(parseISO(report.timestamp), 'd MMM yyyy, h:mm a', { locale: ar })}
                                     </p>
                                  </div>
                                  <div className="flex items-center gap-2">
@@ -180,7 +204,7 @@ export default function DailyReportPage() {
                                                 <span>تعديل</span>
                                             </DropdownMenuItem>
                                             <AlertDialogTrigger asChild>
-                                                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                                                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
                                                     <Trash2 className="ml-2 h-4 w-4" />
                                                     <span>حذف</span>
                                                 </DropdownMenuItem>
@@ -206,10 +230,12 @@ export default function DailyReportPage() {
                             </Card>
                         ))
                     ) : (
-                        <p className="text-center text-muted-foreground p-8">لا توجد تقارير محفوظة لهذا اليوم بعد.</p>
+                        <p className="text-center text-muted-foreground p-8">لا توجد تقارير محفوظة لهذا الشهر.</p>
                     )}
                 </CardContent>
             </Card>
         </div>
     );
 }
+
+    
