@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus } from '@/lib/types';
 import { isWithinInterval, parseISO, isValid } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -76,7 +76,7 @@ interface StudentContextType {
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
   addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
-  deletePayment: (paymentId: string) => Promise<void>;
+  updatePaymentStatus: (paymentId: string, status: PaymentStatus, amount: number) => Promise<void>;
   saveSettings: (newSettings: AppSettings) => Promise<void>;
 }
 
@@ -588,16 +588,10 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
     await set(paymentRef, newPayment);
   };
   
-  const deletePayment = async (paymentId: string) => {
-    if (!authContextUser || isSuperAdmin) throw new Error("User cannot delete payments");
-
-    const payment = payments.find(p => p.id === paymentId);
-    if(!payment) return;
-    const studentOwnerId = students.find(s => s.id === payment.studentId)?.ownerId;
-    if(authContextUser.uid !== studentOwnerId) return;
-
+  const updatePaymentStatus = async (paymentId: string, status: PaymentStatus, amount: number) => {
+    if (!authContextUser || isSuperAdmin) throw new Error("User cannot update payment status");
     const paymentRef = ref(db, `users/${authContextUser.uid}/payments/${paymentId}`);
-    await remove(paymentRef);
+    await update(paymentRef, { status, amount });
   }
 
   const saveSettings = async (newSettings: AppSettings) => {
@@ -607,7 +601,7 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
   };
 
   return (
-    <StudentContext.Provider value={{ students, preRegistrations, allUsers, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, deleteMultipleStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, updatePreRegistration, bulkUpdatePreRegistrations, deleteAllPreRegistrations, deleteMultiplePreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, deletePayment, saveSettings }}>
+    <StudentContext.Provider value={{ students, preRegistrations, allUsers, dailySessions, dailyReports, loading, surahProgress, payments, settings, addStudent, updateStudent, deleteStudent, deleteAllStudents, deleteMultipleStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, updatePreRegistration, bulkUpdatePreRegistrations, deleteAllPreRegistrations, deleteMultiplePreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, updatePaymentStatus, saveSettings }}>
       {children}
     </StudentContext.Provider>
   );

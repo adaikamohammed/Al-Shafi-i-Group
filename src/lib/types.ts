@@ -147,11 +147,14 @@ export interface StudentStat extends Partial<SessionRecord> {
   sessionType: string;
 }
 
+export type PaymentStatus = 'paid' | 'unpaid' | 'exempted';
+
 export interface Payment {
     id: string;
     studentId: string;
     amount: number;
-    date: string; // ISO String
+    date: string; // ISO String for the quarter start date
+    status: PaymentStatus;
 }
 
 export interface PointsConfig {
