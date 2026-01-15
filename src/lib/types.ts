@@ -84,6 +84,8 @@ export interface DailyReport {
   authorName: string;
   authorId: string;
   category: string;
+  status?: 'pending' | 'reviewed';
+  adminNotes?: string;
 }
 
 

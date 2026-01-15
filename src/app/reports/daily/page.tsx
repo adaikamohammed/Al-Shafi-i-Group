@@ -13,23 +13,26 @@ import { useAuth } from '@/context/AuthContext';
 import { format, parseISO, getMonth, getYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { Loader2, Save, MoreVertical, Edit, Trash2, Eye, CheckCircle } from 'lucide-react';
 import type { DailyReport } from '@/lib/types';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 
 const defaultCategories = ["اقتراح", "شكوى", "ملاحظة عامة", "شكر", "طلب"];
 
 export default function DailyReportPage() {
     const { dailyReports, saveDailyReport, deleteDailyReport, loading } = useStudentContext();
-    const { user } = useAuth();
+    const { user, isSuperAdmin } = useAuth();
     const { toast } = useToast();
 
     const [note, setNote] = useState('');
     const [category, setCategory] = useState(defaultCategories[0]);
     const [isSaving, setIsSaving] = useState(false);
     const [editingReport, setEditingReport] = useState<DailyReport | null>(null);
+    const [adminReplies, setAdminReplies] = useState<Record<string, string>>({});
     
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -65,13 +68,14 @@ export default function DailyReportPage() {
         setIsSaving(true);
         
         try {
-            const reportData: Omit<DailyReport, 'id'> = {
+            const reportData: Partial<DailyReport> = {
                 date: editingReport?.date || format(new Date(), 'yyyy-MM-dd'),
                 note: note,
                 timestamp: editingReport?.timestamp || new Date().toISOString(),
                 authorId: user.uid,
                 authorName: user.displayName || "شيخ غير مسمى",
                 category: category,
+                status: editingReport?.status || 'pending',
             };
 
             await saveDailyReport(reportData, editingReport?.id);
@@ -103,6 +107,20 @@ export default function DailyReportPage() {
             toast({ title: "خطأ ❌", description: errorMessage, variant: "destructive" });
         }
     }
+
+    const handleReview = async (report: DailyReport) => {
+        const adminReply = adminReplies[report.id] || '';
+        const updatedReport: Partial<DailyReport> = {
+            status: 'reviewed',
+            adminNotes: adminReply || report.adminNotes, // Keep old notes if new reply is empty
+        };
+        try {
+            await saveDailyReport(updatedReport, report.id);
+            toast({ title: "✅ تم تأكيد المراجعة", description: "تم تحديث حالة التقرير بنجاح." });
+        } catch (error) {
+            toast({ title: "خطأ", description: "فشل تحديث حالة التقرير.", variant: "destructive" });
+        }
+    };
     
     if(loading) {
         return <div className="flex items-center justify-center h-full"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
@@ -110,52 +128,52 @@ export default function DailyReportPage() {
 
     return (
         <div className="space-y-6">
-            <h1 className="text-3xl font-headline font-bold">التقرير اليومي للشيخ</h1>
-            
-            <Card>
-                <CardHeader>
-                    <CardTitle>➕ {editingReport ? 'تعديل التقرير' : `إضافة تقرير جديد ليوم: ${format(new Date(), 'EEEE, d MMMM yyyy', { locale: ar })}`}</CardTitle>
-                    <CardDescription>اكتب هنا ملاحظاتك العامة عن هذا اليوم، مثل السلوك العام للفوج، مستوى الحفظ، اقتراحات، أو أي حالات خاصة تستدعي انتباه الإدارة.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="category">🏷️ التصنيف</Label>
-                        <Select dir="rtl" value={category} onValueChange={setCategory}>
-                            <SelectTrigger id="category">
-                                <SelectValue placeholder="اختر تصنيفًا" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {defaultCategories.map(cat => (
-                                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+            {!isSuperAdmin && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>➕ {editingReport ? 'تعديل التقرير' : `إضافة تقرير جديد ليوم: ${format(new Date(), 'EEEE, d MMMM yyyy', { locale: ar })}`}</CardTitle>
+                        <CardDescription>اكتب هنا ملاحظاتك العامة عن هذا اليوم، مثل السلوك العام للفوج، مستوى الحفظ، اقتراحات، أو أي حالات خاصة تستدعي انتباه الإدارة.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="category">🏷️ التصنيف</Label>
+                            <Select dir="rtl" value={category} onValueChange={setCategory}>
+                                <SelectTrigger id="category">
+                                    <SelectValue placeholder="اختر تصنيفًا" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {defaultCategories.map(cat => (
+                                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="report-note">✏️ نص التقرير</Label>
-                         <Textarea 
-                            id="report-note"
-                            placeholder="مثال: كان الحفظ ممتازًا اليوم، ولكن لوحظ تأخر بعض الطلبة. أقترح..."
-                            rows={6}
-                            value={note}
-                            onChange={(e) => setNote(e.target.value)}
-                        />
-                    </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="report-note">✏️ نص التقرير</Label>
+                            <Textarea 
+                                id="report-note"
+                                placeholder="مثال: كان الحفظ ممتازًا اليوم، ولكن لوحظ تأخر بعض الطلبة. أقترح..."
+                                rows={6}
+                                value={note}
+                                onChange={(e) => setNote(e.target.value)}
+                            />
+                        </div>
 
-                    <div className="flex items-center gap-2">
-                        <Button onClick={handleSaveReport} disabled={isSaving}>
-                            {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                            {editingReport ? 'حفظ التعديلات' : 'إضافة تقرير'}
-                        </Button>
-                         {editingReport && (
-                            <Button variant="outline" onClick={resetForm}>
-                                إلغاء التعديل
+                        <div className="flex items-center gap-2">
+                            <Button onClick={handleSaveReport} disabled={isSaving}>
+                                {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+                                {editingReport ? 'حفظ التعديلات' : 'إضافة تقرير'}
                             </Button>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+                            {editingReport && (
+                                <Button variant="outline" onClick={resetForm}>
+                                    إلغاء التعديل
+                                </Button>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
             
             <Card>
                 <CardHeader>
@@ -193,6 +211,10 @@ export default function DailyReportPage() {
                                     </p>
                                  </div>
                                  <div className="flex items-center gap-2">
+                                  <Badge variant={report.status === 'reviewed' ? 'default' : 'secondary'} className={cn(report.status === 'reviewed' && "bg-green-100 text-green-800 border border-green-300")}>
+                                    <Eye className="ml-1 h-3 w-3" /> {report.status === 'reviewed' ? 'شوهد من الإدارة' : 'لم يراجع بعد'}
+                                  </Badge>
+                                  {!isSuperAdmin && (
                                   <AlertDialog>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
@@ -224,9 +246,33 @@ export default function DailyReportPage() {
                                         </AlertDialogFooter>
                                     </AlertDialogContent>
                                   </AlertDialog>
+                                  )}
                                  </div>
                                </div>
                                 <p className="mt-2 whitespace-pre-wrap border-t pt-2">{report.note}</p>
+                                
+                                {isSuperAdmin && report.status !== 'reviewed' && (
+                                     <div className="mt-4 pt-4 border-t border-dashed space-y-2">
+                                        <Label htmlFor={`admin-reply-${report.id}`}>إضافة رد إداري (اختياري)</Label>
+                                        <Textarea
+                                            id={`admin-reply-${report.id}`}
+                                            placeholder="مثال: بارك الله فيك، تم اتخاذ الإجراء..."
+                                            value={adminReplies[report.id] || ''}
+                                            onChange={(e) => setAdminReplies(prev => ({...prev, [report.id]: e.target.value}))}
+                                        />
+                                        <Button onClick={() => handleReview(report)}>
+                                            <CheckCircle className="ml-2 h-4 w-4" /> تأكيد المراجعة
+                                        </Button>
+                                    </div>
+                                )}
+                                
+                                {report.status === 'reviewed' && report.adminNotes && (
+                                     <div className="mt-4 pt-4 border-t bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md">
+                                        <p className="font-semibold text-blue-800 dark:text-blue-200">رد الإدارة:</p>
+                                        <p className="text-sm whitespace-pre-wrap">{report.adminNotes}</p>
+                                    </div>
+                                )}
+
                             </Card>
                         ))
                     ) : (
@@ -237,5 +283,3 @@ export default function DailyReportPage() {
         </div>
     );
 }
-
-    

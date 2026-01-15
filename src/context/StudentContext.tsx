@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
@@ -71,7 +72,7 @@ interface StudentContextType {
   bulkUpdatePreRegistrations: (ids: string[], data: Partial<PreRegistration>) => void;
   deleteAllPreRegistrations: () => void;
   deleteMultiplePreRegistrations: (ids: string[]) => void;
-  saveDailyReport: (report: Omit<DailyReport, 'id'>, reportIdToUpdate?: string) => Promise<void>;
+  saveDailyReport: (report: Partial<DailyReport>, reportIdToUpdate?: string) => Promise<void>;
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
   addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
@@ -515,23 +516,25 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
        return filteredSessions;
   }
   
-  const saveDailyReport = async (reportData: Omit<DailyReport, 'id'>, reportIdToUpdate?: string) => {
-    if (!authContextUser || isSuperAdmin) throw new Error("User cannot save reports");
-    
+  const saveDailyReport = async (reportData: Partial<DailyReport>, reportIdToUpdate?: string) => {
     const reportId = reportIdToUpdate || Date.now().toString();
+    const date = reportData.date || format(new Date(), 'yyyy-MM-dd');
+    const authorId = reportData.authorId || authContextUser?.uid;
     
-    const reportToSave: DailyReport = {
-        ...reportData,
-        id: reportId,
-    };
+    if (!authorId) throw new Error("User not authenticated");
 
-    const reportRef = ref(db, `users/${authContextUser.uid}/dailyReports/${reportToSave.date}/${reportId}`);
-    await set(reportRef, reportToSave);
+    const fullReportData = { ...reportData, id: reportId, date, authorId };
+    
+    const dbRef = ref(db);
+    await update(dbRef, {
+        [`/users/${authorId}/dailyReports/${date}/${reportId}`]: fullReportData
+    });
   }
 
   const deleteDailyReport = async (reportId: string, date: string) => {
-      if (!authContextUser || isSuperAdmin) throw new Error("User cannot delete reports");
-      const reportDbRef = ref(db, `users/${authContextUser.uid}/dailyReports/${date}/${reportId}`);
+      if (!authContextUser) throw new Error("User not authenticated");
+      const reportAuthorId = dailyReports[date]?.[reportId]?.authorId || authContextUser.uid;
+      const reportDbRef = ref(db, `users/${reportAuthorId}/dailyReports/${date}/${reportId}`);
       await remove(reportDbRef);
   }
   
