@@ -1,10 +1,9 @@
 
-
 "use client";
 
 import '../../app/globals.css';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
-import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield, UserPlus, UserCog } from 'lucide-react';
+import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield, UserPlus, UserCog, Home } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -17,6 +16,7 @@ import { CommandBar } from '@/components/ui/CommandBar';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 
 const allNavItems = [
+  { href: '/home', label: 'البوابة الرئيسية', icon: Home },
   { href: '/overview', label: 'نظرة عامة', icon: LayoutDashboard },
   { href: '/', label: 'إدارة الطلبة', icon: Users },
   { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus },
@@ -64,13 +64,14 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const isParentPortal = pathname.startsWith('/parent-portal');
+        const isHomePage = pathname === '/home';
         if (!authLoading && !user && pathname !== '/login' && !isParentPortal) {
             router.push('/login');
         }
          if (!authLoading && user && pathname === '/login') {
-             router.push('/overview');
+             router.push('/home');
         }
-    }, [user, authLoading, router, pathname, isSuperAdmin]);
+    }, [user, authLoading, router, pathname]);
 
     useEffect(() => {
         const down = (e: KeyboardEvent) => {
@@ -99,7 +100,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         return null;
     }
 
-     if (pathname === '/login') {
+     if (pathname === '/login' || pathname === '/home') {
         return <>{children}</>;
     }
 
@@ -214,3 +215,5 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
           </SidebarProvider>
     )
 }
+
+    

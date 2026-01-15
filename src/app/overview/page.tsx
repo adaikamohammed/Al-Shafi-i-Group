@@ -8,12 +8,8 @@ import { useAuth } from '@/context/AuthContext';
 import { Loader2, Users, DollarSign, UserPlus, FileText, CheckCircle, Award } from 'lucide-react';
 import { format, getMonth, getYear, startOfQuarter, getQuarter, startOfWeek, endOfWeek, subDays, isSameDay, startOfMonth, parseISO, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
 import type { Student, DailySession } from '@/lib/types';
-import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
-import { DailyInspiration } from '@/components/ui/DailyInspiration';
-import { DailyChecklist } from '@/components/ui/DailyChecklist';
 import { AttendanceChart } from '@/components/ui/AttendanceChart';
 import { SmartAlerts } from '@/components/ui/SmartAlerts';
 
@@ -83,7 +79,9 @@ export default function OverviewPage() {
                     const registrationYear = getYear(student.registrationDate);
                     const isFirstPaymentForThisStudent = registrationYear === currentYear && registrationQuarter === currentQuarter && isFirstEverPayment;
                     const tier = student.subscriptionTier || 'فئة الأصاغر';
-                    expectedRevenue += isFirstPaymentForThisStudent ? TIER_PRICES.firstPayment[tier] : TIER_PRICES.renewal[tier];
+                    if (TIER_PRICES.firstPayment && TIER_PRICES.renewal) {
+                        expectedRevenue += isFirstPaymentForThisStudent ? TIER_PRICES.firstPayment[tier] : TIER_PRICES.renewal[tier];
+                    }
                  }
              }
         });
@@ -129,7 +127,7 @@ export default function OverviewPage() {
             mostActiveStudentInExtra
         };
 
-    }, [activeStudents, dailySessions, payments, settings]);
+    }, [activeStudents, dailySessions, payments, settings, TIER_PRICES]);
     
     const attendanceChartData = [
         { name: 'حضور', value: overviewData.attendanceToday },
@@ -150,24 +148,14 @@ export default function OverviewPage() {
 
     return (
         <div className="space-y-6">
-             <DailyInspiration />
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="w-full">
                     <h1 className="text-3xl font-headline font-bold">نظرة عامة</h1>
-                    <p className="text-muted-foreground">{isSuperAdmin ? 'عرض شامل لكل الأفواج' : (user?.group ? `${user.group}` : 'لوحة التحكم')}</p>
+                    <p className="text-muted-foreground">{isSuperAdmin ? 'عرض شامل لكل الأفواج' : (user?.group || 'لوحة التحكم')}</p>
                 </div>
             </div>
             
-            {!isSuperAdmin && <DailyChecklist />}
-            
              <SmartAlerts students={activeStudents} sessions={dailySessions} />
-
-             <GroupEvaluationCard 
-                students={activeStudents} 
-                sessions={dailySessions} 
-                reports={Object.values(dailyReports).flatMap(day => Object.values(day))}
-                groupName={isSuperAdmin ? "كل الأفواج" : user?.group} 
-             />
             
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 <Card className="shadow-lg rounded-2xl bg-gradient-to-tr from-blue-100 to-blue-200 dark:from-blue-900/50 dark:to-blue-950/50">
@@ -256,3 +244,5 @@ export default function OverviewPage() {
         </div>
     );
 }
+
+    
