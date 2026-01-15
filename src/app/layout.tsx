@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AuthWrapper } from '@/components/ui/AuthWrapper';
+import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
   title: 'مدير مدرسة الشافعي',
@@ -23,7 +24,10 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <AuthWrapper>{children}</AuthWrapper>
+        <AuthWrapper>
+            {children}
+        </AuthWrapper>
+        <Toaster />
       </body>
     </html>
   );
