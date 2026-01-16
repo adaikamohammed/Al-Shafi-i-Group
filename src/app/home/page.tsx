@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Camera, LogOut, Users, ClipboardList, Calendar, Swords, DollarSign, Edit, FileText, Award, BookCheck, Gavel, ArrowRightLeft, HelpCircle, UserCog, Settings, UserPlus, LayoutDashboard } from 'lucide-react';
+import { Loader2, Camera, LogOut, Users, ClipboardList, Calendar, Swords, DollarSign, Edit, FileText, Award, BookCheck, Gavel, ArrowRightLeft, HelpCircle, UserCog, Settings, UserPlus, BarChart3, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { DailyChecklist } from '@/components/ui/DailyChecklist';
@@ -17,19 +17,26 @@ import { cn } from '@/lib/utils';
 
 
 const navItems = [
+    // Row 1
     { href: '/', label: 'إدارة الطلبة', icon: Users, color: 'text-blue-400' },
     { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus, color: 'text-teal-400' },
     { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList, color: 'text-sky-400' },
     { href: '/stats', label: 'المتابعة الأسبوعية', icon: Calendar, color: 'text-indigo-400' },
+    // Row 2
+    { href: '/yearly-performance', label: 'رادار الأداء السنوي', icon: BarChart3, color: 'text-purple-400' },
     { href: '/comparison', label: 'ساحة المقارنة', icon: Swords, color: 'text-red-400' },
     { href: '/dues', label: 'المستحقات المالية', icon: DollarSign, color: 'text-amber-400' },
     { href: '/reports/daily', label: 'التقرير اليومي', icon: Edit, color: 'text-rose-400' },
+    // Row 3
     { href: '/reports/student', label: 'تقرير الطالب', icon: FileText, color: 'text-fuchsia-400' },
     { href: '/ranking', label: 'ترتيب الطلبة', icon: Award, color: 'text-yellow-400' },
     { href: '/surahs', label: 'متابعة الحفظ', icon: BookCheck, color: 'text-lime-400' },
     { href: '/points', label: 'نظام النقاط', icon: Gavel, color: 'text-orange-400' },
+    // Row 4
+    { href: '/league', label: 'دوري التميز', icon: Shield, color: 'text-emerald-400' },
     { href: '/data', label: 'البيانات', icon: ArrowRightLeft, color: 'text-cyan-400' },
     { href: '/guide', label: 'دليل الاستخدام', icon: HelpCircle, color: 'text-violet-400' },
+    // Footer / Last row
     { href: '/profile', label: 'الملف الشخصي', icon: UserCog, color: 'text-gray-400' },
     { href: '/settings', label: 'الإعدادات', icon: Settings, color: 'text-gray-400' },
 ];
