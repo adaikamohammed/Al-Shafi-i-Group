@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Crown, Shield, Activity, Sparkles, UserCheck } from 'lucide-react';
+import { Crown, Shield, Activity, Sparkles, UserCheck, Users } from 'lucide-react';
 import type { Student, DailySession } from '@/lib/types';
 import { parseISO, subDays, isAfter } from 'date-fns';
 
@@ -140,46 +140,77 @@ export function HallOfFame({ students, sessions }: HallOfFameProps) {
         return { name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
     }, [activeStudents, allSortedSessions]);
 
-    const fortressStudent = useMemo(() => {
+    const behaviorKing = useMemo(() => {
         if (allSortedSessions.length === 0 || activeStudents.length === 0) {
-            return { name: undefined, days: 0, photoURL: undefined };
+            return { name: undefined, streak: 0, photoURL: undefined };
         }
 
-        const ninetyDaysAgo = subDays(new Date(), 90);
-        
-        let maxDaysWithoutAbsence = 0;
-        let fortressKing: Student | undefined = undefined;
+        let maxStreak = 0;
+        let king: Student | undefined = undefined;
 
         activeStudents.forEach(student => {
-            let attendedDays = 0;
-            let hasAbsence = false;
+            let currentStreak = 0;
+            let studentMaxStreak = 0;
 
             allSortedSessions.forEach(session => {
-                const sessionDate = parseISO(session.date);
-                if (isAfter(sessionDate, ninetyDaysAgo) && sessionDate >= student.registrationDate) {
-                    const record = (session.records || []).find(r => r.studentId === student.id);
-                    if (record) {
-                        if (record.attendance === 'غائب') {
-                            hasAbsence = true;
-                        } else if (record.attendance === 'حاضر' || record.attendance === 'متأخر') {
-                            attendedDays++;
-                        }
+                 if (parseISO(session.date) < student.registrationDate) {
+                    return;
+                }
+                const record = (session.records || []).find(r => r.studentId === student.id);
+                if (record && record.behavior === 'هادئ') {
+                    currentStreak++;
+                } else {
+                    studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
+                    currentStreak = 0;
+                }
+            });
+            
+            studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
+
+            if (studentMaxStreak > maxStreak) {
+                maxStreak = studentMaxStreak;
+                king = student;
+            }
+        });
+        
+        return { name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
+    }, [activeStudents, allSortedSessions]);
+    
+    const helpfulColleague = useMemo(() => {
+        if (allSortedSessions.length === 0 || activeStudents.length === 0) {
+            return { name: undefined, count: 0, photoURL: undefined };
+        }
+
+        const helpCounts: { [id: string]: number } = {};
+        const keywords = ['ساعد', 'يعين', 'يصحح'];
+
+        activeStudents.forEach(student => {
+            helpCounts[student.id] = 0;
+        });
+
+        allSortedSessions.forEach(session => {
+            (session.records || []).forEach(record => {
+                if (record.notes && helpCounts[record.studentId] !== undefined) {
+                    if (keywords.some(kw => record.notes!.includes(kw))) {
+                        helpCounts[record.studentId]++;
                     }
                 }
             });
-
-            if (!hasAbsence && attendedDays > maxDaysWithoutAbsence) {
-                maxDaysWithoutAbsence = attendedDays;
-                fortressKing = student;
-            }
         });
-
-        return { name: fortressKing?.fullName, days: maxDaysWithoutAbsence, photoURL: fortressKing?.photoURL };
+        
+        let maxCount = 0;
+        let kingId: string | undefined = undefined;
+        for (const studentId in helpCounts) {
+            if (helpCounts[studentId] > maxCount) {
+                maxCount = helpCounts[studentId];
+                kingId = studentId;
+            }
+        }
+        
+        const king = kingId ? activeStudents.find(s => s.id === kingId) : undefined;
+        
+        return { name: king?.fullName, count: maxCount, photoURL: king?.photoURL };
     }, [activeStudents, allSortedSessions]);
-
-
-    // Placeholder for other records
-    const pointsKing = { name: "قيد التطوير", streak: 0, photoURL: undefined };
 
 
     return (
@@ -211,23 +242,22 @@ export function HallOfFame({ students, sessions }: HallOfFameProps) {
                     color="border-green-500"
                 />
                  <RecordCard 
-                    title="الحصن الحصين"
-                    studentName={fortressStudent.name}
-                    studentPhoto={fortressStudent.photoURL}
-                    value={fortressStudent.days}
-                    unit="يوم حضور (آخر 90 يوم)"
+                    title="سفير الأدب"
+                    studentName={behaviorKing.name}
+                    studentPhoto={behaviorKing.photoURL}
+                    value={behaviorKing.streak}
+                    unit="يوم هدوء متتالي"
                     icon={<Shield />}
                     color="border-purple-500"
                 />
                  <RecordCard 
-                    title="ملك النقاط"
-                    studentName={pointsKing.name}
-                    studentPhoto={pointsKing.photoURL}
-                    value={pointsKing.streak}
-                    unit="نقطة"
-                    icon={<Activity />}
-                    color="border-yellow-500"
-                    loading={true}
+                    title="الزميل المعين"
+                    studentName={helpfulColleague.name}
+                    studentPhoto={helpfulColleague.photoURL}
+                    value={helpfulColleague.count}
+                    unit="مساعدة مسجلة"
+                    icon={<Users />}
+                    color="border-orange-500"
                 />
             </CardContent>
         </Card>
