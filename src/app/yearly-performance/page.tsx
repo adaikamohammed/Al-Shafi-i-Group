@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -5,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { useStudentContext } from '@/context/StudentContext';
 import { Loader2, ArrowLeft, ArrowRight, Calendar, CheckCircle, TrendingUp, Users } from 'lucide-react';
-import { format, getYear, getDay, startOfYear, addDays, parseISO, getMonth, getDaysInMonth, startOfMonth, endOfMonth, getQuarter, setYear, setMonth, addMonths, subMonths, setQuarter } from 'date-fns';
+import { format, getYear, getDay, startOfYear, addDays, parseISO, getMonth, getDaysInMonth, startOfMonth, endOfMonth, getQuarter, setYear, setMonth, addMonths, subMonths, endOfYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -174,22 +175,16 @@ export default function YearlyPerformancePage() {
     
     const currentYear = getYear(currentDate);
 
-    const { yearlyData, annualStats } = useMemo(() => {
+    const { yearlyData } = useMemo(() => {
         const data: any = {};
-        const stats = {
-            totalSessions: 0,
-            extraSessions: 0,
-            workDays: new Set<string>(),
-            totalAttendance: 0,
-            totalPossibleAttendance: 0,
-        };
-        if (!dailySessions || !students) return { yearlyData: data, annualStats: { commitmentRate: 0, extraSessions: 0, netWorkDays: 0 } };
-
-        const activeStudentsCount = students.filter(s => s.status === 'نشط').length;
-        if(activeStudentsCount === 0) return { yearlyData: data, annualStats: { commitmentRate: 0, extraSessions: 0, netWorkDays: 0 } };
+        if (!dailySessions) return { yearlyData: data };
 
         const yearSessions = Object.keys(dailySessions)
-            .filter(dateString => getYear(parseISO(dateString)) === currentYear)
+            .filter(dateString => {
+                try {
+                    return getYear(parseISO(dateString)) === currentYear;
+                } catch(e) { return false; }
+            })
             .reduce((obj, key) => {
                 obj[key] = dailySessions[key];
                 return obj;
@@ -205,20 +200,13 @@ export default function YearlyPerformancePage() {
             
             let attendanceRate = 0;
             if (!isHoliday && !isSheikhAbsentNoSub && workSessions.length > 0) {
-                stats.workDays.add(dateString);
-                
-                workSessions.forEach(s => {
-                    if (s.sessionType === 'حصة تعويضية') stats.extraSessions++;
-                    stats.totalSessions++;
-                });
-
-                const allRecords = workSessions.flatMap(s => s.records || []);
-                const attendanceCount = allRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
-                const totalPossibleAttendancesForDay = activeStudentsCount * workSessions.length;
-
-                attendanceRate = totalPossibleAttendancesForDay > 0 ? attendanceCount / totalPossibleAttendancesForDay : 0;
-                stats.totalAttendance += attendanceCount;
-                stats.totalPossibleAttendance += totalPossibleAttendancesForDay;
+                const activeStudentsCount = (students || []).filter(s => s.status === 'نشط').length;
+                if(activeStudentsCount > 0){
+                    const allRecords = workSessions.flatMap(s => s.records || []);
+                    const attendanceCount = allRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
+                    const totalPossibleAttendancesForDay = activeStudentsCount * workSessions.length;
+                    attendanceRate = totalPossibleAttendancesForDay > 0 ? attendanceCount / totalPossibleAttendancesForDay : 0;
+                }
             }
 
             data[dateString] = {
@@ -230,17 +218,88 @@ export default function YearlyPerformancePage() {
             };
         });
 
-        const commitmentRate = stats.totalPossibleAttendance > 0 ? (stats.totalAttendance / stats.totalPossibleAttendance) * 100 : 0;
-
-        return { 
-            yearlyData: data, 
-            annualStats: {
-                commitmentRate: commitmentRate.toFixed(0),
-                extraSessions: stats.extraSessions,
-                netWorkDays: stats.workDays.size,
-            }
-        };
+        return { yearlyData: data };
     }, [dailySessions, students, currentYear]);
+    
+    const { periodStats, statsTitle } = useMemo(() => {
+        if (!dailySessions || !students) return { periodStats: { commitmentRate: 0, extraSessions: 0, netWorkDays: 0 }, statsTitle: '' };
+
+        const activeStudentsCount = students.filter(s => s.status === 'نشط').length;
+        if (activeStudentsCount === 0) return { periodStats: { commitmentRate: 0, extraSessions: 0, netWorkDays: 0 }, statsTitle: '' };
+
+        let startDate: Date;
+        let endDate: Date;
+        let title: string;
+
+        const currentYear = getYear(currentDate);
+        const currentQuarter = getQuarter(currentDate);
+
+        switch (viewMode) {
+            case 'year':
+                startDate = startOfYear(currentDate);
+                endDate = endOfYear(currentDate);
+                title = `الإحصائيات السنوية لسنة ${currentYear}`;
+                break;
+            case 'quarter':
+                const startQuarterMonth = (currentQuarter - 1) * 3;
+                startDate = startOfMonth(setMonth(new Date(currentYear, 0), startQuarterMonth));
+                endDate = endOfMonth(setMonth(new Date(currentYear, 0), startQuarterMonth + 2));
+                title = `إحصائيات الربع ${currentQuarter} - ${currentYear}`;
+                break;
+            case 'month':
+            default:
+                startDate = startOfMonth(currentDate);
+                endDate = endOfMonth(currentDate);
+                title = `إحصائيات شهر ${format(currentDate, 'MMMM yyyy', { locale: ar })}`;
+                break;
+        }
+        
+        const stats = {
+            extraSessions: 0,
+            workDays: new Set<string>(),
+            totalAttendance: 0,
+            totalPossibleAttendance: 0,
+        };
+        
+        Object.keys(dailySessions).forEach(dateString => {
+            try {
+                const sessionDate = parseISO(dateString);
+                if (sessionDate >= startDate && sessionDate <= endDate) {
+                    const sessionsOnDay = Object.values(dailySessions[dateString]);
+                    const isHoliday = sessionsOnDay.some(s => s.sessionType === 'يوم عطلة');
+                    const isSheikhAbsentNoSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
+                    
+                    if (!isHoliday && !isSheikhAbsentNoSub) {
+                        const workSessions = sessionsOnDay.filter(s => s.sessionType !== 'يوم عطلة' && !(s.sessionType === 'غياب الشيخ' && !s.substituteTeacher));
+                        if (workSessions.length > 0) {
+                            stats.workDays.add(dateString);
+                            workSessions.forEach(session => {
+                                if (session.sessionType === 'حصة تعويضية') {
+                                    stats.extraSessions++;
+                                }
+                                const attendanceCount = (session.records || []).filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
+                                stats.totalAttendance += attendanceCount;
+                                stats.totalPossibleAttendance += activeStudentsCount;
+                            });
+                        }
+                    }
+                }
+            } catch (e) {
+                // Ignore invalid date strings
+            }
+        });
+
+        const commitmentRate = stats.totalPossibleAttendance > 0 ? (stats.totalAttendance / stats.totalPossibleAttendance) * 100 : 0;
+        
+        const finalStats = {
+            commitmentRate: commitmentRate.toFixed(0),
+            extraSessions: stats.extraSessions,
+            netWorkDays: stats.workDays.size,
+        };
+
+        return { periodStats: finalStats, statsTitle: title };
+
+    }, [dailySessions, students, viewMode, currentDate]);
     
     const handleDateNavigation = (direction: 'prev' | 'next') => {
         const amount = direction === 'next' ? 1 : -1;
@@ -327,26 +386,26 @@ export default function YearlyPerformancePage() {
 
                     <div className="space-y-6">
                         <Card>
-                            <CardHeader>
-                                <CardTitle>الإحصائيات السنوية</CardTitle>
-                                <CardDescription>ملخص أداء الفوج لسنة {currentYear}</CardDescription>
+                             <CardHeader>
+                                <CardTitle>{statsTitle}</CardTitle>
+                                <CardDescription>ملخص أداء الفوج للفترة المحددة</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                <StatWidget 
-                                   title="معدل الالتزام السنوي"
-                                   value={annualStats.commitmentRate}
+                                   title="معدل الالتزام"
+                                   value={periodStats.commitmentRate}
                                    unit="%"
                                    icon={<CheckCircle className="h-8 w-8 text-green-500"/>}
                                />
                                <StatWidget 
                                    title="صافي أيام العمل"
-                                   value={annualStats.netWorkDays}
+                                   value={periodStats.netWorkDays}
                                    unit="يوم"
                                    icon={<Calendar className="h-8 w-8 text-blue-500"/>}
                                />
                                <StatWidget 
                                    title="حصص إضافية وتعويضية"
-                                   value={annualStats.extraSessions}
+                                   value={periodStats.extraSessions}
                                    unit="حصة"
                                    icon={<TrendingUp className="h-8 w-8 text-indigo-500"/>}
                                />
