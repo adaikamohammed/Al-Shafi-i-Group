@@ -282,7 +282,7 @@ export default function LeaguePage() {
                                     قائمة الهدافين
                                 </CardTitle>
                                 <CardDescription>
-                                    ترتيب الطلاب حسب أهداف الحفظ (ممتاز = هدفان، جيد جداً = هدف...).
+                                    ترتيب الطلاب حسب أهداف الحفظ (ممتاز = هدفان، جيد جداً = هدف).
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -325,4 +325,5 @@ export default function LeaguePage() {
             </div>
         </TooltipProvider>
     );
-}
+
+    
