@@ -9,7 +9,7 @@ import { useStudentContext } from '@/context/StudentContext';
 import { Loader2, AlertTriangle, Shield, CheckCircle, XCircle, MinusCircle, Flame, Star, Info, BookOpenCheck, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import type { Student, DailySession, AttendanceStatus, PerformanceLevel } from '@/lib/types';
+import type { Student, DailySession, AttendanceStatus, PerformanceLevel, LeagueStat } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -17,25 +17,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Link from 'next/link';
 import { MatchOfTheWeek } from '@/components/ui/MatchOfTheWeek';
 
-
-export interface LeagueStat {
-    studentId: string;
-    studentName: string;
-    photoURL?: string;
-    played: number;
-    wins: number;
-    draws: number;
-    losses: number;
-    goalsFor: number;
-    goalsAgainst: number;
-    goalDifference: number;
-    points: number;
-    form: AttendanceStatus[];
-    assists: number;
-    rank: number;
-    previousRank: number | null;
-    movement: number;
-}
 
 const FormIcon = ({ status }: { status: AttendanceStatus }) => {
     switch (status) {
@@ -314,7 +295,7 @@ export default function LeaguePage() {
                                             <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">عليه</TableHead></TooltipTrigger><TooltipContent><p>أهداف مستقبلة (ضعف الحفظ)</p></TooltipContent></Tooltip>
                                             <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">+/-</TableHead></TooltipTrigger><TooltipContent><p>فارق الأهداف</p></TooltipContent></Tooltip>
                                             <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">تم (AST)</TableHead></TooltipTrigger><TooltipContent><p>تمريرات مساعدة (السلوك)</p></TooltipContent></Tooltip>
-                                            <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">نقاط</TableHead></TooltipTrigger><TooltipContent><p>إجمالي النقاط (الحاضر)</p></TooltipContent></Tooltip>
+                                            <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">نقاط</TableHead></TooltipTrigger><TooltipContent><p>إجمالي النقاط (الحضور)</p></TooltipContent></Tooltip>
                                             <TableHead className="text-center w-[150px]">آخر 5</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -561,3 +542,4 @@ export default function LeaguePage() {
         </TooltipProvider>
     );
 }
+

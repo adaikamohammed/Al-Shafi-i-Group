@@ -232,9 +232,29 @@ export interface PreRegistration {
     notes?: string;
     photoURL?: string;
 }
+
+export interface LeagueStat {
+    studentId: string;
+    studentName: string;
+    photoURL?: string;
+    played: number;
+    wins: number;
+    draws: number;
+    losses: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    goalDifference: number;
+    points: number;
+    form: AttendanceStatus[];
+    assists: number;
+    rank: number;
+    previousRank: number | null;
+    movement: number;
+}
     
 
     
 
     
+
 

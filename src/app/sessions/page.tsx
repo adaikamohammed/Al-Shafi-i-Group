@@ -8,16 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, DailySession, Covenant } from '@/lib/types';
+import type { DailyRecord, SessionType, AttendanceStatus, PerformanceLevel, BehaviorLevel, Student, DailySession, Covenant, LeagueStat } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, ArrowLeft, ArrowRight, Loader2, Download, MoreVertical, Trash2, PlusCircle, Copy, Dot, ShieldAlert, FilePen } from 'lucide-react';
+import { Info, ArrowLeft, ArrowRight, Loader2, Download, MoreVertical, Trash2, PlusCircle, Copy, Dot, ShieldAlert, FilePen, Swords } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { format, getMonth, getYear, setMonth, getDaysInMonth, startOfMonth, getDay, addMonths, subMonths, isPast, isToday, parseISO } from 'date-fns';
+import { format, getMonth, getYear, setMonth, getDaysInMonth, startOfMonth, getDay, addMonths, subMonths, isPast, isToday, parseISO, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
@@ -25,6 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 
 
 const sessionTypeDescriptions: { [key in SessionType]: string } = {
@@ -100,7 +101,7 @@ export default function DailySessionsPage() {
             return {
                 'التاريخ': readableDate, 'اليوم': dayName,
                 'رقم الحصة': session.sessionNumber, 'نوع الحصة': session.sessionType,
-                'اسم الطالب': student?.fullName || 'غير معروف', 'الحضور': record.attendance || '',
+                'اسم الطالب': student?.fullName || 'غير معروف', 'الحاضر': record.attendance || '',
                 'التقييم': record.memorization || '', 'السلوك': record.behavior || '',
                 'مراجعة': record.review ? 'نعم' : 'لا', 'ملاحظات': record.notes || '',
             }
@@ -380,9 +381,112 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
   const [hasSubstitute, setHasSubstitute] = useState(false);
   const [substituteTeacher, setSubstituteTeacher] = useState('');
   const { toast } = useToast();
+  const { settings, dailySessions } = useStudentContext();
+  const pointsConfig = settings.points;
 
   const formattedDate = format(day, 'yyyy-MM-dd');
   const sessionId = `${formattedDate}-${sessionNumber}`;
+
+  const isMatchDay = useMemo(() => day.getDay() === 3, [day]); // Wednesday is 3
+
+  const matchContenders = useMemo(() => {
+        if (!isMatchDay) return [];
+
+        const activeStudents = students.filter(s => s.status === 'نشط');
+        if (activeStudents.length < 2) return [];
+
+        const selectedMonth = getMonth(day);
+        const selectedYear = getYear(day);
+        const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
+        const monthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
+
+        const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(daySessions =>
+            Object.values(daySessions).filter(session => {
+                if (!session?.date || session.sessionType === 'يوم عطلة' || session.sessionType === 'حصة أنشطة') return false;
+                try {
+                    const sessionDate = parseISO(session.date);
+                    return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
+                } catch (e) { return false; }
+            })
+        );
+        
+        const stats: Omit<LeagueStat, 'rank' | 'previousRank' | 'movement'>[] = activeStudents.map(student => {
+            let wins = 0, draws = 0, losses = 0;
+            const form: AttendanceStatus[] = [];
+            let goalsFor = 0;
+            let goalsAgainst = 0;
+            let assists = 0;
+
+            sessionsInMonth.forEach(session => {
+                const record = (session.records ?? []).find(r => r.studentId === student.id);
+                if (record) {
+                    form.push(record.attendance);
+                    switch (record.attendance) {
+                        case 'حاضر': wins++; break;
+                        case 'متأخر': draws++; break;
+                        case 'غائب': losses++; break;
+                    }
+                    if (record.memorization === 'ممتاز') goalsFor += 2;
+                    else if (record.memorization === 'جيد جداً') goalsFor += 1;
+                    else if (record.memorization === 'متوسط') goalsAgainst += 1;
+                    else if (record.memorization === 'ضعيف') goalsAgainst += 2;
+
+                    if (record.behavior === 'هادئ') assists += 2;
+                    else if (record.behavior === 'متوسط') assists += 1;
+                }
+            });
+
+            return {
+                studentId: student.id,
+                studentName: student.fullName,
+                photoURL: student.photoURL,
+                played: wins + draws + losses,
+                wins, draws, losses,
+                goalsFor, goalsAgainst,
+                goalDifference: goalsFor - goalsAgainst,
+                points: (wins * 3) + (draws * 1),
+                form: form.slice(-5),
+                assists,
+            };
+        });
+
+        const sortedStats = stats.sort((a, b) => {
+            if (b.points !== a.points) return b.points - a.points;
+            if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+            if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+            if (a.losses !== b.losses) return a.losses - b.losses;
+            return a.studentName.localeCompare(b.studentName);
+        });
+
+        if (sortedStats.length < 2) return [];
+
+        let contender1 = sortedStats[0];
+        let contender2 = sortedStats[1];
+
+        if (!((contender1.points - contender2.points) <= 3)) {
+            const topFive = sortedStats.slice(0, 5);
+             if (topFive.length >= 2) {
+                let minDiff = Infinity;
+                for (let i = 0; i < topFive.length; i++) {
+                    for (let j = i + 1; j < topFive.length; j++) {
+                        const diff = Math.abs(topFive[i].points - topFive[j].points);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            contender1 = topFive[i];
+                            contender2 = topFive[j];
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (contender1.points < contender2.points) {
+            [contender1, contender2] = [contender2, contender1];
+        }
+
+        return [contender1.studentId, contender2.studentId];
+
+    }, [isMatchDay, students, dailySessions, day]);
 
   useEffect(() => {
     const existingSession = getSessionById(sessionId);
@@ -566,11 +670,32 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
                 const activeCovenant = getActiveCovenant(student);
                 const empowermentTask = getActiveCovenant(student, 'task');
                 
+                const isContender = matchContenders.includes(student.id);
+
+                let sessionPoints = 0;
+                if (record) {
+                    if (record.attendance && pointsConfig.attendance) sessionPoints += pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] ?? 0;
+                    if (record.memorization && pointsConfig.evaluation) sessionPoints += pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] ?? 0;
+                    if (record.behavior && pointsConfig.behavior) sessionPoints += pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] ?? 0;
+                    if (record.review && pointsConfig.review) sessionPoints += pointsConfig.review.completed;
+                }
+
                 return (
-                  <TableRow key={student.id} className={cn(isAbsent && 'bg-muted/50')}>
+                  <TableRow key={student.id} className={cn(isAbsent && 'bg-muted/50', isContender && 'ring-2 ring-offset-2 ring-amber-400 bg-amber-50 dark:bg-amber-900/20')}>
                     <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
+                            {isContender && <Swords className="h-5 w-5 text-amber-500" />}
                             <span>{student.fullName}</span>
+                            {isContender && (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Badge variant="outline" className="text-amber-600 border-amber-400">{sessionPoints >= 0 ? `+${sessionPoints}` : sessionPoints} نقطة</Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>النقاط المتوقعة من هذه الحصة</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            )}
                             {empowermentTask ? (
                                 <Tooltip>
                                     <TooltipTrigger>
@@ -683,3 +808,4 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     
 
     
+
