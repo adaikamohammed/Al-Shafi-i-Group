@@ -5,17 +5,46 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { useStudentContext } from '@/context/StudentContext';
 import { Loader2, ArrowLeft, ArrowRight, Calendar, CheckCircle, TrendingUp, Users } from 'lucide-react';
-import { format, getYear, getDay, startOfYear, addDays, parseISO } from 'date-fns';
+import { format, getYear, getDay, startOfYear, addDays, parseISO, getMonth, getDaysInMonth, startOfMonth, endOfMonth, getQuarter, setYear, setMonth, addMonths, subMonths, setQuarter } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
+
+// Helper function to get color based on day's data
+const getDayColor = (dayData: any) => {
+    if (!dayData) return 'bg-gray-200 dark:bg-gray-800'; // Default for no data
+    if (dayData.isHoliday) return 'bg-blue-500';
+    if (dayData.isSheikhAbsentNoSub) return 'bg-red-500';
+    if (dayData.workSessionCount >= 2) return 'bg-green-700';
+    if (dayData.workSessionCount === 1) return 'bg-green-300';
+    return 'bg-gray-200 dark:bg-gray-800';
+};
+
+const DayTooltipContent = ({ day, dayData }: { day: Date, dayData: any }) => (
+    <>
+        <p className="font-bold">{format(day, 'd MMMM yyyy', { locale: ar })}</p>
+        {dayData ? (
+            <>
+                {dayData.isHoliday ? (<p>يوم عطلة</p>)
+                 : dayData.isSheikhAbsentNoSub ? (<p>غياب الشيخ</p>)
+                 : (<>
+                        <p>حصص العمل: {dayData.workSessionCount}</p>
+                        <p>الحضور: {(dayData.attendanceRate * 100).toFixed(0)}%</p>
+                    </>)}
+            </>
+        ) : <p>لا توجد بيانات</p>}
+    </>
+);
+
+
+// YearView Component
 const YearView = ({ year, data, onDayClick }: { year: number, data: any, onDayClick: (date: Date) => void }) => {
     const yearStart = startOfYear(new Date(year, 0, 1));
     const daysInYear = getYear(yearStart) % 4 === 0 && (getYear(yearStart) % 100 !== 0 || getYear(yearStart) % 400 === 0) ? 366 : 365;
     const days = Array.from({ length: daysInYear }, (_, i) => addDays(yearStart, i));
-    const firstDay = getDay(yearStart);
-    const startDayIndex = (firstDay + 1) % 7;
+    const firstDayOfWeek = getDay(yearStart); // Sunday is 0
+    const startDayIndex = (firstDayOfWeek + 1) % 7; // Adjust for Saturday start
 
     return (
         <div className="grid grid-cols-53 gap-1.5" style={{ direction: 'rtl' }}>
@@ -23,54 +52,100 @@ const YearView = ({ year, data, onDayClick }: { year: number, data: any, onDayCl
             {days.map(day => {
                 const dateString = format(day, 'yyyy-MM-dd');
                 const dayData = data[dateString];
-                
-                let colorClass = 'bg-gray-200 dark:bg-gray-800'; // Default for no data / empty day
-
-                if (dayData) {
-                    if (dayData.isHoliday) {
-                        colorClass = 'bg-blue-500';
-                    } else if (dayData.isSheikhAbsentNoSub) {
-                        colorClass = 'bg-red-500';
-                    } else if (dayData.workSessionCount >= 2) {
-                        colorClass = 'bg-green-700'; // Dark green
-                    } else if (dayData.workSessionCount === 1) {
-                        colorClass = 'bg-green-300'; // Light green
-                    }
-                }
+                const colorClass = getDayColor(dayData);
 
                 return (
                     <Tooltip key={dateString}>
                         <TooltipTrigger asChild>
-                            <div
-                                className={cn("w-4 h-4 rounded", colorClass)}
-                                onClick={() => onDayClick(day)}
-                            />
+                            <div className={cn("w-4 h-4 rounded", colorClass)} onClick={() => onDayClick(day)} />
                         </TooltipTrigger>
-                        <TooltipContent>
-                            <p className="font-bold">{format(day, 'd MMMM yyyy', { locale: ar })}</p>
-                            {dayData ? (
-                                <>
-                                    {dayData.isHoliday ? (
-                                        <p>نوع الحصة: يوم عطلة</p>
-                                    ) : dayData.isSheikhAbsentNoSub ? (
-                                        <p>نوع الحصة: غياب الشيخ</p>
-                                    ) : (
-                                        <>
-                                            <p>حصص العمل: {dayData.workSessionCount}</p>
-                                            <p>الحضور: {(dayData.attendanceRate * 100).toFixed(0)}%</p>
-                                            <p>تقييم ممتاز: {dayData.excellentCount}</p>
-                                            <p>سلوك غير منضبط: {dayData.undisciplinedCount}</p>
-                                        </>
-                                    )}
-                                </>
-                            ) : <p>لا توجد بيانات</p>}
-                        </TooltipContent>
+                        <TooltipContent><DayTooltipContent day={day} dayData={dayData} /></TooltipContent>
                     </Tooltip>
                 );
             })}
         </div>
     );
 };
+
+// QuarterView Component
+const QuarterView = ({ year, quarter, data, onDayClick }: { year: number, quarter: number, data: any, onDayClick: (date: Date) => void }) => {
+    const startMonth = (quarter - 1) * 3;
+    const months = [startMonth, startMonth + 1, startMonth + 2];
+    
+    return (
+        <div className="space-y-4">
+            {months.map(monthIndex => {
+                const monthStart = startOfMonth(new Date(year, monthIndex));
+                const daysInMonth = getDaysInMonth(monthStart);
+                const firstDay = getDay(monthStart);
+                const startDayIndex = (firstDay + 1) % 7; // Saturday start
+                const days = Array.from({length: daysInMonth}, (_, i) => addDays(monthStart, i));
+
+                return (
+                    <div key={monthIndex}>
+                        <h3 className="text-lg font-bold mb-2">{format(monthStart, 'MMMM yyyy', {locale: ar})}</h3>
+                        <div className="grid grid-cols-7 gap-2">
+                             {Array.from({ length: startDayIndex }).map((_, i) => <div key={`empty-${monthIndex}-${i}`} />)}
+                             {days.map(day => {
+                                 const dateString = format(day, 'yyyy-MM-dd');
+                                 const dayData = data[dateString];
+                                 const colorClass = getDayColor(dayData);
+                                 return (
+                                     <Tooltip key={dateString}>
+                                         <TooltipTrigger asChild>
+                                             <div className={cn("w-8 h-8 rounded-md", colorClass)} onClick={() => onDayClick(day)} />
+                                         </TooltipTrigger>
+                                         <TooltipContent><DayTooltipContent day={day} dayData={dayData} /></TooltipContent>
+                                     </Tooltip>
+                                 );
+                             })}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
+// MonthView Component
+const MonthView = ({ year, month, data, onDayClick }: { year: number, month: number, data: any, onDayClick: (date: Date) => void }) => {
+    const monthStart = startOfMonth(new Date(year, month));
+    const daysInMonth = getDaysInMonth(monthStart);
+    const firstDay = getDay(monthStart);
+    const startDayIndex = (firstDay + 1) % 7; // Saturday start
+    const dayCells = [];
+    
+    const weekdays = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
+    
+    for (let i = 0; i < startDayIndex; i++) {
+        dayCells.push(<div key={`empty-${i}`} className="border rounded-lg bg-muted/20" />);
+    }
+
+    for (let i = 1; i <= daysInMonth; i++) {
+        const day = new Date(year, month, i);
+        const dateString = format(day, 'yyyy-MM-dd');
+        const dayData = data[dateString];
+        const colorClass = getDayColor(dayData);
+        dayCells.push(
+            <Tooltip key={dateString}>
+                <TooltipTrigger asChild>
+                    <div className={cn("w-full h-20 rounded-lg p-2 border-2 text-right flex flex-col justify-between cursor-pointer", colorClass)} onClick={() => onDayClick(day)}>
+                        <span className="font-bold text-lg">{i}</span>
+                    </div>
+                </TooltipTrigger>
+                <TooltipContent><DayTooltipContent day={day} dayData={dayData} /></TooltipContent>
+            </Tooltip>
+        );
+    }
+    
+    return (
+        <div className="grid grid-cols-7 gap-2">
+            {weekdays.map(day => <div key={day} className="text-center font-semibold text-muted-foreground pb-2">{day}</div>)}
+            {dayCells}
+        </div>
+    );
+};
+
 
 const StatWidget = ({ title, value, unit, icon }: { title: string, value: string | number, unit: string, icon: React.ReactNode }) => (
     <div className="flex items-center p-4 bg-muted rounded-lg">
@@ -84,8 +159,10 @@ const StatWidget = ({ title, value, unit, icon }: { title: string, value: string
 
 export default function YearlyPerformancePage() {
     const { students, dailySessions, loading } = useStudentContext();
-    const [currentYear, setCurrentYear] = useState(getYear(new Date()));
+    const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'year' | 'quarter' | 'month'>('year');
+    
+    const currentYear = getYear(currentDate);
 
     const { yearlyData, annualStats } = useMemo(() => {
         const data: any = {};
@@ -112,46 +189,33 @@ export default function YearlyPerformancePage() {
             const sessionsOnDay = Object.values(yearSessions[dateString]);
             if (sessionsOnDay.length === 0) return;
 
-            // Logic for coloring
             const isHoliday = sessionsOnDay.some(s => s.sessionType === 'يوم عطلة');
             const isSheikhAbsentNoSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
-            const workSessionCount = sessionsOnDay.filter(s => s.sessionType !== 'يوم عطلة' && !(s.sessionType === 'غياب الشيخ' && !s.substituteTeacher)).length;
+            const workSessions = sessionsOnDay.filter(s => s.sessionType !== 'يوم عطلة' && !(s.sessionType === 'غياب الشيخ' && !s.substituteTeacher));
             
-            // Logic for tooltip and stats
-            const primarySession = sessionsOnDay[0];
-            const sessionType = primarySession.sessionType;
             let attendanceRate = 0;
-            let excellentCount = 0;
-            let undisciplinedCount = 0;
-
-            if (!isHoliday && !isSheikhAbsentNoSub) {
+            if (!isHoliday && !isSheikhAbsentNoSub && workSessions.length > 0) {
                 stats.workDays.add(dateString);
                 
-                sessionsOnDay.forEach(s => {
+                workSessions.forEach(s => {
                     if (s.sessionType === 'حصة تعويضية') stats.extraSessions++;
-                    if (s.sessionType !== 'يوم عطلة') stats.totalSessions++;
+                    stats.totalSessions++;
                 });
 
-                const allRecords = sessionsOnDay.flatMap(s => s.records || []);
+                const allRecords = workSessions.flatMap(s => s.records || []);
                 const attendanceCount = allRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
-                const totalPossibleAttendancesForDay = activeStudentsCount * sessionsOnDay.filter(s => s.sessionType !== 'يوم عطلة').length;
+                const totalPossibleAttendancesForDay = activeStudentsCount * workSessions.length;
 
                 attendanceRate = totalPossibleAttendancesForDay > 0 ? attendanceCount / totalPossibleAttendancesForDay : 0;
                 stats.totalAttendance += attendanceCount;
                 stats.totalPossibleAttendance += totalPossibleAttendancesForDay;
-                excellentCount = allRecords.filter(r => r.memorization === 'ممتاز').length;
-                undisciplinedCount = allRecords.filter(r => r.behavior === 'غير منضبط').length;
             }
 
             data[dateString] = {
-                sessionType, // for tooltip
                 isHoliday,
                 isSheikhAbsentNoSub,
-                workSessionCount,
-                // for tooltip
+                workSessionCount: workSessions.length,
                 attendanceRate,
-                excellentCount,
-                undisciplinedCount,
             };
         });
 
@@ -166,10 +230,34 @@ export default function YearlyPerformancePage() {
             }
         };
     }, [dailySessions, students, currentYear]);
+    
+    const handleDateNavigation = (direction: 'prev' | 'next') => {
+        const amount = direction === 'next' ? 1 : -1;
+        if (viewMode === 'year') {
+            setCurrentDate(d => setYear(d, getYear(d) + amount));
+        } else if (viewMode === 'month') {
+            setCurrentDate(d => addMonths(d, amount));
+        } else if (viewMode === 'quarter') {
+             setCurrentDate(d => addMonths(d, amount * 3));
+        }
+    };
+    
+    const handleSetQuarter = (q: number) => {
+        const newMonth = (q - 1) * 3;
+        setCurrentDate(current => setMonth(current, newMonth));
+    }
+
 
     if (loading) {
         return <div className="flex items-center justify-center h-full"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
     }
+
+    const currentMonth = getMonth(currentDate);
+    const currentQuarter = getQuarter(currentDate);
+
+    let viewTitle = `${currentYear}`;
+    if (viewMode === 'month') viewTitle = format(currentDate, 'MMMM yyyy', {locale: ar});
+    if (viewMode === 'quarter') viewTitle = `الربع ${currentQuarter} - ${currentYear}`;
 
     return (
         <TooltipProvider>
@@ -184,20 +272,34 @@ export default function YearlyPerformancePage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <Card className="lg:col-span-2">
                         <CardContent className="pt-6">
-                            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
+                            <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
                                 <div className="flex items-center gap-2">
-                                    <Button variant="outline" size="icon" onClick={() => setCurrentYear(y => y - 1)}><ArrowRight className="h-4 w-4" /></Button>
-                                    <span className="font-semibold text-lg">{currentYear}</span>
-                                    <Button variant="outline" size="icon" onClick={() => setCurrentYear(y => y + 1)}><ArrowLeft className="h-4 w-4" /></Button>
+                                    <Button variant="outline" size="icon" onClick={() => handleDateNavigation('prev')}><ArrowRight className="h-4 w-4" /></Button>
+                                    <span className="font-semibold text-lg w-32 text-center">{viewTitle}</span>
+                                    <Button variant="outline" size="icon" onClick={() => handleDateNavigation('next')}><ArrowLeft className="h-4 w-4" /></Button>
                                 </div>
+                                
+                                <div className="flex-1 flex justify-center">
+                                    {viewMode === 'quarter' && (
+                                        <div className="flex items-center space-x-1 rounded-lg bg-muted p-1">
+                                            <Button variant={currentQuarter === 1 ? 'secondary' : 'ghost'} onClick={() => handleSetQuarter(1)} className="h-8 px-2 text-xs">الربع 1</Button>
+                                            <Button variant={currentQuarter === 2 ? 'secondary' : 'ghost'} onClick={() => handleSetQuarter(2)} className="h-8 px-2 text-xs">الربع 2</Button>
+                                            <Button variant={currentQuarter === 3 ? 'secondary' : 'ghost'} onClick={() => handleSetQuarter(3)} className="h-8 px-2 text-xs">الربع 3</Button>
+                                            <Button variant={currentQuarter === 4 ? 'secondary' : 'ghost'} onClick={() => handleSetQuarter(4)} className="h-8 px-2 text-xs">الربع 4</Button>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div className="flex items-center space-x-1 rounded-lg bg-muted p-1">
-                                   <Button variant={viewMode === 'year' ? 'secondary' : 'ghost'} onClick={() => setViewMode('year')} className="h-8 px-3">عرض سنوي</Button>
-                                   <Button variant={viewMode === 'quarter' ? 'secondary' : 'ghost'} onClick={() => setViewMode('quarter')} className="h-8 px-3" disabled>عرض فصلي (قريباً)</Button>
-                                   <Button variant={viewMode === 'month' ? 'secondary' : 'ghost'} onClick={() => setViewMode('month')} className="h-8 px-3" disabled>عرض شهري (قريباً)</Button>
+                                   <Button variant={viewMode === 'year' ? 'secondary' : 'ghost'} onClick={() => setViewMode('year')} className="h-8 px-3">سنوي</Button>
+                                   <Button variant={viewMode === 'quarter' ? 'secondary' : 'ghost'} onClick={() => setViewMode('quarter')} className="h-8 px-3">فصلي</Button>
+                                   <Button variant={viewMode === 'month' ? 'secondary' : 'ghost'} onClick={() => setViewMode('month')} className="h-8 px-3">شهري</Button>
                                 </div>
                             </div>
 
-                            {viewMode === 'year' && <YearView year={currentYear} data={yearlyData} onDayClick={(date) => console.log(date)} />}
+                            {viewMode === 'year' && <YearView year={currentYear} data={yearlyData} onDayClick={(date) => { setCurrentDate(date); setViewMode('month'); }} />}
+                            {viewMode === 'quarter' && <QuarterView year={currentYear} quarter={currentQuarter} data={yearlyData} onDayClick={(date) => { setCurrentDate(date); setViewMode('month'); }} />}
+                            {viewMode === 'month' && <MonthView year={currentYear} month={currentMonth} data={yearlyData} onDayClick={(date) => console.log(date)} />}
 
                             <div className="mt-6 flex flex-wrap justify-center gap-4 text-sm">
                                 <span className="flex items-center gap-2">جهد أقل</span>
