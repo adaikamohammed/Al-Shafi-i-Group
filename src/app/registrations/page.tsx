@@ -30,16 +30,6 @@ import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import { AmiriFont } from '@/lib/AmiriFont';
-
-// Extend jsPDF with autoTable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-  }
-}
 
 // 1. قائمة المشايخ الرسمية مرتبة (المرجع الأساسي)
 const SHEIKHS_LIST = [
@@ -506,7 +496,6 @@ export default function PreRegistrationPage() {
     const [genderFilter, setGenderFilter] = useState('all');
     const [selectedRows, setSelectedRows] = useState<string[]>([]);
     const [isBulkEditOpen, setBulkEditOpen] = useState(false);
-    const [isPrintModalOpen, setPrintModalOpen] = useState(false);
     
     const [accessLevel, setAccessLevel] = useState<'hidden' | 'view_only' | 'unlocked'>('hidden');
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
@@ -579,85 +568,6 @@ export default function PreRegistrationPage() {
         });
     };
     
-    const handleGeneratePdf = () => {
-        const doc = new jsPDF();
-        
-        // This is the key part: setting up the font.
-        if (AmiriFont) {
-          doc.addFileToVFS("Amiri-Regular.ttf", AmiriFont);
-          doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
-          doc.setFont("Amiri");
-        } else {
-          console.warn("Amiri font file is missing. PDF will not render Arabic correctly.");
-        }
-
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const margin = 15;
-
-        // Header
-        doc.setFontSize(10);
-        doc.text("مدير مدرسة الشافعي", pageWidth - margin, margin, { align: 'right' });
-
-        doc.setFontSize(16);
-        doc.text(`قائمة طلبات التسجيل (${filteredRegistrations.length})`, pageWidth / 2, margin + 5, { align: 'center' });
-
-        doc.setFontSize(10);
-        doc.text(format(new Date(), 'd MMMM yyyy, h:mm a', { locale: ar }), margin, margin, { align: 'left' });
-
-        // Table
-        const head = [['تاريخ التسجيل', 'ملاحظات', 'الحالة', 'رقم الهاتف', 'إسم الولي', 'المستوى الدراسي', 'الجنس', 'الإسم الكامل']];
-
-        const body = filteredRegistrations.map(reg => [
-            reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (typeof reg.requestedAt === 'string' ? reg.requestedAt : ''),
-            reg.notes || '',
-            reg.status,
-            reg.phone1 || '',
-            reg.guardianName || '',
-            reg.educationalLevel || '',
-            reg.gender || '',
-            reg.fullName
-        ]);
-        
-        let totalPagesExp = '{total_pages_count_string}';
-
-        doc.autoTable({
-            startY: margin + 20,
-            head: head,
-            body: body,
-            theme: 'grid',
-            headStyles: {
-                fillColor: [60, 100, 25], // Dark Olive Green
-                textColor: 255,
-                halign: 'center',
-                font: 'Amiri',
-                fontStyle: 'bold'
-            },
-            styles: {
-                font: 'Amiri',
-                halign: 'right', // Align all cells to the right for Arabic
-                cellPadding: 2,
-                overflow: 'linebreak' // Ensure text wraps
-            },
-            didDrawPage: function (data) {
-                // Footer
-                doc.setFontSize(10);
-                let footerStr = `صفحة ${doc.internal.pages.length}`;
-                 if (typeof doc.putTotalPages === 'function') {
-                    footerStr = footerStr + ` من ${totalPagesExp}`;
-                }
-                doc.text(footerStr, pageWidth / 2, pageHeight - 10, { align: 'center' });
-            }
-        });
-        
-        if (typeof doc.putTotalPages === 'function') {
-            doc.putTotalPages(totalPagesExp);
-        }
-
-        doc.save(`تقرير_التسجيلات_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-        setPrintModalOpen(false);
-    };
-
     const filteredRegistrations = useMemo(() => {
         const lowercasedFilter = searchTerm.toLowerCase();
 
@@ -823,7 +733,7 @@ export default function PreRegistrationPage() {
 
     return (
         <div className="space-y-6">
-             <Card className={cn("sticky top-0 z-40 transition-colors", currentAccess.color)}>
+             <Card className={cn("sticky top-0 z-40 transition-colors no-print", currentAccess.color)}>
                 <CardContent className="p-3 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Button variant="ghost" size="icon" onClick={() => setIsAccessModalOpen(true)}>
@@ -839,7 +749,7 @@ export default function PreRegistrationPage() {
                 </CardContent>
             </Card>
             
-             <Dialog open={isAccessModalOpen} onOpenChange={setIsAccessModalOpen}>
+             <Dialog open={isAccessModalOpen} onOpenChange={setIsAccessModalOpen} className="no-print">
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>الوصول إلى البيانات</DialogTitle>
@@ -867,7 +777,7 @@ export default function PreRegistrationPage() {
                 </DialogContent>
             </Dialog>
 
-            <Card>
+            <Card className="no-print">
                 <CardHeader>
                     <CardTitle className="text-3xl font-headline font-bold">إدارة التسجيلات الجديدة</CardTitle>
                     <CardDescription>
@@ -884,14 +794,14 @@ export default function PreRegistrationPage() {
             <Dialog open={isFormOpen} onOpenChange={(open) => {
                 setFormOpen(open);
                 if (!open) setEditingRegistration(null);
-            }}>
+            }} className="no-print">
                 <DialogContent className="sm:max-w-2xl">
                     <RegistrationForm onSave={handleSaveRegistration} onCancel={() => setFormOpen(false)} existingRegistration={editingRegistration}/>
                 </DialogContent>
             </Dialog>
             
             {selectedStudent && (
-                 <Dialog open={!!selectedStudent} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}>
+                 <Dialog open={!!selectedStudent} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)} className="no-print">
                     <StudentProfileCard 
                         student={selectedStudent} 
                         onEdit={() => handleEdit(selectedStudent)}
@@ -908,116 +818,125 @@ export default function PreRegistrationPage() {
             />
 
             {accessLevel !== 'hidden' ? (
-                <>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>أدوات الفلترة والبحث</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 space-y-4">
-                             <div className="flex flex-wrap items-center gap-2">
-                                {statusOptions.map(status => (
-                                    <Button key={status} variant={statusFilter.includes(status) ? 'default' : 'outline'} className={cn(statusFilter.includes(status) && statusBadgeColors[status])} onClick={() => {
-                                        setStatusFilter(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status])
-                                    }}>{status}</Button>
-                                ))}
-                                {statusFilter.length > 0 && <Button variant="ghost" size="sm" onClick={() => setStatusFilter([])}>إلغاء الكل <X className="h-4 w-4 mr-1"/></Button>}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <div className="relative flex-grow sm:flex-grow-0">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        placeholder="بحث شامل..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="pl-9 w-full sm:w-[250px]"
-                                    />
+                <div className="printable-section">
+                    <div className="hidden print:block mb-4 text-black">
+                        <div className="flex justify-between items-center">
+                            <h2 className="font-bold">مدير مدرسة الشافعي</h2>
+                            <h1 className="text-xl font-bold">قائمة طلبات التسجيل ({filteredRegistrations.length})</h1>
+                            <h3 className="text-sm">{format(new Date(), 'd MMMM yyyy, h:mm a', { locale: ar })}</h3>
+                        </div>
+                    </div>
+                    <div className="no-print">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>أدوات الفلترة والبحث</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-4">
+                                 <div className="flex flex-wrap items-center gap-2">
+                                    {statusOptions.map(status => (
+                                        <Button key={status} variant={statusFilter.includes(status) ? 'default' : 'outline'} className={cn(statusFilter.includes(status) && statusBadgeColors[status])} onClick={() => {
+                                            setStatusFilter(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status])
+                                        }}>{status}</Button>
+                                    ))}
+                                    {statusFilter.length > 0 && <Button variant="ghost" size="sm" onClick={() => setStatusFilter([])}>إلغاء الكل <X className="h-4 w-4 mr-1"/></Button>}
                                 </div>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline"><Filter className="ml-2 h-4 w-4" />المستوى الدراسي {levelFilter.length > 0 && `(${levelFilter.length})`}</Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-56">
-                                        <DropdownMenuLabel>اختر المستويات</DropdownMenuLabel>
-                                        <DropdownMenuSeparator />
-                                        {Object.entries(educationalLevels).map(([group, levels]) => (
-                                            <React.Fragment key={group}>
-                                                <DropdownMenuLabel className="px-1 text-xs font-bold text-muted-foreground">{group}</DropdownMenuLabel>
-                                                {levels.map(level => (
-                                                    <DropdownMenuCheckboxItem
-                                                        key={level}
-                                                        checked={levelFilter.includes(level)}
-                                                        onCheckedChange={(checked) => {
-                                                            if (checked) {
-                                                                setLevelFilter(prev => [...prev, level]);
-                                                            } else {
-                                                                setLevelFilter(prev => prev.filter(l => l !== level));
-                                                            }
-                                                        }}
-                                                    >
-                                                        {level}
-                                                    </DropdownMenuCheckboxItem>
-                                                ))}
-                                            </React.Fragment>
-                                        ))}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                                
-                                <Select dir="rtl" value={genderFilter} onValueChange={setGenderFilter}>
-                                    <SelectTrigger className="w-full flex-grow sm:w-[150px]">
-                                        <SelectValue placeholder="الجنس" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                    <SelectItem value="all">الكل</SelectItem>
-                                    <SelectItem value="ذكر">ذكر</SelectItem>
-                                    <SelectItem value="أنثى">أنثى</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                 <Button variant="outline" onClick={() => setPrintModalOpen(true)}>
-                                    <Printer className="ml-2 h-4 w-4" /> استخراج تقرير PDF
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <div className="relative flex-grow sm:flex-grow-0">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="بحث شامل..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            className="pl-9 w-full sm:w-[250px]"
+                                        />
+                                    </div>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="outline"><Filter className="ml-2 h-4 w-4" />المستوى الدراسي {levelFilter.length > 0 && `(${levelFilter.length})`}</Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="w-56">
+                                            <DropdownMenuLabel>اختر المستويات</DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            {Object.entries(educationalLevels).map(([group, levels]) => (
+                                                <React.Fragment key={group}>
+                                                    <DropdownMenuLabel className="px-1 text-xs font-bold text-muted-foreground">{group}</DropdownMenuLabel>
+                                                    {levels.map(level => (
+                                                        <DropdownMenuCheckboxItem
+                                                            key={level}
+                                                            checked={levelFilter.includes(level)}
+                                                            onCheckedChange={(checked) => {
+                                                                if (checked) {
+                                                                    setLevelFilter(prev => [...prev, level]);
+                                                                } else {
+                                                                    setLevelFilter(prev => prev.filter(l => l !== level));
+                                                                }
+                                                            }}
+                                                        >
+                                                            {level}
+                                                        </DropdownMenuCheckboxItem>
+                                                    ))}
+                                                </React.Fragment>
+                                            ))}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                    
+                                    <Select dir="rtl" value={genderFilter} onValueChange={setGenderFilter}>
+                                        <SelectTrigger className="w-full flex-grow sm:w-[150px]">
+                                            <SelectValue placeholder="الجنس" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                        <SelectItem value="all">الكل</SelectItem>
+                                        <SelectItem value="ذكر">ذكر</SelectItem>
+                                        <SelectItem value="أنثى">أنثى</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                     <Button variant="outline" onClick={() => window.print()}>
+                                        <Printer className="ml-2 h-4 w-4" /> طباعة القائمة الحالية
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>عرض الأعمدة</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                                {Object.keys(ALL_COLUMNS).map((key) => {
-                                     const col = ALL_COLUMNS[key as keyof typeof ALL_COLUMNS];
-                                     if (!col) return null;
-                                     return (
-                                        <div key={key} className="flex items-center space-x-2 space-x-reverse">
-                                            <Checkbox
-                                                id={`col-${key}`}
-                                                checked={columnVisibility[key as keyof typeof columnVisibility]?.visible ?? false}
-                                                onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
-                                            />
-                                            <label
-                                                htmlFor={`col-${key}`}
-                                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                            >
-                                                {col.label}
-                                            </label>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </CardContent>
-                    </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>عرض الأعمدة</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                                    {Object.keys(ALL_COLUMNS).map((key) => {
+                                         const col = ALL_COLUMNS[key as keyof typeof ALL_COLUMNS];
+                                         if (!col) return null;
+                                         return (
+                                            <div key={key} className="flex items-center space-x-2 space-x-reverse">
+                                                <Checkbox
+                                                    id={`col-${key}`}
+                                                    checked={columnVisibility[key as keyof typeof columnVisibility]?.visible ?? false}
+                                                    onCheckedChange={() => toggleColumn(key as keyof typeof ALL_COLUMNS)}
+                                                />
+                                                <label
+                                                    htmlFor={`col-${key}`}
+                                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                >
+                                                    {col.label}
+                                                </label>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                    <Card className={cn('transition-all', !isLocked && 'border-green-500 ring-2 ring-green-500/20')}>
-                        <CardHeader>
+                    <Card className={cn('transition-all print:shadow-none print:border-none', !isLocked && 'border-green-500 ring-2 ring-green-500/20')}>
+                        <CardHeader className="no-print">
                             <CardTitle>قائمة طلبات التسجيل ({filteredRegistrations.length})</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                            <div className="relative w-full overflow-x-auto">
+                        <CardContent className="print:p-0">
+                            <div className="relative w-full overflow-x-auto print:overflow-visible">
                                 <Table>
                                     <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-[50px] px-2">
+                                        <TableRow className="print-header-table">
+                                            <TableHead className="w-[50px] px-2 no-print">
                                                 <Checkbox
                                                     checked={selectedRows.length > 0 && selectedRows.length === filteredRegistrations.length && filteredRegistrations.length > 0}
                                                     onCheckedChange={(checked) => {
@@ -1045,7 +964,7 @@ export default function PreRegistrationPage() {
                                                     </Button>
                                                 </TableHead>
                                             ))}
-                                            <TableHead className="text-center">إجراءات</TableHead>
+                                            <TableHead className="text-center no-print">إجراءات</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1056,7 +975,7 @@ export default function PreRegistrationPage() {
                                                 onClick={() => setSelectedStudent(reg)}
                                                 data-state={selectedRows.includes(reg.id) && "selected"}
                                             >
-                                                <TableCell className="px-2" onClick={(e) => e.stopPropagation()}>
+                                                <TableCell className="px-2 no-print" onClick={(e) => e.stopPropagation()}>
                                                     <Checkbox
                                                         checked={selectedRows.includes(reg.id)}
                                                         onCheckedChange={(checked) => {
@@ -1095,7 +1014,7 @@ export default function PreRegistrationPage() {
                                                     }
                                                     return <TableCell key={key} className="text-center p-2">{content}</TableCell>;
                                                 })}
-                                                <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                                <TableCell className="text-center no-print" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
                                                             <Button variant="ghost" size="icon" disabled={isLocked}><MoreHorizontal className="h-4 w-4" /></Button>
@@ -1123,9 +1042,9 @@ export default function PreRegistrationPage() {
                             </div>
                         </CardContent>
                     </Card>
-                </>
+                </div>
             ) : (
-                <Card className="flex flex-col items-center justify-center min-h-[300px] border-dashed">
+                <Card className="flex flex-col items-center justify-center min-h-[300px] border-dashed no-print">
                     <CardHeader className="text-center">
                         <EyeOff className="mx-auto h-12 w-12 text-muted-foreground" />
                         <CardTitle>البيانات مخفية</CardTitle>
@@ -1141,7 +1060,7 @@ export default function PreRegistrationPage() {
             )}
             
             {accessLevel === 'unlocked' && selectedRows.length > 0 && (
-                <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 border-t shadow-lg z-50">
+                <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 border-t shadow-lg z-50 no-print">
                     <div className="container mx-auto flex justify-between items-center">
                         <p className="font-semibold">{selectedRows.length} طلاب محددون</p>
                         <div className="flex gap-2">
@@ -1168,25 +1087,6 @@ export default function PreRegistrationPage() {
                     </div>
                 </div>
             )}
-            
-            <Dialog open={isPrintModalOpen} onOpenChange={setPrintModalOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>تأكيد استخراج التقرير</DialogTitle>
-                        <DialogDescription>
-                            سيتم إنشاء تقرير PDF يحتوي على {filteredRegistrations.length} من السجلات المفلترة حاليًا. هل تريد المتابعة؟
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setPrintModalOpen(false)}>إلغاء</Button>
-                        <Button onClick={handleGeneratePdf}>
-                            <Printer className="ml-2 h-4 w-4" />
-                            توليد وحفظ
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
         </div>
     );
 }

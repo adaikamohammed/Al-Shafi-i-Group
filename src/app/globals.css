@@ -103,4 +103,49 @@ body {
   }
 }
 
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-section, .printable-section * {
+    visibility: visible;
+  }
+  .printable-section {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-header-table th {
+    background-color: #004d40 !important;
+    color: white !important;
+  }
+  .print-header-table {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print\\:shadow-none {
+    box-shadow: none !important;
+  }
+  .print\\:border-none {
+    border: none !important;
+  }
+   .print\\:p-0 {
+      padding: 0 !important;
+  }
+   .print\\:overflow-visible {
+      overflow: visible !important;
+  }
+  body {
+    color: black !important;
+    background-color: white !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 1.5cm;
+  }
+}
     
