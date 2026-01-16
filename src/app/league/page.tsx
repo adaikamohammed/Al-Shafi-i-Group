@@ -24,9 +24,11 @@ interface LeagueStat {
     wins: number;
     draws: number;
     losses: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    goalDifference: number;
     points: number;
     form: AttendanceStatus[];
-    goals: number;
 }
 
 const FormIcon = ({ status }: { status: AttendanceStatus }) => {
@@ -68,7 +70,8 @@ export default function LeaguePage() {
         const stats: LeagueStat[] = activeStudents.map(student => {
             let wins = 0, draws = 0, losses = 0;
             const form: AttendanceStatus[] = [];
-            let goals = 0;
+            let goalsFor = 0;
+            let goalsAgainst = 0;
 
             sessionsInMonth.forEach(session => {
                 const record = (session.records || []).find(r => r.studentId === student.id);
@@ -87,12 +90,15 @@ export default function LeaguePage() {
                     }
                     if (record.memorization === 'ممتاز') {
                         switch (student.dailyMemorizationAmount) {
-                            case 'ثمن': goals += 1; break;
-                            case 'ربع': goals += 2; break;
-                            case 'نصف': goals += 4; break;
-                            case 'صفحة': goals += 8; break;
-                            case 'أكثر': goals += 10; break;
+                            case 'ثمن': goalsFor += 1; break;
+                            case 'ربع': goalsFor += 2; break;
+                            case 'نصف': goalsFor += 4; break;
+                            case 'صفحة': goalsFor += 8; break;
+                            case 'أكثر': goalsFor += 10; break;
                         }
+                    }
+                    if (record.memorization === 'ضعيف') {
+                        goalsAgainst += 1;
                     }
                 }
             });
@@ -105,17 +111,19 @@ export default function LeaguePage() {
                 wins,
                 draws,
                 losses,
+                goalsFor,
+                goalsAgainst,
+                goalDifference: goalsFor - goalsAgainst,
                 points: (wins * 3) + (draws * 1),
                 form: form.slice(-5),
-                goals: goals,
             };
         });
 
         return stats.sort((a, b) => {
             if (b.points !== a.points) return b.points - a.points;
-            if (b.goals !== a.goals) return b.goals - a.goals;
+            if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+            if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
             if (a.losses !== b.losses) return a.losses - b.losses;
-            if (b.wins !== a.wins) return b.wins - a.wins;
             return a.studentName.localeCompare(b.studentName);
         });
 
@@ -123,8 +131,8 @@ export default function LeaguePage() {
 
      const topScorers = useMemo(() => {
         return [...leagueTable]
-            .filter(s => s.goals > 0)
-            .sort((a, b) => b.goals - a.goals)
+            .filter(s => s.goalsFor > 0)
+            .sort((a, b) => b.goalsFor - a.goalsFor)
             .slice(0, 10);
     }, [leagueTable]);
 
@@ -159,7 +167,7 @@ export default function LeaguePage() {
                             دوري الاستقامة والحفظ
                         </CardTitle>
                         <CardDescription>
-                            جدول الترتيب الشهري بناءً على الحضور والأداء. في حال تساوي النقاط، يتم اللجوء لفارق الأهداف (قوة الحفظ).
+                            جدول الترتيب الشهري بناءً على الحضور والأداء. في حال تساوي النقاط، يتم اللجوء لفارق الأهداف ثم عدد الأهداف المسجلة.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -197,9 +205,11 @@ export default function LeaguePage() {
                                             <TableHead className="text-center text-green-600">ف</TableHead>
                                             <TableHead className="text-center text-gray-500">ت</TableHead>
                                             <TableHead className="text-center text-red-600">خ</TableHead>
-                                            <TableHead className="text-center">الأهداف</TableHead>
+                                            <TableHead className="text-center">له</TableHead>
+                                            <TableHead className="text-center">عليه</TableHead>
+                                            <TableHead className="text-center">فارق</TableHead>
                                             <TableHead className="text-center">نقاط</TableHead>
-                                            <TableHead className="text-center w-[200px]">آخر 5</TableHead>
+                                            <TableHead className="text-center w-[150px]">آخر 5</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -234,7 +244,9 @@ export default function LeaguePage() {
                                                     <TableCell className="text-center text-green-600 font-semibold">{s.wins}</TableCell>
                                                     <TableCell className="text-center text-gray-500 font-semibold">{s.draws}</TableCell>
                                                     <TableCell className="text-center text-red-600 font-semibold">{s.losses}</TableCell>
-                                                    <TableCell className="text-center font-semibold">{s.goals}</TableCell>
+                                                    <TableCell className="text-center font-semibold">{s.goalsFor}</TableCell>
+                                                    <TableCell className="text-center font-semibold">{s.goalsAgainst}</TableCell>
+                                                    <TableCell className="text-center font-semibold">{s.goalDifference}</TableCell>
                                                     <TableCell className="text-center font-bold text-lg">{s.points}</TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center justify-center gap-2">
@@ -254,7 +266,7 @@ export default function LeaguePage() {
                                             );
                                         }) : (
                                             <TableRow>
-                                                <TableCell colSpan={9} className="text-center h-24">
+                                                <TableCell colSpan={11} className="text-center h-24">
                                                     لا توجد بيانات حضور مسجلة لهذا الشهر.
                                                 </TableCell>
                                             </TableRow>
@@ -297,7 +309,7 @@ export default function LeaguePage() {
                                                         <span className="font-medium">{scorer.studentName}</span>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-center font-bold text-lg">{scorer.goals}</TableCell>
+                                                <TableCell className="text-center font-bold text-lg">{scorer.goalsFor}</TableCell>
                                             </TableRow>
                                         )) : (
                                             <TableRow>
