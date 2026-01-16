@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import Link from 'next/link';
 
 interface LeagueStat {
     studentId: string;
@@ -99,7 +100,8 @@ export default function LeaguePage() {
 
         return stats.sort((a, b) => {
             if (b.points !== a.points) return b.points - a.points;
-            if (b.wins !== a.wins) return b.wins - a.wins;
+            if (a.losses !== b.losses) return a.losses - b.losses; // Fewer losses is better
+            if (b.wins !== a.wins) return b.wins - a.wins; // More wins is better
             return a.studentName.localeCompare(b.studentName);
         });
 
@@ -186,13 +188,13 @@ export default function LeaguePage() {
                                     <TableRow key={s.studentId} className={cn(rankColor(index + 1))}>
                                         <TableCell className="font-bold text-lg text-center">{index + 1}</TableCell>
                                         <TableCell>
-                                             <div className="flex items-center gap-3">
+                                            <Link href={`/parent-portal/${s.studentId}`} className="flex items-center gap-3 hover:underline">
                                                 <Avatar className="h-9 w-9">
                                                     <AvatarImage src={s.photoURL} alt={s.studentName} />
                                                     <AvatarFallback>{s.studentName.charAt(0)}</AvatarFallback>
                                                 </Avatar>
                                                 <span className="font-medium">{s.studentName}</span>
-                                            </div>
+                                            </Link>
                                         </TableCell>
                                         <TableCell className="text-center">{s.played}</TableCell>
                                         <TableCell className="text-center text-green-600 font-semibold">{s.wins}</TableCell>

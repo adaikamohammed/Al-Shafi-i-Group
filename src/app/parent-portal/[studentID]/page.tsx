@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -11,16 +9,16 @@ import { Loader2, AlertTriangle, Star, Award, ShieldAlert, BookOpen, UserCheck, 
 import { format, parseISO, startOfMonth, endOfMonth, getYear, getMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
-import type { Student, DailySession } from '@/lib/types';
+import type { Student } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { surahs as allSurahs } from '@/lib/surahs';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
 
 
 const calculateAge = (birthDate?: Date) => {
@@ -326,21 +324,16 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
     );
 };
 
-export default function ParentPortalPage() {
+
+export default function ParentPortalStudentPage() {
     const { students, loading: contextLoading } = useStudentContext();
-    const { user: authUser } = useAuth();
-    
-    const [open, setOpen] = useState(false);
-    const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+    const params = useParams();
+    const studentID = params?.studentID as string;
 
-    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
-    
-    const handleStudentSelect = (studentId: string) => {
-        setSelectedStudentId(studentId);
-        setOpen(false);
-    };
-
-    const selectedStudent = useMemo(() => activeStudents.find(s => s.id === selectedStudentId), [activeStudents, selectedStudentId]);
+    const student = useMemo(() => {
+        if (!studentID || !students || students.length === 0) return null;
+        return students.find(s => s.id === studentID);
+    }, [students, studentID]);
 
     if (contextLoading) {
       return (
@@ -350,61 +343,18 @@ export default function ParentPortalPage() {
       );
     }
     
-    return (
-        <div className="space-y-8">
-             <Card>
-                <CardHeader>
-                    <CardTitle>بوابة ولي الأمر</CardTitle>
-                     <CardDescription>
-                         {authUser 
-                            ? "اختر طالبًا من القائمة أدناه لمعاينة صفحته كما ستظهر لولي الأمر."
-                            : "ابحث عن اسم ابنك في القائمة، ثم قم بالتحقق من هويتك باستخدام رقم الهاتف المسجل."
-                         }
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Popover open={open} onOpenChange={setOpen}>
-                        <PopoverTrigger asChild>
-                            <Button
-                                variant="outline"
-                                role="combobox"
-                                aria-expanded={open}
-                                className="w-full md:w-[300px] justify-between"
-                            >
-                                {selectedStudent
-                                    ? selectedStudent.fullName
-                                    : "ابحث عن اسم الطالب..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[300px] p-0">
-                            <Command>
-                                <CommandInput placeholder="ابحث عن طالب..." />
-                                <CommandEmpty>لا يوجد طلاب بهذا الاسم.</CommandEmpty>
-                                <CommandGroup>
-                                    {activeStudents.map((student) => (
-                                        <CommandItem
-                                            key={student.id}
-                                            value={student.fullName}
-                                            onSelect={() => handleStudentSelect(student.id)}
-                                        >
-                                            <Check
-                                                className={cn(
-                                                    "mr-2 h-4 w-4",
-                                                    selectedStudentId === student.id ? "opacity-100" : "opacity-0"
-                                                )}
-                                            />
-                                            {student.fullName}
-                                        </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                            </Command>
-                        </PopoverContent>
-                    </Popover>
-                </CardContent>
-            </Card>
+    if (!student && !contextLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-center p-4">
+                 <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+                <h1 className="text-3xl font-bold text-destructive">الطالب غير موجود</h1>
+                <p className="text-muted-foreground mt-2">لا يمكن العثور على الطالب المطلوب. قد يكون الرابط غير صحيح.</p>
+                 <Link href="/league">
+                    <Button variant="outline" className="mt-4">العودة إلى دوري التميز</Button>
+                 </Link>
+            </div>
+        )
+    }
 
-            <ParentPortalContent student={selectedStudent} />
-        </div>
-    )
+    return <ParentPortalContent student={student} />;
 }
