@@ -28,6 +28,7 @@ interface LeagueStat {
     goalDifference: number;
     points: number;
     form: AttendanceStatus[];
+    assists: number;
 }
 
 const FormIcon = ({ status }: { status: AttendanceStatus }) => {
@@ -71,6 +72,7 @@ export default function LeaguePage() {
             const form: AttendanceStatus[] = [];
             let goalsFor = 0;
             let goalsAgainst = 0;
+            let assists = 0;
 
             sessionsInMonth.forEach(session => {
                 const record = (session.records || []).find(r => r.studentId === student.id);
@@ -97,6 +99,12 @@ export default function LeaguePage() {
                     } else if (record.memorization === 'ضعيف') {
                         goalsAgainst += 2;
                     }
+
+                    if (record.behavior === 'هادئ') {
+                        assists += 2;
+                    } else if (record.behavior === 'متوسط') {
+                        assists += 1;
+                    }
                 }
             });
 
@@ -113,6 +121,7 @@ export default function LeaguePage() {
                 goalDifference: goalsFor - goalsAgainst,
                 points: (wins * 3) + (draws * 1),
                 form: form.slice(-5),
+                assists,
             };
         });
 
@@ -130,6 +139,13 @@ export default function LeaguePage() {
         return [...leagueTable]
             .filter(s => s.goalsFor > 0)
             .sort((a, b) => b.goalsFor - a.goalsFor)
+            .slice(0, 10);
+    }, [leagueTable]);
+
+    const topAssists = useMemo(() => {
+        return [...leagueTable]
+            .filter(s => s.assists > 0)
+            .sort((a, b) => b.assists - a.assists)
             .slice(0, 10);
     }, [leagueTable]);
 
@@ -202,7 +218,9 @@ export default function LeaguePage() {
                                             <TableHead className="text-center text-green-600">ف</TableHead>
                                             <TableHead className="text-center text-gray-500">ت</TableHead>
                                             <TableHead className="text-center text-red-600">خ</TableHead>
-                                            <TableHead className="text-center">الأهداف</TableHead>
+                                            <TableHead className="text-center">له</TableHead>
+                                            <TableHead className="text-center">عليه</TableHead>
+                                            <TableHead className="text-center">+/-</TableHead>
                                             <TableHead className="text-center">نقاط</TableHead>
                                             <TableHead className="text-center w-[150px]">آخر 5</TableHead>
                                         </TableRow>
@@ -244,6 +262,8 @@ export default function LeaguePage() {
                                                     <TableCell className="text-center text-gray-500 font-semibold">{s.draws}</TableCell>
                                                     <TableCell className="text-center text-red-600 font-semibold">{s.losses}</TableCell>
                                                     <TableCell className="text-center font-semibold">{s.goalsFor}</TableCell>
+                                                    <TableCell className="text-center font-semibold">{s.goalsAgainst}</TableCell>
+                                                    <TableCell className="text-center font-semibold">{s.goalDifference}</TableCell>
                                                     <TableCell className="text-center font-bold text-lg">{s.points}</TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center justify-center gap-2">
@@ -263,7 +283,7 @@ export default function LeaguePage() {
                                             );
                                         }) : (
                                             <TableRow>
-                                                <TableCell colSpan={9} className="text-center h-24">
+                                                <TableCell colSpan={11} className="text-center h-24">
                                                     لا توجد بيانات حضور مسجلة لهذا الشهر.
                                                 </TableCell>
                                             </TableRow>
@@ -273,7 +293,7 @@ export default function LeaguePage() {
                             </CardContent>
                         </Card>
                     </div>
-                     <div>
+                     <div className="space-y-6">
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
@@ -312,6 +332,51 @@ export default function LeaguePage() {
                                             <TableRow>
                                                 <TableCell colSpan={3} className="text-center h-24">
                                                     لم يسجل أي طالب أهدافاً هذا الشهر.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Shield className="text-blue-500" />
+                                    صانع الهدوء
+                                </CardTitle>
+                                <CardDescription>
+                                    الترتيب حسب السلوك: هادئ = تمريرتان، متوسط = تمريرة.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-[50px]">#</TableHead>
+                                            <TableHead>الطالب</TableHead>
+                                            <TableHead className="text-center">تمريرات</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {topAssists.length > 0 ? topAssists.map((player, index) => (
+                                            <TableRow key={player.studentId}>
+                                                <TableCell className="font-bold text-lg">{index + 1}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-3">
+                                                        <Avatar className="h-9 w-9">
+                                                            <AvatarImage src={player.photoURL} alt={player.studentName} />
+                                                            <AvatarFallback>{player.studentName.charAt(0)}</AvatarFallback>
+                                                        </Avatar>
+                                                        <span className="font-medium">{player.studentName}</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-center font-bold text-lg">{player.assists}</TableCell>
+                                            </TableRow>
+                                        )) : (
+                                            <TableRow>
+                                                <TableCell colSpan={3} className="text-center h-24">
+                                                    لم يسجل أي طالب تمريرات هذا الشهر.
                                                 </TableCell>
                                             </TableRow>
                                         )}
