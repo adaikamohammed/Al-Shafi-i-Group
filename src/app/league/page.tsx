@@ -310,7 +310,7 @@ export default function LeaguePage() {
                                             <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">عليه</TableHead></TooltipTrigger><TooltipContent><p>أهداف مستقبلة (ضعف الحفظ)</p></TooltipContent></Tooltip>
                                             <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">+/-</TableHead></TooltipTrigger><TooltipContent><p>فارق الأهداف</p></TooltipContent></Tooltip>
                                             <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">تم (AST)</TableHead></TooltipTrigger><TooltipContent><p>تمريرات مساعدة (السلوك)</p></TooltipContent></Tooltip>
-                                            <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">نقاط</TableHead></TooltipTrigger><TooltipContent><p>إجمالي النقاط (الحضور)</p></TooltipContent></Tooltip>
+                                            <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">نقاط</TableHead></TooltipTrigger><TooltipContent><p>إجمالي النقاط (الحاضر)</p></TooltipContent></Tooltip>
                                             <TableHead className="text-center w-[150px]">آخر 5</TableHead>
                                         </TableRow>
                                     </TableHeader>
