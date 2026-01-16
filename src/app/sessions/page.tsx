@@ -40,6 +40,71 @@ const attendanceOptions: AttendanceStatus[] = ["حاضر", "غائب", "متأخ
 const sessionTypeOptions: SessionType[] = ["حصة أساسية", "حصة أنشطة", "يوم عطلة", "حصة تعويضية", "غياب الشيخ"];
 
 
+const calculateLeagueTableForMonth = (
+  sessionsData: Record<string, Record<string, DailySession>>,
+  studentsData: Student[],
+  year: number,
+  month: number
+): any[] => {
+    const monthStartDate = startOfMonth(new Date(year, month));
+    const monthEndDate = endOfMonth(new Date(year, month));
+
+    const activeStudents = studentsData.filter(s => s.status === 'نشط');
+    if (activeStudents.length === 0) return [];
+
+    const sessionsInMonth = Object.values(sessionsData ?? {}).flatMap(daySessions =>
+        Object.values(daySessions).filter(session => {
+            if (!session?.date || session.sessionType === 'يوم عطلة' || session.sessionType === 'حصة أنشطة') return false;
+            try {
+                const sessionDate = parseISO(session.date);
+                return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
+            } catch (e) {
+                return false;
+            }
+        })
+    );
+    
+    const stats: any[] = activeStudents.map(student => {
+        let wins = 0, draws = 0, losses = 0;
+        let goalsFor = 0;
+        let goalsAgainst = 0;
+
+        sessionsInMonth.forEach(session => {
+            const record = (session.records ?? []).find(r => r.studentId === student.id);
+            if (record) {
+                switch (record.attendance) {
+                    case 'حاضر': wins++; break;
+                    case 'متأخر': draws++; break;
+                    case 'غائب': losses++; break;
+                }
+                
+                if (record.memorization === 'ممتاز') goalsFor += 2;
+                else if (record.memorization === 'جيد جداً') goalsFor += 1;
+                else if (record.memorization === 'متوسط') goalsAgainst += 1;
+                else if (record.memorization === 'ضعيف') goalsAgainst += 2;
+            }
+        });
+
+        return {
+            studentId: student.id,
+            studentName: student.fullName,
+            losses,
+            goalsFor,
+            goalDifference: goalsFor - goalsAgainst,
+            points: (wins * 3) + (draws * 1),
+        };
+    });
+
+    return stats.sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+        if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+        if (a.losses !== b.losses) return a.losses - b.losses;
+        return a.studentName.localeCompare(b.studentName);
+    });
+};
+
+
 export default function DailySessionsPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -551,6 +616,18 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     }
     
     setIsLoading(true);
+
+    const isWednesday = day.getDay() === 3;
+    const currentMonth = getMonth(day);
+    const currentYear = getYear(day);
+    let oldLeaderId: string | undefined;
+
+    if (isWednesday && matchContenders.length > 0) {
+        const oldTable = calculateLeagueTableForMonth(dailySessions, students, currentYear, currentMonth);
+        if (oldTable.length > 0) {
+            oldLeaderId = oldTable[0].studentId;
+        }
+    }
     
     const sessionToSave: Omit<DailySession, 'teacherAbsenceReason' | 'substituteTeacher'> & Partial<Pick<DailySession, 'teacherAbsenceReason' | 'substituteTeacher'>> = {
         id: sessionId,
@@ -569,6 +646,27 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     
     addDailySession(sessionToSave as DailySession);
     
+    if (isWednesday && matchContenders.length > 0 && oldLeaderId) {
+        const newDailySessions = { ...dailySessions };
+        if (!newDailySessions[formattedDate]) {
+            newDailySessions[formattedDate] = {};
+        }
+        newDailySessions[formattedDate][sessionId] = sessionToSave as DailySession;
+
+        const newTable = calculateLeagueTableForMonth(newDailySessions, students, currentYear, currentMonth);
+        const newLeader = newTable.length > 0 ? newTable[0] : undefined;
+
+        if (newLeader && newLeader.studentId !== oldLeaderId) {
+            if (matchContenders.includes(newLeader.studentId)) {
+                toast({
+                    title: "👑 تم حسم القمة!",
+                    description: `${newLeader.studentName} ينتزع الصدارة في آخر لحظات الأسبوع!`,
+                    duration: 6000
+                });
+            }
+        }
+    }
+
     setIsLoading(false);
     onClose();
   }
@@ -808,4 +906,5 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     
 
     
+
 
