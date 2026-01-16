@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Crown, Shield, Activity, Sparkles, UserCheck } from 'lucide-react';
 import type { Student, DailySession } from '@/lib/types';
-import { parseISO } from 'date-fns';
+import { parseISO, subDays, isAfter } from 'date-fns';
 
 interface HallOfFameProps {
     students: Student[];
@@ -48,24 +48,19 @@ const RecordCard = ({ title, studentName, studentPhoto, value, unit, icon, color
 export function HallOfFame({ students, sessions }: HallOfFameProps) {
     const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
 
-    const commitmentKing = useMemo(() => {
-        if (!sessions || activeStudents.length === 0) {
-            return { name: undefined, streak: 0, photoURL: undefined };
-        }
-        
-        const allWorkSessions = Object.values(sessions)
+    const allSortedSessions = useMemo(() => {
+        if (!sessions) return [];
+        return Object.values(sessions)
             .flatMap(day => Object.values(day))
             .filter(session => session.sessionType === 'حصة أساسية')
+            .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+    }, [sessions]);
 
-        const workSessionsByDate = allWorkSessions.reduce((acc, session) => {
-            if (!acc[session.date]) {
-                acc[session.date] = [];
-            }
-            acc[session.date].push(session);
-            return acc;
-        }, {} as Record<string, DailySession[]>);
 
-        const uniqueWorkDays = Object.keys(workSessionsByDate).sort();
+    const commitmentKing = useMemo(() => {
+        if (allSortedSessions.length === 0 || activeStudents.length === 0) {
+            return { name: undefined, streak: 0, photoURL: undefined };
+        }
         
         let maxStreak = 0;
         let king: Student | undefined = undefined;
@@ -74,37 +69,30 @@ export function HallOfFame({ students, sessions }: HallOfFameProps) {
             let currentStreak = 0;
             let studentMaxStreak = 0;
             
-            uniqueWorkDays.forEach(date => {
-                const sessionsOnDay = workSessionsByDate[date];
-                let present = false;
-                let absentOrLate = false;
-                
+            allSortedSessions.forEach(session => {
                 // Student should not be checked for attendance before they were registered.
-                if (parseISO(date) < student.registrationDate) {
+                if (parseISO(session.date) < student.registrationDate) {
                     return;
                 }
 
-                for (const session of sessionsOnDay) {
-                    const record = (session.records || []).find(r => r.studentId === student.id);
-                    if (record) {
-                        if(record.attendance === 'حاضر') present = true;
-                        if(record.attendance === 'غائب' || record.attendance === 'متأخر') {
-                            absentOrLate = true;
-                            break;
-                        }
+                const record = (session.records || []).find(r => r.studentId === student.id);
+                
+                if (record) {
+                    if (record.attendance === 'حاضر') {
+                        currentStreak++;
+                    } else {
+                        // Any other status (غائب, متأخر) breaks the streak
+                        studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
+                        currentStreak = 0;
                     }
-                }
-                
-                if (absentOrLate) {
-                    currentStreak = 0;
-                } else if (present) {
-                    currentStreak++;
                 } else {
+                    // No record for the student on a session day also breaks the streak
+                    studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
                     currentStreak = 0;
                 }
-                
-                studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
             });
+            
+            studentMaxStreak = Math.max(studentMaxStreak, currentStreak); // Final check
 
             if (studentMaxStreak > maxStreak) {
                 maxStreak = studentMaxStreak;
@@ -114,13 +102,84 @@ export function HallOfFame({ students, sessions }: HallOfFameProps) {
         
         return { name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
 
-    }, [activeStudents, sessions]);
+    }, [activeStudents, allSortedSessions]);
+    
+    const academicKing = useMemo(() => {
+        if (allSortedSessions.length === 0 || activeStudents.length === 0) {
+            return { name: undefined, streak: 0, photoURL: undefined };
+        }
+
+        let maxStreak = 0;
+        let king: Student | undefined = undefined;
+
+        activeStudents.forEach(student => {
+            let currentStreak = 0;
+            let studentMaxStreak = 0;
+
+            allSortedSessions.forEach(session => {
+                 if (parseISO(session.date) < student.registrationDate) {
+                    return;
+                }
+                const record = (session.records || []).find(r => r.studentId === student.id);
+                if (record && record.memorization === 'ممتاز') {
+                    currentStreak++;
+                } else {
+                    studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
+                    currentStreak = 0;
+                }
+            });
+            
+            studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
+
+            if (studentMaxStreak > maxStreak) {
+                maxStreak = studentMaxStreak;
+                king = student;
+            }
+        });
+        
+        return { name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
+    }, [activeStudents, allSortedSessions]);
+
+    const fortressStudent = useMemo(() => {
+        if (allSortedSessions.length === 0 || activeStudents.length === 0) {
+            return { name: undefined, days: 0, photoURL: undefined };
+        }
+
+        const ninetyDaysAgo = subDays(new Date(), 90);
+        
+        let maxDaysWithoutAbsence = 0;
+        let fortressKing: Student | undefined = undefined;
+
+        activeStudents.forEach(student => {
+            let attendedDays = 0;
+            let hasAbsence = false;
+
+            allSortedSessions.forEach(session => {
+                const sessionDate = parseISO(session.date);
+                if (isAfter(sessionDate, ninetyDaysAgo) && sessionDate >= student.registrationDate) {
+                    const record = (session.records || []).find(r => r.studentId === student.id);
+                    if (record) {
+                        if (record.attendance === 'غائب') {
+                            hasAbsence = true;
+                        } else if (record.attendance === 'حاضر' || record.attendance === 'متأخر') {
+                            attendedDays++;
+                        }
+                    }
+                }
+            });
+
+            if (!hasAbsence && attendedDays > maxDaysWithoutAbsence) {
+                maxDaysWithoutAbsence = attendedDays;
+                fortressKing = student;
+            }
+        });
+
+        return { name: fortressKing?.fullName, days: maxDaysWithoutAbsence, photoURL: fortressKing?.photoURL };
+    }, [activeStudents, allSortedSessions]);
 
 
     // Placeholder for other records
-    const hifzKing = { name: "قيد التطوير", streak: 0, photoURL: undefined };
     const pointsKing = { name: "قيد التطوير", streak: 0, photoURL: undefined };
-    const behaviorKing = { name: "قيد التطوير", streak: 0, photoURL: undefined };
 
 
     return (
@@ -139,18 +198,26 @@ export function HallOfFame({ students, sessions }: HallOfFameProps) {
                     studentPhoto={commitmentKing.photoURL}
                     value={commitmentKing.streak}
                     unit="يوم متتالي"
-                    icon={<Shield />}
+                    icon={<UserCheck />}
                     color="border-blue-500"
                 />
                  <RecordCard 
-                    title="ملك الحفظ"
-                    studentName={hifzKing.name}
-                    studentPhoto={hifzKing.photoURL}
-                    value={hifzKing.streak}
-                    unit="سورة متقنة"
+                    title="الخمسة المتتالية"
+                    studentName={academicKing.name}
+                    studentPhoto={academicKing.photoURL}
+                    value={academicKing.streak}
+                    unit="تقييم ممتاز"
                     icon={<Sparkles />}
                     color="border-green-500"
-                    loading={true}
+                />
+                 <RecordCard 
+                    title="الحصن الحصين"
+                    studentName={fortressStudent.name}
+                    studentPhoto={fortressStudent.photoURL}
+                    value={fortressStudent.days}
+                    unit="يوم حضور (آخر 90 يوم)"
+                    icon={<Shield />}
+                    color="border-purple-500"
                 />
                  <RecordCard 
                     title="ملك النقاط"
@@ -159,16 +226,6 @@ export function HallOfFame({ students, sessions }: HallOfFameProps) {
                     value={pointsKing.streak}
                     unit="نقطة"
                     icon={<Activity />}
-                    color="border-purple-500"
-                    loading={true}
-                />
-                 <RecordCard 
-                    title="ملك السلوك"
-                    studentName={behaviorKing.name}
-                    studentPhoto={behaviorKing.photoURL}
-                    value={behaviorKing.streak}
-                    unit="يوم منضبط"
-                    icon={<UserCheck />}
                     color="border-yellow-500"
                     loading={true}
                 />
