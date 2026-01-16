@@ -18,7 +18,7 @@ const YearView = ({ year, data, onDayClick }: { year: number, data: any, onDayCl
     const startDayIndex = (firstDay + 1) % 7;
 
     return (
-        <div className="grid grid-cols-53 gap-1" style={{ direction: 'rtl' }}>
+        <div className="grid grid-cols-53 gap-1.5" style={{ direction: 'rtl' }}>
             {Array.from({ length: startDayIndex }).map((_, i) => <div key={`empty-${i}`} />)}
             {days.map(day => {
                 const dateString = format(day, 'yyyy-MM-dd');
@@ -47,7 +47,7 @@ const YearView = ({ year, data, onDayClick }: { year: number, data: any, onDayCl
                     <Tooltip key={dateString}>
                         <TooltipTrigger asChild>
                             <div
-                                className={cn("w-4 h-4 rounded-sm", colorClass)}
+                                className={cn("w-4 h-4 rounded", colorClass)}
                                 onClick={() => onDayClick(day)}
                             />
                         </TooltipTrigger>
@@ -189,16 +189,16 @@ export default function YearlyPerformancePage() {
 
                             <div className="mt-6 flex flex-wrap justify-center gap-4 text-sm">
                                 <span className="flex items-center gap-2">أقل</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-orange-400"></div></span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-green-400"></div></span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-green-500"></div></span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-green-600"></div></span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-orange-400"></div></span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-green-400"></div></span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-green-500"></div></span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-green-600"></div></span>
                                 <span className="flex items-center gap-2">أكثر</span>
                                 <span className="flex items-center gap-2 font-semibold ml-4">|</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-red-500"></div>غياب كلي</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-blue-300"></div>عطلة/غياب شيخ</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-yellow-400"></div>حصة إضافية</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-gray-200"></div>يوم فارغ</span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500"></div>غياب كلي</span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-blue-300"></div>عطلة/غياب شيخ</span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-yellow-400"></div>حصة إضافية</span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-gray-200"></div>يوم فارغ</span>
                             </div>
                         </CardContent>
                     </Card>
