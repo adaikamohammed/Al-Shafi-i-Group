@@ -132,7 +132,7 @@ body {
     background-color: white !important;
   }
   @page {
-    size: A4 portrait;
+    size: A4 landscape;
     margin: 1.5cm;
   }
 }
