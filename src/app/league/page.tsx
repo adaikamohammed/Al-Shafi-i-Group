@@ -1,11 +1,12 @@
-"use client";
 
-import React, { useState, useMemo } from 'react';
+      "use client";
+
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, Shield, CheckCircle, XCircle, MinusCircle, Flame, Star, Info, BookOpenCheck } from 'lucide-react';
+import { Loader2, AlertTriangle, Shield, CheckCircle, XCircle, MinusCircle, Flame, Star, Info, BookOpenCheck, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Student, DailySession, AttendanceStatus, PerformanceLevel } from '@/lib/types';
@@ -29,6 +30,9 @@ interface LeagueStat {
     points: number;
     form: AttendanceStatus[];
     assists: number;
+    rank: number;
+    previousRank: number | null;
+    movement: number;
 }
 
 const FormIcon = ({ status }: { status: AttendanceStatus }) => {
@@ -49,6 +53,7 @@ export default function LeaguePage() {
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [isFlipped, setIsFlipped] = useState(false);
+    const previousRankingRef = useRef<Map<string, number>>(new Map());
 
 
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
@@ -69,7 +74,7 @@ export default function LeaguePage() {
             })
         ).sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
         
-        const stats: LeagueStat[] = activeStudents.map(student => {
+        const stats: Omit<LeagueStat, 'rank' | 'previousRank' | 'movement'>[] = activeStudents.map(student => {
             let wins = 0, draws = 0, losses = 0;
             const form: AttendanceStatus[] = [];
             let goalsFor = 0;
@@ -127,7 +132,7 @@ export default function LeaguePage() {
             };
         });
 
-        return stats.sort((a, b) => {
+        const sortedStats = stats.sort((a, b) => {
             if (b.points !== a.points) return b.points - a.points;
             if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
             if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
@@ -135,7 +140,29 @@ export default function LeaguePage() {
             return a.studentName.localeCompare(b.studentName);
         });
 
+        const newRankingWithMovement = sortedStats.map((stat, index) => {
+            const currentRank = index + 1;
+            const previousRank = previousRankingRef.current.get(stat.studentId);
+            const movement = previousRank ? previousRank - currentRank : 0;
+            return {
+                ...stat,
+                rank: currentRank,
+                previousRank: previousRank || null,
+                movement,
+            };
+        });
+
+        return newRankingWithMovement;
+
     }, [activeStudents, dailySessions, selectedMonth, selectedYear]);
+
+    useEffect(() => {
+        const newRankMap = new Map<string, number>();
+        leagueTable.forEach((stat) => {
+            newRankMap.set(stat.studentId, stat.rank);
+        });
+        previousRankingRef.current = newRankMap;
+    }, [leagueTable]);
 
      const topScorers = useMemo(() => {
         return [...leagueTable]
@@ -272,7 +299,7 @@ export default function LeaguePage() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[50px]">#</TableHead>
+                                            <TableHead className="w-[80px]">#</TableHead>
                                             <TableHead>الطالب</TableHead>
                                             <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">ل</TableHead></TooltipTrigger><TooltipContent><p>لعب</p></TooltipContent></Tooltip>
                                             <Tooltip><TooltipTrigger asChild><TableHead className="text-center text-green-600 cursor-pointer">ف</TableHead></TooltipTrigger><TooltipContent><p>فوز (حضور)</p></TooltipContent></Tooltip>
@@ -288,7 +315,7 @@ export default function LeaguePage() {
                                     </TableHeader>
                                     <TableBody>
                                         {leagueTable.length > 0 ? leagueTable.map((s, index) => {
-                                            const rank = index + 1;
+                                            const rank = s.rank;
                                             const totalPlayers = leagueTable.length;
                                             let rankDisplay;
                                             let rowClass = '';
@@ -308,7 +335,24 @@ export default function LeaguePage() {
 
                                             return (
                                                 <TableRow key={s.studentId} className={cn(rowClass)}>
-                                                    <TableCell className="font-bold text-lg text-center">{rankDisplay}</TableCell>
+                                                    <TableCell className="font-bold text-lg text-center">
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <span>{rankDisplay}</span>
+                                                            <Tooltip>
+                                                                <TooltipTrigger>
+                                                                    {s.movement > 0 && <TrendingUp className="h-4 w-4 text-green-500" />}
+                                                                    {s.movement < 0 && <TrendingDown className="h-4 w-4 text-red-500" />}
+                                                                    {s.movement === 0 && s.previousRank !== null && <Minus className="h-4 w-4 text-gray-500" />}
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    {s.movement > 0 && <p>صعود {s.movement} {s.movement > 1 ? 'مراكز' : 'مركز'}</p>}
+                                                                    {s.movement < 0 && <p>هبوط {Math.abs(s.movement)} {Math.abs(s.movement) > 1 ? 'مراكز' : 'مركز'}</p>}
+                                                                    {s.movement === 0 && s.previousRank !== null && <p>المركز ثابت</p>}
+                                                                    {s.previousRank === null && <p>طالب جديد في الترتيب هذا الشهر</p>}
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </div>
+                                                    </TableCell>
                                                     <TableCell>
                                                         <Link href={`/parent-portal/${s.studentId}`} className="flex items-center gap-3 hover:underline">
                                                             <Avatar className="h-9 w-9">
@@ -510,3 +554,5 @@ export default function LeaguePage() {
         </TooltipProvider>
     );
 }
+
+    
