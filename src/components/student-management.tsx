@@ -177,6 +177,9 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
     
     const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط');
 
+    const totalCovenants = student.covenants?.length || 0;
+    const fulfilledCovenants = student.covenants?.filter(c => c.status === 'تم الوفاء بها').length || 0;
+
     return (
         <DialogContent className="sm:max-w-3xl p-0 flex flex-col max-h-[90vh]">
             <DialogHeader className="sr-only">
@@ -342,54 +345,64 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
                 </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2"><Archive /> السجل التاريخي والتأديبي</CardTitle>
+                        <CardTitle className="text-base flex justify-between items-center">
+                            <span className="flex items-center gap-2"><Archive /> السجل التاريخي والتأديبي</span>
+                            {totalCovenants > 0 && (
+                                <Badge variant="outline">
+                                    المواثيق المنجزة: {fulfilledCovenants} / {totalCovenants}
+                                </Badge>
+                            )}
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {timelineItems.length > 0 ? (
-                            <div className="relative pl-6 after:absolute after:inset-y-0 after:w-px after:bg-gray-200 after:right-1 dark:after:bg-gray-700">
+                            <div className="relative pr-6 after:absolute after:inset-y-0 after:w-px after:bg-gray-200 after:left-1 dark:after:bg-gray-700">
                                 {timelineItems.map((timelineItem, index) => {
                                     const isCovenant = timelineItem.type === 'covenant';
                                     const item = timelineItem.item;
                                     
                                     const statusConfig = {
-                                        "تم الوفاء بها": {
-                                            icon: <CheckCircle className="h-4 w-4 text-green-500" />,
-                                            textClass: "text-green-600",
-                                        },
-                                        "نُقِض": {
-                                            icon: <XCircle className="h-4 w-4 text-red-500" />,
-                                            textClass: "text-red-600",
-                                        },
-                                        "نشط": {
-                                            icon: <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />,
-                                            textClass: "text-blue-600",
-                                        },
-                                        "طرد": {
-                                            icon: <UserX className="h-4 w-4 text-red-700" />,
-                                            textClass: "text-red-700",
-                                        }
+                                        "تم الوفاء بها": { icon: <CheckCircle className="h-4 w-4 text-green-500" />, textClass: "text-green-600", },
+                                        "نُقِض": { icon: <XCircle className="h-4 w-4 text-red-500" />, textClass: "text-red-600", },
+                                        "نشط": { icon: <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />, textClass: "text-blue-600", },
+                                        "طرد": { icon: <UserX className="h-4 w-4 text-red-700" />, textClass: "text-red-700", }
                                     };
                                     
                                     const statusKey = isCovenant ? item.status : "طرد";
                                     const currentStatus = statusConfig[statusKey as keyof typeof statusConfig] || { icon: null, textClass: "" };
 
+                                    const cardClass = isCovenant && item.card === 'بطاقة صفراء' 
+                                        ? 'border-s-yellow-400 bg-yellow-50 dark:bg-yellow-900/20' 
+                                        : isCovenant && item.card === 'بطاقة حمراء' 
+                                        ? 'border-s-red-400 bg-red-50 dark:bg-red-900/20' 
+                                        : 'border-s-transparent';
+
                                     return (
                                         <div key={index} className="grid grid-cols-[auto_1fr] items-start gap-x-3 relative">
-                                            <div className="flex items-center justify-center -translate-x-1/2">
+                                            <div className="flex items-center justify-center translate-x-1/2">
                                                 <span className="relative z-10 flex h-6 w-6 items-center justify-center rounded-full bg-background ring-2 ring-gray-200 dark:ring-gray-700">
                                                     {currentStatus.icon}
                                                 </span>
                                             </div>
-                                            <div className="w-full space-y-1 py-2">
+                                            <div className={cn("w-full space-y-1 py-2 ps-3 border-s-4 rounded-s-md", cardClass)}>
                                                 <div className="flex justify-between items-center">
                                                     <p className={`font-semibold ${currentStatus.textClass}`}>
                                                         {isCovenant ? item.type : "قرار طرد"}
+                                                        {isCovenant && item.card !== 'بدون' && <span className="text-xs font-normal"> ({item.card})</span>}
                                                     </p>
                                                     <time className="text-xs text-muted-foreground">
                                                         {format(timelineItem.date, 'd MMM yyyy', { locale: ar })}
                                                     </time>
                                                 </div>
                                                 <p className="text-sm text-muted-foreground">{isCovenant ? item.text : item.reason}</p>
+                                                {isCovenant && (
+                                                    <div className={`text-sm font-semibold flex items-center gap-1 ${currentStatus.textClass}`}>
+                                                        {currentStatus.icon}
+                                                        <span>
+                                                            {item.status === 'تم الوفاء بها' ? 'تم الوفاء بالميثاق' : item.status === 'نُقِض' ? 'تم نقض الميثاق' : 'الميثاق ما زال نشطًا'}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     );
