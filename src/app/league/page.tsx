@@ -113,8 +113,9 @@ export default function LeaguePage() {
 
         return stats.sort((a, b) => {
             if (b.points !== a.points) return b.points - a.points;
-            if (a.losses !== b.losses) return a.losses - b.losses; // Fewer losses is better
-            if (b.wins !== a.wins) return b.wins - a.wins; // More wins is better
+            if (b.goals !== a.goals) return b.goals - a.goals;
+            if (a.losses !== b.losses) return a.losses - b.losses;
+            if (b.wins !== a.wins) return b.wins - a.wins;
             return a.studentName.localeCompare(b.studentName);
         });
 
@@ -155,10 +156,10 @@ export default function LeaguePage() {
                     <CardHeader>
                         <CardTitle className="text-3xl font-headline font-bold flex items-center gap-2">
                             <Shield className="text-primary" />
-                            دوري الاستقامة الصارمة
+                            دوري الاستقامة والحفظ
                         </CardTitle>
                         <CardDescription>
-                            جدول الترتيب الشهري بناءً على الحضور: فوز (3 نقاط)، تعادل (نقطة)، خسارة (0 نقاط). المراكز الثلاثة الأولى منطقة التكريم، والأخيرة منطقة الخطر.
+                            جدول الترتيب الشهري بناءً على الحضور والأداء. في حال تساوي النقاط، يتم اللجوء لفارق الأهداف (قوة الحفظ).
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -196,6 +197,7 @@ export default function LeaguePage() {
                                             <TableHead className="text-center text-green-600">ف</TableHead>
                                             <TableHead className="text-center text-gray-500">ت</TableHead>
                                             <TableHead className="text-center text-red-600">خ</TableHead>
+                                            <TableHead className="text-center">الأهداف</TableHead>
                                             <TableHead className="text-center">نقاط</TableHead>
                                             <TableHead className="text-center w-[200px]">آخر 5</TableHead>
                                         </TableRow>
@@ -232,6 +234,7 @@ export default function LeaguePage() {
                                                     <TableCell className="text-center text-green-600 font-semibold">{s.wins}</TableCell>
                                                     <TableCell className="text-center text-gray-500 font-semibold">{s.draws}</TableCell>
                                                     <TableCell className="text-center text-red-600 font-semibold">{s.losses}</TableCell>
+                                                    <TableCell className="text-center font-semibold">{s.goals}</TableCell>
                                                     <TableCell className="text-center font-bold text-lg">{s.points}</TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center justify-center gap-2">
@@ -251,7 +254,7 @@ export default function LeaguePage() {
                                             );
                                         }) : (
                                             <TableRow>
-                                                <TableCell colSpan={8} className="text-center h-24">
+                                                <TableCell colSpan={9} className="text-center h-24">
                                                     لا توجد بيانات حضور مسجلة لهذا الشهر.
                                                 </TableCell>
                                             </TableRow>
@@ -313,4 +316,3 @@ export default function LeaguePage() {
         </TooltipProvider>
     );
 }
-
