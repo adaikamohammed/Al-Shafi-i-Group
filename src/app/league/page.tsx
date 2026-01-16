@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, Shield, CheckCircle, XCircle, MinusCircle, Flame } from 'lucide-react';
+import { Loader2, AlertTriangle, Shield, CheckCircle, XCircle, MinusCircle, Flame, Star } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Student, DailySession, AttendanceStatus, PerformanceLevel } from '@/lib/types';
@@ -147,6 +147,29 @@ export default function LeaguePage() {
             .filter(s => s.assists > 0)
             .sort((a, b) => b.assists - a.assists)
             .slice(0, 10);
+    }, [leagueTable]);
+    
+    const starOfTheMonth = useMemo(() => {
+        if (!leagueTable || leagueTable.length === 0) return null;
+
+        const star = leagueTable
+            .filter(s => s.played > 0)
+            .reduce((best, current) => {
+                const currentScore = current.points + current.goalsFor + current.assists;
+                const bestScore = best.points + best.goalsFor + best.assists;
+
+                if (currentScore > bestScore) {
+                    return current;
+                }
+                if (currentScore === bestScore) {
+                    if (current.losses < best.losses) {
+                        return current;
+                    }
+                }
+                return best;
+            }, leagueTable[0]); 
+
+        return star;
     }, [leagueTable]);
 
 
@@ -296,6 +319,40 @@ export default function LeaguePage() {
                         </Card>
                     </div>
                      <div className="space-y-6">
+                        {starOfTheMonth && leagueTable.length > 0 && (
+                            <Card className="bg-gradient-to-tr from-yellow-100 to-amber-200 dark:from-yellow-900/50 dark:to-amber-800/50 border-amber-400">
+                                <CardHeader className="text-center">
+                                    <div className="mx-auto bg-amber-500 text-white rounded-full p-3 w-fit mb-2 animate-pulse">
+                                        <Star className="h-8 w-8" />
+                                    </div>
+                                    <CardTitle className="text-2xl font-headline text-amber-800 dark:text-amber-200">
+                                        نجم شهر {format(new Date(selectedYear, selectedMonth), 'MMMM', { locale: ar })}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="flex flex-col items-center text-center">
+                                    <Avatar className="w-24 h-24 mb-4 border-4 border-white">
+                                        <AvatarImage src={starOfTheMonth.photoURL} alt={starOfTheMonth.studentName} />
+                                        <AvatarFallback>{starOfTheMonth.studentName.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <h3 className="text-xl font-bold">{starOfTheMonth.studentName}</h3>
+                                    <p className="text-muted-foreground">صاحب أعلى تقييم إجمالي</p>
+                                    <div className="flex justify-around w-full mt-4 text-sm">
+                                        <div className="text-center">
+                                            <p className="font-bold text-lg">{starOfTheMonth.points}</p>
+                                            <p className="text-xs text-muted-foreground">نقاط</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="font-bold text-lg">{starOfTheMonth.goalsFor}</p>
+                                            <p className="text-xs text-muted-foreground">أهداف</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="font-bold text-lg">{starOfTheMonth.assists}</p>
+                                            <p className="text-xs text-muted-foreground">تمريرات</p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
