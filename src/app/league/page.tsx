@@ -299,8 +299,9 @@ export default function LeaguePage() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[80px]">#</TableHead>
+                                            <TableHead className="w-[50px]">#</TableHead>
                                             <TableHead>الطالب</TableHead>
+                                            <Tooltip><TooltipTrigger asChild><TableHead className="w-[80px] text-center cursor-pointer">الحراك</TableHead></TooltipTrigger><TooltipContent><p>مؤشر تغير مركز الطالب</p></TooltipContent></Tooltip>
                                             <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">ل</TableHead></TooltipTrigger><TooltipContent><p>لعب</p></TooltipContent></Tooltip>
                                             <Tooltip><TooltipTrigger asChild><TableHead className="text-center text-green-600 cursor-pointer">ف</TableHead></TooltipTrigger><TooltipContent><p>فوز (حضور)</p></TooltipContent></Tooltip>
                                             <Tooltip><TooltipTrigger asChild><TableHead className="text-center text-gray-500 cursor-pointer">ت</TableHead></TooltipTrigger><TooltipContent><p>تعادل (تأخر)</p></TooltipContent></Tooltip>
@@ -335,24 +336,7 @@ export default function LeaguePage() {
 
                                             return (
                                                 <TableRow key={s.studentId} className={cn(rowClass)}>
-                                                    <TableCell className="font-bold text-lg text-center">
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            <span>{rankDisplay}</span>
-                                                            <Tooltip>
-                                                                <TooltipTrigger>
-                                                                    {s.movement > 0 && <TrendingUp className="h-4 w-4 text-green-500" />}
-                                                                    {s.movement < 0 && <TrendingDown className="h-4 w-4 text-red-500" />}
-                                                                    {s.movement === 0 && s.previousRank !== null && <Minus className="h-4 w-4 text-gray-500" />}
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>
-                                                                    {s.movement > 0 && <p>صعود {s.movement} {s.movement > 1 ? 'مراكز' : 'مركز'}</p>}
-                                                                    {s.movement < 0 && <p>هبوط {Math.abs(s.movement)} {Math.abs(s.movement) > 1 ? 'مراكز' : 'مركز'}</p>}
-                                                                    {s.movement === 0 && s.previousRank !== null && <p>المركز ثابت</p>}
-                                                                    {s.previousRank === null && <p>طالب جديد في الترتيب هذا الشهر</p>}
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                        </div>
-                                                    </TableCell>
+                                                    <TableCell className="font-bold text-lg text-center">{rankDisplay}</TableCell>
                                                     <TableCell>
                                                         <Link href={`/parent-portal/${s.studentId}`} className="flex items-center gap-3 hover:underline">
                                                             <Avatar className="h-9 w-9">
@@ -361,6 +345,25 @@ export default function LeaguePage() {
                                                             </Avatar>
                                                             <span className="font-medium">{s.studentName}</span>
                                                         </Link>
+                                                    </TableCell>
+                                                     <TableCell className="text-center font-semibold">
+                                                        <Tooltip>
+                                                            <TooltipTrigger>
+                                                                <div className="flex items-center justify-center gap-1">
+                                                                    {s.movement > 0 && <TrendingUp className="h-4 w-4 text-green-500" />}
+                                                                    {s.movement < 0 && <TrendingDown className="h-4 w-4 text-red-500" />}
+                                                                    {s.movement === 0 && s.previousRank !== null && <Minus className="h-4 w-4 text-gray-500" />}
+                                                                    {s.previousRank === null && <Star className="h-4 w-4 text-blue-400" />}
+                                                                    {s.movement !== 0 && <span>{Math.abs(s.movement)}</span>}
+                                                                </div>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                {s.movement > 0 && <p>صعود {s.movement} {s.movement > 1 ? 'مراكز' : 'مركز'}</p>}
+                                                                {s.movement < 0 && <p>هبوط {Math.abs(s.movement)} {Math.abs(s.movement) > 1 ? 'مراكز' : 'مركز'}</p>}
+                                                                {s.movement === 0 && s.previousRank !== null && <p>المركز ثابت</p>}
+                                                                {s.previousRank === null && <p>طالب جديد في الترتيب هذا الشهر</p>}
+                                                            </TooltipContent>
+                                                        </Tooltip>
                                                     </TableCell>
                                                     <TableCell className="text-center">{s.played}</TableCell>
                                                     <TableCell className="text-center text-green-600 font-semibold">{s.wins}</TableCell>
@@ -389,7 +392,7 @@ export default function LeaguePage() {
                                             );
                                         }) : (
                                             <TableRow>
-                                                <TableCell colSpan={13} className="text-center h-24">
+                                                <TableCell colSpan={14} className="text-center h-24">
                                                     لا توجد بيانات حضور مسجلة لهذا الشهر.
                                                 </TableCell>
                                             </TableRow>
@@ -554,5 +557,7 @@ export default function LeaguePage() {
         </TooltipProvider>
     );
 }
+
+    
 
     
