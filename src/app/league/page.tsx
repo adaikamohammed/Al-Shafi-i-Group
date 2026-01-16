@@ -214,15 +214,15 @@ export default function LeaguePage() {
                                         <TableRow>
                                             <TableHead className="w-[50px]">#</TableHead>
                                             <TableHead>الطالب</TableHead>
-                                            <TableHead className="text-center">ل</TableHead>
-                                            <TableHead className="text-center text-green-600">ف</TableHead>
-                                            <TableHead className="text-center text-gray-500">ت</TableHead>
-                                            <TableHead className="text-center text-red-600">خ</TableHead>
-                                            <TableHead className="text-center">له</TableHead>
-                                            <TableHead className="text-center">عليه</TableHead>
-                                            <TableHead className="text-center">+/-</TableHead>
-                                            <TableHead className="text-center">تم</TableHead>
-                                            <TableHead className="text-center">نقاط</TableHead>
+                                            <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">ل</TableHead></TooltipTrigger><TooltipContent><p>لعب</p></TooltipContent></Tooltip>
+                                            <Tooltip><TooltipTrigger asChild><TableHead className="text-center text-green-600 cursor-pointer">ف</TableHead></TooltipTrigger><TooltipContent><p>فوز (حضور)</p></TooltipContent></Tooltip>
+                                            <Tooltip><TooltipTrigger asChild><TableHead className="text-center text-gray-500 cursor-pointer">ت</TableHead></TooltipTrigger><TooltipContent><p>تعادل (تأخر)</p></TooltipContent></Tooltip>
+                                            <Tooltip><TooltipTrigger asChild><TableHead className="text-center text-red-600 cursor-pointer">خ</TableHead></TooltipTrigger><TooltipContent><p>خسارة (غياب)</p></TooltipContent></Tooltip>
+                                            <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">له</TableHead></TooltipTrigger><TooltipContent><p>أهداف مسجلة (جودة الحفظ)</p></TooltipContent></Tooltip>
+                                            <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">عليه</TableHead></TooltipTrigger><TooltipContent><p>أهداف مستقبلة (ضعف الحفظ)</p></TooltipContent></Tooltip>
+                                            <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">+/-</TableHead></TooltipTrigger><TooltipContent><p>فارق الأهداف</p></TooltipContent></Tooltip>
+                                            <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">تم (AST)</TableHead></TooltipTrigger><TooltipContent><p>تمريرات مساعدة (السلوك)</p></TooltipContent></Tooltip>
+                                            <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer">نقاط</TableHead></TooltipTrigger><TooltipContent><p>إجمالي النقاط (الحضور)</p></TooltipContent></Tooltip>
                                             <TableHead className="text-center w-[150px]">آخر 5</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -285,7 +285,7 @@ export default function LeaguePage() {
                                             );
                                         }) : (
                                             <TableRow>
-                                                <TableCell colSpan={12} className="text-center h-24">
+                                                <TableCell colSpan={13} className="text-center h-24">
                                                     لا توجد بيانات حضور مسجلة لهذا الشهر.
                                                 </TableCell>
                                             </TableRow>
@@ -345,10 +345,10 @@ export default function LeaguePage() {
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <Shield className="text-blue-500" />
-                                    أفضل صانعي الهدوء
+                                    أفضل صانعي الألعاب
                                 </CardTitle>
                                 <CardDescription>
-                                    الترتيب حسب السلوك: هادئ = تمريرتان، متوسط = تمريرة.
+                                    الترتيب حسب السلوك: هادئ (+2)، متوسط (+1). من يتصدر يلقب بـ "مهندس الحلقة".
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
