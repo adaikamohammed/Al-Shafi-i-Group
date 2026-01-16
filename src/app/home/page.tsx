@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { DailyChecklist } from '@/components/ui/DailyChecklist';
 import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
+import { HallOfFame } from '@/components/ui/HallOfFame';
 import { useStudentContext } from '@/context/StudentContext';
 import { cn } from '@/lib/utils';
 
@@ -115,6 +116,7 @@ export default function HomePage() {
             <DailyInspiration />
             <DailyChecklist />
             <GroupEvaluationCard students={students || []} sessions={dailySessions} reports={Object.values(dailyReports).flatMap(day => Object.values(day))} groupName={user?.group} />
+            <HallOfFame students={students || []} sessions={dailySessions} />
         </div>
     </div>
   );
@@ -122,3 +124,4 @@ export default function HomePage() {
     
 
     
+
