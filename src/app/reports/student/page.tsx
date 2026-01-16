@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, AlertTriangle, FileDown, FileText as FileTextIcon, MessageCircle, Send } from 'lucide-react';
+import { Loader2, AlertTriangle, FileDown, MessageCircle, Send } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, startOfYear, endOfYear, setMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -37,7 +37,6 @@ export default function StudentReportPage() {
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [teacherNote, setTeacherNote] = useState('');
     const [tajweedScore, setTajweedScore] = useState(5);
-    const [akhlaqScore, setAkhlaqScore] = useState(5);
     const [messageTemplate, setMessageTemplate] = useState<MessageTemplate>('tashjee');
     const [messageContent, setMessageContent] = useState('');
 
@@ -139,11 +138,10 @@ export default function StudentReportPage() {
 
 
         const radarData = [
-            { subject: 'الحاضر', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
+            { subject: 'الحضور', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
             { subject: 'الحفظ', score: parseFloat(memorizationScore.toFixed(1)), fullMark: 10 },
-            { subject: 'الانضباط', score: parseFloat(disciplineScore.toFixed(1)), fullMark: 10 },
+            { subject: 'السلوك', score: parseFloat(disciplineScore.toFixed(1)), fullMark: 10 },
             { subject: 'التجويد', score: tajweedScore, fullMark: 10 },
-            { subject: 'الأخلاق', score: akhlaqScore, fullMark: 10 },
         ];
         
         let autoNote = '';
@@ -157,9 +155,8 @@ export default function StudentReportPage() {
                 switch(minScoreItem.subject) {
                     case 'الحفظ': autoNote = 'نوصي بتكثيف المراجعة والتركيز على تثبيت السور المحفوظة للوصول لمرحلة الإتقان.'; break;
                     case 'الحضور': autoNote = 'نوصي بالتركيز على تحسين جانب الحضور والالتزام بمواعيد الحصص.'; break;
-                    case 'الانضباط': autoNote = 'نوصي بالعمل على تحسين السلوك والانضباط داخل الحلقة.'; break;
+                    case 'السلوك': autoNote = 'نوصي بالعمل على تحسين السلوك والانضباط داخل الحلقة.'; break;
                     case 'التجويد': autoNote = 'نوصي بالتركيز على مخارج الحروف وأحكام التجويد.'; break;
-                    case 'الأخلاق': autoNote = 'نوصي بتعزيز جانب الأخلاق والآداب الإسلامية العامة.'; break;
                 }
             }
         }
@@ -180,7 +177,7 @@ export default function StudentReportPage() {
             activeCovenant,
         };
 
-    }, [selectedStudentId, reportPeriod, selectedMonth, selectedSeason, selectedYear, students, dailySessions, surahProgress, tajweedScore, akhlaqScore, loading]);
+    }, [selectedStudentId, reportPeriod, selectedMonth, selectedSeason, selectedYear, students, dailySessions, surahProgress, tajweedScore, loading]);
     
      useEffect(() => {
         if (!selectedStudent || !user) {
@@ -250,26 +247,6 @@ export default function StudentReportPage() {
     };
 
 
-    const handleDownloadAsWord = () => {
-        const reportElement = document.getElementById('report-content');
-        if(reportElement) {
-            const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' "+
-                           "xmlns:w='urn:schemas-microsoft-com:office:word' "+
-                           "xmlns='http://www.w3.org/TR/REC-html40'>"+
-                           "<head><meta charset='utf-8'><title>Export HTML to Word Document</title></head><body dir='rtl'>";
-            const footer = "</body></html>";
-            const sourceHTML = header + reportElement.innerHTML + footer;
-            
-            const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
-            const fileDownload = document.createElement("a");
-            document.body.appendChild(fileDownload);
-            fileDownload.href = source;
-            fileDownload.download = getReportFilename('doc');
-            fileDownload.click();
-            document.body.removeChild(fileDownload);
-        }
-    };
-    
     const handleSendWhatsApp = () => {
         if (!messageContent || !selectedStudent?.phone1) {
             toast({
@@ -363,10 +340,6 @@ export default function StudentReportPage() {
                             <FileDown className="ml-2 h-4 w-4" />
                             حفظ كـ PDF
                         </Button>
-                        <Button onClick={handleDownloadAsWord} disabled={!selectedStudentId}>
-                            <FileTextIcon className="ml-2 h-4 w-4" />
-                            حفظ بصيغة Word
-                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -375,20 +348,14 @@ export default function StudentReportPage() {
                 <CardHeader>
                   <CardTitle>ملاحظات وتقييمات الشيخ للتقرير</CardTitle>
                   <CardDescription>
-                    أضف ملاحظاتك الكتابية هنا، وقم بتقييم التجويد والأخلاق يدويًا. ستظهر هذه التقييمات في الرسم البياني والتقرير المطبوع.
+                    أضف ملاحظاتك الكتابية هنا، وقم بتقييم التجويد يدويًا. ستظهر هذه التقييمات في الرسم البياني والتقرير المطبوع.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-3">
-                           <Label htmlFor="tajweed-slider">تقييم التجويد: {tajweedScore}/10</Label>
-                           <Slider id="tajweed-slider" defaultValue={[tajweedScore]} max={10} step={1} onValueChange={(val) => setTajweedScore(val[0])} />
-                        </div>
-                         <div className="space-y-3">
-                           <Label htmlFor="akhlaq-slider">تقييم الأخلاق: {akhlaqScore}/10</Label>
-                           <Slider id="akhlaq-slider" defaultValue={[akhlaqScore]} max={10} step={1} onValueChange={(val) => setAkhlaqScore(val[0])} />
-                        </div>
-                   </div>
+                   <div className="space-y-3">
+                       <Label htmlFor="tajweed-slider">تقييم التجويد: {tajweedScore}/10</Label>
+                       <Slider id="tajweed-slider" defaultValue={[tajweedScore]} max={10} step={1} onValueChange={(val) => setTajweedScore(val[0])} />
+                    </div>
                     <div className="space-y-2">
                         <Label htmlFor="teacher-note">ملاحظات الشيخ الختامية للتقرير</Label>
                         <Textarea 
@@ -452,3 +419,4 @@ export default function StudentReportPage() {
     
 
     
+
