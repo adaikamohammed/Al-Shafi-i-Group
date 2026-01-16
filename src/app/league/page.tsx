@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, Shield, CheckCircle, XCircle, MinusCircle, Flame, Star, Info } from 'lucide-react';
+import { Loader2, AlertTriangle, Shield, CheckCircle, XCircle, MinusCircle, Flame, Star, Info, BookOpenCheck } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Student, DailySession, AttendanceStatus, PerformanceLevel } from '@/lib/types';
@@ -48,6 +48,8 @@ export default function LeaguePage() {
     const { students, dailySessions, loading } = useStudentContext();
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+    const [isFlipped, setIsFlipped] = useState(false);
+
 
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
 
@@ -355,42 +357,62 @@ export default function LeaguePage() {
                     </div>
                      <div className="space-y-6">
                         {starOfTheMonth && leagueTable.length > 0 && (
-                            <Card className="relative overflow-hidden bg-gradient-to-br from-yellow-300 via-amber-500 to-yellow-600 text-white shadow-2xl">
-                                <div className="absolute inset-0 w-full h-full bg-black/10"></div>
-                                <div className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] animate-shine bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
-                                <CardHeader className="relative z-10 text-center pt-4 pb-2">
-                                    <CardTitle className="text-xl font-headline text-white drop-shadow-lg">
-                                        نجم شهر {format(new Date(selectedYear, selectedMonth), 'MMMM', { locale: ar })}
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="relative z-10 flex flex-col items-center text-center p-4 pt-0">
-                                     <div className="font-bold text-4xl text-black bg-white/80 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-2 border-2 border-white/50 shadow-inner">
-                                        {starOfTheMonth.overallRating}
+                            <div className="w-full max-w-sm mx-auto [perspective:1000px]">
+                                <div
+                                    className={cn(
+                                        "relative h-[480px] w-full rounded-xl shadow-2xl transition-all duration-700 [transform-style:preserve-3d] cursor-pointer",
+                                        isFlipped ? '[transform:rotateY(180deg)]' : ''
+                                    )}
+                                    onClick={() => setIsFlipped(!isFlipped)}
+                                >
+                                    {/* Front Side */}
+                                    <div className="absolute inset-0 [backface-visibility:hidden]">
+                                        <Card className="relative overflow-hidden bg-gradient-to-br from-yellow-300 via-amber-500 to-yellow-600 text-white shadow-2xl h-full">
+                                            <div className="absolute inset-0 w-full h-full bg-black/10"></div>
+                                            <div className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] animate-shine bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+                                            <CardHeader className="relative z-10 text-center pt-4 pb-2">
+                                                <CardTitle className="text-xl font-headline text-white drop-shadow-lg">
+                                                    نجم شهر {format(new Date(selectedYear, selectedMonth), 'MMMM', { locale: ar })}
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="relative z-10 flex flex-col items-center text-center p-4 pt-0">
+                                                <div className="font-bold text-4xl text-black bg-white/80 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-2 border-2 border-white/50 shadow-inner">
+                                                    {starOfTheMonth.overallRating}
+                                                </div>
+                                                <Avatar className="w-28 h-28 mb-2 mx-auto border-4 border-white/50">
+                                                    <AvatarImage src={starOfTheMonth.photoURL} alt={starOfTheMonth.studentName} />
+                                                    <AvatarFallback>{starOfTheMonth.studentName.charAt(0)}</AvatarFallback>
+                                                </Avatar>
+                                                <h3 className="text-2xl font-bold drop-shadow-md">{starOfTheMonth.studentName}</h3>
+                                                <div className="w-full h-px bg-white/30 my-3"></div>
+                                                <div className="grid grid-cols-4 gap-2 w-full text-black">
+                                                    <div className="bg-white/80 p-1.5 rounded-md">
+                                                        <p className="font-bold text-xl">{starOfTheMonth.stats.MEM}</p><p className="text-xs font-semibold">حفظ</p>
+                                                    </div>
+                                                    <div className="bg-white/80 p-1.5 rounded-md">
+                                                        <p className="font-bold text-xl">{starOfTheMonth.stats.BEH}</p><p className="text-xs font-semibold">سلوك</p>
+                                                    </div>
+                                                    <div className="bg-white/80 p-1.5 rounded-md">
+                                                        <p className="font-bold text-xl">{starOfTheMonth.stats.ATT}</p><p className="text-xs font-semibold">حضور</p>
+                                                    </div>
+                                                    <div className="bg-white/80 p-1.5 rounded-md">
+                                                        <p className="font-bold text-xl">{starOfTheMonth.stats.TAJ.toFixed(1)}</p><p className="text-xs font-semibold">تجويد</p>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
                                     </div>
-                                    <Avatar className="w-28 h-28 mb-2 mx-auto border-4 border-white/50">
-                                        <AvatarImage src={starOfTheMonth.photoURL} alt={starOfTheMonth.studentName} />
-                                        <AvatarFallback>{starOfTheMonth.studentName.charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <h3 className="text-2xl font-bold drop-shadow-md">{starOfTheMonth.studentName}</h3>
 
-                                     <div className="w-full h-px bg-white/30 my-3"></div>
-
-                                    <div className="grid grid-cols-4 gap-2 w-full text-black">
-                                         <div className="bg-white/80 p-1.5 rounded-md">
-                                            <p className="font-bold text-xl">{starOfTheMonth.stats.MEM}</p><p className="text-xs font-semibold">حفظ</p>
-                                         </div>
-                                         <div className="bg-white/80 p-1.5 rounded-md">
-                                            <p className="font-bold text-xl">{starOfTheMonth.stats.BEH}</p><p className="text-xs font-semibold">سلوك</p>
-                                         </div>
-                                         <div className="bg-white/80 p-1.5 rounded-md">
-                                            <p className="font-bold text-xl">{starOfTheMonth.stats.ATT}</p><p className="text-xs font-semibold">حضور</p>
-                                         </div>
-                                         <div className="bg-white/80 p-1.5 rounded-md">
-                                            <p className="font-bold text-xl">{starOfTheMonth.stats.TAJ.toFixed(1)}</p><p className="text-xs font-semibold">تجويد</p>
-                                         </div>
+                                    {/* Back Side */}
+                                    <div className="absolute inset-0 h-full w-full rounded-xl bg-gradient-to-br from-gray-800 via-black to-gray-900 text-white [transform:rotateY(180deg)] [backface-visibility:hidden]">
+                                        <div className="flex min-h-full flex-col items-center justify-center text-center p-4">
+                                            <BookOpenCheck className="h-20 w-20 text-yellow-400 mb-4" />
+                                            <h3 className="text-xl font-bold font-headline">المدرسة القرآنية للإمام الشافعي</h3>
+                                            <p className="mt-4 text-2xl font-headline text-yellow-300">من هو نجم هذا الشهر؟</p>
+                                        </div>
                                     </div>
-                                </CardContent>
-                            </Card>
+                                </div>
+                            </div>
                         )}
                         <Card>
                             <CardHeader>
