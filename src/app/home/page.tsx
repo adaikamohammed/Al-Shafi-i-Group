@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
@@ -25,7 +24,7 @@ const navItems = [
     // Row 2
     { href: '/yearly-performance', label: 'رادار الأداء السنوي', icon: BarChart3, color: 'text-purple-400' },
     { href: '/comparison', label: 'ساحة المقارنة', icon: Swords, color: 'text-red-400' },
-    { href: '/dues', label: 'المستحقات المالية', icon: DollarSign, color: 'text-amber-400' },
+    { href: '/dues', label: 'المستحقات المالية', icon: DollarSign, color: 'text-green-500' },
     { href: '/reports/daily', label: 'التقرير اليومي', icon: Edit, color: 'text-rose-400' },
     // Row 3
     { href: '/reports/student', label: 'تقرير الطالب', icon: FileText, color: 'text-fuchsia-400' },
@@ -33,7 +32,7 @@ const navItems = [
     { href: '/surahs', label: 'متابعة الحفظ', icon: BookCheck, color: 'text-lime-400' },
     { href: '/points', label: 'نظام النقاط', icon: Gavel, color: 'text-orange-400' },
     // Row 4
-    { href: '/league', label: 'دوري التميز', icon: Shield, color: 'text-emerald-400' },
+    { href: '/league', label: 'دوري التميز', icon: Shield, color: 'text-amber-500' },
     { href: '/data', label: 'البيانات', icon: ArrowRightLeft, color: 'text-cyan-400' },
     { href: '/guide', label: 'دليل الاستخدام', icon: HelpCircle, color: 'text-violet-400' },
     // Footer / Last row
@@ -98,11 +97,11 @@ export default function HomePage() {
         </div>
         
         <div className="relative z-10 text-center mb-8 text-white">
-            <h1 className="text-4xl font-bold text-amber-300 drop-shadow-lg">{user?.group || "فوج غير محدد"}</h1>
-            <p className="text-lg opacity-90">{user?.displayName}</p>
+            <h1 className="text-4xl font-bold text-amber-300 drop-shadow-lg">{user?.group || "فوج 7"}</h1>
+            <p className="text-lg opacity-90">{user?.displayName || "الشيخ محمد منصور"}</p>
         </div>
         
-         <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 w-full max-w-6xl">
+         <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-6xl">
             {navItems.map((item) => (
                 <Link
                     href={item.href}
