@@ -136,7 +136,7 @@ export default function DailySessionsPage() {
   const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
     deleteDailySession(sessionId);
-    toast({ title: "✅ تم الحذف", description: `تم حذف بيانات الحصة بنجاح.` });
+    toast({ title: "تم الحذف", description: `تم حذف بيانات الحصة بنجاح.` });
   }
 
   const handleExportSession = (e: React.MouseEvent, sessionId: string) => {
@@ -659,7 +659,7 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
         if (newLeader && newLeader.studentId !== oldLeaderId) {
             if (matchContenders.includes(newLeader.studentId)) {
                 toast({
-                    title: "👑 تم حسم القمة!",
+                    title: "تم حسم القمة!",
                     description: `${newLeader.studentName} ينتزع الصدارة في آخر لحظات الأسبوع!`,
                     duration: 6000
                 });

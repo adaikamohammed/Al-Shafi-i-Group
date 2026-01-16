@@ -102,7 +102,7 @@ export default function SurahProgressPage() {
             <div className="space-y-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-3xl font-headline font-bold">📖 متابعة الحفظ والإتقان</CardTitle>
+                        <CardTitle className="text-3xl font-headline font-bold">متابعة الحفظ والإتقان</CardTitle>
                         <CardDescription>
                             حدد طالبًا، ثم انقر على السورة لتغيير حالتها: <span className="p-1 rounded-md bg-gray-200">غير محفوظة</span> &larr; <span className="p-1 rounded-md bg-green-200 text-green-800">محفوظة</span> &larr; <span className="p-1 rounded-md bg-green-600 text-white">متقنة</span>
                         </CardDescription>
@@ -151,7 +151,7 @@ export default function SurahProgressPage() {
                 <div className="grid md:grid-cols-3 gap-6">
                      <Card className="md:col-span-1">
                         <CardHeader>
-                            <CardTitle>🏆 لوحة شرف الحفظ</CardTitle>
+                            <CardTitle>لوحة شرف الحفظ</CardTitle>
                             <CardDescription>الترتيب حسب نقاط الإتقان: (المحفوظ * 1) + (المتقن * 3)</CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -193,7 +193,7 @@ export default function SurahProgressPage() {
                                                                  <Award className="h-5 w-5 text-yellow-500" />
                                                             </TooltipTrigger>
                                                             <TooltipContent>
-                                                                <p>🎉 خاتم للقرآن الكريم</p>
+                                                                <p>خاتم للقرآن الكريم</p>
                                                             </TooltipContent>
                                                         </Tooltip>
                                                     }

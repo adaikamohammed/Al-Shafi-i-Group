@@ -1139,7 +1139,7 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
         const oldCovenant = originalCovenants.find(oc => oc.id === newCovenant.id);
         if (oldCovenant && oldCovenant.status === 'نشط' && newCovenant.status === 'تم الوفاء بها') {
              toast({
-                title: `🎉 +${settings.points.covenantCompleted} نقطة`,
+                title: `+${settings.points.covenantCompleted} نقطة`,
                 description: `تمت مكافأة الطالب ${student?.fullName} لإنجازه المهمة بنجاح. سيتم تحديث ترتيبه.`,
             });
         }
@@ -1343,8 +1343,8 @@ function StudentForm({ student, onSuccess, onCancel, addStudent, updateStudent }
                         <SelectValue placeholder="اختر الحالة" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="نشط">✅ نشط</SelectItem>
-                        <SelectItem value="مطرود">❌ مطرود</SelectItem>
+                        <SelectItem value="نشط">نشط</SelectItem>
+                        <SelectItem value="مطرود">مطرود</SelectItem>
                     </SelectContent>
                 </Select>
             </div>

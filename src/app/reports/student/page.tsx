@@ -341,10 +341,6 @@ export default function StudentReportPage() {
                             <FileDown className="ml-2 h-4 w-4" />
                             حفظ كـ PDF
                         </Button>
-                         <Button onClick={handleSendWhatsApp} disabled={!selectedStudentId}>
-                            <Send className="ml-2 h-4 w-4" />
-                            إرسال التقرير عبر واتساب
-                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -386,6 +382,10 @@ export default function StudentReportPage() {
                             placeholder="اختر قالبًا ليظهر المحتوى هنا..."
                         />
                     </div>
+                    <Button onClick={handleSendWhatsApp} disabled={!selectedStudentId}>
+                        <Send className="ml-2 h-4 w-4" />
+                        إرسال عبر واتساب
+                    </Button>
                 </CardContent>
             </Card>
 

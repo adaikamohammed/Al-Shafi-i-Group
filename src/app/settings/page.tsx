@@ -79,12 +79,12 @@ export default function SettingsPage() {
             await saveSettings(nextState);
             setLocalSettings(nextState);
             toast({
-                title: "🎉 موسم جديد قد بدأ!",
+                title: "موسم جديد قد بدأ!",
                 description: "تمت أرشفة نقاط الموسم السابق وبدء موسم جديد بنقاط صفرية."
             });
         } catch (error) {
              toast({
-                title: "❌ خطأ",
+                title: "خطأ",
                 description: "فشل إنهاء الموسم الحالي.",
                 variant: 'destructive',
             });
@@ -98,12 +98,12 @@ export default function SettingsPage() {
         try {
             await saveSettings(localSettings);
             toast({
-                title: "✅ تم الحفظ",
+                title: "تم الحفظ",
                 description: "تم حفظ الإعدادات المخصصة بنجاح."
             });
         } catch (error) {
             toast({
-                title: "❌ خطأ",
+                title: "خطأ",
                 description: "فشل حفظ الإعدادات.",
                 variant: 'destructive',
             });
@@ -262,7 +262,7 @@ export default function SettingsPage() {
         
         <Card>
             <CardHeader>
-                 <CardTitle className="flex items-center gap-2">🎁 إدارة الجوائز</CardTitle>
+                 <CardTitle className="flex items-center gap-2">إدارة الجوائز</CardTitle>
                  <CardDescription>تحكم في الجوائز المتوفرة في "سوق النقاط" وتكلفتها.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -283,7 +283,7 @@ export default function SettingsPage() {
 
         <Card>
              <CardHeader>
-                 <CardTitle className="flex items-center gap-2"><ShieldCheck />إدارة الأوسمة التلقائية</CardTitle>
+                 <CardTitle className="flex items-center gap-2">إدارة الأوسمة التلقائية</CardTitle>
                  <CardDescription>حدد الشروط لمنح الأوسمة تلقائيًا بناءً على إنجازات الطلبة.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

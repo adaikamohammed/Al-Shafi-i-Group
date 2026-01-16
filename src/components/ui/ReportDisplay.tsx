@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -36,7 +37,7 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                 
                 <section className="avoid-break">
                     <Card className="bg-white shadow-none border border-gray-300">
-                        <CardHeader><CardTitle className="text-lg text-gray-800">📄 بيانات الطالب</CardTitle></CardHeader>
+                        <CardHeader><CardTitle className="text-lg text-gray-800">بيانات الطالب</CardTitle></CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                                 <div><span className="font-semibold">الاسم الكامل:</span> {reportData.student.fullName}</div>
@@ -52,7 +53,7 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                 
                  <section className="grid md:grid-cols-2 gap-4 avoid-break">
                      <Card className="bg-white shadow-none border border-gray-300">
-                        <CardHeader><CardTitle className="text-base text-gray-800">🎯 ملخص تقييم المهارات</CardTitle></CardHeader>
+                        <CardHeader><CardTitle className="text-base text-gray-800">ملخص تقييم المهارات</CardTitle></CardHeader>
                         <CardContent className="p-3">
                            <table className="w-full text-sm text-center border-collapse border border-gray-300">
                                 <thead>
@@ -74,7 +75,7 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                     </Card>
 
                     <Card className="bg-white shadow-none border border-gray-300">
-                        <CardHeader><CardTitle className="text-base text-gray-800">📊 سجل الحضور والانضباط العام</CardTitle></CardHeader>
+                        <CardHeader><CardTitle className="text-base text-gray-800">سجل الحضور والانضباط العام</CardTitle></CardHeader>
                         <CardContent className="p-3">
                             <table className="w-full text-sm text-center border-collapse border border-gray-300">
                                 <thead>
@@ -115,7 +116,7 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                     <Card className="bg-white shadow-none border border-gray-300">
                          <CardContent className="p-4 space-y-3">
                             <div>
-                                <h3 className="font-bold text-gray-800">📚 متابعة حفظ السور ({reportData.memorizedSurahsCount} / 114)</h3>
+                                <h3 className="font-bold text-gray-800">متابعة حفظ السور ({reportData.memorizedSurahsCount} / 114)</h3>
                                 {reportData.memorizedSurahsCount > 0 ? (
                                     <p className="text-gray-600 text-sm">
                                         أتم الطالب حفظ {reportData.memorizedSurahsCount} سورة من القرآن الكريم.
@@ -144,7 +145,7 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                 
                  <section className="avoid-break">
                         <Card className="bg-white shadow-none border border-gray-300">
-                            <CardHeader><CardTitle className="text-lg text-gray-800">🖊️ ملاحظات وتوصيات الشيخ</CardTitle></CardHeader>
+                            <CardHeader><CardTitle className="text-lg text-gray-800">ملاحظات وتوصيات الشيخ</CardTitle></CardHeader>
                             <CardContent className="min-h-[100px]">
                                 {reportData.autoNote && <p className="whitespace-pre-wrap text-sm font-bold mb-2 p-2 bg-amber-100 text-amber-800 rounded-md">التوصية الآلية: {reportData.autoNote}</p>}
                                 <p className="whitespace-pre-wrap text-sm">{teacherNote ? teacherNote : (reportData.autoNote ? '' : 'لا توجد ملاحظات إضافية.')}</p>

@@ -186,7 +186,7 @@ export default function RankingPage() {
         <TooltipProvider>
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <h1 className="text-3xl font-headline font-bold">🏅 لوحة شرف الطلبة</h1>
+                <h1 className="text-3xl font-headline font-bold">لوحة شرف الطلبة</h1>
                  <div className="flex gap-2 w-full md:w-auto">
                     <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
                         <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
@@ -412,4 +412,5 @@ export default function RankingPage() {
 
 
     
+
 
