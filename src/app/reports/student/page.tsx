@@ -89,7 +89,7 @@ export default function StudentReportPage() {
             return sessionDate >= startDate && sessionDate <= endDate;
         });
 
-        const stats = { present: 0, absent: 0, late: 0, makeup: 0, holidays: 0, calm: 0, mediumBehavior: 0, undisciplined: 0, totalBehavior: 0, excellent: 0, good: 0, average: 0, poor: 0, totalEvaluations: 0, compensationBalance: 0 };
+        const stats = { present: 0, absent: 0, late: 0, makeup: 0, holidays: 0, calm: 0, mediumBehavior: 0, undisciplined: 0, totalBehavior: 0, excellent: 0, good: 0, average: 0, poor: 0, totalEvaluations: 0, compensationBalance: 0, reviewed: 0 };
         let totalSessionsHeld = 0;
 
         sessionsInRange.forEach(session => {
@@ -125,6 +125,9 @@ export default function StudentReportPage() {
                             case 'ضعيف': stats.poor++; break;
                         }
                     }
+                    if (record.review) {
+                        stats.reviewed++;
+                    }
                 }
             }
         });
@@ -136,11 +139,13 @@ export default function StudentReportPage() {
         const masteredCount = Object.values(studentMastery).filter(s => s.status === 2).length;
         const memorizationScore = masteredCount > 0 ? (masteredCount / 114) * 10 : 0;
 
+        const reviewScore = totalSessionsHeld > 0 ? (stats.reviewed / totalSessionsHeld) * 10 : 0;
 
         const radarData = [
             { subject: 'الحضور', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
             { subject: 'الحفظ', score: parseFloat(memorizationScore.toFixed(1)), fullMark: 10 },
             { subject: 'السلوك', score: parseFloat(disciplineScore.toFixed(1)), fullMark: 10 },
+            { subject: 'المراجعة', score: parseFloat(reviewScore.toFixed(1)), fullMark: 10 },
             { subject: 'التجويد', score: tajweedScore, fullMark: 10 },
         ];
         
@@ -156,6 +161,7 @@ export default function StudentReportPage() {
                     case 'الحفظ': autoNote = 'نوصي بتكثيف المراجعة والتركيز على تثبيت السور المحفوظة للوصول لمرحلة الإتقان.'; break;
                     case 'الحضور': autoNote = 'نوصي بالتركيز على تحسين جانب الحضور والالتزام بمواعيد الحصص.'; break;
                     case 'السلوك': autoNote = 'نوصي بالعمل على تحسين السلوك والانضباط داخل الحلقة.'; break;
+                    case 'المراجعة': autoNote = 'نوصي بالاهتمام أكثر بمراجعة الدرس السابق لضمان تثبيت الحفظ.'; break;
                     case 'التجويد': autoNote = 'نوصي بالتركيز على مخارج الحروف وأحكام التجويد.'; break;
                 }
             }
@@ -419,4 +425,5 @@ export default function StudentReportPage() {
     
 
     
+
 
