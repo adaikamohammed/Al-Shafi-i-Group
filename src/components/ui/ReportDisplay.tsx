@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -7,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { ShieldAlert } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 const calculateAge = (birthDate?: Date) => {
   if (!birthDate) return 'N/A';
@@ -73,47 +73,42 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
                         </CardContent>
                     </Card>
 
-                    <div className="space-y-4">
-                        <Card className="bg-white shadow-none border border-gray-300">
-                            <CardHeader><CardTitle className="text-base text-gray-800">{`📊 إحصائيات الحضور`}</CardTitle></CardHeader>
-                            <CardContent className="p-3">
-                                <table className="w-full text-sm text-center border-collapse border border-gray-300">
-                                    <thead>
-                                        <tr className="border-b border-gray-300 bg-gray-50">
-                                            <th className="p-2 border border-gray-300">الحالة</th>
-                                            <th className="p-2 border border-gray-300">العدد</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr><td className="p-1 border border-gray-300 font-medium">حاضر</td><td className="border border-gray-300">{reportData.stats.present}</td></tr>
-                                        <tr><td className="p-1 border border-gray-300 font-medium">غائب</td><td className="border border-gray-300">{reportData.stats.absent}</td></tr>
-                                        <tr><td className="p-1 border border-gray-300 font-medium">متأخر</td><td className="border border-gray-300">{reportData.stats.late}</td></tr>
-                                    </tbody>
-                                </table>
-                            </CardContent>
-                        </Card>
-                        <Card className="bg-white shadow-none border border-gray-300">
-                             <CardHeader><CardTitle className="text-base text-gray-800">⚖️ ميزان الالتزام</CardTitle></CardHeader>
-                            <CardContent className="p-3">
-                                 <table className="w-full text-sm text-center border-collapse border border-gray-300">
-                                    <tbody>
-                                        <tr><td className="p-1 border border-gray-300 font-medium">رصيد الغياب</td><td className="border border-gray-300">{reportData.stats.absent}</td></tr>
-                                        <tr><td className="p-1 border border-gray-300 font-medium">رصيد التعويض</td><td className="border border-gray-300">{reportData.stats.compensationBalance}</td></tr>
-                                        <tr className="font-bold bg-gray-50">
-                                            <td className="p-1 border border-gray-300">صافي الرصيد</td>
-                                            <td className="border border-gray-300">
-                                                 {(reportData.stats.absent - reportData.stats.compensationBalance) > 0 ? (
-                                                    <span className="text-red-600">مطلوب {reportData.stats.absent - reportData.stats.compensationBalance} حصص</span>
-                                                ) : (
-                                                    <span className="text-green-600">مستوفٍ</span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </CardContent>
-                        </Card>
-                    </div>
+                    <Card className="bg-white shadow-none border border-gray-300">
+                        <CardHeader><CardTitle className="text-base text-gray-800">📊 سجل الحضور والانضباط العام</CardTitle></CardHeader>
+                        <CardContent className="p-3">
+                            <table className="w-full text-sm text-center border-collapse border border-gray-300">
+                                <thead>
+                                    <tr className="border-b border-gray-300 bg-gray-50">
+                                        <th className="p-2 border border-gray-300">حاضر</th>
+                                        <th className="p-2 border border-gray-300">غائب</th>
+                                        <th className="p-2 border border-gray-300">متأخر</th>
+                                        <th className="p-2 border border-gray-300">رصيد الغياب</th>
+                                        <th className="p-2 border border-gray-300">رصيد التعويض</th>
+                                        <th className="p-2 border border-gray-300">صافي الرصيد</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td className="p-1 border border-gray-300 font-medium">{reportData.stats.present}</td>
+                                        <td className="p-1 border border-gray-300 font-medium">{reportData.stats.absent}</td>
+                                        <td className="p-1 border border-gray-300 font-medium">{reportData.stats.late}</td>
+                                        <td className="p-1 border border-gray-300 font-medium">{reportData.stats.absent}</td>
+                                        <td className="p-1 border border-gray-300 font-medium">{reportData.stats.compensationBalance}</td>
+                                        <td className={cn(
+                                            "p-1 border border-gray-300 font-bold",
+                                            (reportData.stats.absent - reportData.stats.compensationBalance) > 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+                                        )}>
+                                            {(reportData.stats.absent - reportData.stats.compensationBalance) > 0 ? (
+                                                `مطلوب ${reportData.stats.absent - reportData.stats.compensationBalance} حصص`
+                                            ) : (
+                                                "مستوفٍ"
+                                            )}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </CardContent>
+                    </Card>
                 </section>
                 
                 <section className="avoid-break">
