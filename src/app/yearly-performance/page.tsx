@@ -21,21 +21,31 @@ const getDayColor = (dayData: any) => {
     return 'bg-gray-200 dark:bg-gray-800';
 };
 
-const DayTooltipContent = ({ day, dayData }: { day: Date, dayData: any }) => (
-    <>
-        <p className="font-bold">{format(day, 'd MMMM yyyy', { locale: ar })}</p>
-        {dayData ? (
-            <>
-                {dayData.isHoliday ? (<p>يوم عطلة</p>)
-                 : dayData.isSheikhAbsentNoSub ? (<p>غياب الشيخ</p>)
-                 : (<>
-                        <p>حصص العمل: {dayData.workSessionCount}</p>
-                        <p>الحضور: {(dayData.attendanceRate * 100).toFixed(0)}%</p>
-                    </>)}
-            </>
-        ) : <p>لا توجد بيانات</p>}
-    </>
-);
+const DayTooltipContent = ({ day, dayData }: { day: Date, dayData: any }) => {
+    const formattedDate = format(day, 'd MMMM yyyy', { locale: ar });
+
+    if (!dayData) {
+        return <p className="font-bold">{formattedDate}<br/>لا توجد بيانات</p>;
+    }
+
+    if (dayData.isHoliday) {
+        return <p className="font-bold">{formattedDate}<br/>ملخص: يوم عطلة</p>;
+    }
+
+    if (dayData.isSheikhAbsentNoSub) {
+        return <p className="font-bold">{formattedDate}<br/>ملخص: غياب الشيخ</p>;
+    }
+
+    const sessionTypesString = dayData.sessionTypes?.join(' + ') || 'غير محدد';
+
+    return (
+        <div className="space-y-1 text-right">
+            <p className="font-bold">{formattedDate}</p>
+            <p className="text-xs">عدد الحصص: {dayData.workSessionCount} ({sessionTypesString})</p>
+            <p className="text-xs">الملخص: تم إنجاز الورد بنسبة حضور {(dayData.attendanceRate * 100).toFixed(0)}%</p>
+        </div>
+    );
+};
 
 
 // YearView Component
@@ -216,6 +226,7 @@ export default function YearlyPerformancePage() {
                 isSheikhAbsentNoSub,
                 workSessionCount: workSessions.length,
                 attendanceRate,
+                sessionTypes: workSessions.map(s => s.sessionType)
             };
         });
 
