@@ -273,6 +273,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         if (!dailySessions) return [];
         return Object.values(dailySessions)
             .flatMap(day => Object.values(day))
+            .filter(session => session && session.date)
             .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
     }, [dailySessions]);
 
