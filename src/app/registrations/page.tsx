@@ -558,14 +558,13 @@ export default function PreRegistrationPage() {
     };
 
     const toggleColumn = (key: keyof typeof ALL_COLUMNS) => {
-        setColumnVisibility((prev) => {
-            const newVisibility = { ...prev };
-            const currentColumn = newVisibility[key as keyof typeof newVisibility];
-            if(currentColumn) {
-                currentColumn.visible = !currentColumn.visible;
-            }
-            return newVisibility;
-        });
+        setColumnVisibility(prev => ({
+            ...prev,
+            [key]: {
+                ...prev[key],
+                visible: !prev[key].visible,
+            },
+        }));
     };
     
     const filteredRegistrations = useMemo(() => {
@@ -684,19 +683,9 @@ export default function PreRegistrationPage() {
     };
     
     const columnsToRender = useMemo(() => {
-        const forcedOrder = ['pageNumber', 'fullName'];
-        
-        // Filter visible columns and separate forced, and others
-        const visibleEntries = Object.entries(columnVisibility).filter(([, { visible }]) => visible);
-
-        const forced = forcedOrder.map(key => visibleEntries.find(([k]) => k === key)).filter(Boolean) as [string, { label: string; visible: boolean; printOrder: number }][];
-        const others = visibleEntries
-            .filter(([k]) => !forcedOrder.includes(k))
+        return Object.entries(columnVisibility)
+            .filter(([, { visible }]) => visible)
             .sort(([, a], [, b]) => (a.printOrder || 99) - (b.printOrder || 99));
-
-        let finalOrder = [...forced, ...others];
-        
-        return finalOrder;
     }, [columnVisibility]);
 
     
@@ -1093,3 +1082,4 @@ export default function PreRegistrationPage() {
 
 
     
+
