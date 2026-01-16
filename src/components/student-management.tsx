@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban, UserRound, Filter, ArrowUpDown, BookOpen, Shield, Printer, Archive, History } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FilePen, Trash2, UserX, Loader2, Download, Search, ShieldAlert, User as UserIcon, Calendar as CalendarIcon, Phone, GraduationCap, Award, FolderKanban, UserRound, Filter, ArrowUpDown, BookOpen, Shield, Printer, Archive, History, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -147,6 +147,33 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
             commitmentBalance: studentRankData.stats.commitmentBalance,
         }
     }, [rankingData, student.id]);
+    
+    const timelineItems = useMemo(() => {
+        const items: any[] = [];
+    
+        (student.covenants || []).forEach(c => {
+            try {
+                items.push({
+                    date: parseISO(c.date),
+                    type: 'covenant',
+                    item: c
+                });
+            } catch(e) { console.error("Invalid covenant date", c.date) }
+        });
+    
+        (student.expulsionHistory || []).forEach(e => {
+            try {
+                items.push({
+                    date: parseISO(e.date),
+                    type: 'expulsion',
+                    item: e
+                });
+            } catch(e) { console.error("Invalid expulsion date", e.date) }
+        });
+    
+        return items.sort((a, b) => b.date.getTime() - a.date.getTime());
+    
+    }, [student.covenants, student.expulsionHistory]);
     
     const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط');
 
@@ -313,30 +340,63 @@ const StudentProfileCard = ({ student, user, rankingData, onEdit, onViewStats }:
                         </div>
                     </CardContent>
                 </Card>
-                 <Card>
+                <Card>
                     <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2"><Archive /> السجل التأديبي</CardTitle>
+                        <CardTitle className="text-base flex items-center gap-2"><Archive /> السجل التاريخي والتأديبي</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {student.expulsionHistory && student.expulsionHistory.length > 0 ? (
-                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>تاريخ الطرد</TableHead>
-                                        <TableHead>السبب</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {student.expulsionHistory.map((record, index) => (
-                                        <TableRow key={index}>
-                                            <TableCell>{format(parseISO(record.date), 'd MMMM yyyy', { locale: ar })}</TableCell>
-                                            <TableCell>{record.reason}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                        {timelineItems.length > 0 ? (
+                            <div className="relative pl-6 after:absolute after:inset-y-0 after:w-px after:bg-gray-200 after:right-1 dark:after:bg-gray-700">
+                                {timelineItems.map((timelineItem, index) => {
+                                    const isCovenant = timelineItem.type === 'covenant';
+                                    const item = timelineItem.item;
+                                    
+                                    const statusConfig = {
+                                        "تم الوفاء بها": {
+                                            icon: <CheckCircle className="h-4 w-4 text-green-500" />,
+                                            textClass: "text-green-600",
+                                        },
+                                        "نُقِض": {
+                                            icon: <XCircle className="h-4 w-4 text-red-500" />,
+                                            textClass: "text-red-600",
+                                        },
+                                        "نشط": {
+                                            icon: <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />,
+                                            textClass: "text-blue-600",
+                                        },
+                                        "طرد": {
+                                            icon: <UserX className="h-4 w-4 text-red-700" />,
+                                            textClass: "text-red-700",
+                                        }
+                                    };
+                                    
+                                    const statusKey = isCovenant ? item.status : "طرد";
+                                    const currentStatus = statusConfig[statusKey as keyof typeof statusConfig] || { icon: null, textClass: "" };
+
+                                    return (
+                                        <div key={index} className="grid grid-cols-[auto_1fr] items-start gap-x-3 relative">
+                                            <div className="flex items-center justify-center -translate-x-1/2">
+                                                <span className="relative z-10 flex h-6 w-6 items-center justify-center rounded-full bg-background ring-2 ring-gray-200 dark:ring-gray-700">
+                                                    {currentStatus.icon}
+                                                </span>
+                                            </div>
+                                            <div className="w-full space-y-1 py-2">
+                                                <div className="flex justify-between items-center">
+                                                    <p className={`font-semibold ${currentStatus.textClass}`}>
+                                                        {isCovenant ? item.type : "قرار طرد"}
+                                                    </p>
+                                                    <time className="text-xs text-muted-foreground">
+                                                        {format(timelineItem.date, 'd MMM yyyy', { locale: ar })}
+                                                    </time>
+                                                </div>
+                                                <p className="text-sm text-muted-foreground">{isCovenant ? item.text : item.reason}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         ) : (
-                            <p className="text-sm text-muted-foreground text-center py-4">لا يوجد سجل تأديبي سابق لهذا الطالب.</p>
+                            <p className="text-sm text-muted-foreground text-center py-4">لا يوجد سجل تاريخي أو تأديبي لهذا الطالب.</p>
                         )}
                     </CardContent>
                 </Card>
