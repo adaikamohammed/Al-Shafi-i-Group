@@ -88,17 +88,15 @@ export default function LeaguePage() {
                             losses++;
                             break;
                     }
+                    
                     if (record.memorization === 'ممتاز') {
-                        switch (student.dailyMemorizationAmount) {
-                            case 'ثمن': goalsFor += 1; break;
-                            case 'ربع': goalsFor += 2; break;
-                            case 'نصف': goalsFor += 4; break;
-                            case 'صفحة': goalsFor += 8; break;
-                            case 'أكثر': goalsFor += 10; break;
-                        }
-                    }
-                    if (record.memorization === 'ضعيف') {
+                        goalsFor += 2;
+                    } else if (record.memorization === 'جيد جداً') {
+                        goalsFor += 1;
+                    } else if (record.memorization === 'متوسط') {
                         goalsAgainst += 1;
+                    } else if (record.memorization === 'ضعيف') {
+                        goalsAgainst += 2;
                     }
                 }
             });
@@ -284,7 +282,7 @@ export default function LeaguePage() {
                                     قائمة الهدافين
                                 </CardTitle>
                                 <CardDescription>
-                                    ترتيب الطلاب حسب أهداف الحفظ (ثمن ممتاز = هدف، ربع ممتاز = هدفان...).
+                                    ترتيب الطلاب حسب أهداف الحفظ (ممتاز = هدفان، جيد جداً = هدف...).
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
