@@ -127,12 +127,6 @@ export default function LeaguePage() {
         );
     }
     
-    const rankColor = (rank: number) => {
-        if (rank === 1) return 'bg-yellow-100 dark:bg-yellow-900/30';
-        if (rank <= 3) return 'bg-blue-50 dark:bg-blue-900/20';
-        return '';
-    };
-
     return (
         <TooltipProvider>
             <div className="space-y-6">
@@ -143,7 +137,7 @@ export default function LeaguePage() {
                             دوري الاستقامة الصارمة
                         </CardTitle>
                         <CardDescription>
-                            جدول الترتيب الشهري بناءً على الحضور: فوز (3 نقاط)، تعادل (نقطة)، خسارة (0 نقاط).
+                            جدول الترتيب الشهري بناءً على الحضور: فوز (3 نقاط)، تعادل (نقطة)، خسارة (0 نقاط). المراكز الثلاثة الأولى منطقة التكريم، والأخيرة منطقة الخطر.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -184,39 +178,55 @@ export default function LeaguePage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {leagueTable.length > 0 ? leagueTable.map((s, index) => (
-                                    <TableRow key={s.studentId} className={cn(rankColor(index + 1))}>
-                                        <TableCell className="font-bold text-lg text-center">{index + 1}</TableCell>
-                                        <TableCell>
-                                            <Link href={`/parent-portal/${s.studentId}`} className="flex items-center gap-3 hover:underline">
-                                                <Avatar className="h-9 w-9">
-                                                    <AvatarImage src={s.photoURL} alt={s.studentName} />
-                                                    <AvatarFallback>{s.studentName.charAt(0)}</AvatarFallback>
-                                                </Avatar>
-                                                <span className="font-medium">{s.studentName}</span>
-                                            </Link>
-                                        </TableCell>
-                                        <TableCell className="text-center">{s.played}</TableCell>
-                                        <TableCell className="text-center text-green-600 font-semibold">{s.wins}</TableCell>
-                                        <TableCell className="text-center text-gray-500 font-semibold">{s.draws}</TableCell>
-                                        <TableCell className="text-center text-red-600 font-semibold">{s.losses}</TableCell>
-                                        <TableCell className="text-center font-bold text-lg">{s.points}</TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center justify-center gap-2">
-                                                {s.form.map((status, i) => (
-                                                    <Tooltip key={i}>
-                                                        <TooltipTrigger>
-                                                            <FormIcon status={status} />
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p>{status}</p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                ))}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                )) : (
+                                {leagueTable.length > 0 ? leagueTable.map((s, index) => {
+                                    const rank = index + 1;
+                                    const totalPlayers = leagueTable.length;
+                                    let rankDisplay;
+                                    let rowClass = '';
+
+                                    if (rank === 1) { rankDisplay = '🥇'; rowClass = 'bg-green-100 dark:bg-green-900/30'; }
+                                    else if (rank === 2) { rankDisplay = '🥈'; rowClass = 'bg-green-100 dark:bg-green-900/30'; }
+                                    else if (rank === 3) { rankDisplay = '🥉'; rowClass = 'bg-green-100 dark:bg-green-900/30'; }
+                                    else { rankDisplay = rank; }
+                                    
+                                    if (rank > totalPlayers - 3 && totalPlayers > 5 && rank > 3) {
+                                        rowClass = 'bg-red-100 dark:bg-red-900/30';
+                                    }
+
+                                    return (
+                                        <TableRow key={s.studentId} className={cn(rowClass)}>
+                                            <TableCell className="font-bold text-lg text-center">{rankDisplay}</TableCell>
+                                            <TableCell>
+                                                <Link href={`/parent-portal/${s.studentId}`} className="flex items-center gap-3 hover:underline">
+                                                    <Avatar className="h-9 w-9">
+                                                        <AvatarImage src={s.photoURL} alt={s.studentName} />
+                                                        <AvatarFallback>{s.studentName.charAt(0)}</AvatarFallback>
+                                                    </Avatar>
+                                                    <span className="font-medium">{s.studentName}</span>
+                                                </Link>
+                                            </TableCell>
+                                            <TableCell className="text-center">{s.played}</TableCell>
+                                            <TableCell className="text-center text-green-600 font-semibold">{s.wins}</TableCell>
+                                            <TableCell className="text-center text-gray-500 font-semibold">{s.draws}</TableCell>
+                                            <TableCell className="text-center text-red-600 font-semibold">{s.losses}</TableCell>
+                                            <TableCell className="text-center font-bold text-lg">{s.points}</TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center justify-center gap-2">
+                                                    {s.form.map((status, i) => (
+                                                        <Tooltip key={i}>
+                                                            <TooltipTrigger>
+                                                                <FormIcon status={status} />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>{status}</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    ))}
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                }) : (
                                     <TableRow>
                                         <TableCell colSpan={8} className="text-center h-24">
                                             لا توجد بيانات حضور مسجلة لهذا الشهر.
