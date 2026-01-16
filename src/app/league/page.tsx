@@ -1,5 +1,5 @@
 
-      "use client";
+"use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -15,8 +15,10 @@ import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Link from 'next/link';
+import { MatchOfTheWeek } from '@/components/ui/MatchOfTheWeek';
 
-interface LeagueStat {
+
+export interface LeagueStat {
     studentId: string;
     studentName: string;
     photoURL?: string;
@@ -197,7 +199,7 @@ export default function LeaguePage() {
         .filter(s => s.played > 0)
         .reduce((best, current) => {
             const currentScore = current.points + current.goalsFor + current.assists;
-            const bestScore = best.points + best.goalsFor + best.assists;
+            const bestScore = best ? (best.points + best.goalsFor + best.assists) : -1;
 
             if (currentScore > bestScore) {
                 return current;
@@ -292,6 +294,8 @@ export default function LeaguePage() {
                     </CardContent>
                 </Card>
 
+                <MatchOfTheWeek leagueTable={leagueTable} />
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2">
                         <Card>
@@ -340,7 +344,7 @@ export default function LeaguePage() {
                                                     <TableCell>
                                                         <Link href={`/parent-portal/${s.studentId}`} className="flex items-center gap-3 hover:underline">
                                                             <Avatar className="h-9 w-9">
-                                                                <AvatarImage src={s.photoURL} alt={s.studentName} />
+                                                                <AvatarImage src={s.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${s.studentName}`} alt={s.studentName} />
                                                                 <AvatarFallback>{s.studentName.charAt(0)}</AvatarFallback>
                                                             </Avatar>
                                                             <span className="font-medium">{s.studentName}</span>
@@ -427,7 +431,7 @@ export default function LeaguePage() {
                                                     {starOfTheMonth.overallRating}
                                                 </div>
                                                 <Avatar className="w-28 h-28 mb-2 mx-auto border-4 border-white/50">
-                                                    <AvatarImage src={starOfTheMonth.photoURL} alt={starOfTheMonth.studentName} />
+                                                    <AvatarImage src={starOfTheMonth.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${starOfTheMonth.studentName}`} alt={starOfTheMonth.studentName} />
                                                     <AvatarFallback>{starOfTheMonth.studentName.charAt(0)}</AvatarFallback>
                                                 </Avatar>
                                                 <h3 className="text-2xl font-bold drop-shadow-md">{starOfTheMonth.studentName}</h3>
@@ -487,7 +491,7 @@ export default function LeaguePage() {
                                                 <TableCell>
                                                     <div className="flex items-center gap-3">
                                                         <Avatar className="h-9 w-9">
-                                                            <AvatarImage src={scorer.photoURL} alt={scorer.studentName} />
+                                                            <AvatarImage src={scorer.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${scorer.studentName}`} alt={scorer.studentName} />
                                                             <AvatarFallback>{scorer.studentName.charAt(0)}</AvatarFallback>
                                                         </Avatar>
                                                         <span className="font-medium">{scorer.studentName}</span>
@@ -532,7 +536,7 @@ export default function LeaguePage() {
                                                 <TableCell>
                                                     <div className="flex items-center gap-3">
                                                         <Avatar className="h-9 w-9">
-                                                            <AvatarImage src={player.photoURL} alt={player.studentName} />
+                                                            <AvatarImage src={player.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${player.studentName}`} alt={player.studentName} />
                                                             <AvatarFallback>{player.studentName.charAt(0)}</AvatarFallback>
                                                         </Avatar>
                                                         <span className="font-medium">{player.studentName}</span>
@@ -557,7 +561,3 @@ export default function LeaguePage() {
         </TooltipProvider>
     );
 }
-
-    
-
-    
