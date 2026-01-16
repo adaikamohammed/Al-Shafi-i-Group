@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -9,7 +8,7 @@ import { useStudentContext } from '@/context/StudentContext';
 import { Loader2, AlertTriangle, Shield, CheckCircle, XCircle, MinusCircle, Flame } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import type { Student, DailySession, AttendanceStatus } from '@/lib/types';
+import type { Student, DailySession, AttendanceStatus, PerformanceLevel } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -325,5 +324,4 @@ export default function LeaguePage() {
             </div>
         </TooltipProvider>
     );
-
-    
+}
