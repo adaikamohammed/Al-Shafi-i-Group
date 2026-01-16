@@ -171,13 +171,13 @@ export default function LeaguePage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[50px]">الترتيب</TableHead>
+                                    <TableHead className="w-[50px]">#</TableHead>
                                     <TableHead>الطالب</TableHead>
-                                    <TableHead className="text-center">لعب</TableHead>
+                                    <TableHead className="text-center">ل</TableHead>
                                     <TableHead className="text-center text-green-600">ف</TableHead>
                                     <TableHead className="text-center text-gray-500">ت</TableHead>
                                     <TableHead className="text-center text-red-600">خ</TableHead>
-                                    <TableHead className="text-center">النقاط</TableHead>
+                                    <TableHead className="text-center">نقاط</TableHead>
                                     <TableHead className="text-center w-[200px]">آخر 5</TableHead>
                                 </TableRow>
                             </TableHeader>
