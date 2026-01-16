@@ -975,7 +975,7 @@ export default function PreRegistrationPage() {
                         </Card>
                     </div>
 
-                    <Card className={cn('transition-all print:shadow-none print:border-none', !isLocked && 'border-green-500 ring-2 ring-green-500/20')}>
+                    <Card className={cn('transition-all print:shadow-none', !isLocked && 'border-green-500 ring-2 ring-green-500/20')}>
                         <CardHeader className="no-print">
                             <CardTitle>قائمة طلبات التسجيل ({filteredRegistrations.length})</CardTitle>
                         </CardHeader>
@@ -1143,5 +1143,6 @@ export default function PreRegistrationPage() {
 
 
     
+
 
 
