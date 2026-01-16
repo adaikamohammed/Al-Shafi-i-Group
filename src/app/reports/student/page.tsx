@@ -41,7 +41,7 @@ export default function StudentReportPage() {
     const [messageTemplate, setMessageTemplate] = useState<MessageTemplate>('tashjee');
     const [messageContent, setMessageContent] = useState('');
 
-    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
+    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط').sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
     const selectedStudent = useMemo(() => activeStudents.find(s => s.id === selectedStudentId), [activeStudents, selectedStudentId]);
 
      useEffect(() => {
@@ -139,7 +139,7 @@ export default function StudentReportPage() {
 
 
         const radarData = [
-            { subject: 'الحضور', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
+            { subject: 'الحاضر', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
             { subject: 'الحفظ', score: parseFloat(memorizationScore.toFixed(1)), fullMark: 10 },
             { subject: 'الانضباط', score: parseFloat(disciplineScore.toFixed(1)), fullMark: 10 },
             { subject: 'التجويد', score: tajweedScore, fullMark: 10 },

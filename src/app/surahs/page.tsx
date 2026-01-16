@@ -20,7 +20,7 @@ export default function SurahProgressPage() {
     const { students, surahProgress, toggleSurahStatus, loading } = useStudentContext();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
 
-    const studentsToShow = useMemo(() => (students ?? []), [students]);
+    const studentsToShow = useMemo(() => (students ?? []).sort((a,b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
 
     const selectedStudent = useMemo(() => {
         return studentsToShow.find(s => s.id === selectedStudentId);

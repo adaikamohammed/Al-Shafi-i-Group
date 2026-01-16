@@ -115,7 +115,7 @@ export default function DailySessionsPage() {
   const { students, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById } = useStudentContext();
   const { isSuperAdmin } = useAuth();
   const activeStudents = useMemo(() => 
-    (students ?? []).filter(s => s.status === "نشط"), 
+    (students ?? []).filter(s => s.status === "نشط").sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), 
   [students]);
 
   const handleDayClick = (day: number, sessionNumber: 1 | 2 = 1) => {
@@ -906,5 +906,3 @@ function DailySessionForm({ day, sessionNumber, students, onClose, addDailySessi
     
 
     
-
-

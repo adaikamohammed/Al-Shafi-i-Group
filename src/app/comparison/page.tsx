@@ -148,7 +148,7 @@ export default function ComparisonPage() {
     const [student1Id, setStudent1Id] = useState<string | null>(null);
     const [student2Id, setStudent2Id] = useState<string | null>(null);
 
-    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط'), [students]);
+    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط').sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
 
     const student1 = useMemo(() => activeStudents.find(s => s.id === student1Id) || null, [activeStudents, student1Id]);
     const student2 = useMemo(() => activeStudents.find(s => s.id === student2Id) || null, [activeStudents, student2Id]);
@@ -382,4 +382,3 @@ export default function ComparisonPage() {
         </div>
     );
 }
-
