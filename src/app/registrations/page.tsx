@@ -653,8 +653,7 @@ export default function PreRegistrationPage() {
         toast({
             title: `تم حذف ${itemsToDelete.length} تسجيل مؤقتاً`,
             description: "سيتم الحذف النهائي بعد 10 ثواني.",
-            action: (
-                <Button variant="secondary" onClick={() => {
+            action: <Button variant="secondary" onClick={() => {
                     setPendingDeletion(prev => prev.filter(id => !itemsToDelete.includes(id)));
                     if (undoTimeoutRef.current) {
                         clearTimeout(undoTimeoutRef.current);
@@ -663,8 +662,7 @@ export default function PreRegistrationPage() {
                     toast({title: '✅ تم التراجع عن الحذف'});
                 }}>
                     تراجع
-                </Button>
-            ),
+                </Button>,
             duration: 10000,
         });
 
