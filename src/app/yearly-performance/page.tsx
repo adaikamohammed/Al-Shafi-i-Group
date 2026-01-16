@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -16,23 +15,42 @@ import { useAuth } from '@/context/AuthContext';
 
 const YearView = ({ year, data, onDayClick }: { year: number, data: any, onDayClick: (date: Date) => void }) => {
     const yearStart = startOfYear(new Date(year, 0, 1));
-    const days = Array.from({ length: 366 }, (_, i) => addDays(yearStart, i)).filter(d => getYear(d) === year);
-    const firstDay = getDay(yearStart);
+    // Ensure we handle leap years correctly
+    const daysInYear = getYear(yearStart) % 4 === 0 && (getYear(yearStart) % 100 !== 0 || getYear(yearStart) % 400 === 0) ? 366 : 365;
+    const days = Array.from({ length: daysInYear }, (_, i) => addDays(yearStart, i));
+    const firstDay = getDay(yearStart); // 0 for Sunday, 6 for Saturday
+
+    // We want Saturday to be the first day of the week, so we adjust.
+    // getDay returns 0 for Sun, 1 for Mon... 6 for Sat.
+    // If our week starts on Saturday (6), we want index 0.
+    const startDayIndex = (firstDay + 1) % 7;
+
 
     return (
         <div className="grid grid-cols-53 gap-1" style={{direction: 'rtl'}}>
-            {Array.from({length: firstDay}).map((_, i) => <div key={`empty-${i}`} />)}
+             {/* Add empty cells to align the first day of the year */}
+            {Array.from({length: startDayIndex}).map((_, i) => <div key={`empty-${i}`} />)}
             {days.map(day => {
                 const dateString = format(day, 'yyyy-MM-dd');
                 const dayData = data[dateString];
-                let colorClass = 'bg-gray-200 dark:bg-gray-800';
+                let colorClass = 'bg-gray-200 dark:bg-gray-800'; // Default for no data
+                
                 if(dayData) {
-                    if (dayData.attendanceRate > 0.9) colorClass = 'bg-green-600';
-                    else if (dayData.attendanceRate > 0.7) colorClass = 'bg-green-400';
-                    else if (dayData.attendanceRate > 0.5) colorClass = 'bg-yellow-400';
-                    else if (dayData.attendanceRate > 0) colorClass = 'bg-orange-400';
-                    else if (dayData.sessionType === 'يوم عطلة' || dayData.sessionType === 'غياب الشيخ') colorClass = 'bg-blue-300';
-                    else colorClass = 'bg-red-500';
+                     if (dayData.sessionType === 'يوم عطلة' || (dayData.sessionType === 'غياب الشيخ' && !dayData.hasSubstitute)) {
+                        colorClass = 'bg-blue-300';
+                    } else if (dayData.sessionType === 'حصة تعويضية') {
+                        colorClass = 'bg-yellow-400';
+                    } else if (dayData.attendanceRate >= 0.9) {
+                        colorClass = 'bg-green-600';
+                    } else if (dayData.attendanceRate >= 0.7) {
+                        colorClass = 'bg-green-500';
+                    } else if (dayData.attendanceRate > 0.5) {
+                        colorClass = 'bg-green-400';
+                    } else if (dayData.attendanceRate > 0) {
+                        colorClass = 'bg-orange-400';
+                    } else {
+                        colorClass = 'bg-red-500'; // Zero attendance on a session day
+                    }
                 }
 
                 return (
@@ -48,6 +66,7 @@ const YearView = ({ year, data, onDayClick }: { year: number, data: any, onDayCl
                                 <p className="font-bold">{format(day, 'd MMMM yyyy', {locale: ar})}</p>
                                 {dayData ? (
                                     <>
+                                        <p>نوع الحصة: {dayData.sessionType}</p>
                                         <p>الحضور: {(dayData.attendanceRate * 100).toFixed(0)}%</p>
                                         <p>تقييم ممتاز: {dayData.excellentCount}</p>
                                         <p>سلوك غير منضبط: {dayData.undisciplinedCount}</p>
@@ -64,39 +83,40 @@ const YearView = ({ year, data, onDayClick }: { year: number, data: any, onDayCl
 
 export default function YearlyPerformancePage() {
     const { students, dailySessions, loading } = useStudentContext();
-    const { isSuperAdmin } = useAuth();
     const [currentYear, setCurrentYear] = useState(getYear(new Date()));
     const [viewMode, setViewMode] = useState<'year' | 'quarter' | 'month'>('year');
     
     const yearlyData = useMemo(() => {
         const data: any = {};
-        if (!dailySessions) return data;
+        if (!dailySessions || !students) return data;
+        const activeStudentsCount = students.filter(s => s.status === 'نشط').length;
+        if(activeStudentsCount === 0) return data;
 
         Object.keys(dailySessions).forEach(dateString => {
             const sessions = Object.values(dailySessions[dateString]);
             if(sessions.length === 0) return;
 
-            const totalRecords = sessions.flatMap(s => s.records || []);
-            const activeStudentsToday = students.filter(s => s.status === 'نشط').length;
-            
-            if(activeStudentsToday === 0) return;
+            const primarySession = sessions[0];
+            const sessionType = primarySession.sessionType;
+            let attendanceRate = 0;
+            let excellentCount = 0;
+            let undisciplinedCount = 0;
 
-            const sessionType = sessions[0].sessionType;
-            if(sessionType === 'يوم عطلة' || sessionType === 'غياب الشيخ') {
-                 data[dateString] = {
-                    sessionType: sessionType,
-                    attendanceRate: 0, excellentCount: 0, undisciplinedCount: 0
-                };
-                return;
+            if(sessionType === 'يوم عطلة' || (sessionType === 'غياب الشيخ' && !primarySession.substituteTeacher)) {
+                // No attendance data needed
+            } else {
+                const allRecords = sessions.flatMap(s => s.records || []);
+                const attendanceCount = allRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
+                const totalPossibleAttendances = activeStudentsCount * sessions.length;
+                attendanceRate = totalPossibleAttendances > 0 ? attendanceCount / totalPossibleAttendances : 0;
+                excellentCount = allRecords.filter(r => r.memorization === 'ممتاز').length;
+                undisciplinedCount = allRecords.filter(r => r.behavior === 'غير منضبط').length;
             }
-
-            const attendanceCount = totalRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
-            const excellentCount = totalRecords.filter(r => r.memorization === 'ممتاز').length;
-            const undisciplinedCount = totalRecords.filter(r => r.behavior === 'غير منضبط').length;
-
+            
             data[dateString] = {
                 sessionType: sessionType,
-                attendanceRate: attendanceCount / (activeStudentsToday * sessions.length),
+                hasSubstitute: !!primarySession.substituteTeacher,
+                attendanceRate,
                 excellentCount,
                 undisciplinedCount
             };
@@ -126,22 +146,25 @@ export default function YearlyPerformancePage() {
                         </div>
                         <div className="flex items-center space-x-1 rounded-lg bg-muted p-1">
                            <Button variant={viewMode === 'year' ? 'secondary' : 'ghost'} onClick={() => setViewMode('year')} className="h-8 px-3">عرض سنوي</Button>
-                           <Button variant={viewMode === 'quarter' ? 'secondary' : 'ghost'} onClick={() => setViewMode('quarter')} className="h-8 px-3">عرض فصلي</Button>
-                           <Button variant={viewMode === 'month' ? 'secondary' : 'ghost'} onClick={() => setViewMode('month')} className="h-8 px-3">عرض شهري</Button>
+                           <Button variant={viewMode === 'quarter' ? 'secondary' : 'ghost'} onClick={() => setViewMode('quarter')} className="h-8 px-3" disabled>عرض فصلي (قريباً)</Button>
+                           <Button variant={viewMode === 'month' ? 'secondary' : 'ghost'} onClick={() => setViewMode('month')} className="h-8 px-3" disabled>عرض شهري (قريباً)</Button>
                         </div>
                     </div>
 
                     {viewMode === 'year' && <YearView year={currentYear} data={yearlyData} onDayClick={(date) => console.log(date)} />}
 
                     <div className="mt-6 flex flex-wrap justify-center gap-4 text-sm">
-                        <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-gray-200 border"></div>أقل</span>
+                        <span className="flex items-center gap-2">أقل</span>
                         <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-orange-400"></div></span>
-                        <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-yellow-400"></div></span>
                         <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-green-400"></div></span>
-                        <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-green-600"></div>أكثر</span>
+                        <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-green-500"></div></span>
+                        <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-green-600"></div></span>
+                        <span className="flex items-center gap-2">أكثر</span>
                         <span className="flex items-center gap-2 font-semibold ml-4">|</span>
                         <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-red-500"></div>غياب كلي</span>
                         <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-blue-300"></div>عطلة/غياب شيخ</span>
+                        <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-yellow-400"></div>حصة إضافية</span>
+                        <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-gray-200"></div>يوم فارغ</span>
                     </div>
 
                  </CardContent>

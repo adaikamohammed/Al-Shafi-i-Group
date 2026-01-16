@@ -1,4 +1,3 @@
-
 import type {Config} from 'tailwindcss';
 
 export default {
@@ -10,6 +9,9 @@ export default {
   ],
   theme: {
     extend: {
+      gridTemplateColumns: {
+        '53': 'repeat(53, minmax(0, 1fr))',
+      },
       fontFamily: {
         body: ['Cairo', 'sans-serif'],
         headline: ['Cairo', 'sans-serif'],
@@ -112,5 +114,3 @@ export default {
   },
   plugins: [require('tailwindcss-animate')],
 } satisfies Config;
-
-    
