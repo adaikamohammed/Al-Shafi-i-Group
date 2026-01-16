@@ -5,7 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, ArrowLeft, ArrowRight, Calendar, CheckCircle, TrendingUp, Users } from 'lucide-react';
+import { Loader2, ArrowLeft, ArrowRight, Calendar, CheckCircle, TrendingUp, Users, CalendarX } from 'lucide-react';
 import { format, getYear, getDay, startOfYear, addDays, parseISO, getMonth, getDaysInMonth, startOfMonth, endOfMonth, getQuarter, setYear, setMonth, addMonths, subMonths, endOfYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -222,10 +222,10 @@ export default function YearlyPerformancePage() {
     }, [dailySessions, students, currentYear]);
     
     const { periodStats, statsTitle } = useMemo(() => {
-        if (!dailySessions || !students) return { periodStats: { commitmentRate: 0, extraSessions: 0, netWorkDays: 0 }, statsTitle: '' };
+        if (!dailySessions || !students) return { periodStats: { commitmentRate: 0, extraSessions: 0, netWorkDays: 0, sheikhAbsenceDays: 0 }, statsTitle: '' };
 
         const activeStudentsCount = students.filter(s => s.status === 'نشط').length;
-        if (activeStudentsCount === 0) return { periodStats: { commitmentRate: 0, extraSessions: 0, netWorkDays: 0 }, statsTitle: '' };
+        if (activeStudentsCount === 0) return { periodStats: { commitmentRate: 0, extraSessions: 0, netWorkDays: 0, sheikhAbsenceDays: 0 }, statsTitle: '' };
 
         let startDate: Date;
         let endDate: Date;
@@ -259,6 +259,7 @@ export default function YearlyPerformancePage() {
             workDays: new Set<string>(),
             totalAttendance: 0,
             totalPossibleAttendance: 0,
+            sheikhAbsenceDays: 0,
         };
         
         Object.keys(dailySessions).forEach(dateString => {
@@ -268,6 +269,10 @@ export default function YearlyPerformancePage() {
                     const sessionsOnDay = Object.values(dailySessions[dateString]);
                     const isHoliday = sessionsOnDay.some(s => s.sessionType === 'يوم عطلة');
                     const isSheikhAbsentNoSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
+                    
+                    if (isSheikhAbsentNoSub) {
+                        stats.sheikhAbsenceDays++;
+                    }
                     
                     if (!isHoliday && !isSheikhAbsentNoSub) {
                         const workSessions = sessionsOnDay.filter(s => s.sessionType !== 'يوم عطلة' && !(s.sessionType === 'غياب الشيخ' && !s.substituteTeacher));
@@ -295,6 +300,7 @@ export default function YearlyPerformancePage() {
             commitmentRate: commitmentRate.toFixed(0),
             extraSessions: stats.extraSessions,
             netWorkDays: stats.workDays.size,
+            sheikhAbsenceDays: stats.sheikhAbsenceDays,
         };
 
         return { periodStats: finalStats, statsTitle: title };
@@ -408,6 +414,12 @@ export default function YearlyPerformancePage() {
                                    value={periodStats.extraSessions}
                                    unit="حصة"
                                    icon={<TrendingUp className="h-8 w-8 text-indigo-500"/>}
+                               />
+                               <StatWidget 
+                                   title="غيابات الشيخ"
+                                   value={periodStats.sheikhAbsenceDays}
+                                   unit="يوم"
+                                   icon={<CalendarX className="h-8 w-8 text-red-500"/>}
                                />
                             </CardContent>
                         </Card>
