@@ -4,7 +4,6 @@
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useStudentContext } from '@/context/StudentContext';
 import { Bot, AlertTriangle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { 
@@ -262,3 +261,5 @@ export function GroupEvaluationCard({ students, sessions, groupName }: { student
         </Card>
     );
 }
+
+    
