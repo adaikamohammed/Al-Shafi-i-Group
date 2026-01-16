@@ -506,6 +506,7 @@ export default function PreRegistrationPage() {
     const [pendingDeletion, setPendingDeletion] = useState<string[]>([]);
     const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+    const [isPrintModalOpen, setPrintModalOpen] = useState(false);
     const [columnVisibility, setColumnVisibility] = useState(() => {
         const saved = typeof window !== 'undefined' ? localStorage.getItem('preRegColumnVisibility') : null;
         let initialVisibility = { ...ALL_COLUMNS };
@@ -524,6 +525,10 @@ export default function PreRegistrationPage() {
         }
         return initialVisibility;
     });
+    
+    const [columnsToPrint, setColumnsToPrint] = useState(columnVisibility);
+    const originalColumnVisibilityRef = useRef(columnVisibility);
+
 
     const isLocked = accessLevel !== 'unlocked';
     
@@ -542,6 +547,17 @@ export default function PreRegistrationPage() {
             }
         };
     }, []);
+    
+    useEffect(() => {
+        const handleAfterPrint = () => {
+            setColumnVisibility(originalColumnVisibilityRef.current);
+        };
+
+        window.addEventListener('afterprint', handleAfterPrint);
+        return () => {
+            window.removeEventListener('afterprint', handleAfterPrint);
+        };
+    }, []);
 
     const handleAccessCodeSubmit = () => {
         if (accessCode === 'admin8888') {
@@ -558,13 +574,21 @@ export default function PreRegistrationPage() {
     };
 
     const toggleColumn = (key: keyof typeof ALL_COLUMNS) => {
-        setColumnVisibility(prev => ({
-            ...prev,
-            [key]: {
-                ...prev[key],
-                visible: !prev[key].visible,
-            },
-        }));
+        setColumnVisibility(prev => {
+            const newState = { ...prev };
+            newState[key] = { ...newState[key], visible: !newState[key].visible };
+            return newState;
+        });
+    };
+    
+    const handleConfirmPrint = () => {
+        originalColumnVisibilityRef.current = columnVisibility;
+        setColumnVisibility(columnsToPrint);
+        setPrintModalOpen(false);
+        
+        setTimeout(() => {
+            window.print();
+        }, 100);
     };
     
     const filteredRegistrations = useMemo(() => {
@@ -803,6 +827,43 @@ export default function PreRegistrationPage() {
                 selectedCount={selectedRows.length}
                 onSave={handleBulkEditSave}
             />
+            
+            <Dialog open={isPrintModalOpen} onOpenChange={setPrintModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>تخصيص الطباعة</DialogTitle>
+                        <DialogDescription>
+                            اختر الأعمدة التي ترغب في طباعتها في التقرير.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid grid-cols-2 gap-4 py-4">
+                        {Object.keys(ALL_COLUMNS).map((key) => {
+                            const col = ALL_COLUMNS[key as keyof typeof ALL_COLUMNS];
+                            return (
+                                <div key={key} className="flex items-center space-x-2 space-x-reverse">
+                                    <Checkbox
+                                        id={`print-col-${key}`}
+                                        checked={columnsToPrint[key as keyof typeof columnsToPrint]?.visible ?? false}
+                                        onCheckedChange={(checked) => {
+                                            setColumnsToPrint(prev => ({
+                                                ...prev,
+                                                [key]: { ...prev[key as keyof typeof prev], visible: !!checked }
+                                            }));
+                                        }}
+                                    />
+                                    <label htmlFor={`print-col-${key}`} className="text-sm font-medium leading-none">
+                                        {col.label}
+                                    </label>
+                                </div>
+                            )
+                        })}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setPrintModalOpen(false)}>إلغاء</Button>
+                        <Button onClick={handleConfirmPrint}>تأكيد الطباعة</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {accessLevel !== 'hidden' ? (
                 <div className="printable-section">
@@ -877,7 +938,7 @@ export default function PreRegistrationPage() {
                                         <SelectItem value="أنثى">أنثى</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                     <Button variant="outline" onClick={() => window.print()}>
+                                     <Button variant="outline" onClick={() => { setColumnsToPrint(columnVisibility); setPrintModalOpen(true); }}>
                                         <Printer className="ml-2 h-4 w-4" /> طباعة القائمة الحالية
                                     </Button>
                                 </div>
@@ -1082,4 +1143,5 @@ export default function PreRegistrationPage() {
 
 
     
+
 
