@@ -105,10 +105,15 @@ export default {
             height: '0',
           },
         },
+        'shine': {
+          'from': { transform: 'translateX(-100%) rotate(30deg)' },
+          'to': { transform: 'translateX(100%) rotate(30deg)' },
+        }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'shine': 'shine 4s linear infinite'
       },
     },
   },

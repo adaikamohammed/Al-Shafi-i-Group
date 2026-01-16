@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, Shield, CheckCircle, XCircle, MinusCircle, Flame, Star } from 'lucide-react';
+import { Loader2, AlertTriangle, Shield, CheckCircle, XCircle, MinusCircle, Flame, Star, Info } from 'lucide-react';
 import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Student, DailySession, AttendanceStatus, PerformanceLevel } from '@/lib/types';
@@ -75,7 +75,7 @@ export default function LeaguePage() {
             let assists = 0;
 
             sessionsInMonth.forEach(session => {
-                const record = (session.records || []).find(r => r.studentId === student.id);
+                const record = (session.records ?? []).find(r => r.studentId === student.id);
                 if (record) {
                     form.push(record.attendance);
                     switch (record.attendance) {
@@ -150,27 +150,62 @@ export default function LeaguePage() {
     }, [leagueTable]);
     
     const starOfTheMonth = useMemo(() => {
-        if (!leagueTable || leagueTable.length === 0) return null;
+    if (!leagueTable || leagueTable.length === 0 || !dailySessions) return null;
 
-        const star = leagueTable
-            .filter(s => s.played > 0)
-            .reduce((best, current) => {
-                const currentScore = current.points + current.goalsFor + current.assists;
-                const bestScore = best.points + best.goalsFor + best.assists;
+    const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(daySessions =>
+        Object.values(daySessions).filter(session => {
+            if (!session?.date || session.sessionType === 'يوم عطلة' || session.sessionType === 'حصة أنشطة') return false;
+            try {
+                const sessionDate = parseISO(session.date);
+                return getMonth(sessionDate) === selectedMonth && getYear(sessionDate) === selectedYear;
+            } catch (e) {
+                return false;
+            }
+        })
+    );
 
-                if (currentScore > bestScore) {
+    const star = leagueTable
+        .filter(s => s.played > 0)
+        .reduce((best, current) => {
+            const currentScore = current.points + current.goalsFor + current.assists;
+            const bestScore = best.points + best.goalsFor + best.assists;
+
+            if (currentScore > bestScore) {
+                return current;
+            }
+            if (currentScore === bestScore) {
+                if (current.losses < best.losses) {
                     return current;
                 }
-                if (currentScore === bestScore) {
-                    if (current.losses < best.losses) {
-                        return current;
-                    }
-                }
-                return best;
-            }, leagueTable[0]); 
+            }
+            return best;
+        }, leagueTable[0]);
 
-        return star;
-    }, [leagueTable]);
+    if (!star) return null;
+
+    // Overall Rating Calculation
+    const totalPossibleSessions = sessionsInMonth.length;
+    
+    const attendanceScore = totalPossibleSessions > 0 ? (star.wins / totalPossibleSessions) * 100 : 0;
+    
+    const maxGoals = totalPossibleSessions > 0 ? totalPossibleSessions * 2 : 1;
+    const memorizationScore = (star.goalsFor / maxGoals) * 100;
+    
+    const maxAssists = totalPossibleSessions > 0 ? totalPossibleSessions * 2 : 1;
+    const behaviorScore = (star.assists / maxAssists) * 100;
+
+    const tajweedScore = 85; // Placeholder
+    const akhlaqScore = 90; // Placeholder
+
+    const overallAverage = (attendanceScore + memorizationScore + behaviorScore + tajweedScore + akhlaqScore) / 5;
+    const overallRating = Math.min(99, Math.round((overallAverage / 100) * 99));
+
+    return {
+        ...star,
+        overallRating,
+        stats: { MEM: star.goalsFor, BEH: star.assists, ATT: star.wins, TAJ: 8.5 }
+    };
+}, [leagueTable, dailySessions, selectedMonth, selectedYear]);
 
 
     if (loading) {
@@ -320,35 +355,39 @@ export default function LeaguePage() {
                     </div>
                      <div className="space-y-6">
                         {starOfTheMonth && leagueTable.length > 0 && (
-                            <Card className="bg-gradient-to-tr from-yellow-100 to-amber-200 dark:from-yellow-900/50 dark:to-amber-800/50 border-amber-400">
-                                <CardHeader className="text-center">
-                                    <div className="mx-auto bg-amber-500 text-white rounded-full p-3 w-fit mb-2 animate-pulse">
-                                        <Star className="h-8 w-8" />
-                                    </div>
-                                    <CardTitle className="text-2xl font-headline text-amber-800 dark:text-amber-200">
+                            <Card className="relative overflow-hidden bg-gradient-to-br from-yellow-300 via-amber-500 to-yellow-600 text-white shadow-2xl">
+                                <div className="absolute inset-0 w-full h-full bg-black/10"></div>
+                                <div className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] animate-shine bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+                                <CardHeader className="relative z-10 text-center pt-4 pb-2">
+                                    <CardTitle className="text-xl font-headline text-white drop-shadow-lg">
                                         نجم شهر {format(new Date(selectedYear, selectedMonth), 'MMMM', { locale: ar })}
                                     </CardTitle>
                                 </CardHeader>
-                                <CardContent className="flex flex-col items-center text-center">
-                                    <Avatar className="w-24 h-24 mb-4 border-4 border-white">
+                                <CardContent className="relative z-10 flex flex-col items-center text-center p-4 pt-0">
+                                     <div className="font-bold text-4xl text-black bg-white/80 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-2 border-2 border-white/50 shadow-inner">
+                                        {starOfTheMonth.overallRating}
+                                    </div>
+                                    <Avatar className="w-28 h-28 mb-2 mx-auto border-4 border-white/50">
                                         <AvatarImage src={starOfTheMonth.photoURL} alt={starOfTheMonth.studentName} />
                                         <AvatarFallback>{starOfTheMonth.studentName.charAt(0)}</AvatarFallback>
                                     </Avatar>
-                                    <h3 className="text-xl font-bold">{starOfTheMonth.studentName}</h3>
-                                    <p className="text-muted-foreground">صاحب أعلى تقييم إجمالي</p>
-                                    <div className="flex justify-around w-full mt-4 text-sm">
-                                        <div className="text-center">
-                                            <p className="font-bold text-lg">{starOfTheMonth.points}</p>
-                                            <p className="text-xs text-muted-foreground">نقاط</p>
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="font-bold text-lg">{starOfTheMonth.goalsFor}</p>
-                                            <p className="text-xs text-muted-foreground">أهداف</p>
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="font-bold text-lg">{starOfTheMonth.assists}</p>
-                                            <p className="text-xs text-muted-foreground">تمريرات</p>
-                                        </div>
+                                    <h3 className="text-2xl font-bold drop-shadow-md">{starOfTheMonth.studentName}</h3>
+
+                                     <div className="w-full h-px bg-white/30 my-3"></div>
+
+                                    <div className="grid grid-cols-4 gap-2 w-full text-black">
+                                         <div className="bg-white/80 p-1.5 rounded-md">
+                                            <p className="font-bold text-xl">{starOfTheMonth.stats.MEM}</p><p className="text-xs font-semibold">حفظ</p>
+                                         </div>
+                                         <div className="bg-white/80 p-1.5 rounded-md">
+                                            <p className="font-bold text-xl">{starOfTheMonth.stats.BEH}</p><p className="text-xs font-semibold">سلوك</p>
+                                         </div>
+                                         <div className="bg-white/80 p-1.5 rounded-md">
+                                            <p className="font-bold text-xl">{starOfTheMonth.stats.ATT}</p><p className="text-xs font-semibold">حضور</p>
+                                         </div>
+                                         <div className="bg-white/80 p-1.5 rounded-md">
+                                            <p className="font-bold text-xl">{starOfTheMonth.stats.TAJ.toFixed(1)}</p><p className="text-xs font-semibold">تجويد</p>
+                                         </div>
                                     </div>
                                 </CardContent>
                             </Card>
