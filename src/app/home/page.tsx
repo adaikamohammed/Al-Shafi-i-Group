@@ -41,7 +41,7 @@ export default function HomePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const { students, dailySessions, dailyReports, loading } = useStudentContext();
+  const { students, dailySessions, loading } = useStudentContext();
 
   const handleBackgroundChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -115,14 +115,9 @@ export default function HomePage() {
         <div className="relative z-10 w-full max-w-6xl mt-8 space-y-6">
             <DailyInspiration />
             <DailyChecklist />
-            <GroupEvaluationCard students={students || []} sessions={dailySessions} reports={Object.values(dailyReports).flatMap(day => Object.values(day))} groupName={user?.group} />
-            <HallOfFame students={students || []} sessions={dailySessions} />
+            <GroupEvaluationCard students={students || []} sessions={dailySessions} groupName={user?.group} />
+            <HallOfFame />
         </div>
     </div>
   );
 }
-    
-
-    
-
-

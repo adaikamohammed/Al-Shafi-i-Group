@@ -1,162 +1,188 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import type { Student, DailySession, DailyReport } from '@/lib/types';
-import { Bot, Lightbulb, AlertTriangle, TrendingUp, TrendingDown, Smile, Frown, Meh } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useStudentContext } from '@/context/StudentContext';
+import { Bot, AlertTriangle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-import { format, startOfWeek, endOfWeek, subWeeks, parseISO } from 'date-fns';
+import { 
+    format, 
+    startOfWeek, 
+    endOfWeek, 
+    subWeeks, 
+    eachMonthOfInterval, 
+    startOfMonth, 
+    endOfMonth, 
+    getYear, 
+    subYears, 
+    startOfYear, 
+    endOfYear, 
+    eachQuarterOfInterval,
+    endOfQuarter,
+    addYears,
+    parseISO
+} from 'date-fns';
 import { ar } from 'date-fns/locale';
+import type { DailySession, Student } from '@/lib/types';
+import { Button } from './button';
 
-interface GroupEvaluationCardProps {
-    students: Student[];
-    sessions: Record<string, Record<string, DailySession>>;
-    reports: DailyReport[];
-    groupName?: string | null;
-}
-
-const POSITIVE_REPORT_CATEGORIES = ["شكر", "اقتراح"];
-const NEGATIVE_REPORT_CATEGORIES = ["شكوى"];
-
-const calculateSentimentForWeek = (
-    activeStudents: Student[], 
-    sessions: Record<string, Record<string, DailySession>>, 
-    reports: DailyReport[], 
-    weekStartDate: Date, 
-    weekEndDate: Date
+const calculatePeriodStats = (
+    startDate: Date,
+    endDate: Date,
+    activeStudents: Student[],
+    sessions: Record<string, Record<string, DailySession>>
 ) => {
-    if (activeStudents.length === 0) return { score: 0, attendanceRate: 0, badBehaviorCount: 0 };
-    
-    const weeklySessions = Object.values(sessions).flatMap(s => Object.values(s)).filter(s => {
-        if (!s || !s.date) return false;
-        try {
-          const sessionDate = parseISO(s.date);
-          return sessionDate >= weekStartDate && sessionDate <= weekEndDate;
-        } catch(e) { return false; }
-    });
-
-    const weeklyReports = reports.filter(r => {
-        if (!r || !r.date) return false;
-        const reportDate = parseISO(r.date);
-        return reportDate >= weekStartDate && reportDate <= weekEndDate;
-    });
-
-    const records = weeklySessions.flatMap(s => s.records ?? []);
-    
-    const totalPossibleAttendances = weeklySessions.filter(s => s.sessionType !== 'يوم عطلة').length * activeStudents.length;
-    const totalActualAttendances = records.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
-    const attendanceScore = totalPossibleAttendances > 0 ? (totalActualAttendances / totalPossibleAttendances) * 40 : 0;
-    const attendanceRate = totalPossibleAttendances > 0 ? (totalActualAttendances / totalPossibleAttendances) * 100 : 0;
-
-    const totalBehaviorRecords = records.filter(r => r.behavior).length;
-    const positiveBehavior = records.filter(r => r.behavior === 'هادئ').length;
-    const neutralBehavior = records.filter(r => r.behavior === 'متوسط').length;
-    const badBehaviorCount = records.filter(r => r.behavior === 'غير منضبط').length;
-    const disciplineScore = totalBehaviorRecords > 0 ? ((positiveBehavior * 1 + neutralBehavior * 0.5) / totalBehaviorRecords) * 30 : 0;
-    
-    const positiveReports = weeklyReports.filter(r => POSITIVE_REPORT_CATEGORIES.includes(r.category)).length;
-    const negativeReports = weeklyReports.filter(r => NEGATIVE_REPORT_CATEGORIES.includes(r.category)).length;
-    let reportScore = 15;
-    if (weeklyReports.length > 0) {
-        reportScore = 15 + (positiveReports * 5) - (negativeReports * 5);
-        reportScore = Math.max(0, Math.min(30, reportScore));
+    if (activeStudents.length === 0) {
+        return { attendance: 0, behavior: 0, review: 0, memorization: 0, commitment: 0 };
     }
+
+    const periodSessions = Object.values(sessions)
+        .flatMap(day => Object.values(day))
+        .filter(s => {
+            if (!s.date) return false;
+            try {
+                const d = parseISO(s.date);
+                return d >= startDate && d <= endDate;
+            } catch { return false; }
+        });
+
+    const workSessions = periodSessions.filter(s => s.sessionType === 'حصة أساسية' || s.sessionType === 'حصة تعويضية');
     
-    return { score: attendanceScore + disciplineScore + reportScore, attendanceRate, badBehaviorCount };
-}
+    let totalAttendance = 0;
+    let totalPossibleAttendance = 0;
 
+    let behaviorSum = 0;
+    let behaviorCount = 0;
 
-export function GroupEvaluationCard({ students, sessions, reports, groupName }: GroupEvaluationCardProps) {
+    let reviewSum = 0;
+    let reviewCount = 0;
+    
+    let memorizationSum = 0;
+    let memorizationCount = 0;
+
+    const memorizationScoreMap: { [key: string]: number } = { 'ممتاز': 10, 'جيد جداً': 8, 'جيد': 6, 'متوسط': 4, 'ضعيف': 2, 'لا يوجد': 0 };
+    const behaviorScoreMap: { [key: string]: number } = { 'هادئ': 10, 'متوسط': 5, 'غير منضبط': 0 };
+    
+    workSessions.forEach(session => {
+        const sessionDate = parseISO(session.date);
+        activeStudents.forEach(student => {
+            if (sessionDate >= student.registrationDate) {
+                totalPossibleAttendance++;
+                const record = session.records?.find(r => r.studentId === student.id);
+                if (record) {
+                    if (record.attendance === 'حاضر' || record.attendance === 'متأخر') {
+                        totalAttendance++;
+                    }
+
+                    if (record.behavior && record.behavior in behaviorScoreMap) {
+                        behaviorSum += behaviorScoreMap[record.behavior];
+                        behaviorCount++;
+                    }
+                    
+                    if (session.sessionType === 'حصة أساسية') {
+                        reviewCount++;
+                        if (record.review) {
+                            reviewSum++;
+                        }
+                    }
+
+                    if (record.memorization && record.memorization in memorizationScoreMap) {
+                        memorizationSum += memorizationScoreMap[record.memorization];
+                        memorizationCount++;
+                    }
+                }
+            }
+        });
+    });
+
+    const attendanceScore = totalPossibleAttendance > 0 ? (totalAttendance / totalPossibleAttendance) * 100 : 0;
+    const behaviorScore = behaviorCount > 0 ? (behaviorSum / behaviorCount) * 10 : 0;
+    const reviewScore = reviewCount > 0 ? (reviewSum / reviewCount) * 100 : 0;
+    const memorizationScore = memorizationCount > 0 ? (memorizationSum / memorizationCount) * 10 : 0;
+
+    const commitmentScore = (attendanceScore + behaviorScore + reviewScore + memorizationScore) / 4;
+
+    return {
+        attendance: attendanceScore,
+        behavior: behaviorScore,
+        review: reviewScore,
+        memorization: memorizationScore,
+        commitment: commitmentScore
+    };
+};
+
+export function GroupEvaluationCard({ students, sessions, groupName }: { students: Student[]; sessions: Record<string, Record<string, DailySession>>; groupName?: string | null; }) {
+    type ViewType = 'commitment' | 'attendance' | 'behavior' | 'review' | 'memorization';
+    type RangeType = 'weekly'| 'monthly' | 'seasonal' | 'yearly';
+    
+    const [view, setView] = useState<ViewType>('commitment');
+    const [range, setRange] = useState<RangeType>('monthly');
+    const [displayYear, setDisplayYear] = useState(new Date());
+
     const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
 
-    const weeklySentiments = useMemo(() => {
-        const data = Array.from({ length: 4 }).map((_, i) => {
-            const weekEndDate = endOfWeek(subWeeks(new Date(), i), { weekStartsOn: 6 });
-            const weekStartDate = startOfWeek(weekEndDate, { weekStartsOn: 6 });
-            
-            const { score } = calculateSentimentForWeek(activeStudents, sessions, reports, weekStartDate, weekEndDate);
-            
-            return {
-                name: format(weekStartDate, 'dd/MM', { locale: ar }),
-                score: parseFloat(score.toFixed(1)),
-            };
-        }).reverse();
-        return data;
-    }, [activeStudents, sessions, reports]);
-
-    const currentSentimentData = useMemo(() => {
-        const today = new Date();
-        const weekStartDate = startOfWeek(today, { weekStartsOn: 6 });
-        const weekEndDate = endOfWeek(today, { weekStartsOn: 6 });
-
-        const { score, attendanceRate, badBehaviorCount } = calculateSentimentForWeek(activeStudents, sessions, reports, weekStartDate, weekEndDate);
-
-        return {
-            sentimentIndex: score,
-            attendanceRate,
-            badBehaviorCount
-        };
-    }, [activeStudents, sessions, reports]);
-
-    const evaluateGroupPerformance = (sentimentIndex: number, attendanceRate: number, badBehaviorCount: number) => {
-        let rating: string;
-        let suggestions: string[] = [];
-        let icon: React.ReactNode;
-        let ratingText: string;
-
-        if (sentimentIndex >= 85) {
-            rating = "ممتاز";
-            ratingText = "الفوج في قمة عطائه.. استمروا!";
-            icon = <TrendingUp className="h-10 w-10 text-green-500" />;
-        } else if (sentimentIndex >= 60) {
-            rating = "جيد ومستقر";
-            ratingText = "أداء مستقر، نحتاج لدفعة بسيطة نحو التميز.";
-            icon = <Smile className="h-10 w-10 text-blue-500" />;
-             if (badBehaviorCount > 2) {
-                suggestions.push("📈 لوحظ تكرار السلوك غير المنضبط. قد يكون من الجيد تخصيص وقت للتوجيه.");
-            }
-        } else {
-            rating = "بحاجة لتحسين";
-            ratingText = "مؤشر الالتزام في هبوط.. ربما حان وقت مكافأة أو نشاط لكسر الروتين.";
-            icon = <Frown className="h-10 w-10 text-red-500" />;
+    const chartData = useMemo(() => {
+        if (range === 'weekly') {
+            return Array.from({ length: 6 }).map((_, i) => {
+                const weekEndDate = endOfWeek(subWeeks(new Date(), i), { weekStartsOn: 6 });
+                const weekStartDate = startOfWeek(weekEndDate, { weekStartsOn: 6 });
+                const stats = calculatePeriodStats(weekStartDate, weekEndDate, activeStudents, sessions);
+                return { name: format(weekStartDate, 'dd/MM', { locale: ar }), ...stats };
+            }).reverse();
         }
-        
-        if (attendanceRate < 75) {
-            suggestions.push("📉 نسبة الحضور منخفضة. يُنصح بالتواصل مع أولياء أمور الطلبة الأكثر غيابًا.");
+        if (range === 'monthly') {
+            const months = eachMonthOfInterval({ start: startOfYear(displayYear), end: endOfYear(displayYear) });
+            return months.map(monthStart => {
+                const monthEnd = endOfMonth(monthStart);
+                const stats = calculatePeriodStats(monthStart, monthEnd, activeStudents, sessions);
+                return { name: format(monthStart, 'MMM', { locale: ar }), ...stats };
+            });
         }
+        if (range === 'seasonal') {
+            const quarters = eachQuarterOfInterval({ start: startOfYear(displayYear), end: endOfYear(displayYear) });
+            return quarters.map((quarterStart, i) => {
+                const quarterEnd = endOfQuarter(quarterStart);
+                const stats = calculatePeriodStats(quarterStart, quarterEnd, activeStudents, sessions);
+                return { name: `الربع ${i + 1}`, ...stats };
+            });
+        }
+        if (range === 'yearly') {
+            return Array.from({ length: 5 }).map((_, i) => {
+                const yearDate = subYears(new Date(), i);
+                const yearStart = startOfYear(yearDate);
+                const yearEnd = endOfYear(yearDate);
+                const stats = calculatePeriodStats(yearStart, yearEnd, activeStudents, sessions);
+                return { name: format(yearStart, 'yyyy', { locale: ar }), ...stats };
+            }).reverse();
+        }
+        return [];
+    }, [range, activeStudents, sessions, displayYear]);
 
-        const weeklyMasteryChange = 0; // Placeholder logic
-        if (weeklyMasteryChange < 0 && sentimentIndex < 85) {
-            suggestions.push("📚 الحفظ في تباطؤ. ربما يحتاج الطلاب لمسابقة سريعة لتحفيزهم.");
-        }
-        
-        return { rating, suggestions, icon, ratingText };
-    }
+    const processedChartData = useMemo(() => {
+        if (!chartData) return [];
+        return chartData.map(item => ({
+            name: item.name,
+            score: item[view]?.toFixed(1),
+        }));
+    }, [view, chartData]);
 
-    const { rating, suggestions, icon, ratingText } = evaluateGroupPerformance(
-        currentSentimentData.sentimentIndex, 
-        currentSentimentData.attendanceRate,
-        currentSentimentData.badBehaviorCount
-    );
-    
-    const getRatingBadgeClass = (currentRating: string) => {
-        switch(currentRating) {
-            case 'ممتاز': return 'bg-green-100 text-green-800 border-green-300';
-            case 'جيد ومستقر': return 'bg-blue-100 text-blue-800 border-blue-300';
-            case 'بحاجة لتحسين': return 'bg-red-100 text-red-800 border-red-300';
-            default: return 'bg-gray-100 text-gray-800 border-gray-300';
-        }
-    }
-    
-    if (Object.keys(sessions).length === 0 || activeStudents.length === 0) {
+    const viewTitles: Record<ViewType, string> = {
+        commitment: "منحنى الالتزام المدمج",
+        attendance: "منحنى نسبة الحضور",
+        behavior: "منحنى متوسط السلوك",
+        review: "منحنى نسبة المراجعة",
+        memorization: "منحنى متوسط أداء الحفظ"
+    };
+
+    if (activeStudents.length === 0 || Object.keys(sessions).length === 0) {
         return (
             <Card className="md:col-span-2 lg:col-span-4">
                  <CardHeader>
                     <div className="flex items-center gap-2">
                         <Bot className="h-6 w-6 text-primary" />
-                        <CardTitle>رادار الروح المعنوية للفوج</CardTitle>
+                        <CardTitle>الرادار التحليلي للفوج</CardTitle>
                     </div>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center text-center p-8">
@@ -169,61 +195,70 @@ export function GroupEvaluationCard({ students, sessions, reports, groupName }: 
     }
 
     return (
-        <Card className="md:col-span-2 lg:col-span-4">
+        <Card className="md:col-span-2 lg:col-span-4 bg-white/30 backdrop-blur-sm border-gray-200/50 shadow-lg">
             <CardHeader>
                 <div className="flex items-center gap-2">
                     <Bot className="h-6 w-6 text-primary" />
-                    <CardTitle>رادار الروح المعنوية للفوج</CardTitle>
+                    <CardTitle>الرادار التحليلي للفوج</CardTitle>
                 </div>
                 <CardDescription>
-                    تقييم تلقائي لأداء {groupName || 'الفوج'} بناءً على مؤشرات الحضور، الانضباط، والتقارير.
+                    تحليل بياني لأداء {groupName || 'الفوج'} عبر مؤشرات مختلفة.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="grid md:grid-cols-2 gap-6">
-                <div className="flex flex-col justify-between space-y-4 p-6 bg-muted rounded-lg">
-                   <div className="flex justify-between items-start">
-                     <div>
-                        <p className="text-lg font-semibold text-muted-foreground">مؤشر الالتزام الحالي</p>
-                        <Badge className={`text-xl px-4 py-1 border ${getRatingBadgeClass(rating)}`}>{rating}</Badge>
-                     </div>
-                     {icon}
-                   </div>
-                   <p className="text-sm font-medium">{ratingText}</p>
-                </div>
-                <div className="space-y-2">
-                     <div className="flex items-center gap-2">
-                        <h4 className="font-semibold text-lg">منحنى الالتزام (آخر 4 أسابيع)</h4>
+            <CardContent className="space-y-4">
+                <div className="flex flex-col md:flex-row justify-between gap-4">
+                    <Tabs defaultValue="commitment" onValueChange={(v) => setView(v as ViewType)} dir="rtl">
+                        <TabsList>
+                            <TabsTrigger value="commitment">الالتزام</TabsTrigger>
+                            <TabsTrigger value="attendance">الحضور</TabsTrigger>
+                            <TabsTrigger value="behavior">السلوك</TabsTrigger>
+                            <TabsTrigger value="review">المراجعة</TabsTrigger>
+                            <TabsTrigger value="memorization">الحفظ</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                    <div className="flex items-center gap-2 justify-end">
+                        {(range === 'monthly' || range === 'seasonal') && (
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" size="icon" onClick={() => setDisplayYear(y => addYears(y, -1))}><ArrowRight/></Button>
+                                <span className="font-bold text-lg">{format(displayYear, 'yyyy')}</span>
+                                <Button variant="outline" size="icon" onClick={() => setDisplayYear(y => addYears(y, 1))}><ArrowLeft/></Button>
+                            </div>
+                        )}
+                        <Tabs defaultValue="monthly" onValueChange={(v) => setRange(v as RangeType)} dir="rtl">
+                            <TabsList>
+                                <TabsTrigger value="weekly">أسبوعي</TabsTrigger>
+                                <TabsTrigger value="monthly">شهري</TabsTrigger>
+                                <TabsTrigger value="seasonal">موسمي</TabsTrigger>
+                                <TabsTrigger value="yearly">سنوي</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
                     </div>
-                    <div className="h-[150px]">
+                </div>
+
+                <div>
+                    <h4 className="font-semibold text-center mb-2">{viewTitles[view]}</h4>
+                    <div className="h-[250px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={weeklySentiments} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                            <AreaChart data={processedChartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                                 <defs>
-                                    <linearGradient id="sentimentGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
                                         <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis domain={[0, 100]} fontSize={12} tickLine={false} axisLine={false} />
+                                <YAxis domain={[0, 100]} fontSize={12} tickLine={false} axisLine={false} unit="%" />
                                 <Tooltip
                                     contentStyle={{ borderRadius: '0.5rem', direction: 'rtl', fontSize: '12px', padding: '4px 8px' }}
-                                    formatter={(value: number) => [`${value}%`, 'الالتزام']}
+                                    formatter={(value: number) => [`${value}%`, 'النتيجة']}
                                 />
-                                <Area type="monotone" dataKey="score" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#sentimentGradient)" />
+                                <Area type="monotone" dataKey="score" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#chartGradient)" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
             </CardContent>
-            {suggestions.length > 0 && (
-                <div className="p-4 border-t space-y-2">
-                    <h4 className="font-semibold flex items-center gap-2"><Lightbulb className="text-yellow-500" /> نصائح ذكية</h4>
-                    <ul className="list-disc pr-5 space-y-1 text-sm text-muted-foreground">
-                        {suggestions.map((tip, i) => <li key={i}>{tip}</li>)}
-                    </ul>
-                </div>
-            )}
         </Card>
     );
 }
