@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -23,7 +22,7 @@ const ReportDisplay = dynamic(() => import('@/components/ui/ReportDisplay').then
     loading: () => <div className="flex items-center justify-center h-96"><Loader2 className="h-8 w-8 animate-spin" /></div>
 });
 
-type MessageTemplate = "tashjee" | "tanbih" | "tahdidi" | "istidaa" | "inqitaa";
+type MessageTemplate = "report" | "tashjee" | "tanbih" | "tahdidi" | "istidaa" | "inqitaa";
 
 export default function StudentReportPage() {
     const { students, dailySessions, surahProgress, loading } = useStudentContext();
@@ -37,7 +36,7 @@ export default function StudentReportPage() {
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [teacherNote, setTeacherNote] = useState('');
     const [tajweedScore, setTajweedScore] = useState(5);
-    const [messageTemplate, setMessageTemplate] = useState<MessageTemplate>('tashjee');
+    const [messageTemplate, setMessageTemplate] = useState<MessageTemplate>('report');
     const [messageContent, setMessageContent] = useState('');
 
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط').sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
@@ -184,45 +183,24 @@ export default function StudentReportPage() {
         };
 
     }, [selectedStudentId, reportPeriod, selectedMonth, selectedSeason, selectedYear, students, dailySessions, surahProgress, tajweedScore, loading]);
-    
-     useEffect(() => {
-        if (!selectedStudent || !user) {
-            setMessageContent('');
-            return;
-        }
-
-        const studentName = selectedStudent.fullName;
-        const sheikhName = user.displayName || "الشيخ";
-        
-        // Auto-suggestion logic
-        if (reportData) {
-            const { stats, radarData } = reportData;
-            const hifzScore = radarData.find(d => d.subject === 'الحفظ')?.score || 0;
-            
-            if (stats.absent > 2) {
-                setMessageTemplate('tahdidi');
-            } else if (hifzScore < 5) {
-                setMessageTemplate('tanbih');
-            } else {
-                setMessageTemplate('tashjee');
-            }
-        }
-
-    }, [selectedStudent, reportData, user]);
 
     useEffect(() => {
-        if (!selectedStudent || !user) {
+        if (!selectedStudent || !user || !reportData) {
             setMessageContent('');
             return;
         }
 
         const studentName = selectedStudent.fullName;
         const sheikhName = user.displayName || "الشيخ";
+        const monthName = reportData.statsPeriod;
         let generatedMessage = '';
 
-        const messageBase = `*📢 تقرير أداء الطالب: ${studentName}*\n*👨‍🏫 الشيخ المسؤول: ${sheikhName}*\n\n`;
+        const messageBase = `السلام عليكم ورحمة الله وبركاته.\nالسيد ولي أمر الطالب: ${studentName}.\nالشيخ المسؤول: ${sheikhName}\n\n`;
 
         switch (messageTemplate) {
+            case 'report':
+                 generatedMessage = `السلام عليكم ورحمة الله وبركاته. السيد ولي أمر الطالب: ${studentName}. تحية طيبة وبعد، نرسل لكم تقرير أداء الطالب لشهر ${monthName}. نرجو منكم مراجعة التقرير بعناية وإرفاقه مطبوعاً مع التوقيع في موعد أقصاه ثلاثة أيام من تاريخه. شاكرين لكم حسن تعاونكم وحرصكم.`;
+                break;
             case 'tahdidi':
                 generatedMessage = messageBase + `نلاحظ تكرار غياب ابنكم، وعليه نرجو منكم الحضور للمدرسة للتوقيع على تعهد بالالتزام لضمان استمراره.`;
                 break;
@@ -233,14 +211,15 @@ export default function StudentReportPage() {
                 generatedMessage = messageBase + `يرجى منكم الحضور لمقر مدرسة الشافعي في أقرب وقت لمقابلة الشيخ لأمر ضروري يخص ابنكم.`;
                 break;
             case 'tashjee':
-                generatedMessage = messageBase + `ما شاء الله! نبارك لكم التميز الباهر لابنكم في حصص القرآن مؤخراً. استمروا في دعمه وتشجيعه.`;
+                generatedMessage = messageBase + `نبارك لكم التميز الباهر لابنكم في حصص القرآن مؤخراً. استمروا في دعمه وتشجيعه.`;
                 break;
             case 'inqitaa':
                  generatedMessage = messageBase + `إشعار انقطاع: نحيطكم علماً بأن ابنكم قد تغيب لأكثر من 3 حصص متتالية دون عذر. نرجو منكم التواصل مع الإدارة بشكل عاجل.`;
                 break;
         }
         setMessageContent(generatedMessage);
-    }, [messageTemplate, selectedStudent, user]);
+    }, [messageTemplate, selectedStudent, user, reportData]);
+
 
     const getReportFilename = (extension: string) => {
         if (!reportData) return `report.${extension}`;
@@ -288,9 +267,9 @@ export default function StudentReportPage() {
              <Card className="print:hidden">
                 <CardHeader>
                     <CardTitle>إنشاء تقرير أداء الطالب</CardTitle>
-                    <CardDescription>اختر الطالب والفترة الزمنية المطلوبة، ثم قم بحفظ التقرير بالصيغة التي تفضلها.</CardDescription>
+                    <CardDescription>اختر الطالب والفترة، أضف ملاحظاتك، ثم قم بحفظ التقرير أو إرساله.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
                      <div className="flex flex-col md:flex-row gap-2">
                          <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
                             <SelectTrigger className="w-full md:w-[200px]"><SelectValue placeholder="اختر طالبًا" /></SelectTrigger>
@@ -341,24 +320,8 @@ export default function StudentReportPage() {
                             </SelectContent>
                         </Select>
                     </div>
-                     <div className="flex flex-wrap gap-2">
-                        <Button onClick={handleDownloadAsPDF} disabled={!selectedStudentId} variant="destructive">
-                            <FileDown className="ml-2 h-4 w-4" />
-                            حفظ كـ PDF
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
-            
-             <Card className="print:hidden">
-                <CardHeader>
-                  <CardTitle>ملاحظات وتقييمات الشيخ للتقرير</CardTitle>
-                  <CardDescription>
-                    أضف ملاحظاتك الكتابية هنا، وقم بتقييم التجويد يدويًا. ستظهر هذه التقييمات في الرسم البياني والتقرير المطبوع.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                   <div className="space-y-3">
+
+                    <div className="space-y-3">
                        <Label htmlFor="tajweed-slider">تقييم التجويد: {tajweedScore}/10</Label>
                        <Slider id="tajweed-slider" defaultValue={[tajweedScore]} max={10} step={1} onValueChange={(val) => setTajweedScore(val[0])} />
                     </div>
@@ -372,41 +335,56 @@ export default function StudentReportPage() {
                             rows={3}
                         />
                     </div>
-                    <div className="pt-4 border-t">
-                        <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-4 items-end">
-                            <div className="space-y-2">
-                                <Label htmlFor="message-template">اختر قالب رسالة واتساب</Label>
-                                 <Select dir="rtl" value={messageTemplate} onValueChange={(value: MessageTemplate) => setMessageTemplate(value)}>
-                                    <SelectTrigger id="message-template" className={cn(
-                                        messageTemplate === 'tahdidi' || messageTemplate === 'tanbih' || messageTemplate === 'inqitaa' ? 'ring-2 ring-destructive' : '',
-                                        messageTemplate === 'tashjee' ? 'ring-2 ring-green-500' : ''
-                                    )}>
-                                        <SelectValue placeholder="اختر نوع الرسالة" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="tashjee">رسالة تشجيع (للتميز)</SelectItem>
-                                        <SelectItem value="tanbih">رسالة تنبيه (لضعف الحفظ)</SelectItem>
-                                        <SelectItem value="tahdidi">رسالة تعهد (لضبط الغياب)</SelectItem>
-                                        <SelectItem value="inqitaa">إشعار انقطاع (غياب 3+ حصص)</SelectItem>
-                                        <SelectItem value="istidaa">استدعاء ولي أمر</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                             <Button onClick={handleSendWhatsApp} disabled={!selectedStudentId} className="w-full">
-                                <Send className="ml-2 h-4 w-4" />
-                                إرسال عبر واتساب
-                            </Button>
-                        </div>
-                        <div className="mt-2 space-y-2">
-                            <Label htmlFor="whatsapp-message">محتوى الرسالة (قابل للتعديل)</Label>
-                             <Textarea
-                                id="whatsapp-message"
-                                value={messageContent}
-                                onChange={(e) => setMessageContent(e.target.value)}
-                                rows={4}
-                                placeholder="اختر قالبًا ليظهر المحتوى هنا..."
-                            />
-                        </div>
+
+                    <div className="flex flex-wrap gap-2 pt-4 border-t">
+                        <Button onClick={handleDownloadAsPDF} disabled={!selectedStudentId} variant="destructive">
+                            <FileDown className="ml-2 h-4 w-4" />
+                            حفظ كـ PDF
+                        </Button>
+                         <Button onClick={handleSendWhatsApp} disabled={!selectedStudentId}>
+                            <Send className="ml-2 h-4 w-4" />
+                            إرسال التقرير عبر واتساب
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+            
+             <Card className="print:hidden">
+                <CardHeader>
+                  <CardTitle>قناة التواصل مع ولي الأمر</CardTitle>
+                  <CardDescription>
+                    اختر قالب رسالة جاهز، أو قم بتعديل النص يدويًا قبل إرساله عبر واتساب.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="message-template">اختر قالب الرسالة</Label>
+                         <Select dir="rtl" value={messageTemplate} onValueChange={(value: MessageTemplate) => setMessageTemplate(value)}>
+                            <SelectTrigger id="message-template" className={cn(
+                                messageTemplate === 'tahdidi' || messageTemplate === 'tanbih' || messageTemplate === 'inqitaa' ? 'ring-2 ring-destructive' : '',
+                                messageTemplate === 'tashjee' ? 'ring-2 ring-green-500' : ''
+                            )}>
+                                <SelectValue placeholder="اختر نوع الرسالة" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="report">رسالة تقرير رسمي</SelectItem>
+                                <SelectItem value="tashjee">رسالة تشجيع (للتميز)</SelectItem>
+                                <SelectItem value="tanbih">رسالة تنبيه (لضعف الحفظ)</SelectItem>
+                                <SelectItem value="tahdidi">رسالة تعهد (لضبط الغياب)</SelectItem>
+                                <SelectItem value="inqitaa">إشعار انقطاع (غياب 3+ حصص)</SelectItem>
+                                <SelectItem value="istidaa">استدعاء ولي أمر</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="whatsapp-message">محتوى الرسالة (قابل للتعديل)</Label>
+                         <Textarea
+                            id="whatsapp-message"
+                            value={messageContent}
+                            onChange={(e) => setMessageContent(e.target.value)}
+                            rows={6}
+                            placeholder="اختر قالبًا ليظهر المحتوى هنا..."
+                        />
                     </div>
                 </CardContent>
             </Card>
@@ -423,7 +401,3 @@ export default function StudentReportPage() {
 }
 
     
-
-    
-
-
