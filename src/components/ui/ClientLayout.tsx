@@ -28,6 +28,7 @@ const allNavItems = [
   { href: '/ranking', label: 'ترتيب الطلبة', icon: Award },
   { href: '/surahs', label: 'متابعة الحفظ', icon: BookCheck },
   { href: '/points', label: 'نظام النقاط', icon: Gavel },
+  { href: '/league', label: 'دوري التميز', icon: Shield },
   { href: '/data', label: 'البيانات', icon: ArrowRightLeft },
   { href: '/guide', label: 'دليل الاستخدام', icon: HelpCircle },
   { href: '/profile', label: 'الملف الشخصي', icon: UserCog, separator: true },
