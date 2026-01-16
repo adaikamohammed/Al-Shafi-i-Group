@@ -1,19 +1,15 @@
 
+
 "use client";
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Crown, Shield, Activity, Sparkles, UserCheck, Users, TrendingUp } from 'lucide-react';
-import type { Student, DailySession } from '@/lib/types';
-import { parseISO, isAfter } from 'date-fns';
+import { Crown, Shield, Activity, Sparkles, UserCheck, Users, TrendingUp, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useStudentContext } from '@/context/StudentContext';
 
-interface HallOfFameProps {
-    students: Student[];
-    sessions: Record<string, Record<string, DailySession>>;
-}
+interface HallOfFameProps {}
 
 const RecordCard = ({ title, studentName, studentPhoto, value, unit, icon, color, loading }: { title: string, studentName?: string, studentPhoto?: string, value: number, unit: string, icon: React.ReactNode, color: string, loading?: boolean }) => {
     return (
@@ -27,7 +23,7 @@ const RecordCard = ({ title, studentName, studentPhoto, value, unit, icon, color
                 </div>
             </CardHeader>
             <CardContent>
-                {loading ? <p className="text-sm text-muted-foreground">جارِ الحساب...</p> : 
+                {loading ? <div className="flex justify-center pt-4"><Loader2 className="h-6 w-6 animate-spin"/></div> : 
                  studentName && value > 0 ? (
                      <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
@@ -48,220 +44,28 @@ const RecordCard = ({ title, studentName, studentPhoto, value, unit, icon, color
 };
 
 
-export function HallOfFame({ students, sessions }: HallOfFameProps) {
+export function HallOfFame({}: HallOfFameProps) {
     const { user } = useAuth();
-    const { settings } = useStudentContext();
-    const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
-
-    const allSortedSessions = useMemo(() => {
-        if (!sessions) return [];
-        return Object.values(sessions)
-            .flatMap(day => Object.values(day))
-            .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
-    }, [sessions]);
-
-
-    const commitmentKing = useMemo(() => {
-        if (allSortedSessions.length === 0 || activeStudents.length === 0) {
-            return { name: undefined, streak: 0, photoURL: undefined };
-        }
-        
-        const sortedBasicSessions = allSortedSessions.filter(s => s.sessionType === 'حصة أساسية');
-        if(sortedBasicSessions.length === 0) return { name: undefined, streak: 0, photoURL: undefined };
-
-        let maxStreak = 0;
-        let king: Student | undefined = undefined;
-
-        activeStudents.forEach(student => {
-            let currentStreak = 0;
-            let studentMaxStreak = 0;
-            
-            sortedBasicSessions.forEach(session => {
-                if (parseISO(session.date) < student.registrationDate) {
-                    return;
-                }
-
-                const record = (session.records || []).find(r => r.studentId === student.id);
-                
-                if (record) {
-                    if (record.attendance === 'حاضر') {
-                        currentStreak++;
-                    } else {
-                        studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
-                        currentStreak = 0;
-                    }
-                } else {
-                    studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
-                    currentStreak = 0;
-                }
-            });
-            
-            studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
-
-            if (studentMaxStreak > maxStreak) {
-                maxStreak = studentMaxStreak;
-                king = student;
-            }
-        });
-        
-        return { name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
-
-    }, [activeStudents, allSortedSessions]);
-    
-    const academicKing = useMemo(() => {
-        if (allSortedSessions.length === 0 || activeStudents.length === 0) {
-            return { name: undefined, streak: 0, photoURL: undefined };
-        }
-        const sortedBasicSessions = allSortedSessions.filter(s => s.sessionType === 'حصة أساسية');
-
-        let maxStreak = 0;
-        let king: Student | undefined = undefined;
-
-        activeStudents.forEach(student => {
-            let currentStreak = 0;
-            let studentMaxStreak = 0;
-
-            sortedBasicSessions.forEach(session => {
-                 if (parseISO(session.date) < student.registrationDate) {
-                    return;
-                }
-                const record = (session.records || []).find(r => r.studentId === student.id);
-                if (record && record.memorization === 'ممتاز') {
-                    currentStreak++;
-                } else {
-                    studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
-                    currentStreak = 0;
-                }
-            });
-            
-            studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
-
-            if (studentMaxStreak > maxStreak) {
-                maxStreak = studentMaxStreak;
-                king = student;
-            }
-        });
-        
-        return { name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
-    }, [activeStudents, allSortedSessions]);
-
-    const behaviorKing = useMemo(() => {
-        if (allSortedSessions.length === 0 || activeStudents.length === 0) {
-            return { name: undefined, streak: 0, photoURL: undefined };
-        }
-        const sortedBasicSessions = allSortedSessions.filter(s => s.sessionType === 'حصة أساسية');
-
-        let maxStreak = 0;
-        let king: Student | undefined = undefined;
-
-        activeStudents.forEach(student => {
-            let currentStreak = 0;
-            let studentMaxStreak = 0;
-
-            sortedBasicSessions.forEach(session => {
-                 if (parseISO(session.date) < student.registrationDate) {
-                    return;
-                }
-                const record = (session.records || []).find(r => r.studentId === student.id);
-                if (record && record.behavior === 'هادئ') {
-                    currentStreak++;
-                } else {
-                    studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
-                    currentStreak = 0;
-                }
-            });
-            
-            studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
-
-            if (studentMaxStreak > maxStreak) {
-                maxStreak = studentMaxStreak;
-                king = student;
-            }
-        });
-        
-        return { name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
-    }, [activeStudents, allSortedSessions]);
-    
-    const helpfulColleague = useMemo(() => {
-        if (allSortedSessions.length === 0 || activeStudents.length === 0) {
-            return { name: undefined, count: 0, photoURL: undefined };
-        }
-
-        const helpCounts: { [id: string]: number } = {};
-        const keywords = ['ساعد', 'يعين', 'يصحح'];
-
-        activeStudents.forEach(student => {
-            helpCounts[student.id] = 0;
-        });
-
-        allSortedSessions.forEach(session => {
-            (session.records || []).forEach(record => {
-                if (record.notes && helpCounts[record.studentId] !== undefined) {
-                    if (keywords.some(kw => record.notes!.includes(kw))) {
-                        helpCounts[record.studentId]++;
-                    }
-                }
-            });
-        });
-        
-        let maxCount = 0;
-        let kingId: string | undefined = undefined;
-        for (const studentId in helpCounts) {
-            if (helpCounts[studentId] > maxCount) {
-                maxCount = helpCounts[studentId];
-                kingId = studentId;
-            }
-        }
-        
-        const king = kingId ? activeStudents.find(s => s.id === kingId) : undefined;
-        
-        return { name: king?.fullName, count: maxCount, photoURL: king?.photoURL };
-    }, [activeStudents, allSortedSessions]);
-
-    const persistentTeacher = useMemo(() => {
-        if (allSortedSessions.length === 0) {
-            return { streak: 0 };
-        }
-        let maxStreak = 0;
-        let currentStreak = 0;
-        
-        const uniqueDates = [...new Set(allSortedSessions.map(s => s.date))].sort();
-
-        uniqueDates.forEach(date => {
-            const sessionsForDay = allSortedSessions.filter(s => s.date === date);
-            const isTeacherAbsent = sessionsForDay.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
-
-            if (!isTeacherAbsent) {
-                currentStreak++;
-            } else {
-                maxStreak = Math.max(maxStreak, currentStreak);
-                currentStreak = 0;
-            }
-        });
-
-        maxStreak = Math.max(maxStreak, currentStreak);
-        return { streak: maxStreak };
-    }, [allSortedSessions]);
-
-    const givingRecord = useMemo(() => {
-        if (allSortedSessions.length === 0 || !settings) {
-            return { count: 0 };
-        }
-        const seasonStartDate = settings.seasonStartDate ? parseISO(settings.seasonStartDate) : null;
-
-        const extraSessions = allSortedSessions.filter(s => {
-            if (s.sessionType !== 'حصة تعويضية') return false;
-            if (seasonStartDate) {
-                const sessionDate = parseISO(s.date);
-                return isAfter(sessionDate, seasonStartDate);
-            }
-            return true;
-        });
-        return { count: extraSessions.length };
-    }, [allSortedSessions, settings]);
-
+    const { hallOfFame, loading } = useStudentContext();
     const teacherName = user?.displayName || 'الشيخ';
 
+    if (loading || !hallOfFame) {
+        return (
+             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Crown className="text-amber-500" />
+                        الأرقام القياسية للفوج
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="flex justify-center items-center h-24">
+                     <Loader2 className="h-8 w-8 animate-spin" />
+                </CardContent>
+             </Card>
+        )
+    }
+
+    const { commitmentKing, academicKing, behaviorKing, helpfulColleague, persistentTeacher, givingRecord } = hallOfFame;
 
     return (
         <Card className="bg-white/30 backdrop-blur-sm border-gray-200/50 shadow-lg">

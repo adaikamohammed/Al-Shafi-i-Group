@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -26,7 +27,7 @@ const calculateAge = (birthDate?: Date) => {
   return Math.abs(ageDate.getUTCFullYear() - 1970);
 };
 
-const StudentCard = ({ student, onSelectStudent, studentList, disabledStudentId }: { student: Student | null, onSelectStudent: (id: string | null) => void, studentList: Student[], disabledStudentId?: string | null }) => {
+const StudentCard = ({ student, onSelectStudent, studentList, disabledStudentId, isRecordHolder }: { student: Student | null, onSelectStudent: (id: string | null) => void, studentList: Student[], disabledStudentId?: string | null, isRecordHolder?: boolean }) => {
     const [open, setOpen] = useState(false);
 
     return (
@@ -82,7 +83,10 @@ const StudentCard = ({ student, onSelectStudent, studentList, disabledStudentId 
                             <AvatarImage src={student.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${student.fullName}`} alt={student.fullName} />
                             <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
                         </Avatar>
-                        <h3 className="text-xl font-bold">{student.fullName}</h3>
+                        <h3 className="text-xl font-bold flex items-center justify-center gap-2">
+                          {student.fullName}
+                          {isRecordHolder && <Crown className="h-5 w-5 text-yellow-500" />}
+                        </h3>
                         <div className="flex flex-wrap justify-center gap-4 text-sm text-muted-foreground mt-2">
                              <div className="flex items-center gap-1">
                                 <Cake className="h-4 w-4"/>
@@ -133,7 +137,7 @@ const ComparisonStat = ({ title, value1, value2, suffix = '', higherIsBetter = t
 
 
 export default function ComparisonPage() {
-    const { students, dailySessions, loading } = useStudentContext();
+    const { students, dailySessions, loading, hallOfFame } = useStudentContext();
     const { toast } = useToast();
 
     const [periodType, setPeriodType] = useState<'month' | 'season' | 'year'>('month');
@@ -148,6 +152,14 @@ export default function ComparisonPage() {
 
     const student1 = useMemo(() => activeStudents.find(s => s.id === student1Id) || null, [activeStudents, student1Id]);
     const student2 = useMemo(() => activeStudents.find(s => s.id === student2Id) || null, [activeStudents, student2Id]);
+
+    const isRecordHolder = (studentId: string | null): boolean => {
+        if (!studentId || !hallOfFame) return false;
+        return Object.values(hallOfFame).some(record => {
+            if (!record || !('id' in record)) return false; 
+            return (record as any).id === studentId;
+        });
+    }
 
     const comparisonData = useMemo(() => {
         if (!student1 || !student2) return null;
@@ -324,6 +336,7 @@ export default function ComparisonPage() {
                     onSelectStudent={setStudent1Id}
                     studentList={activeStudents}
                     disabledStudentId={student2Id}
+                    isRecordHolder={isRecordHolder(student1Id)}
                 />
                 
                 <div className="flex items-center justify-center h-full pt-20">
@@ -335,6 +348,7 @@ export default function ComparisonPage() {
                     onSelectStudent={setStudent2Id}
                     studentList={activeStudents}
                     disabledStudentId={student1Id}
+                    isRecordHolder={isRecordHolder(student2Id)}
                 />
             </div>
             
@@ -368,3 +382,4 @@ export default function ComparisonPage() {
         </div>
     );
 }
+
