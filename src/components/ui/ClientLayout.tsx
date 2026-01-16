@@ -21,6 +21,7 @@ const allNavItems = [
   { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus },
   { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList },
   { href: '/stats', label: 'المتابعة الأسبوعية', icon: Calendar },
+  { href: '/yearly-performance', label: 'رادار الأداء السنوي', icon: BarChart3 },
   { href: '/comparison', label: 'ساحة المقارنة', icon: Swords },
   { href: '/dues', label: 'المستحقات المالية', icon: DollarSign },
   { href: '/reports/daily', label: 'التقرير اليومي', icon: Edit },
