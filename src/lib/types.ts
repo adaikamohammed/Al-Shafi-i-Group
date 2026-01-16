@@ -104,7 +104,13 @@ export type SurahStatus =
   | "مراجعة جماعية"
   | "مؤجلة مؤقتًا";
 
-export type SurahMastery = Record<number, 0 | 1 | 2>; // 0: not memorized, 1: memorized, 2: mastered
+export type SurahMasteryEntry = {
+  status: 0 | 1 | 2; // 0: not memorized, 1: memorized, 2: mastered
+  completedAt?: string; // ISO string for when it was first marked as status 1 or 2
+};
+
+export type SurahMastery = Record<number, SurahMasteryEntry>;
+
 
 export interface SurahProgress {
     studentId: string;
@@ -197,6 +203,16 @@ export interface AppSettings {
     registrationFees: { [year: number]: { [quarter: number]: number } };
 }
 
+export interface HallOfFameData {
+    commitmentKing: { id?: string; name?: string; streak: number; photoURL?: string; };
+    academicKing: { id?: string; name?: string; streak: number; photoURL?: string; };
+    behaviorKing: { id?: string; name?: string; streak: number; photoURL?: string; };
+    suraGuardian: { id?: string; name?: string; count: number; photoURL?: string; };
+    persistentTeacher: { streak: number; };
+    givingRecord: { count: number; };
+}
+
+
 export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "مرشح";
 
 export interface PreRegistration {
@@ -221,3 +237,4 @@ export interface PreRegistration {
     
 
     
+

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -69,9 +70,9 @@ export default function PointsSystemPage() {
 
             // Points from Surah mastery
             const progress = surahProgress ? (surahProgress[student.id] || {}) : {};
-            Object.values(progress).forEach(status => {
-                if (status === 1) totalPoints += pointsConfig.surah.memorized;
-                if (status === 2) totalPoints += pointsConfig.surah.mastered;
+            Object.values(progress).forEach(entry => {
+                if (entry.status === 1) totalPoints += pointsConfig.surah.memorized;
+                if (entry.status === 2) totalPoints += pointsConfig.surah.mastered;
             });
             
              // Add bonus points for fulfilled covenants

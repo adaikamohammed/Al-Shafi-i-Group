@@ -3,8 +3,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus } from '@/lib/types';
-import { isWithinInterval, parseISO, isValid, isAfter } from 'date-fns';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry } from '@/lib/types';
+import { isWithinInterval, parseISO, isValid, isAfter, subDays } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { db, storage } from '@/lib/firebase';
@@ -49,7 +49,7 @@ interface HallOfFameData {
     commitmentKing: { id?: string; name?: string; streak: number; photoURL?: string; };
     academicKing: { id?: string; name?: string; streak: number; photoURL?: string; };
     behaviorKing: { id?: string; name?: string; streak: number; photoURL?: string; };
-    helpfulColleague: { id?: string; name?: string; count: number; photoURL?: string; };
+    suraGuardian: { id?: string; name?: string; count: number; photoURL?: string; };
     persistentTeacher: { streak: number; };
     givingRecord: { count: number; };
 }
@@ -274,7 +274,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         return Object.values(dailySessions)
             .flatMap(day => Object.values(day))
             .filter(session => session && session.date)
-            .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+            .sort((a, b) => {
+                try {
+                    return parseISO(a.date).getTime() - parseISO(b.date).getTime()
+                } catch(e) { return 0 }
+            });
     }, [dailySessions]);
 
     const commitmentKing = useMemo(() => {
@@ -332,25 +336,39 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         return { id: king?.id, name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
     }, [activeStudents, allSortedSessions]);
 
-    const helpfulColleague = useMemo(() => {
-        if (allSortedSessions.length === 0 || activeStudents.length === 0) return { id: undefined, name: undefined, count: 0, photoURL: undefined };
-        const helpCounts: { [id: string]: number } = {};
-        const keywords = ['ساعد', 'يعين', 'يصحح'];
-        activeStudents.forEach(student => { helpCounts[student.id] = 0; });
-        allSortedSessions.forEach(session => {
-            (session.records || []).forEach(record => {
-                if (record.notes && helpCounts[record.studentId] !== undefined) {
-                    if (keywords.some(kw => record.notes!.includes(kw))) helpCounts[record.studentId]++;
-                }
-            });
-        });
-        let maxCount = 0; let kingId: string | undefined = undefined;
-        for (const studentId in helpCounts) {
-            if (helpCounts[studentId] > maxCount) { maxCount = helpCounts[studentId]; kingId = studentId; }
+    const suraGuardian = useMemo(() => {
+        if (activeStudents.length === 0 || !surahProgress) {
+            return { id: undefined, name: undefined, count: 0, photoURL: undefined };
         }
-        const king = kingId ? activeStudents.find(s => s.id === kingId) : undefined;
-        return { id: king?.id, name: king?.fullName, count: maxCount, photoURL: king?.photoURL };
-    }, [activeStudents, allSortedSessions]);
+
+        const thirtyDaysAgo = subDays(new Date(), 30);
+        let maxCount = 0;
+        let guardian: Student | undefined = undefined;
+
+        activeStudents.forEach(student => {
+            const studentProgress = surahProgress[student.id];
+            if (!studentProgress) return;
+
+            const recentCompletions = Object.values(studentProgress).filter(entry => {
+                if (entry.status > 0 && entry.completedAt) {
+                    try {
+                        const completionDate = parseISO(entry.completedAt);
+                        return isAfter(completionDate, thirtyDaysAgo);
+                    } catch (e) {
+                        return false;
+                    }
+                }
+                return false;
+            });
+
+            if (recentCompletions.length > maxCount) {
+                maxCount = recentCompletions.length;
+                guardian = student;
+            }
+        });
+
+        return { id: guardian?.id, name: guardian?.fullName, count: maxCount, photoURL: guardian?.photoURL };
+    }, [activeStudents, surahProgress]);
 
     const persistentTeacher = useMemo(() => {
         if (allSortedSessions.length === 0) return { streak: 0 };
@@ -378,8 +396,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }, [allSortedSessions, settings]);
 
     const hallOfFame = useMemo<HallOfFameData | null>(() => ({
-        commitmentKing, academicKing, behaviorKing, helpfulColleague, persistentTeacher, givingRecord
-    }), [commitmentKing, academicKing, behaviorKing, helpfulColleague, persistentTeacher, givingRecord]);
+        commitmentKing, academicKing, behaviorKing, suraGuardian, persistentTeacher, givingRecord
+    }), [commitmentKing, academicKing, behaviorKing, suraGuardian, persistentTeacher, givingRecord]);
 
     const previousHallOfFame = useRef<HallOfFameData | null>(hallOfFame);
 
@@ -399,7 +417,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         checkRecordChange(hallOfFame.commitmentKing, previousHallOfFame.current.commitmentKing, 'ملك الالتزام');
         checkRecordChange(hallOfFame.academicKing, previousHallOfFame.current.academicKing, 'الخمسة المتتالية');
         checkRecordChange(hallOfFame.behaviorKing, previousHallOfFame.current.behaviorKing, 'سفير الأدب');
-        checkRecordChange(hallOfFame.helpfulColleague, previousHallOfFame.current.helpfulColleague, 'الزميل المعين');
+        checkRecordChange(hallOfFame.suraGuardian, previousHallOfFame.current.suraGuardian, 'حارس السور');
         previousHallOfFame.current = hallOfFame;
     }, [hallOfFame, toast]);
 
@@ -709,17 +727,32 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
       await remove(reportDbRef);
   }
   
- const toggleSurahStatus = (studentId: string, surahId: number) => {
+  const toggleSurahStatus = (studentId: string, surahId: number) => {
     if (!authContextUser) return;
 
     const studentOwnerId = students.find(s => s.id === studentId)?.ownerId;
     if(!studentOwnerId || (!isSuperAdmin && authContextUser.uid !== studentOwnerId)) return;
 
-    const studentProgressMap = { ...(surahProgress[studentId] || {}) };
-    const currentStatus = studentProgressMap[surahId] || 0;
+    const studentProgressMap: SurahMastery = { ...(surahProgress[studentId] || {}) };
+    const currentEntry = studentProgressMap[surahId] || { status: 0 };
+    const currentStatus = currentEntry.status;
 
     const nextStatus = (currentStatus + 1) % 3;
-    studentProgressMap[surahId] = nextStatus;
+    
+    const newEntry: SurahMasteryEntry = { status: nextStatus };
+
+    // Set completion date only when moving from 0 to 1, and preserve it on subsequent promotions
+    if (nextStatus > 0 && currentStatus === 0) {
+      newEntry.completedAt = new Date().toISOString();
+    } else if (nextStatus > 0) {
+      newEntry.completedAt = currentEntry.completedAt || new Date().toISOString();
+    }
+
+    if (nextStatus === 0) {
+        delete studentProgressMap[surahId];
+    } else {
+        studentProgressMap[surahId] = newEntry;
+    }
     
     const pointsMemorized = settings.points.surah['memorized'];
     const pointsMastered = settings.points.surah['mastered'];
@@ -736,14 +769,10 @@ const bulkUpdatePreRegistrations = (ids: string[], data: Partial<PreRegistration
         toast({ title: `🔄 -${pointsMastered} نقطة`, description: 'تم خصم نقاط الإتقان.', variant: 'destructive' });
     }
 
-    if (nextStatus === 0) {
-        delete studentProgressMap[surahId];
-    }
-
     const surahProgressRef = ref(db, `users/${studentOwnerId}/surahProgress/${studentId}`);
     set(surahProgressRef, studentProgressMap);
     
-    const memorizedCount = Object.values(studentProgressMap).filter(status => status > 0).length;
+    const memorizedCount = Object.values(studentProgressMap).filter(entry => entry.status > 0).length;
     updateStudent(studentId, { memorizedSurahsCount: memorizedCount }, studentOwnerId);
   }
 
@@ -787,4 +816,5 @@ export const useStudentContext = () => {
   }
   return context;
 };
+
 

@@ -5,7 +5,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Crown, Shield, Activity, Sparkles, UserCheck, Users, TrendingUp, Loader2 } from 'lucide-react';
+import { Crown, Shield, Activity, Sparkles, UserCheck, Users, TrendingUp, Loader2, BookOpenCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useStudentContext } from '@/context/StudentContext';
 
@@ -65,7 +65,7 @@ export function HallOfFame({}: HallOfFameProps) {
         )
     }
 
-    const { commitmentKing, academicKing, behaviorKing, helpfulColleague, persistentTeacher, givingRecord } = hallOfFame;
+    const { commitmentKing, academicKing, behaviorKing, suraGuardian, persistentTeacher, givingRecord } = hallOfFame;
 
     return (
         <Card className="bg-white/30 backdrop-blur-sm border-gray-200/50 shadow-lg">
@@ -105,13 +105,13 @@ export function HallOfFame({}: HallOfFameProps) {
                     color="border-purple-500"
                 />
                  <RecordCard 
-                    title="الزميل المعين"
-                    studentName={helpfulColleague.name}
-                    studentPhoto={helpfulColleague.photoURL}
-                    value={helpfulColleague.count}
-                    unit="مساعدة مسجلة"
-                    icon={<Users />}
-                    color="border-orange-500"
+                    title="حارس السور"
+                    studentName={suraGuardian.name}
+                    studentPhoto={suraGuardian.photoURL}
+                    value={suraGuardian.count}
+                    unit="سورة في 30 يوم"
+                    icon={<BookOpenCheck />}
+                    color="border-sky-500"
                 />
                 <RecordCard 
                     title="المعلم المثابر"

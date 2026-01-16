@@ -32,8 +32,8 @@ export default function SurahProgressPage() {
     }, [surahProgress, selectedStudentId]);
 
     const progressCounts = useMemo(() => {
-        const memorized = Object.values(studentProgress).filter(s => s === 1).length;
-        const mastered = Object.values(studentProgress).filter(s => s === 2).length;
+        const memorized = Object.values(studentProgress).filter(s => s.status === 1).length;
+        const mastered = Object.values(studentProgress).filter(s => s.status === 2).length;
         return { memorized, mastered, total: memorized + mastered };
     }, [studentProgress]);
 
@@ -49,8 +49,8 @@ export default function SurahProgressPage() {
     const leaderboard = useMemo(() => {
         return studentsToShow.map(student => {
              const progress = surahProgress ? (surahProgress[student.id] || {}) : {};
-             const memorizedCount = Object.values(progress).filter(status => status === 1).length;
-             const masteredCount = Object.values(progress).filter(status => status === 2).length;
+             const memorizedCount = Object.values(progress).filter(entry => entry.status === 1).length;
+             const masteredCount = Object.values(progress).filter(entry => entry.status === 2).length;
              const masteryScore = (memorizedCount * 1) + (masteredCount * 3);
              
              return {
@@ -235,7 +235,7 @@ export default function SurahProgressPage() {
                         <CardContent>
                             <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3">
                                 {allSurahs.map(surah => {
-                                    const status = studentProgress[surah.id] || 0;
+                                    const status = studentProgress[surah.id]?.status || 0;
                                     let buttonClass = "bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200";
                                     if (status === 1) buttonClass = "bg-green-200 hover:bg-green-300 text-green-800 dark:bg-green-800 dark:hover:bg-green-700 dark:text-green-100";
                                     if (status === 2) buttonClass = "bg-green-600 hover:bg-green-700 text-white dark:bg-green-600 dark:hover:bg-green-500";

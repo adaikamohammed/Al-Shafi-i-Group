@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -135,7 +136,7 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
         }
         
         const studentMastery = surahProgress[student.id] || {};
-        const masteredCount = Object.values(studentMastery).filter(s => s === 2).length;
+        const masteredCount = Object.values(studentMastery).filter(s => s.status === 2).length;
         
         const studentRecordsInMonth = sessionsInMonth.flatMap(s => s.records ?? []).filter(r => r.studentId === student.id);
         const attendanceScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length) / studentRecordsInMonth.length) * 10 : 0;
@@ -143,7 +144,7 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
         const memorizationScore = (masteredCount / allSurahs.length) * 10;
         
         const radarData = [
-            { subject: 'الحضور', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
+            { subject: 'الحاضر', score: parseFloat(attendanceScore.toFixed(1)), fullMark: 10 },
             { subject: 'الحفظ', score: parseFloat(memorizationScore.toFixed(1)), fullMark: 10 },
             { subject: 'الانضباط', score: parseFloat(disciplineScore.toFixed(1)), fullMark: 10 },
         ];

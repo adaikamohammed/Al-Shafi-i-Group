@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -133,7 +134,7 @@ export default function StudentReportPage() {
         const disciplineScore = stats.totalBehavior > 0 ? ((stats.calm * 2 + stats.mediumBehavior * 1) / (stats.totalBehavior * 2)) * 10 : 0;
         
         const studentMastery = surahProgress[selectedStudentId] || {};
-        const masteredCount = Object.values(studentMastery).filter(s => s === 2).length;
+        const masteredCount = Object.values(studentMastery).filter(s => s.status === 2).length;
         const memorizationScore = masteredCount > 0 ? (masteredCount / 114) * 10 : 0;
 
 
@@ -147,7 +148,7 @@ export default function StudentReportPage() {
         
         let autoNote = '';
         const studentProgressData = surahProgress[selectedStudentId] || {};
-        const memorizedCount = Object.values(studentProgressData).filter(s => s === 1).length;
+        const memorizedCount = Object.values(studentProgressData).filter(s => s.status === 1).length;
         if(masteredCount > 0 && memorizedCount > masteredCount) {
              autoNote = 'الطالب يحفظ جيداً ولكن يحتاج لتركيز أكبر على مراجعة وتثبيت المحفوظ القديم.';
         } else {
