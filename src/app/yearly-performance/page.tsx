@@ -23,23 +23,18 @@ const YearView = ({ year, data, onDayClick }: { year: number, data: any, onDayCl
             {days.map(day => {
                 const dateString = format(day, 'yyyy-MM-dd');
                 const dayData = data[dateString];
-                let colorClass = 'bg-gray-200 dark:bg-gray-800'; // Default for no data
+                
+                let colorClass = 'bg-gray-200 dark:bg-gray-800'; // Default for no data / empty day
 
                 if (dayData) {
-                    if (dayData.sessionType === 'يوم عطلة' || (dayData.sessionType === 'غياب الشيخ' && !dayData.hasSubstitute)) {
-                        colorClass = 'bg-blue-300';
-                    } else if (dayData.sessionType === 'حصة تعويضية') {
-                        colorClass = 'bg-yellow-400';
-                    } else if (dayData.attendanceRate >= 0.9) {
-                        colorClass = 'bg-green-600';
-                    } else if (dayData.attendanceRate >= 0.7) {
-                        colorClass = 'bg-green-500';
-                    } else if (dayData.attendanceRate > 0.5) {
-                        colorClass = 'bg-green-400';
-                    } else if (dayData.attendanceRate > 0) {
-                        colorClass = 'bg-orange-400';
-                    } else {
+                    if (dayData.isHoliday) {
+                        colorClass = 'bg-blue-500';
+                    } else if (dayData.isSheikhAbsentNoSub) {
                         colorClass = 'bg-red-500';
+                    } else if (dayData.workSessionCount >= 2) {
+                        colorClass = 'bg-green-700'; // Dark green
+                    } else if (dayData.workSessionCount === 1) {
+                        colorClass = 'bg-green-300'; // Light green
                     }
                 }
 
@@ -55,10 +50,18 @@ const YearView = ({ year, data, onDayClick }: { year: number, data: any, onDayCl
                             <p className="font-bold">{format(day, 'd MMMM yyyy', { locale: ar })}</p>
                             {dayData ? (
                                 <>
-                                    <p>نوع الحصة: {dayData.sessionType}</p>
-                                    <p>الحضور: {(dayData.attendanceRate * 100).toFixed(0)}%</p>
-                                    <p>تقييم ممتاز: {dayData.excellentCount}</p>
-                                    <p>سلوك غير منضبط: {dayData.undisciplinedCount}</p>
+                                    {dayData.isHoliday ? (
+                                        <p>نوع الحصة: يوم عطلة</p>
+                                    ) : dayData.isSheikhAbsentNoSub ? (
+                                        <p>نوع الحصة: غياب الشيخ</p>
+                                    ) : (
+                                        <>
+                                            <p>حصص العمل: {dayData.workSessionCount}</p>
+                                            <p>الحضور: {(dayData.attendanceRate * 100).toFixed(0)}%</p>
+                                            <p>تقييم ممتاز: {dayData.excellentCount}</p>
+                                            <p>سلوك غير منضبط: {dayData.undisciplinedCount}</p>
+                                        </>
+                                    )}
                                 </>
                             ) : <p>لا توجد بيانات</p>}
                         </TooltipContent>
@@ -109,13 +112,19 @@ export default function YearlyPerformancePage() {
             const sessionsOnDay = Object.values(yearSessions[dateString]);
             if (sessionsOnDay.length === 0) return;
 
+            // Logic for coloring
+            const isHoliday = sessionsOnDay.some(s => s.sessionType === 'يوم عطلة');
+            const isSheikhAbsentNoSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
+            const workSessionCount = sessionsOnDay.filter(s => s.sessionType !== 'يوم عطلة' && !(s.sessionType === 'غياب الشيخ' && !s.substituteTeacher)).length;
+            
+            // Logic for tooltip and stats
             const primarySession = sessionsOnDay[0];
             const sessionType = primarySession.sessionType;
             let attendanceRate = 0;
             let excellentCount = 0;
             let undisciplinedCount = 0;
 
-            if (!(sessionType === 'يوم عطلة' || (sessionType === 'غياب الشيخ' && !primarySession.substituteTeacher))) {
+            if (!isHoliday && !isSheikhAbsentNoSub) {
                 stats.workDays.add(dateString);
                 
                 sessionsOnDay.forEach(s => {
@@ -135,11 +144,14 @@ export default function YearlyPerformancePage() {
             }
 
             data[dateString] = {
-                sessionType: sessionType,
-                hasSubstitute: !!primarySession.substituteTeacher,
+                sessionType, // for tooltip
+                isHoliday,
+                isSheikhAbsentNoSub,
+                workSessionCount,
+                // for tooltip
                 attendanceRate,
                 excellentCount,
-                undisciplinedCount
+                undisciplinedCount,
             };
         });
 
@@ -188,16 +200,13 @@ export default function YearlyPerformancePage() {
                             {viewMode === 'year' && <YearView year={currentYear} data={yearlyData} onDayClick={(date) => console.log(date)} />}
 
                             <div className="mt-6 flex flex-wrap justify-center gap-4 text-sm">
-                                <span className="flex items-center gap-2">أقل</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-orange-400"></div></span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-green-400"></div></span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-green-500"></div></span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-green-600"></div></span>
-                                <span className="flex items-center gap-2">أكثر</span>
+                                <span className="flex items-center gap-2">جهد أقل</span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-green-300"></div></span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-green-700"></div></span>
+                                <span className="flex items-center gap-2">جهد أعلى</span>
                                 <span className="flex items-center gap-2 font-semibold ml-4">|</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500"></div>غياب كلي</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-blue-300"></div>عطلة/غياب شيخ</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-yellow-400"></div>حصة إضافية</span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500"></div>غياب الشيخ</span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-blue-500"></div>عطلة</span>
                                 <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-gray-200"></div>يوم فارغ</span>
                             </div>
                         </CardContent>
