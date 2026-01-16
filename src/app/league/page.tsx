@@ -68,7 +68,7 @@ export default function LeaguePage() {
             const form: AttendanceStatus[] = [];
 
             sessionsInMonth.forEach(session => {
-                const record = session.records.find(r => r.studentId === student.id);
+                const record = (session.records || []).find(r => r.studentId === student.id);
                 if (record) {
                     form.push(record.attendance);
                     switch (record.attendance) {
