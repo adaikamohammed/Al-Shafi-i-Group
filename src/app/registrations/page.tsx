@@ -582,65 +582,77 @@ export default function PreRegistrationPage() {
     const handleGeneratePdf = () => {
         const doc = new jsPDF();
         
-        // This is a placeholder for a proper Arabic font.
-        // The Amiri font data should be loaded in AmiriFont.ts for this to work.
+        // This is the key part: setting up the font.
         if (AmiriFont) {
           doc.addFileToVFS("Amiri-Regular.ttf", AmiriFont);
           doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
           doc.setFont("Amiri");
         } else {
-          // Fallback if font is not available
-          doc.setFont("Helvetica");
+          console.warn("Amiri font file is missing. PDF will not render Arabic correctly.");
         }
 
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 15;
+
         // Header
-        doc.setFontSize(16);
-        doc.text("قائمة طلبات التسجيل", doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
         doc.setFontSize(10);
-        doc.text(`تاريخ الاستخراج: ${format(new Date(), 'yyyy/MM/dd')}`, doc.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
+        doc.text("مدير مدرسة الشافعي", pageWidth - margin, margin, { align: 'right' });
 
-        const visibleColumns = Object.entries(columnVisibility)
-            .filter(([, { visible }]) => visible)
-            .sort(([, a], [, b]) => (a.printOrder || 99) - (b.printOrder || 99));
+        doc.setFontSize(16);
+        doc.text(`قائمة طلبات التسجيل (${filteredRegistrations.length})`, pageWidth / 2, margin + 5, { align: 'center' });
 
-        const headers = visibleColumns.map(([, { label }]) => label);
+        doc.setFontSize(10);
+        doc.text(format(new Date(), 'd MMMM yyyy, h:mm a', { locale: ar }), margin, margin, { align: 'left' });
+
+        // Table
+        const head = [['تاريخ التسجيل', 'ملاحظات', 'الحالة', 'رقم الهاتف', 'إسم الولي', 'المستوى الدراسي', 'الجنس', 'الإسم الكامل']];
+
+        const body = filteredRegistrations.map(reg => [
+            reg.requestedAt instanceof Date && isValid(reg.requestedAt) ? format(reg.requestedAt, 'yyyy/MM/dd') : (typeof reg.requestedAt === 'string' ? reg.requestedAt : ''),
+            reg.notes || '',
+            reg.status,
+            reg.phone1 || '',
+            reg.guardianName || '',
+            reg.educationalLevel || '',
+            reg.gender || '',
+            reg.fullName
+        ]);
         
-        const body = filteredRegistrations.map(reg => {
-            return visibleColumns.map(([key]) => {
-                const value = reg[key as keyof PreRegistration];
-                 if (key === 'birthDate' || key === 'requestedAt') {
-                    return value instanceof Date && isValid(value) ? format(value, 'yyyy/MM/dd') : (value ? value.toString() : '');
-                }
-                return value ? value.toString() : '';
-            });
-        });
+        let totalPagesExp = '{total_pages_count_string}';
 
         doc.autoTable({
-            startY: 30,
-            head: [headers],
+            startY: margin + 20,
+            head: head,
             body: body,
             theme: 'grid',
             headStyles: {
-                fillColor: [60, 100, 25], // Olive Green
+                fillColor: [60, 100, 25], // Dark Olive Green
                 textColor: 255,
                 halign: 'center',
-                font: 'Amiri'
+                font: 'Amiri',
+                fontStyle: 'bold'
             },
             styles: {
-                font: AmiriFont ? 'Amiri' : 'Helvetica',
-                halign: 'center',
+                font: 'Amiri',
+                halign: 'right', // Align all cells to the right for Arabic
                 cellPadding: 2,
+                overflow: 'linebreak' // Ensure text wraps
             },
             didDrawPage: function (data) {
                 // Footer
                 doc.setFontSize(10);
-                doc.text(
-                    'Page ' + doc.internal.pages.length,
-                    data.settings.margin.left,
-                    doc.internal.pageSize.getHeight() - 10
-                );
+                let footerStr = `صفحة ${doc.internal.pages.length}`;
+                 if (typeof doc.putTotalPages === 'function') {
+                    footerStr = footerStr + ` من ${totalPagesExp}`;
+                }
+                doc.text(footerStr, pageWidth / 2, pageHeight - 10, { align: 'center' });
             }
         });
+        
+        if (typeof doc.putTotalPages === 'function') {
+            doc.putTotalPages(totalPagesExp);
+        }
 
         doc.save(`تقرير_التسجيلات_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
         setPrintModalOpen(false);
@@ -1160,33 +1172,11 @@ export default function PreRegistrationPage() {
             <Dialog open={isPrintModalOpen} onOpenChange={setPrintModalOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>إعدادات تقرير PDF</DialogTitle>
+                        <DialogTitle>تأكيد استخراج التقرير</DialogTitle>
                         <DialogDescription>
-                            اختر الأعمدة التي ترغب في تضمينها في التقرير. سيتم تصدير الصفوف المفلترة حاليًا فقط.
+                            سيتم إنشاء تقرير PDF يحتوي على {filteredRegistrations.length} من السجلات المفلترة حاليًا. هل تريد المتابعة؟
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid grid-cols-2 gap-4 py-4">
-                        {Object.entries(ALL_COLUMNS).map(([key, {label}]) => {
-                             if (!label) return null;
-                             return (
-                                <div key={key} className="flex items-center space-x-2 space-x-reverse">
-                                    <Checkbox
-                                        id={`print-col-${key}`}
-                                        checked={(columnVisibility as any)[key]?.visible ?? false}
-                                        onCheckedChange={(checked) => {
-                                            setColumnVisibility(prev => ({...prev, [key]: {...(prev as any)[key], visible: !!checked}}));
-                                        }}
-                                    />
-                                    <label
-                                        htmlFor={`print-col-${key}`}
-                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                    >
-                                        {label}
-                                    </label>
-                                </div>
-                            )
-                        })}
-                    </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setPrintModalOpen(false)}>إلغاء</Button>
                         <Button onClick={handleGeneratePdf}>
@@ -1202,3 +1192,6 @@ export default function PreRegistrationPage() {
 }
 
 
+
+
+    
