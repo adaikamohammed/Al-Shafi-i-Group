@@ -164,7 +164,7 @@ export default function LeaguePage() {
                             دوري الاستقامة والحفظ
                         </CardTitle>
                         <CardDescription>
-                            جدول الترتيب الشهري بناءً على الحضور والأداء. في حال تساوي النقاط، يتم اللجوء لفارق الأهداف ثم عدد الأهداف المسجلة.
+                            جدول الترتيب الشهري. في حال تساوي النقاط، يتم اللجوء لفارق الأهداف ثم عدد الأهداف المسجلة.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -202,9 +202,7 @@ export default function LeaguePage() {
                                             <TableHead className="text-center text-green-600">ف</TableHead>
                                             <TableHead className="text-center text-gray-500">ت</TableHead>
                                             <TableHead className="text-center text-red-600">خ</TableHead>
-                                            <TableHead className="text-center">له</TableHead>
-                                            <TableHead className="text-center">عليه</TableHead>
-                                            <TableHead className="text-center">فارق</TableHead>
+                                            <TableHead className="text-center">الأهداف</TableHead>
                                             <TableHead className="text-center">نقاط</TableHead>
                                             <TableHead className="text-center w-[150px]">آخر 5</TableHead>
                                         </TableRow>
@@ -216,10 +214,14 @@ export default function LeaguePage() {
                                             let rankDisplay;
                                             let rowClass = '';
 
-                                            if (rank === 1) { rankDisplay = '🥇'; rowClass = 'bg-green-100 dark:bg-green-900/30'; }
-                                            else if (rank === 2) { rankDisplay = '🥈'; rowClass = 'bg-green-100 dark:bg-green-900/30'; }
-                                            else if (rank === 3) { rankDisplay = '🥉'; rowClass = 'bg-green-100 dark:bg-green-900/30'; }
-                                            else { rankDisplay = rank; }
+                                            if (rank <= 3) {
+                                                if (rank === 1) rankDisplay = '🥇';
+                                                else if (rank === 2) rankDisplay = '🥈';
+                                                else rankDisplay = '🥉';
+                                                rowClass = 'bg-green-100 dark:bg-green-900/30';
+                                            } else {
+                                                rankDisplay = rank;
+                                            }
                                             
                                             if (rank > totalPlayers - 3 && totalPlayers > 5 && rank > 3) {
                                                 rowClass = 'bg-red-100 dark:bg-red-900/30';
@@ -242,8 +244,6 @@ export default function LeaguePage() {
                                                     <TableCell className="text-center text-gray-500 font-semibold">{s.draws}</TableCell>
                                                     <TableCell className="text-center text-red-600 font-semibold">{s.losses}</TableCell>
                                                     <TableCell className="text-center font-semibold">{s.goalsFor}</TableCell>
-                                                    <TableCell className="text-center font-semibold">{s.goalsAgainst}</TableCell>
-                                                    <TableCell className="text-center font-semibold">{s.goalDifference}</TableCell>
                                                     <TableCell className="text-center font-bold text-lg">{s.points}</TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center justify-center gap-2">
@@ -263,7 +263,7 @@ export default function LeaguePage() {
                                             );
                                         }) : (
                                             <TableRow>
-                                                <TableCell colSpan={11} className="text-center h-24">
+                                                <TableCell colSpan={9} className="text-center h-24">
                                                     لا توجد بيانات حضور مسجلة لهذا الشهر.
                                                 </TableCell>
                                             </TableRow>
@@ -281,7 +281,7 @@ export default function LeaguePage() {
                                     قائمة الهدافين
                                 </CardTitle>
                                 <CardDescription>
-                                    ترتيب الطلاب حسب أهداف الحفظ (ممتاز = هدفان، جيد جداً = هدف).
+                                    الترتيب حسب الحفظ: ممتاز = هدفان، جيد جداً = هدف.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
