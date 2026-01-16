@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, Smartphone, Lock } from 'lucide-react';
+import { Archive, Shield, FileText, BarChart3, Printer, Award, Tv } from 'lucide-react';
 
 
 const GuideStep = ({ icon, title, description, points }: { icon: React.ReactNode, title: string, description: string, points?: string[] }) => (
@@ -28,48 +29,44 @@ const GuideStep = ({ icon, title, description, points }: { icon: React.ReactNode
 export default function GuidePage() {
     const guideSteps = [
         {
-            icon: <Lock className="h-6 w-6" />,
-            title: "1. تسجيل الدخول",
-            description: "اكتب بريدك وكلمة السر، ثم اضغط \"تسجيل الدخول\". إذا نسيت كلمة السر، يمكنك طلب إعادة تعيينها.",
-        },
-        {
-            icon: <Users className="h-6 w-6" />,
-            title: "2. إضافة الطلبة",
-            description: "من القائمة الجانبية اختر \"إدارة الطلبة\" ثم اضغط \"➕ إضافة طالب جديد\".",
+            icon: <Archive className="h-6 w-6" />,
+            title: "1. إدارة الطلبة والسجل التأديبي الجديد",
+            description: "تم تحويل ملف الطالب إلى سجل تاريخي شامل يوثق رحلته بالكامل.",
             points: [
-                "املأ الاسم والعمر والتقدير التقريبي للحفظ.",
-                "لا تقلق، كل الحقول سهلة ويمكن تعديلها لاحقًا.",
-                "يمكنك ترك رقم الهاتف أو اسم الولي فارغًا إذا لم يتوفر."
+                "عند إضافة \"مهمة تمكين\" أو \"ميثاق حفظ\"، يتم تسجيلها تلقائياً في السجل التأديبي للطالب.",
+                "القوائم المنسدلة في النظام مرتبة أبجدياً لتجد الطالب فوراً دون عناء البحث.",
+                "افتح ملف أي طالب من صفحة \"إدارة الطلبة\" لمشاهدة سجله التاريخي."
             ]
         },
         {
-            icon: <ClipboardList className="h-6 w-6" />,
-            title: "3. تسجيل حصة يومية",
-            description: "اذهب إلى \"الحصص اليومية\"، اختر اليوم، وسجل الحضور والتقييم لكل طالب.",
+            icon: <Shield className="h-6 w-6" />,
+            title: "2. دوري التميز وسوق الانتقالات",
+            description: "نظام تنافسي أسبوعي وشهري لإشعال روح الحماس بين الطلاب.",
             points: [
-                "اختر نوع الحصة (أساسية، أنشطة، عطلة...).",
-                "سجل حضور الطالب وتقييمه وسلوكه.",
-                "أضف ملاحظات خاصة إذا لزم الأمر، ثم اضغط \"حفظ بيانات اليوم\"."
+                "النظام يختار تلقائياً \"نجم الشهر\" ويصمم له بطاقة ذهبية خاصة.",
+                "راقب \"سوق الانتقالات\" (الأسهم) بجانب أسماء الطلاب لمعرفة من يتقدم ومن يتراجع.",
+                "ترقب \"مباراة القمة\" كل يوم أربعاء، حيث يعلن النظام عن مواجهة حاسمة."
             ]
-        },
-        {
-            icon: <BookCheck className="h-6 w-6" />,
-            title: "4. تسجيل حفظ السور",
-            description: "من صفحة \"متابعة الحفظ\"، اختر الطالب، ثم انقر على السور التي أتم حفظها لتحديث تقدمه.",
         },
         {
             icon: <FileText className="h-6 w-6" />,
-            title: "5. استخراج تقرير شامل",
-            description: "من صفحة \"تقرير الطالب\"، اختر الطالب، ثم اختر الفترة:",
+            title: "3. منظومة التقارير الرسمية والواتساب",
+            description: "أداة احترافية لإعداد وإرسال تقارير الأداء لأولياء الأمور بسهولة.",
             points: [
-                "تقرير شهري، أو موسمي، أو سنوي.",
-                "يمكنك تحميل التقرير كـ Word أو PDF.",
+                "تم تحديث المهارات لتشمل \"المراجعة\" كعلامة من 10، وتوحيد مسمى \"السلوك\".",
+                "بضغطة زر، يمكنك إرسال رسالة رسمية عبر واتساب لولي الأمر.",
+                "الرسالة تحتوي على نص رسمي جاهز وطلب لتوقيع التقرير المرفق (PDF)."
             ]
         },
         {
             icon: <BarChart3 className="h-6 w-6" />,
-            title: "6. تقييم الأداء الذكي",
-            description: "يمكنك معرفة تقييم شامل لأداء فوجك من \"الإحصائيات الشهرية\"، مع اقتراحات لتحسينه.",
+            title: "4. رادار الأداء السنوي (المتطور)",
+            description: "نظرة تحليلية على أداء الفوج ككتلة واحدة لمراقبة الحالة المعنوية.",
+            points: [
+                "يمكنك فلترة الرادار لرؤية منحنى (الحضور)، (السلوك)، (المراجعة)، أو (الحفظ).",
+                "استخدم الفلترة الزمنية (أسبوعي/شهري/موسمي) لمراقبة تطور مستوى الالتزام.",
+                "راقب \"مؤشر الالتزام المدمج\" لتقييم الحالة العامة للفوج بنظرة واحدة."
+            ]
         },
     ];
 
@@ -77,9 +74,9 @@ export default function GuidePage() {
         <div className="space-y-8">
             <Card className="bg-primary/5 border-primary">
                 <CardHeader>
-                    <CardTitle className="text-3xl font-headline font-bold text-primary">📘 إرشادات الشيخ: دليلك المبسّط لاستخدام الموقع</CardTitle>
+                    <CardTitle className="text-3xl font-headline font-bold text-primary">📘 إرشادات الشيخ: دليلك المحدث لاستخدام الموقع</CardTitle>
                     <CardDescription className="text-lg">
-                        أهلًا بك شيخنا الكريم. أنشأنا هذه الصفحة خصيصًا لتكون مرشدك خطوة بخطوة في استخدام الموقع بسهولة تامة. كل شيء هنا بسيط ولا يحتاج أي خبرة مسبقة 👨‍🏫.
+                        أهلاً بك شيخنا الكريم. لقد صممنا هذه الصفحة لتكون مرجعك السريع لكل الميزات الجديدة التي تجعل إدارتك للفوج أكثر ذكاءً وإثارة.
                     </CardDescription>
                 </CardHeader>
             </Card>
@@ -92,17 +89,16 @@ export default function GuidePage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="font-headline">💡 ملاحظات إضافية ونصيحة ختامية</CardTitle>
+                    <CardTitle className="font-headline">💡 ملاحظات تقنية هامة ونصائح ختامية</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex flex-wrap gap-2">
-                        <Badge variant="secondary"><Smartphone className="ml-1 h-4 w-4" /> يعمل على الهاتف بسهولة</Badge>
-                        <Badge variant="secondary"><Edit className="ml-1 h-4 w-4" /> يمكنك تعديل أو حذف أي شيء</Badge>
-                        <Badge variant="secondary"><Lock className="ml-1 h-4 w-4" /> كل بياناتك محفوظة وآمنة</Badge>
+                        <Badge variant="secondary"><Printer className="ml-1 h-4 w-4" /> نوصي باستخدام تقارير PDF الموحدة لطباعة احترافية.</Badge>
+                        <Badge variant="secondary"><Award className="ml-1 h-4 w-4" /> تابع لوحة "الأرقام القياسية" في البوابة الرئيسية لتكريم المتميزين.</Badge>
+                        <Badge variant="secondary"><Tv className="ml-1 h-4 w-4" /> يمكنك دائماً تغيير هوية البوابة البصرية من الزر المخصص.</Badge>
                     </div>
                     <div className="p-4 bg-green-50 text-green-800 rounded-lg border-r-4 border-green-500">
-                        <p className="font-bold">لا تقلق من استخدام الموقع! فقط جرّب، وإذا أخطأت يمكنك التعديل بسهولة. نحن هنا لمساعدتك في كل خطوة.</p>
-                        <p className="mt-2">📞 للاستفسار، تواصل مع الإدارة.</p>
+                        <p className="font-bold">نصيحة الشيخ: تذكر أن هدف هذا الموقع هو تحويل "الأرقام" إلى "أثر تربوي"؛ فالسهم الأحمر للطالب هو فرصة لتشجيعه، والبطاقة الذهبية هي وسيلة لتعزيز ثقته بنفسه.</p>
                     </div>
                 </CardContent>
             </Card>
