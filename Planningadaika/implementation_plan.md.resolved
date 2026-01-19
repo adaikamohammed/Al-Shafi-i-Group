@@ -1,0 +1,40 @@
+# Unified Session Status Coloring
+
+This plan ensures consistent and clear coloring for session statuses (Holiday, Teacher Absence, and Substitute Teacher) across the Daily Sessions Calendar and the Yearly Performance Radar.
+
+## Color Scheme Specification
+
+| Status | Color (Light) | Color (Dark/Midnight) | Icon/Marker |
+| :--- | :--- | :--- | :--- |
+| **Holiday (عطلة)** | Blue (`bg-blue-100/50` border `blue-300`) | `bg-blue-900/40` border `blue-800` | 🏝️ |
+| **Teacher Absent (غياب الشيخ)** | Red (`bg-red-50` border `red-200`) | `bg-red-950/30` border `red-800` | ❌ |
+| **Substitute Teacher (شيخ بديل)** | Purple (`bg-purple-50` border `purple-200`) | `bg-purple-950/30` border `purple-800` | 🔄 |
+| **Normal Session (حصة عادية)** | Green (`bg-emerald-50` border `emerald-200`) | `bg-emerald-900/40` border `emerald-800` | ✅ |
+
+## Proposed Changes
+
+### [Component] Session Components
+#### [MODIFY] [SessionCalendar.tsx](file:///g:/Al-Shafi-i-Group-main/Al-Shafi-i-Group-main/src/components/sessions/SessionCalendar.tsx)
+- Update `statusClass` logic to differentiate between:
+  - Holiday (Blue)
+  - Sheikh Absent without substitute (Red)
+  - Sheikh Absent with substitute (Purple)
+  - Normal session (Green)
+- Ensure colors are consistent with the "Classic" (light) theme requirements.
+
+### [Page] Analytics Layer
+#### [MODIFY] [yearly-performance/page.tsx](file:///g:/Al-Shafi-i-Group-main/Al-Shafi-i-Group-main/src/app/yearly-performance/page.tsx)
+- Update [getDayColor](file:///g:/Al-Shafi-i-Group-main/Al-Shafi-i-Group-main/src/app/yearly-performance/page.tsx#15-24) helper function to match the new color scheme.
+- Update `yearlyData` memo logic to properly flag "Absent with Substitute".
+- Update the legend (bottom of the page) to reflect the new categories.
+- Ensure the tooltip content reflects these statuses accurately.
+
+## Verification Plan
+### Automated Tests
+- N/A (Visual styling changes)
+
+### Manual Verification
+1. Create a session of each type (Normal, Holiday, Absent, Absent with Substitute).
+2. Verify colors in the Daily Sessions Calendar (Light and Dark themes).
+3. Verify colors in the Yearly Performance Radar (Light and Dark themes).
+4. Check that tooltips in the Radar show the correct status names.

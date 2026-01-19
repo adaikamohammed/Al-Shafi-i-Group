@@ -14,27 +14,32 @@ import { cn } from '@/lib/utils';
 
 // Helper function to get color based on day's data
 const getDayColor = (dayData: any) => {
-    if (!dayData) return 'bg-gray-200 dark:bg-gray-800'; // Default for no data
-    if (dayData.isHoliday) return 'bg-blue-500';
-    if (dayData.isSheikhAbsentNoSub) return 'bg-red-500';
-    if (dayData.workSessionCount >= 2) return 'bg-green-700';
-    if (dayData.workSessionCount === 1) return 'bg-green-300';
-    return 'bg-gray-200 dark:bg-gray-800';
+    if (!dayData) return 'bg-gray-100 dark:bg-gray-800/40 border-transparent'; // Default for no data
+    if (dayData.isHoliday) return 'bg-blue-400 border-blue-500';
+    if (dayData.isSheikhAbsentNoSub) return 'bg-red-400 border-red-500';
+    if (dayData.isSheikhAbsentWithSub) return 'bg-purple-400 border-purple-500';
+    if (dayData.workSessionCount >= 2) return 'bg-emerald-600 border-emerald-700';
+    if (dayData.workSessionCount === 1) return 'bg-emerald-400 border-emerald-500';
+    return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
 };
 
 const DayTooltipContent = ({ day, dayData }: { day: Date, dayData: any }) => {
     const formattedDate = format(day, 'd MMMM yyyy', { locale: ar });
 
     if (!dayData) {
-        return <p className="font-bold">{formattedDate}<br/>لا توجد بيانات</p>;
+        return <p className="font-bold">{formattedDate}<br />لا توجد بيانات</p>;
     }
 
     if (dayData.isHoliday) {
-        return <p className="font-bold">{formattedDate}<br/>ملخص: يوم عطلة</p>;
+        return <p className="font-bold">{formattedDate}<br />ملخص: يوم عطلة</p>;
     }
 
     if (dayData.isSheikhAbsentNoSub) {
-        return <p className="font-bold">{formattedDate}<br/>ملخص: غياب الشيخ</p>;
+        return <p className="font-bold">{formattedDate}<br />ملخص: غياب الشيخ (بدون بديل)</p>;
+    }
+
+    if (dayData.isSheikhAbsentWithSub) {
+        return <p className="font-bold">{formattedDate}<br />ملخص: غياب الشيخ (مع وجود بديل)</p>;
     }
 
     const sessionTypesString = dayData.sessionTypes?.join(' + ') || 'غير محدد';
@@ -82,7 +87,7 @@ const YearView = ({ year, data, onDayClick }: { year: number, data: any, onDayCl
 const QuarterView = ({ year, quarter, data, onDayClick }: { year: number, quarter: number, data: any, onDayClick: (date: Date) => void }) => {
     const startMonth = (quarter - 1) * 3;
     const months = [startMonth, startMonth + 1, startMonth + 2];
-    
+
     return (
         <div className="space-y-4">
             {months.map(monthIndex => {
@@ -90,26 +95,26 @@ const QuarterView = ({ year, quarter, data, onDayClick }: { year: number, quarte
                 const daysInMonth = getDaysInMonth(monthStart);
                 const firstDay = getDay(monthStart);
                 const startDayIndex = (firstDay + 1) % 7; // Saturday start
-                const days = Array.from({length: daysInMonth}, (_, i) => addDays(monthStart, i));
+                const days = Array.from({ length: daysInMonth }, (_, i) => addDays(monthStart, i));
 
                 return (
                     <div key={monthIndex}>
-                        <h3 className="text-lg font-bold mb-2">{format(monthStart, 'MMMM yyyy', {locale: ar})}</h3>
+                        <h3 className="text-lg font-bold mb-2">{format(monthStart, 'MMMM yyyy', { locale: ar })}</h3>
                         <div className="grid grid-cols-7 gap-2">
-                             {Array.from({ length: startDayIndex }).map((_, i) => <div key={`empty-${monthIndex}-${i}`} />)}
-                             {days.map(day => {
-                                 const dateString = format(day, 'yyyy-MM-dd');
-                                 const dayData = data[dateString];
-                                 const colorClass = getDayColor(dayData);
-                                 return (
-                                     <Tooltip key={dateString}>
-                                         <TooltipTrigger asChild>
-                                             <div className={cn("w-8 h-8 rounded-md", colorClass)} onClick={() => onDayClick(day)} />
-                                         </TooltipTrigger>
-                                         <TooltipContent><DayTooltipContent day={day} dayData={dayData} /></TooltipContent>
-                                     </Tooltip>
-                                 );
-                             })}
+                            {Array.from({ length: startDayIndex }).map((_, i) => <div key={`empty-${monthIndex}-${i}`} />)}
+                            {days.map(day => {
+                                const dateString = format(day, 'yyyy-MM-dd');
+                                const dayData = data[dateString];
+                                const colorClass = getDayColor(dayData);
+                                return (
+                                    <Tooltip key={dateString}>
+                                        <TooltipTrigger asChild>
+                                            <div className={cn("w-8 h-8 rounded-md", colorClass)} onClick={() => onDayClick(day)} />
+                                        </TooltipTrigger>
+                                        <TooltipContent><DayTooltipContent day={day} dayData={dayData} /></TooltipContent>
+                                    </Tooltip>
+                                );
+                            })}
                         </div>
                     </div>
                 );
@@ -125,9 +130,9 @@ const MonthView = ({ year, month, data, onDayClick }: { year: number, month: num
     const firstDay = getDay(monthStart);
     const startDayIndex = (firstDay + 1) % 7; // Saturday start
     const dayCells = [];
-    
+
     const weekdays = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
-    
+
     for (let i = 0; i < startDayIndex; i++) {
         dayCells.push(<div key={`empty-${i}`} className="border rounded-lg bg-muted/20" />);
     }
@@ -148,7 +153,7 @@ const MonthView = ({ year, month, data, onDayClick }: { year: number, month: num
             </Tooltip>
         );
     }
-    
+
     return (
         <div className="grid grid-cols-7 gap-2">
             {weekdays.map(day => <div key={day} className="text-center font-semibold text-muted-foreground pb-2">{day}</div>)}
@@ -172,7 +177,7 @@ export default function YearlyPerformancePage() {
     const { students, dailySessions, loading } = useStudentContext();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'year' | 'quarter' | 'month'>('year');
-    
+
     const currentYear = getYear(currentDate);
 
     const { yearlyData } = useMemo(() => {
@@ -183,7 +188,7 @@ export default function YearlyPerformancePage() {
             .filter(dateString => {
                 try {
                     return getYear(parseISO(dateString)) === currentYear;
-                } catch(e) { return false; }
+                } catch (e) { return false; }
             })
             .reduce((obj, key) => {
                 obj[key] = dailySessions[key];
@@ -196,12 +201,13 @@ export default function YearlyPerformancePage() {
 
             const isHoliday = sessionsOnDay.some(s => s.sessionType === 'يوم عطلة');
             const isSheikhAbsentNoSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
+            const isSheikhAbsentWithSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && s.substituteTeacher);
             const workSessions = sessionsOnDay.filter(s => s.sessionType !== 'يوم عطلة' && !(s.sessionType === 'غياب الشيخ' && !s.substituteTeacher));
-            
+
             let attendanceRate = 0;
             if (!isHoliday && !isSheikhAbsentNoSub && workSessions.length > 0) {
                 const activeStudentsCount = (students || []).filter(s => s.status === 'نشط').length;
-                if(activeStudentsCount > 0){
+                if (activeStudentsCount > 0) {
                     const allRecords = workSessions.flatMap(s => s.records || []);
                     const attendanceCount = allRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
                     const totalPossibleAttendancesForDay = activeStudentsCount * workSessions.length;
@@ -212,6 +218,7 @@ export default function YearlyPerformancePage() {
             data[dateString] = {
                 isHoliday,
                 isSheikhAbsentNoSub,
+                isSheikhAbsentWithSub,
                 workSessionCount: workSessions.length,
                 attendanceRate,
                 sessionTypes: workSessions.map(s => s.sessionType)
@@ -220,7 +227,7 @@ export default function YearlyPerformancePage() {
 
         return { yearlyData: data };
     }, [dailySessions, students, currentYear]);
-    
+
     const { periodStats, statsTitle } = useMemo(() => {
         if (!dailySessions || !students) return { periodStats: { commitmentRate: 0, extraSessions: 0, netWorkDays: 0, sheikhAbsenceDays: 0 }, statsTitle: '' };
 
@@ -253,7 +260,7 @@ export default function YearlyPerformancePage() {
                 title = `إحصائيات شهر ${format(currentDate, 'MMMM yyyy', { locale: ar })}`;
                 break;
         }
-        
+
         const stats = {
             extraSessions: 0,
             workDays: new Set<string>(),
@@ -261,7 +268,7 @@ export default function YearlyPerformancePage() {
             totalPossibleAttendance: 0,
             sheikhAbsenceDays: 0,
         };
-        
+
         Object.keys(dailySessions).forEach(dateString => {
             try {
                 const sessionDate = parseISO(dateString);
@@ -269,11 +276,11 @@ export default function YearlyPerformancePage() {
                     const sessionsOnDay = Object.values(dailySessions[dateString]);
                     const isHoliday = sessionsOnDay.some(s => s.sessionType === 'يوم عطلة');
                     const isSheikhAbsentNoSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
-                    
+
                     if (isSheikhAbsentNoSub) {
                         stats.sheikhAbsenceDays++;
                     }
-                    
+
                     if (!isHoliday && !isSheikhAbsentNoSub) {
                         const workSessions = sessionsOnDay.filter(s => s.sessionType !== 'يوم عطلة' && !(s.sessionType === 'غياب الشيخ' && !s.substituteTeacher));
                         if (workSessions.length > 0) {
@@ -295,7 +302,7 @@ export default function YearlyPerformancePage() {
         });
 
         const commitmentRate = stats.totalPossibleAttendance > 0 ? (stats.totalAttendance / stats.totalPossibleAttendance) * 100 : 0;
-        
+
         const finalStats = {
             commitmentRate: commitmentRate.toFixed(0),
             extraSessions: stats.extraSessions,
@@ -306,7 +313,7 @@ export default function YearlyPerformancePage() {
         return { periodStats: finalStats, statsTitle: title };
 
     }, [dailySessions, students, viewMode, currentDate]);
-    
+
     const handleDateNavigation = (direction: 'prev' | 'next') => {
         const amount = direction === 'next' ? 1 : -1;
         if (viewMode === 'year') {
@@ -314,10 +321,10 @@ export default function YearlyPerformancePage() {
         } else if (viewMode === 'month') {
             setCurrentDate(d => addMonths(d, amount));
         } else if (viewMode === 'quarter') {
-             setCurrentDate(d => addMonths(d, amount * 3));
+            setCurrentDate(d => addMonths(d, amount * 3));
         }
     };
-    
+
     const handleSetQuarter = (q: number) => {
         const newMonth = (q - 1) * 3;
         setCurrentDate(current => setMonth(current, newMonth));
@@ -332,7 +339,7 @@ export default function YearlyPerformancePage() {
     const currentQuarter = getQuarter(currentDate);
 
     let viewTitle = `${currentYear}`;
-    if (viewMode === 'month') viewTitle = format(currentDate, 'MMMM yyyy', {locale: ar});
+    if (viewMode === 'month') viewTitle = format(currentDate, 'MMMM yyyy', { locale: ar });
     if (viewMode === 'quarter') viewTitle = `الربع ${currentQuarter} - ${currentYear}`;
 
     return (
@@ -354,7 +361,7 @@ export default function YearlyPerformancePage() {
                                     <span className="font-semibold text-lg w-32 text-center">{viewTitle}</span>
                                     <Button variant="outline" size="icon" onClick={() => handleDateNavigation('next')}><ArrowLeft className="h-4 w-4" /></Button>
                                 </div>
-                                
+
                                 <div className="flex-1 flex justify-center">
                                     {viewMode === 'quarter' && (
                                         <div className="flex items-center space-x-1 rounded-lg bg-muted p-1">
@@ -367,9 +374,9 @@ export default function YearlyPerformancePage() {
                                 </div>
 
                                 <div className="flex items-center space-x-1 rounded-lg bg-muted p-1">
-                                   <Button variant={viewMode === 'year' ? 'secondary' : 'ghost'} onClick={() => setViewMode('year')} className="h-8 px-3">سنوي</Button>
-                                   <Button variant={viewMode === 'quarter' ? 'secondary' : 'ghost'} onClick={() => setViewMode('quarter')} className="h-8 px-3">فصلي</Button>
-                                   <Button variant={viewMode === 'month' ? 'secondary' : 'ghost'} onClick={() => setViewMode('month')} className="h-8 px-3">شهري</Button>
+                                    <Button variant={viewMode === 'year' ? 'secondary' : 'ghost'} onClick={() => setViewMode('year')} className="h-8 px-3">سنوي</Button>
+                                    <Button variant={viewMode === 'quarter' ? 'secondary' : 'ghost'} onClick={() => setViewMode('quarter')} className="h-8 px-3">فصلي</Button>
+                                    <Button variant={viewMode === 'month' ? 'secondary' : 'ghost'} onClick={() => setViewMode('month')} className="h-8 px-3">شهري</Button>
                                 </div>
                             </div>
 
@@ -379,48 +386,49 @@ export default function YearlyPerformancePage() {
 
                             <div className="mt-6 flex flex-wrap justify-center gap-4 text-sm">
                                 <span className="flex items-center gap-2">جهد أقل</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-green-300"></div></span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-green-700"></div></span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-400 border border-emerald-500"></div></span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-600 border border-emerald-700"></div></span>
                                 <span className="flex items-center gap-2">جهد أعلى</span>
                                 <span className="flex items-center gap-2 font-semibold ml-4">|</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500"></div>غياب الشيخ</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-blue-500"></div>عطلة</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-gray-200"></div>يوم فارغ</span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-400 border border-red-500"></div>غياب</span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-purple-400 border border-purple-500"></div>غياب (ببديل)</span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-blue-400 border border-blue-500"></div>عطلة</span>
+                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-gray-100 dark:bg-gray-800"></div>يوم فارغ</span>
                             </div>
                         </CardContent>
                     </Card>
 
                     <div className="space-y-6">
                         <Card>
-                             <CardHeader>
+                            <CardHeader>
                                 <CardTitle>{statsTitle}</CardTitle>
                                 <CardDescription>ملخص أداء الفوج للفترة المحددة</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                               <StatWidget 
-                                   title="معدل الالتزام"
-                                   value={periodStats.commitmentRate}
-                                   unit="%"
-                                   icon={<CheckCircle className="h-8 w-8 text-green-500"/>}
-                               />
-                               <StatWidget 
-                                   title="صافي أيام العمل"
-                                   value={periodStats.netWorkDays}
-                                   unit="يوم"
-                                   icon={<Calendar className="h-8 w-8 text-blue-500"/>}
-                               />
-                               <StatWidget 
-                                   title="حصص إضافية وتعويضية"
-                                   value={periodStats.extraSessions}
-                                   unit="حصة"
-                                   icon={<TrendingUp className="h-8 w-8 text-indigo-500"/>}
-                               />
-                               <StatWidget 
-                                   title="غيابات الشيخ"
-                                   value={periodStats.sheikhAbsenceDays}
-                                   unit="يوم"
-                                   icon={<CalendarX className="h-8 w-8 text-red-500"/>}
-                               />
+                                <StatWidget
+                                    title="معدل الالتزام"
+                                    value={periodStats.commitmentRate}
+                                    unit="%"
+                                    icon={<CheckCircle className="h-8 w-8 text-green-500" />}
+                                />
+                                <StatWidget
+                                    title="صافي أيام العمل"
+                                    value={periodStats.netWorkDays}
+                                    unit="يوم"
+                                    icon={<Calendar className="h-8 w-8 text-blue-500" />}
+                                />
+                                <StatWidget
+                                    title="حصص إضافية وتعويضية"
+                                    value={periodStats.extraSessions}
+                                    unit="حصة"
+                                    icon={<TrendingUp className="h-8 w-8 text-indigo-500" />}
+                                />
+                                <StatWidget
+                                    title="غيابات الشيخ"
+                                    value={periodStats.sheikhAbsenceDays}
+                                    unit="يوم"
+                                    icon={<CalendarX className="h-8 w-8 text-red-500" />}
+                                />
                             </CardContent>
                         </Card>
                     </div>

@@ -69,13 +69,21 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
             let statusClass = "bg-card hover:bg-accent/50 border-transparent shadow-sm"; // Default
 
             if (sessions.length > 0) {
-                if (sessions.some(s => s.sessionType === 'يوم عطلة' || (s.sessionType === 'غياب الشيخ' && !s.substituteTeacher))) {
-                    statusClass = 'bg-amber-100 dark:bg-amber-900/40 border-amber-300 dark:border-amber-800'; // Holiday/Absent
+                const hasHoliday = sessions.some(s => s.sessionType === 'يوم عطلة');
+                const hasAbsentNoSub = sessions.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
+                const hasAbsentWithSub = sessions.some(s => s.sessionType === 'غياب الشيخ' && s.substituteTeacher);
+
+                if (hasHoliday) {
+                    statusClass = 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'; // Holiday
+                } else if (hasAbsentNoSub) {
+                    statusClass = 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900'; // Absent
+                } else if (hasAbsentWithSub) {
+                    statusClass = 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800'; // Absent with Sub
                 } else {
-                    statusClass = 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-800'; // Completed
+                    statusClass = 'bg-emerald-50 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-800'; // Completed/Normal
                 }
             } else if (isPast(dayDate) && !isTodayDate) {
-                statusClass = 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900 opacity-80'; // Missed day
+                statusClass = 'bg-muted/30 border-muted/20 opacity-80'; // Empty past day
             }
             if (isTodayDate) statusClass += " ring-2 ring-primary ring-offset-2 !bg-primary/5";
 
