@@ -2,6 +2,7 @@
 
 import '../../app/globals.css';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarSeparator, useSidebar } from '@/components/ui/sidebar';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield, UserPlus, UserCog, Home, PanelRight, PanelLeft, Palette, Check } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
@@ -30,6 +31,15 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isMobile = useIsMobile();
   const [isCommandBarOpen, setCommandBarOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
+
+  const toggleGroup = (groupTitle: string) => {
+    setOpenGroups(prev =>
+      prev.includes(groupTitle)
+        ? prev.filter(t => t !== groupTitle)
+        : [...prev, groupTitle]
+    );
+  };
 
   // Global Theme Logic
   const currentThemeId = user?.portalTheme || 'midnight';
@@ -127,11 +137,12 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
           {filteredNavGroups.map((group) => {
             const primaryItem = group.items.find(i => i.primary);
             const mainIcon = primaryItem?.icon || group.items[0]?.icon || Layers;
+            const isOpen = openGroups.includes(group.title);
 
             return (
               <SidebarMenuItem key={group.title}>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                <Collapsible open={isOpen} onOpenChange={() => toggleGroup(group.title)}>
+                  <CollapsibleTrigger asChild>
                     <SidebarMenuButton
                       className={cn(
                         "rounded-2xl h-12 w-full flex items-center gap-3 transition-all duration-500 border border-transparent shadow-sm hover:scale-[1.02] relative group/btn px-3",
@@ -155,46 +166,39 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                         {group.title}
                       </span>
 
-                      {/* Sub-items indicator badge */}
-                      <div className="absolute top-1.5 left-2 group-data-[collapsible=icon]:top-1 group-data-[collapsible=icon]:left-1 flex items-center justify-center">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse opacity-40" />
-                      </div>
+                      {/* Chevron indicator */}
+                      <ChevronLeft className={cn(
+                        "h-4 w-4 mr-auto transition-transform duration-300 group-data-[collapsible=icon]:hidden",
+                        isOpen && "rotate-90"
+                      )} />
                     </SidebarMenuButton>
-                  </DropdownMenuTrigger>
+                  </CollapsibleTrigger>
 
-                  <DropdownMenuContent
-                    side="left"
-                    align="start"
-                    className={cn(
-                      "w-48 p-2 rounded-2xl border-none shadow-2xl animate-in slide-in-from-right-2 duration-300 rtl z-[100]",
-                      theme.isLight ? "bg-white/95 backdrop-blur-xl" : "bg-slate-950/95 backdrop-blur-xl"
-                    )}
-                    sideOffset={10}
-                  >
-                    <div className="mb-2 px-2 py-1">
-                      <p className="text-[10px] font-black text-primary uppercase tracking-widest opacity-60 font-headline">
-                        {group.title}
-                      </p>
-                    </div>
-                    {group.items.map((item) => (
-                      <DropdownMenuItem key={item.href} asChild>
+                  <CollapsibleContent className="group-data-[collapsible=icon]:hidden">
+                    <div className="mt-2 space-y-1 pr-2">
+                      {group.items.map((item) => (
                         <Link
+                          key={item.href}
                           href={item.href}
                           className={cn(
-                            "flex items-center gap-3 p-2 rounded-xl transition-all mb-1 cursor-pointer",
-                            theme.isLight ? "hover:bg-slate-100" : "hover:bg-white/5",
-                            pathname === item.href && (theme.isLight ? "bg-primary/10 text-primary" : "bg-primary text-white")
+                            "flex items-center gap-3 p-2 pr-4 rounded-xl transition-all cursor-pointer",
+                            theme.isLight
+                              ? "hover:bg-slate-100 text-slate-600"
+                              : "hover:bg-white/5 text-white/70",
+                            pathname === item.href && (theme.isLight
+                              ? "bg-primary/10 text-primary font-bold"
+                              : "bg-primary/20 text-primary font-bold")
                           )}
                         >
-                          <item.icon className={cn("h-4 w-4 shrink-0", item.primary && "text-primary")} />
-                          <span className={cn("font-bold text-[11px] font-body", item.primary && "text-primary")}>
+                          <item.icon className={cn("h-3.5 w-3.5 shrink-0 mr-1", item.primary && "text-primary")} />
+                          <span className={cn("text-[10px] font-medium font-body", item.primary && "text-primary")}>
                             {item.label}
                           </span>
                         </Link>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               </SidebarMenuItem>
             );
           })}
