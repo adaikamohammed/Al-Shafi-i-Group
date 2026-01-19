@@ -430,7 +430,7 @@ export const StudentProfileCard = memo(({ student, user, rankingData, medalHisto
 
                     <DialogFooter className="border-t p-6 gap-3 flex-col sm:flex-row glass">
                         <Button variant="outline" onClick={onEdit} className="flex-1 font-headline font-bold hover:bg-muted">تعديل البيانات</Button>
-                        <Button onClick={() => setShowStats(true)} className="flex-1 font-headline font-bold shadow-lg shadow-primary/20">عرض الإحصائيات الشاملة</Button>
+                        <Button onClick={onViewStats} className="flex-1 font-headline font-bold shadow-lg shadow-primary/20">عرض الإحصائيات الشاملة</Button>
                     </DialogFooter>
                 </>
             )}

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -188,12 +189,21 @@ const StudentStatWidget = ({ title, value, unit, icon, colorClass }: { title: st
     </div>
 );
 
-export default function StudentHistoryPage() {
+function StudentHistoryContent() {
     const { students, dailySessions, loading } = useStudentContext();
+    const searchParams = useSearchParams();
+    const studentIdParam = searchParams.get('studentId');
+
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'year' | 'quarter' | 'month'>('year');
     const [viewType, setViewType] = useState<'attendance' | 'evaluation'>('attendance');
+
+    useEffect(() => {
+        if (studentIdParam) {
+            setSelectedStudentId(studentIdParam);
+        }
+    }, [studentIdParam]);
 
     const selectedStudent = useMemo(() =>
         (students || []).find(s => s.id === selectedStudentId)
@@ -679,6 +689,14 @@ export default function StudentHistoryPage() {
                 )}
             </div>
         </TooltipProvider>
+    );
+}
+
+export default function StudentHistoryPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+            <StudentHistoryContent />
+        </Suspense>
     );
 }
 

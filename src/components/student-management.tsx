@@ -13,6 +13,7 @@ import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
+import { useRouter } from 'next/navigation';
 import { Student, StudentStatus } from '@/lib/types';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
@@ -28,6 +29,7 @@ import { useStudentStats } from '@/hooks/useStudentStats';
 const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
 
 export default function StudentManagement() {
+    const router = useRouter();
     const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings, addStudent } = useStudentContext();
     const { user, isSuperAdmin } = useAuth();
     const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
@@ -295,7 +297,7 @@ export default function StudentManagement() {
                             rankingData={rankingData}
                             medalHistory={getStudentMedalHistory(selectedStudent.id)}
                             onEdit={() => setEditStudentDialogOpen(true)}
-                            onViewStats={() => setSelectedStudent(null)}
+                            onViewStats={() => router.push(`/student-history?studentId=${selectedStudent.id}`)}
                         />
                     </Dialog>
                 )}

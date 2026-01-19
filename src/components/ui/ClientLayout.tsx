@@ -196,10 +196,10 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
         <CommandBar students={students ?? []} isOpen={isCommandBarOpen} onOpenChange={setCommandBarOpen} router={router} />
 
-        <div className="flex min-h-screen relative z-10 rtl">
+        <div className="flex min-h-screen relative z-10 rtl overflow-x-hidden">
           {isMobile ? (
             <Sheet>
-              <div className="flex flex-col flex-1">
+              <div className="flex flex-col flex-1 min-w-0">
                 <header className={cn(
                   "flex h-16 items-center justify-between gap-4 border-b px-6 backdrop-blur-md sticky top-0 z-50",
                   theme.isLight ? "bg-white/60 border-slate-200" : "bg-slate-950/60 border-white/5"

@@ -402,12 +402,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const previousHallOfFame = useRef<HallOfFameData | null>(hallOfFame);
 
   useEffect(() => {
-    if (!hallOfFame || !previousHallOfFame.current) {
+    if (loading || !hallOfFame || !previousHallOfFame.current) {
       previousHallOfFame.current = hallOfFame;
       return;
     };
     const checkRecordChange = (newRecord: any, oldRecord: any, category: string) => {
-      if (newRecord?.id && newRecord.id !== oldRecord?.id && newRecord.name) {
+      if (newRecord?.id && oldRecord?.id && newRecord.id !== oldRecord.id && newRecord.name) {
         toast({
           title: `👑 إنجاز جديد!`,
           description: `${newRecord.name} حطم الرقم القياسي في: ${category}!`,
