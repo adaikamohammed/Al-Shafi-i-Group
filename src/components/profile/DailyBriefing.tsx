@@ -34,7 +34,7 @@ export function DailyBriefing({ students, dailySessions, sheikhName }: DailyBrie
                 if (!session.date) return false;
                 const date = parseISO(session.date);
                 if (date < currentMonthStart) return false;
-                const record = session.records.find(r => r.studentId === student.id);
+                const record = session.records.find((r: any) => r.studentId === student.id);
                 return record && record.attendance === 'غائب';
             }).length;
             if (absenceCount >= 3) retentionRiskCount++;

@@ -25,8 +25,8 @@ type QuarterStatusFilter = 'all' | 'paid' | 'unpaid' | 'exempted';
 type StatusFilter = 'all' | 'نشط' | 'مطرود';
 
 const statusVariant: { [key in 'نشط' | 'مطرود']: "default" | "destructive" } = {
-  "نشط": "default",
-  "مطرود": "destructive",
+    "نشط": "default",
+    "مطرود": "destructive",
 };
 
 
@@ -40,7 +40,8 @@ export default function DuesPage() {
     const [quarterStatusFilter, setQuarterStatusFilter] = useState<QuarterStatusFilter>('all');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('نشط');
     const [isSaving, setIsSaving] = useState(false);
-    
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
     const [registrationFees, setRegistrationFees] = useState<Record<number, number>>({});
     const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -52,17 +53,24 @@ export default function DuesPage() {
         }
     }, [currentYear, settings.registrationFees]);
 
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
+
     const handleFeeChange = (quarter: number, value: string) => {
         const newFees = { ...registrationFees, [quarter]: Number(value) || 0 };
         setRegistrationFees(newFees);
-        
+
         if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
 
         debounceTimeout.current = setTimeout(() => {
             handleSaveFees(newFees, true); // Auto-save silently
         }, 1500); // 1.5 second delay
     };
-    
+
     const handleSaveFees = async (feesToSave?: Record<number, number>, isSilent: boolean = false) => {
         setIsSaving(true);
         const fees = feesToSave || registrationFees;
@@ -90,39 +98,48 @@ export default function DuesPage() {
     const prices = settings?.prices?.renewal || { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 };
 
     const studentsWithDues = useMemo(() => {
-        return (students ?? [])
-            .map(student => {
-                const studentPayments = (payments ?? [])
-                    .filter(p => p.studentId === student.id && getYear(parseISO(p.date)) === currentYear);
+        if (!students) return [];
 
-                const paymentStatusByQuarter: Record<number, {status: PaymentStatus, paymentId?: string}> = {};
+        // Index payments by studentId for O(1) lookup
+        const paymentsByStudent = (payments ?? []).reduce((acc, p) => {
+            if (getYear(parseISO(p.date)) === currentYear) {
+                if (!acc[p.studentId]) acc[p.studentId] = [];
+                acc[p.studentId].push(p);
+            }
+            return acc;
+        }, {} as Record<string, Payment[]>);
 
-                for (let q = 1; q <= 4; q++) {
-                    const paymentForQuarter = studentPayments.find(p => getQuarter(parseISO(p.date)) === q);
-                    if (paymentForQuarter) {
-                        paymentStatusByQuarter[q] = { status: paymentForQuarter.status, paymentId: paymentForQuarter.id };
-                    } else {
-                        paymentStatusByQuarter[q] = { status: 'unpaid' };
-                    }
+        return students.map(student => {
+            const studentPayments = paymentsByStudent[student.id] || [];
+
+            const paymentStatusByQuarter: Record<number, { status: PaymentStatus, paymentId?: string }> = {};
+
+            for (let q = 1; q <= 4; q++) {
+                const paymentForQuarter = studentPayments.find(p => getQuarter(parseISO(p.date)) === q);
+                if (paymentForQuarter) {
+                    paymentStatusByQuarter[q] = { status: paymentForQuarter.status, paymentId: paymentForQuarter.id };
+                } else {
+                    paymentStatusByQuarter[q] = { status: 'unpaid' };
                 }
-                
-                const totalPaid = studentPayments
-                    .filter(p => p.status === 'paid')
-                    .reduce((sum, p) => sum + p.amount, 0);
+            }
 
-                return {
-                    ...student,
-                    paymentStatus: paymentStatusByQuarter,
-                    totalPaid,
-                };
-            });
+            const totalPaid = studentPayments
+                .filter(p => p.status === 'paid')
+                .reduce((sum, p) => sum + p.amount, 0);
+
+            return {
+                ...student,
+                paymentStatus: paymentStatusByQuarter,
+                totalPaid,
+            };
+        });
 
     }, [students, payments, currentYear]);
-    
-     const filteredStudents = useMemo(() => {
+
+    const filteredStudents = useMemo(() => {
         return studentsWithDues.filter(student => {
-            const nameMatch = student.fullName.toLowerCase().includes(searchTerm.toLowerCase());
-            
+            const nameMatch = student.fullName.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+
             const statusMatch = statusFilter === 'all' || student.status === statusFilter;
 
             let quarterMatch = true;
@@ -132,13 +149,13 @@ export default function DuesPage() {
                 if (quarterStatusFilter === 'unpaid') quarterMatch = student.paymentStatus[q]?.status === 'unpaid';
                 if (quarterStatusFilter === 'exempted') quarterMatch = student.paymentStatus[q]?.status === 'exempted';
             }
-            
+
             return nameMatch && quarterMatch && statusMatch;
         });
     }, [studentsWithDues, searchTerm, quarterFilter, quarterStatusFilter, statusFilter]);
-    
+
     const totalsByQuarter = useMemo(() => {
-        const quarterTotals: Record<number, { revenue: number, paidCount: number, exemptedCount: number }> = { 1: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 2: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 3: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 4: { revenue: 0, paidCount: 0, exemptedCount: 0 }};
+        const quarterTotals: Record<number, { revenue: number, paidCount: number, exemptedCount: number }> = { 1: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 2: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 3: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 4: { revenue: 0, paidCount: 0, exemptedCount: 0 } };
 
         filteredStudents.forEach(student => {
             for (let q = 1; q <= 4; q++) {
@@ -153,11 +170,11 @@ export default function DuesPage() {
                 }
             }
         });
-        
+
         for (let q = 1; q <= 4; q++) {
             quarterTotals[q].revenue += registrationFees[q] || 0;
         }
-        
+
         return quarterTotals;
     }, [filteredStudents, registrationFees, prices]);
 
@@ -167,9 +184,9 @@ export default function DuesPage() {
     }, [totalsByQuarter]);
 
 
-    const handlePaymentAction = async (student: Student, quarter: number, status: PaymentStatus) => {
+    const handlePaymentAction = React.useCallback(async (student: Student, quarter: number, status: PaymentStatus) => {
         if (isSuperAdmin) return;
-        
+
         const tier = student.subscriptionTier || 'فئة الأصاغر';
         const amount = prices[tier] || 0;
         const monthOfQuarter = (quarter - 1) * 3;
@@ -181,7 +198,7 @@ export default function DuesPage() {
             if (existingPayment) {
                 await updatePaymentStatus(existingPayment.id, status, status === 'paid' ? amount : 0);
             } else {
-                 await addPayment({
+                await addPayment({
                     studentId: student.id,
                     amount: status === 'paid' ? amount : 0,
                     date: paymentDate.toISOString(),
@@ -199,24 +216,24 @@ export default function DuesPage() {
             });
 
         } catch (error) {
-             toast({
+            toast({
                 title: "❌ خطأ",
                 description: "فشل تحديث حالة الدفعة.",
                 variant: 'destructive'
             });
         }
-    };
-    
+    }, [isSuperAdmin, prices, currentYear, payments, updatePaymentStatus, addPayment, toast]);
+
     const handleExport = () => {
         const dataToExport = filteredStudents.map(s => ({
-                "اسم الطالب": s.fullName,
-                "الحالة": s.status,
-                "الفئة": s.subscriptionTier,
-                "فصل 1": s.paymentStatus[1]?.status || 'unpaid',
-                "فصل 2": s.paymentStatus[2]?.status || 'unpaid',
-                "فصل 3": s.paymentStatus[3]?.status || 'unpaid',
-                "فصل 4": s.paymentStatus[4]?.status || 'unpaid',
-                "الإجمالي المدفوع": s.totalPaid,
+            "اسم الطالب": s.fullName,
+            "الحالة": s.status,
+            "الفئة": s.subscriptionTier,
+            "فصل 1": s.paymentStatus[1]?.status || 'unpaid',
+            "فصل 2": s.paymentStatus[2]?.status || 'unpaid',
+            "فصل 3": s.paymentStatus[3]?.status || 'unpaid',
+            "فصل 4": s.paymentStatus[4]?.status || 'unpaid',
+            "الإجمالي المدفوع": s.totalPaid,
         }));
 
         const ws = XLSX.utils.json_to_sheet(dataToExport);
@@ -233,8 +250,8 @@ export default function DuesPage() {
             </div>
         );
     }
-    
-     if ((students ?? []).length === 0) {
+
+    if ((students ?? []).length === 0) {
         return (
             <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
                 <AlertTriangle className="h-16 w-16 text-yellow-400" />
@@ -245,17 +262,17 @@ export default function DuesPage() {
             </div>
         );
     }
-    
-    const yearOptions = Array.from({length: 5}, (_, i) => getYear(new Date()) - i);
-    const quarterNames: Record<string, string> = { '1': 'فصل 1', '2': 'فصل 2', '3': 'فصل 3', '4': 'فصل 4'};
+
+    const yearOptions = Array.from({ length: 5 }, (_, i) => getYear(new Date()) - i);
+    const quarterNames: Record<string, string> = { '1': 'فصل 1', '2': 'فصل 2', '3': 'فصل 3', '4': 'فصل 4' };
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                 <h1 className="text-3xl font-headline font-bold">المستحقات المالية الفصلية</h1>
+                <h1 className="text-3xl font-headline font-bold">المستحقات المالية الفصلية</h1>
                 <div className="flex items-center gap-2">
                     <Button onClick={() => handleSaveFees()} disabled={isSaving}>
-                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
+                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
                         حفظ
                     </Button>
                     <Select dir="rtl" value={currentYear.toString()} onValueChange={(value) => setCurrentYear(parseInt(value))}>
@@ -266,24 +283,24 @@ export default function DuesPage() {
                             {yearOptions.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
                         </SelectContent>
                     </Select>
-                 </div>
+                </div>
             </div>
-            
+
             <Card>
                 <CardHeader>
                     <CardTitle>أدوات الفلترة والبحث</CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                     <div className="relative">
+                    <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input 
+                        <Input
                             placeholder="بحث باسم الطالب..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-9"
                         />
                     </div>
-                     <div className="flex gap-2">
+                    <div className="flex gap-2">
                         <Select dir="rtl" value={quarterFilter} onValueChange={setQuarterFilter}>
                             <SelectTrigger className="w-1/2"><SelectValue placeholder="اختر الفصل" /></SelectTrigger>
                             <SelectContent>
@@ -304,12 +321,12 @@ export default function DuesPage() {
                             </SelectContent>
                         </Select>
                     </div>
-                     <div className="flex items-center space-x-1 rounded-lg bg-muted p-1">
+                    <div className="flex items-center space-x-1 rounded-lg bg-muted p-1">
                         <Button variant={statusFilter === 'all' ? 'secondary' : 'ghost'} onClick={() => setStatusFilter('all')} className="h-8 px-3">الكل</Button>
                         <Button variant={statusFilter === 'نشط' ? 'secondary' : 'ghost'} onClick={() => setStatusFilter('نشط')} className="h-8 px-3">النشطون فقط</Button>
                         <Button variant={statusFilter === 'مطرود' ? 'secondary' : 'ghost'} onClick={() => setStatusFilter('مطرود')} className="h-8 px-3">المطرودون</Button>
-                     </div>
-                    <Button onClick={handleExport}><Download className="ml-2 h-4 w-4"/> تصدير (Excel)</Button>
+                    </div>
+                    <Button onClick={handleExport}><Download className="ml-2 h-4 w-4" /> تصدير (Excel)</Button>
                 </CardContent>
             </Card>
 
@@ -317,123 +334,66 @@ export default function DuesPage() {
                 <CardHeader>
                     <CardTitle>سجل الدفعات لسنة {currentYear}</CardTitle>
                     <CardDescription>
-                       أسعار الاشتراكات الفصلية ثابتة: ({prices['فئة الأكابر']} د.ج للأكابر، {prices['فئة الأصاغر']} د.ج للأصاغر).
+                        أسعار الاشتراكات الفصلية ثابتة: ({prices['فئة الأكابر']} د.ج للأكابر، {prices['فئة الأصاغر']} د.ج للأصاغر).
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="w-full overflow-x-auto">
-                    <Table className="min-w-full">
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-1/4">اسم الطالب</TableHead>
-                                {isSuperAdmin && <TableHead>الفوج</TableHead>}
-                                <TableHead>الحالة</TableHead>
-                                <TableHead>الفئة</TableHead>
-                                {[1, 2, 3, 4].map(q => <TableHead key={q} className="text-center">{quarterNames[q.toString()]}</TableHead>)}
-                                <TableHead>الإجمالي السنوي</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredStudents.length > 0 ? filteredStudents.map(student => (
-                                <TableRow key={student.id} className={cn(student.status === 'مطرود' && 'opacity-50')}>
-                                    <TableCell className="font-medium">{student.fullName}</TableCell>
-                                    {isSuperAdmin && <TableCell><Badge variant="outline">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
-                                    <TableCell>
-                                         <Badge variant={statusVariant[student.status] || 'secondary'}>{student.status}</Badge>
-                                        {student.status === 'مطرود' && student.expulsionDate && 
-                                            <p className="text-xs text-muted-foreground">({formatDistanceToNowStrict(parseISO(student.expulsionDate), {locale: ar, addSuffix: true})})</p>
-                                        }
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant="secondary">{student.subscriptionTier || 'فئة الأصاغر'}</Badge>
-                                    </TableCell>
-                                    {[1, 2, 3, 4].map(q => {
-                                        const payment = student.paymentStatus[q];
-                                        return (
-                                            <TableCell key={q} className="text-center">
-                                                {payment?.status === 'paid' && (
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <CheckCircle className="h-5 w-5 text-green-500" />
-                                                        {!isSuperAdmin && student.status === 'نشط' && (
-                                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handlePaymentAction(student, q, 'unpaid')}>
-                                                                <Undo2 className="h-4 w-4 text-muted-foreground" />
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                 {payment?.status === 'exempted' && (
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <FileX className="h-5 w-5 text-blue-500" />
-                                                         {!isSuperAdmin && student.status === 'نشط' && (
-                                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handlePaymentAction(student, q, 'unpaid')}>
-                                                                <Undo2 className="h-4 w-4 text-muted-foreground" />
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                {payment?.status === 'unpaid' && (
-                                                    !isSuperAdmin && student.status === 'نشط' ? (
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="outline" size="sm"><PlusCircle className="ml-1 h-4 w-4" /> إضافة</Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent>
-                                                                <DropdownMenuItem onSelect={() => handlePaymentAction(student, q, 'paid')}>
-                                                                    <CheckCircle className="ml-2 h-4 w-4 text-green-500"/>
-                                                                    <span>تأكيد الدفع ({prices[student.subscriptionTier || 'فئة الأصاغر']} د.ج)</span>
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem onSelect={() => handlePaymentAction(student, q, 'exempted')}>
-                                                                     <FileX className="ml-2 h-4 w-4 text-blue-500" />
-                                                                     <span>إعفاء من الدفع</span>
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    ) : (
-                                                        <XCircle className="mx-auto h-5 w-5 text-red-500" />
-                                                    )
-                                                )}
-                                            </TableCell>
-                                        )
-                                    })}
-                                    <TableCell>
-                                        <span className="font-bold">{student.totalPaid.toLocaleString()} د.ج</span>
-                                    </TableCell>
-                                </TableRow>
-                            )) : (
+                        <Table className="min-w-full">
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={isSuperAdmin ? 8 : 7} className="h-24 text-center">
-                                        لا يوجد طلبة مطابقون لخيارات البحث الحالية.
-                                    </TableCell>
+                                    <TableHead className="w-1/4">اسم الطالب</TableHead>
+                                    {isSuperAdmin && <TableHead>الفوج</TableHead>}
+                                    <TableHead>الحالة</TableHead>
+                                    <TableHead>الفئة</TableHead>
+                                    {[1, 2, 3, 4].map(q => <TableHead key={q} className="text-center">{quarterNames[q.toString()]}</TableHead>)}
+                                    <TableHead>الإجمالي السنوي</TableHead>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                         <TableFooter>
-                            <TableRow className="bg-muted/30">
-                                <TableCell colSpan={isSuperAdmin ? 4 : 3} className="font-semibold">حقوق التسجيل الإجمالية للفصل</TableCell>
-                                {[1, 2, 3, 4].map(q => (
-                                    <TableCell key={`reg-fee-${q}`} className="text-center p-1">
-                                        <Input 
-                                            type="number" 
-                                            className="w-24 mx-auto text-center h-8 bg-blue-50 dark:bg-blue-900/20" 
-                                            placeholder="أدخل مبلغًا"
-                                            value={registrationFees[q] || ''}
-                                            onChange={(e) => handleFeeChange(q, e.target.value)}
-                                        />
-                                    </TableCell>
-                                ))}
-                                <TableCell></TableCell>
-                            </TableRow>
-                            <TableRow className="bg-amber-100 dark:bg-amber-800/20 font-bold text-base border-t-2 border-amber-300">
-                                <TableCell colSpan={isSuperAdmin ? 4 : 3}>الإجمالي النهائي للفصل</TableCell>
-                                {[1, 2, 3, 4].map(q => (
-                                    <TableCell key={`total-footer-${q}`} className="text-center text-lg text-amber-800 dark:text-amber-200 transition-colors">
-                                       {totalsByQuarter[q].revenue.toLocaleString()} د.ج
-                                    </TableCell>
-                                ))}
-                                <TableCell className="text-xl text-amber-900 dark:text-amber-100 transition-colors">{totalRevenue.toLocaleString()} د.ج</TableCell>
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredStudents.length > 0 ? filteredStudents.map(student => (
+                                    <PaymentRow
+                                        key={student.id}
+                                        student={student}
+                                        isSuperAdmin={isSuperAdmin}
+                                        prices={prices}
+                                        onPaymentAction={handlePaymentAction}
+                                    />
+                                )) : (
+                                    <TableRow>
+                                        <TableCell colSpan={isSuperAdmin ? 8 : 7} className="h-24 text-center">
+                                            لا يوجد طلبة مطابقون لخيارات البحث الحالية.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                            <TableFooter>
+                                <TableRow className="bg-muted/30">
+                                    <TableCell colSpan={isSuperAdmin ? 4 : 3} className="font-semibold">حقوق التسجيل الإجمالية للفصل</TableCell>
+                                    {[1, 2, 3, 4].map(q => (
+                                        <TableCell key={`reg-fee-${q}`} className="text-center p-1">
+                                            <Input
+                                                type="number"
+                                                className="w-24 mx-auto text-center h-8 bg-blue-50 dark:bg-blue-900/20"
+                                                placeholder="أدخل مبلغًا"
+                                                value={registrationFees[q] || ''}
+                                                onChange={(e) => handleFeeChange(q, e.target.value)}
+                                            />
+                                        </TableCell>
+                                    ))}
+                                    <TableCell></TableCell>
+                                </TableRow>
+                                <TableRow className="bg-amber-100 dark:bg-amber-800/20 font-bold text-base border-t-2 border-amber-300">
+                                    <TableCell colSpan={isSuperAdmin ? 4 : 3}>الإجمالي النهائي للفصل</TableCell>
+                                    {[1, 2, 3, 4].map(q => (
+                                        <TableCell key={`total-footer-${q}`} className="text-center text-lg text-amber-800 dark:text-amber-200 transition-colors">
+                                            {totalsByQuarter[q].revenue.toLocaleString()} د.ج
+                                        </TableCell>
+                                    ))}
+                                    <TableCell className="text-xl text-amber-900 dark:text-amber-100 transition-colors">{totalRevenue.toLocaleString()} د.ج</TableCell>
+                                </TableRow>
+                            </TableFooter>
+                        </Table>
                     </div>
                 </CardContent>
             </Card>
@@ -441,6 +401,103 @@ export default function DuesPage() {
     );
 }
 
-    
+// Memoized Row Component
+const PaymentRow = React.memo(({
+    student,
+    isSuperAdmin,
+    prices,
+    onPaymentAction
+}: {
+    student: any,
+    isSuperAdmin: boolean,
+    prices: any,
+    onPaymentAction: (s: any, q: number, st: PaymentStatus) => void
+}) => {
+    return (
+        <TableRow className={cn(student.status === 'مطرود' && 'opacity-50 hover:opacity-70 transition-opacity')}>
+            <TableCell className="font-bold text-slate-700 dark:text-slate-200 py-4">{student.fullName}</TableCell>
+            {isSuperAdmin && <TableCell><Badge variant="outline" className="font-medium">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
+            <TableCell>
+                <Badge variant={statusVariant[student.status as 'نشط' | 'مطرود'] || 'secondary'} className="font-bold">
+                    {student.status}
+                </Badge>
+                {student.status === 'مطرود' && student.expulsionDate &&
+                    <p className="text-[10px] text-muted-foreground mt-1">({formatDistanceToNowStrict(parseISO(student.expulsionDate), { locale: ar, addSuffix: true })})</p>
+                }
+            </TableCell>
+            <TableCell>
+                <Badge variant="secondary" className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-medium">
+                    {student.subscriptionTier || 'فئة الأصاغر'}
+                </Badge>
+            </TableCell>
+            {[1, 2, 3, 4].map(q => {
+                const payment = student.paymentStatus[q];
+                return (
+                    <TableCell key={q} className="text-center">
+                        {payment?.status === 'paid' && (
+                            <div className="flex items-center justify-center gap-2">
+                                <CheckCircle className="h-5 w-5 text-emerald-500" />
+                                {!isSuperAdmin && student.status === 'نشط' && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => onPaymentAction(student, q, 'unpaid')}>
+                                        <Undo2 className="h-3.5 w-3.5 text-slate-400" />
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+                        {payment?.status === 'exempted' && (
+                            <div className="flex items-center justify-center gap-2">
+                                <FileX className="h-5 w-5 text-sky-500" />
+                                {!isSuperAdmin && student.status === 'نشط' && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => onPaymentAction(student, q, 'unpaid')}>
+                                        <Undo2 className="h-3.5 w-3.5 text-slate-400" />
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+                        {payment?.status === 'unpaid' && (
+                            !isSuperAdmin && student.status === 'نشط' ? (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" size="sm" className="h-8 px-2 border-dashed border-slate-300 hover:border-primary hover:text-primary transition-all">
+                                            <PlusCircle className="ml-1.5 h-3.5 w-3.5" />
+                                            إضافة
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="center" className="w-48">
+                                        <DropdownMenuItem onSelect={() => onPaymentAction(student, q, 'paid')} className="cursor-pointer">
+                                            <CheckCircle className="ml-2 h-4 w-4 text-emerald-500" />
+                                            <span className="font-medium">تأكيد الدفع ({prices[student.subscriptionTier || 'فئة الأصاغر']} د.ج)</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => onPaymentAction(student, q, 'exempted')} className="cursor-pointer">
+                                            <FileX className="ml-2 h-4 w-4 text-sky-500" />
+                                            <span className="font-medium">إعفاء من الدفع</span>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            ) : (
+                                <XCircle className="mx-auto h-5 w-5 text-rose-300 dark:text-rose-900/50" />
+                            )
+                        )}
+                    </TableCell>
+                )
+            })}
+            <TableCell>
+                <div className="flex flex-col items-center">
+                    <span className="font-bold text-slate-900 dark:text-white">{student.totalPaid.toLocaleString()} د.ج</span>
+                    <div className="h-1 w-full bg-slate-100 rounded-full mt-1 overflow-hidden">
+                        <div
+                            className="h-full bg-emerald-500 transition-all duration-500"
+                            style={{ width: `${Math.min((student.totalPaid / 8000) * 100, 100)}%` }}
+                        />
+                    </div>
+                </div>
+            </TableCell>
+        </TableRow>
+    );
+});
 
-    
+PaymentRow.displayName = 'PaymentRow';
+
+
+
+
