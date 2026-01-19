@@ -53,7 +53,7 @@ export const PORTAL_THEMES: Record<string, PortalTheme> = {
     classic: {
         id: "classic",
         name: "الأصالة الكلاسيكية (أبيض × ذهبي)",
-        gradient: "from-slate-50 via-white to-slate-50",
+        gradient: "from-slate-100 via-slate-50 to-slate-100",
         accent: "amber",
         preview: "bg-white",
         isLight: true

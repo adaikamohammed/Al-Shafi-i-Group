@@ -21,7 +21,6 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { EducationEvent } from '@/lib/types';
 import { ProfileTimeline } from '@/components/profile/ProfileTimeline';
-import { SurahStatsChart } from '@/components/profile/SurahStatsChart';
 import { DailyBriefing } from '@/components/profile/DailyBriefing';
 
 export default function ProfilePage() {
@@ -49,6 +48,8 @@ export default function ProfilePage() {
         phone: '',
         secondaryPhone: '',
         certifications: '',
+        achievements: '',
+        futurePlans: '',
         bio: '',
         joinDate: '',
         birthDate: '',
@@ -131,6 +132,8 @@ export default function ProfilePage() {
                 phone: user.phone || '',
                 secondaryPhone: user.secondaryPhone || '',
                 certifications: user.certifications || '',
+                achievements: user.achievements || '',
+                futurePlans: user.futurePlans || '',
                 bio: user.bio || '',
                 joinDate: user.joinDate || '',
                 birthDate: user.birthDate || '',
@@ -150,8 +153,8 @@ export default function ProfilePage() {
         if (typeof e === 'string') {
             setFormData(prev => ({ ...prev, [field]: e }));
         } else {
-            const { name, value } = e.target;
-            setFormData(prev => ({ ...prev, [name]: value }));
+            const { value } = e.target;
+            setFormData(prev => ({ ...prev, [field]: value }));
         }
     };
 
@@ -273,7 +276,7 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div dir="rtl" className="max-w-6xl mx-auto space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* 1. Assistant Greeting */}
             <DailyBriefing students={students} dailySessions={dailySessions} sheikhName={user.displayName || 'الشيخ الكريم'} />
 
@@ -298,7 +301,7 @@ export default function ProfilePage() {
                         {photoFile && (<Badge className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 whitespace-nowrap bg-emerald-500 animate-pulse">جاهز للحفظ</Badge>)}
                     </div>
 
-                    <div className="flex-1 text-center md:text-right space-y-3">
+                    <div className="flex-1 text-center md:text-start space-y-3">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold font-body mb-2">
                             <Award className="h-3 w-3" />
                             {user.role === 'super_admin' ? 'المدير العام' : 'شيخ الفوج المعتمد'}
@@ -337,7 +340,7 @@ export default function ProfilePage() {
                                 <div className={cn("p-2 rounded-xl", stat.color)}>
                                     <stat.icon className="h-5 w-5" />
                                 </div>
-                                <div className="space-y-0.5">
+                                <div className="space-y-0.5 w-full">
                                     <p className="text-[10px] text-muted-foreground font-body font-bold uppercase tracking-wider">{stat.label}</p>
                                     <p className="text-xl font-headline font-bold">{stat.value}</p>
                                 </div>
@@ -372,9 +375,6 @@ export default function ProfilePage() {
                                     onQuranCompletedDateChange={(date) => setFormData(prev => ({ ...prev, quranCompletedDate: date }))}
                                     editable={true}
                                 />
-
-                                {/* Surah Stats */}
-                                <SurahStatsChart students={students} surahProgress={surahProgress || {}} />
                             </div>
 
                             {/* Right Column: Personal Details & Bio */}
@@ -408,11 +408,19 @@ export default function ProfilePage() {
                                         </div>
                                         <Separator />
                                         <div className="space-y-2">
-                                            <Label className="font-bold text-xs">النبذة التعريفية (Bio)</Label>
+                                            <Label className="font-bold text-xs">إنجازات الشيخ (قائمة)</Label>
+                                            <Textarea className="rounded-xl bg-muted/20 min-h-[100px]" value={formData.achievements} onChange={(e) => handleInputChange(e, 'achievements')} placeholder="أهم الإنجازات التي تفتخر بها..." />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="font-bold text-xs">الخطط المستقبيلة</Label>
+                                            <Textarea className="rounded-xl bg-muted/20 min-h-[100px]" value={formData.futurePlans} onChange={(e) => handleInputChange(e, 'futurePlans')} placeholder="ما الذي تطمح لتحقيقه..." />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="font-bold text-xs">نبذة تعريفية سريعة</Label>
                                             <Textarea className="rounded-xl bg-muted/20 min-h-[120px]" value={formData.bio} onChange={(e) => handleInputChange(e, 'bio')} placeholder="اكتب نبذة عنك..." />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label className="font-bold text-xs">الإجازات (نص)</Label>
+                                            <Label className="font-bold text-xs">الإجازات العلمية</Label>
                                             <Textarea className="rounded-xl bg-muted/20 min-h-[100px]" value={formData.certifications} onChange={(e) => handleInputChange(e, 'certifications')} placeholder="قائمة الإجازات..." />
                                         </div>
                                     </CardContent>

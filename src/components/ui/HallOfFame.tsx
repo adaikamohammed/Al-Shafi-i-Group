@@ -11,7 +11,7 @@ import { motion } from 'framer-motion';
 
 interface HallOfFameProps { }
 
-const RecordCard = ({ title, studentName, studentPhoto, value, unit, icon, color, loading, delay }: { title: string, studentName?: string, studentPhoto?: string, value: number, unit: string, icon: React.ReactNode, color: string, loading?: boolean, delay: number }) => {
+const RecordCard = ({ title, studentName, studentPhoto, value, unit, icon, color, loading, delay, theme }: { title: string, studentName?: string, studentPhoto?: string, value: number, unit: string, icon: React.ReactNode, color: string, loading?: boolean, delay: number, theme: any }) => {
     return (
         <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -20,38 +20,62 @@ const RecordCard = ({ title, studentName, studentPhoto, value, unit, icon, color
         >
             <Card className={cn(
                 "relative overflow-hidden group transition-all duration-300 border-none",
-                "bg-white/5 backdrop-blur-md hover:bg-white/10"
+                theme.isLight
+                    ? "bg-white shadow-xl shadow-slate-200/50 hover:bg-slate-50"
+                    : "bg-white/5 backdrop-blur-md hover:bg-white/10"
             )}>
                 {/* Accent Line */}
                 <div className={cn("absolute bottom-0 right-0 left-0 h-1", color)} />
 
                 <CardHeader className="pb-2">
                     <div className="flex items-center gap-3">
-                        <div className={cn("p-2 rounded-xl bg-white/5 group-hover:scale-110 transition-transform", color.replace('bg-', 'text-'))}>
+                        <div className={cn(
+                            "p-2 rounded-xl transition-transform group-hover:scale-110",
+                            theme.isLight ? "bg-slate-100" : "bg-white/5",
+                            color.replace('bg-', 'text-')
+                        )}>
                             {icon}
                         </div>
-                        <CardTitle className="text-base font-headline font-bold text-white/90">{title}</CardTitle>
+                        <CardTitle className={cn(
+                            "text-base font-headline font-bold",
+                            theme.isLight ? "text-slate-800" : "text-white/90"
+                        )}>{title}</CardTitle>
                     </div>
                 </CardHeader>
                 <CardContent className="pt-2">
                     {loading ? (
-                        <div className="flex justify-center py-4"><Loader2 className="h-6 w-6 animate-spin text-white/20" /></div>
+                        <div className="flex justify-center py-4"><Loader2 className={cn("h-6 w-6 animate-spin", theme.isLight ? "text-slate-200" : "text-white/20")} /></div>
                     ) : studentName && value > 0 ? (
                         <div className="flex items-center gap-4">
-                            <Avatar className="h-12 w-12 border-2 border-white/10 ring-2 ring-white/5">
+                            <Avatar className={cn(
+                                "h-12 w-12 border-2 transition-colors",
+                                theme.isLight ? "border-slate-100 ring-2 ring-slate-50" : "border-white/10 ring-2 ring-white/5"
+                            )}>
                                 <AvatarImage src={studentPhoto} className="object-cover" />
-                                <AvatarFallback className="bg-slate-800 text-white font-bold">{studentName.charAt(0)}</AvatarFallback>
+                                <AvatarFallback className={cn(
+                                    "font-bold",
+                                    theme.isLight ? "bg-slate-100 text-slate-400" : "bg-slate-800 text-white"
+                                )}>{studentName.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <div className="min-w-0">
-                                <p className="font-bold text-white truncate text-sm">{studentName}</p>
-                                <p className="text-2xl font-headline font-bold text-amber-400">
-                                    {value} <span className="text-xs font-normal text-white/40 uppercase tracking-tighter">{unit}</span>
+                                <p className={cn(
+                                    "font-bold truncate text-sm",
+                                    theme.isLight ? "text-slate-700" : "text-white"
+                                )}>{studentName}</p>
+                                <p className="text-2xl font-headline font-bold text-amber-500">
+                                    {value} <span className={cn(
+                                        "text-xs font-normal uppercase tracking-tighter",
+                                        theme.isLight ? "text-slate-400" : "text-white/40"
+                                    )}>{unit}</span>
                                 </p>
                             </div>
                         </div>
                     ) : (
                         <div className="py-4 text-center">
-                            <p className="text-white/20 text-xs font-medium">في انتظار البطل القادم...</p>
+                            <p className={cn(
+                                "text-xs font-medium",
+                                theme.isLight ? "text-slate-300" : "text-white/20"
+                            )}>في انتظار البطل القادم...</p>
                         </div>
                     )}
                 </CardContent>
@@ -65,11 +89,21 @@ export function HallOfFame({ }: HallOfFameProps) {
     const { hallOfFame, loading: contextLoading } = useStudentContext();
     const teacherName = user?.displayName || 'الشيخ';
 
+    const currentThemeId = user?.portalTheme || 'midnight';
+    const { PORTAL_THEMES } = require('@/lib/themes');
+    const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
+
     if (contextLoading || !hallOfFame) {
         return (
-            <Card className="bg-white/5 backdrop-blur-md border-none border-white/10">
+            <Card className={cn(
+                "border-none",
+                theme.isLight ? "bg-white shadow-xl shadow-slate-200/50" : "bg-white/5 backdrop-blur-md border-white/10"
+            )}>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-white">
+                    <CardTitle className={cn(
+                        "flex items-center gap-2",
+                        theme.isLight ? "text-slate-800" : "text-white"
+                    )}>
                         <Crown className="text-amber-500 animate-pulse" />
                         الأرقام القياسية للفوج
                     </CardTitle>
@@ -96,6 +130,7 @@ export function HallOfFame({ }: HallOfFameProps) {
                     icon={<UserCheck className="h-5 w-5" />}
                     color="bg-blue-500"
                     delay={0.1}
+                    theme={theme}
                 />
                 <RecordCard
                     title="الخمسة المتتالية"
@@ -106,6 +141,7 @@ export function HallOfFame({ }: HallOfFameProps) {
                     icon={<Sparkles className="h-5 w-5" />}
                     color="bg-emerald-500"
                     delay={0.2}
+                    theme={theme}
                 />
                 <RecordCard
                     title="سفير الأدب"
@@ -116,6 +152,7 @@ export function HallOfFame({ }: HallOfFameProps) {
                     icon={<Shield className="h-5 w-5" />}
                     color="bg-purple-500"
                     delay={0.3}
+                    theme={theme}
                 />
                 <RecordCard
                     title="حارس السور"
@@ -126,6 +163,7 @@ export function HallOfFame({ }: HallOfFameProps) {
                     icon={<BookOpenCheck className="h-5 w-5" />}
                     color="bg-sky-500"
                     delay={0.4}
+                    theme={theme}
                 />
                 <RecordCard
                     title="المعلم المثابر"
@@ -136,6 +174,7 @@ export function HallOfFame({ }: HallOfFameProps) {
                     icon={<Activity className="h-5 w-5" />}
                     color="bg-teal-500"
                     delay={0.5}
+                    theme={theme}
                 />
                 <RecordCard
                     title="حصص العطاء"
@@ -146,6 +185,7 @@ export function HallOfFame({ }: HallOfFameProps) {
                     icon={<TrendingUp className="h-5 w-5" />}
                     color="bg-cyan-500"
                     delay={0.6}
+                    theme={theme}
                 />
             </div>
         </div>

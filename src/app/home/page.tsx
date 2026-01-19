@@ -109,7 +109,7 @@ export default function HomePage() {
         {/* Top Toolbar */}
         <div className="w-full max-w-7xl flex items-center justify-between mb-12">
           <div className={cn(
-            "flex items-center gap-3 backdrop-blur-md px-4 py-2 rounded-2xl border shadow-xl",
+            "flex items-center gap-3 backdrop-blur-md px-4 py-2 rounded-xl border shadow-lg",
             theme.isLight ? "bg-white border-slate-200" : "bg-white/5 border-white/10"
           )}>
             <TrendingUp className="h-4 w-4 text-emerald-400" />
@@ -125,7 +125,7 @@ export default function HomePage() {
                   variant="outline"
                   disabled={isSaving}
                   className={cn(
-                    "backdrop-blur-md rounded-2xl h-11 shadow-2xl transition-all",
+                    "backdrop-blur-md rounded-xl h-11 shadow-lg transition-all",
                     theme.isLight ? "bg-white border-slate-200 text-slate-900 hover:bg-slate-50" : "bg-white/10 border-white/10 text-white hover:bg-white/20"
                   )}
                 >
@@ -140,7 +140,7 @@ export default function HomePage() {
                 <DropdownMenuLabel className={cn(
                   "font-headline text-xs uppercase tracking-widest px-4 pt-3",
                   theme.isLight ? "text-slate-400" : "text-white/50"
-                )}>اختر طابع البوابة</DropdownMenuLabel>
+                )}>طابع البوابة</DropdownMenuLabel>
                 <DropdownMenuSeparator className={theme.isLight ? "bg-slate-100" : "bg-white/5"} />
                 {Object.values(PORTAL_THEMES).map((t) => (
                   <DropdownMenuItem
@@ -207,13 +207,13 @@ export default function HomePage() {
               <Link
                 href={item.href}
                 className={cn(
-                  "group relative flex flex-col items-center justify-center gap-6 p-10 rounded-[3rem]",
-                  "backdrop-blur-2xl border transition-all duration-500 hover:-translate-y-4 hover:scale-[1.03] shadow-2xl",
+                  "group relative flex flex-col items-center justify-center gap-6 p-8 rounded-[2rem]",
+                  "backdrop-blur-2xl border transition-all duration-500 hover:-translate-y-3 hover:scale-[1.02] shadow-2xl",
                   theme.isLight ? "bg-white border-slate-100 hover:bg-slate-50 shadow-slate-200/50" : "bg-white/5 border-white/5 hover:bg-white/10 shadow-black/80",
                   item.glow
                 )}
               >
-                <div className={cn("absolute inset-0 rounded-[3rem] opacity-0 group-hover:opacity-10 transition-opacity blur-3xl", theme.preview)} />
+                <div className={cn("absolute inset-0 rounded-[2rem] opacity-0 group-hover:opacity-10 transition-opacity blur-3xl", theme.preview)} />
 
                 <div className={cn("relative p-6 rounded-[1.8rem] bg-white/5 group-hover:scale-125 transition-transform duration-500 shadow-inner", item.color)}>
                   <item.icon className="h-10 w-10" />
@@ -256,7 +256,7 @@ export default function HomePage() {
         {/* Bottom Section: Milestones & Hall of Fame - Full Width */}
         <div className="w-full max-w-7xl mt-12 space-y-12 mb-32 px-2 lg:px-4">
           <div className={cn(
-            "backdrop-blur-xl p-8 lg:p-12 rounded-[3.5rem] border shadow-2xl space-y-16",
+            "backdrop-blur-xl p-8 lg:p-12 rounded-[2.5rem] border shadow-2xl space-y-16",
             theme.isLight ? "bg-white border-slate-200" : "bg-white/5 border-white/10"
           )}>
             <section className="space-y-8">

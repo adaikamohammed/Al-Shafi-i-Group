@@ -14,6 +14,7 @@ import { Loader2, AlertTriangle, CheckCircle, Award, Check } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
+import { SurahStatsChart } from '@/components/profile/SurahStatsChart';
 
 
 export default function SurahProgressPage() {
@@ -131,10 +132,16 @@ export default function SurahProgressPage() {
                                     </div>
                                     <Tooltip>
                                         <TooltipTrigger className="w-full">
-                                            <Progress className="h-3 w-full">
-                                                <Progress value={progressPercentage.mastered + progressPercentage.memorized} className="bg-green-300" />
-                                                <Progress value={progressPercentage.mastered} className="bg-green-600 -mt-3" />
-                                            </Progress>
+                                            <div className="relative w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                <div
+                                                    className="absolute top-0 right-0 h-full bg-emerald-300 transition-all duration-500"
+                                                    style={{ width: `${progressPercentage.mastered + progressPercentage.memorized}%` }}
+                                                />
+                                                <div
+                                                    className="absolute top-0 right-0 h-full bg-emerald-700 transition-all duration-500"
+                                                    style={{ width: `${progressPercentage.mastered}%` }}
+                                                />
+                                            </div>
                                         </TooltipTrigger>
                                         <TooltipContent>
                                             <p>المجموع: {progressCounts.total} ({((progressCounts.total / allSurahs.length) * 100).toFixed(1)}%)</p>
@@ -271,6 +278,10 @@ export default function SurahProgressPage() {
                             </div>
                         </CardContent>
                     </Card>
+                </div>
+
+                <div className="w-full">
+                    <SurahStatsChart students={students} surahProgress={surahProgress || {}} />
                 </div>
             </div>
         </TooltipProvider>

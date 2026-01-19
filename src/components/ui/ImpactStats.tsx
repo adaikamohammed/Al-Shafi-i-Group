@@ -40,7 +40,7 @@ export function ImpactStats() {
                     transition={{ delay: idx * 0.1 }}
                     className={cn(
                         "relative overflow-hidden p-6 rounded-3xl border backdrop-blur-xl group hover:scale-[1.02] transition-all duration-300",
-                        theme.isLight ? "bg-white border-slate-100 shadow-xl shadow-slate-200/50" : "bg-white/5 border-white/5 hover:bg-white/10"
+                        theme.isLight ? "bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:bg-slate-50" : "bg-white/5 border-white/5 hover:bg-white/10"
                     )}
                 >
                     <div className="flex flex-col items-center text-center gap-2">

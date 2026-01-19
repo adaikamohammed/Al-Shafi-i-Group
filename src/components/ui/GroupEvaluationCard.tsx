@@ -114,6 +114,11 @@ const calculatePeriodStats = (
 };
 
 export function GroupEvaluationCard({ students, sessions, groupName }: { students: Student[]; sessions: Record<string, Record<string, DailySession>>; groupName?: string | null; }) {
+    const { user } = require('@/context/AuthContext').useAuth();
+    const { PORTAL_THEMES } = require('@/lib/themes');
+    const currentThemeId = user?.portalTheme || 'midnight';
+    const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
+
     type ViewType = 'commitment' | 'attendance' | 'behavior' | 'review' | 'memorization';
     type RangeType = 'weekly' | 'monthly' | 'seasonal' | 'yearly';
 
@@ -178,24 +183,30 @@ export function GroupEvaluationCard({ students, sessions, groupName }: { student
 
     if (activeStudents.length === 0 || Object.keys(sessions).length === 0) {
         return (
-            <Card className="bg-white/5 border-none backdrop-blur-md">
+            <Card className={cn(
+                "border-none",
+                theme.isLight ? "bg-white shadow-xl shadow-slate-200/50" : "bg-white/5 backdrop-blur-md"
+            )}>
                 <CardHeader>
                     <div className="flex items-center gap-2">
                         <Bot className="h-6 w-6 text-primary" />
-                        <CardTitle className="text-white">الرادار التحليلي</CardTitle>
+                        <CardTitle className={theme.isLight ? "text-slate-800" : "text-white"}>الرادار التحليلي</CardTitle>
                     </div>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center text-center p-12">
                     <AlertTriangle className="h-12 w-12 text-rose-500/50 mb-3" />
-                    <p className="font-bold text-white">بيانات غير مكتملة</p>
-                    <p className="text-sm text-white/40">يرجى تسجيل الطلاب وإدارة الجلسات لتفعيل الرادار.</p>
+                    <p className={cn("font-bold", theme.isLight ? "text-slate-700" : "text-white")}>بيانات غير مكتملة</p>
+                    <p className={theme.isLight ? "text-slate-400" : "text-white/40"}>يرجى تسجيل الطلاب وإدارة الجلسات لتفعيل الرادار.</p>
                 </CardContent>
             </Card>
         );
     }
 
     return (
-        <Card className="bg-white/5 border-none backdrop-blur-md overflow-hidden relative">
+        <Card className={cn(
+            "border-none overflow-hidden relative",
+            theme.isLight ? "bg-white shadow-xl shadow-slate-200/50" : "bg-white/5 backdrop-blur-md"
+        )}>
             <div className="absolute top-0 left-0 p-4 opacity-5 pointer-events-none">
                 <Zap className="h-24 w-24 text-primary" />
             </div>
@@ -207,8 +218,14 @@ export function GroupEvaluationCard({ students, sessions, groupName }: { student
                             <Bot className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                            <CardTitle className="text-xl font-headline font-bold text-white">الرادار التحليلي للفوج</CardTitle>
-                            <CardDescription className="text-white/40 font-body">نمو أداء {groupName || 'الفوج'} خلال الفترات المحددة.</CardDescription>
+                            <CardTitle className={cn(
+                                "text-xl font-headline font-bold",
+                                theme.isLight ? "text-slate-800" : "text-white"
+                            )}>الرادار التحليلي للفوج</CardTitle>
+                            <CardDescription className={cn(
+                                "font-body",
+                                theme.isLight ? "text-slate-400" : "text-white/40"
+                            )}>نمو أداء {groupName || 'الفوج'} خلال الفترات المحددة.</CardDescription>
                         </div>
                     </div>
                 </div>
@@ -217,14 +234,19 @@ export function GroupEvaluationCard({ students, sessions, groupName }: { student
                 <div className="flex flex-col gap-6">
                     {/* View Controls */}
                     <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="p-1 bg-white/5 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
+                        <div className={cn(
+                            "p-1 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full",
+                            theme.isLight ? "bg-slate-50" : "bg-white/5"
+                        )}>
                             {Object.entries(viewTitles).map(([key, title]) => (
                                 <button
                                     key={key}
                                     onClick={() => setView(key as ViewType)}
                                     className={cn(
                                         "px-4 py-2 rounded-xl text-xs font-bold font-headline transition-all whitespace-nowrap",
-                                        view === key ? "bg-primary text-slate-950 shadow-lg shadow-primary/20" : "text-white/60 hover:text-white"
+                                        view === key
+                                            ? "bg-primary text-slate-950 shadow-lg shadow-primary/20"
+                                            : theme.isLight ? "text-slate-400 hover:text-slate-600" : "text-white/60 hover:text-white"
                                     )}
                                 >
                                     {title.split(' ')[1] || title}
@@ -233,14 +255,19 @@ export function GroupEvaluationCard({ students, sessions, groupName }: { student
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <div className="flex p-1 bg-white/5 rounded-xl">
+                            <div className={cn(
+                                "flex p-1 rounded-xl",
+                                theme.isLight ? "bg-slate-50" : "bg-white/5"
+                            )}>
                                 {(['weekly', 'monthly', 'yearly'] as const).map((r) => (
                                     <button
                                         key={r}
                                         onClick={() => setRange(r)}
                                         className={cn(
                                             "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                                            range === r ? "bg-white/10 text-white" : "text-white/40 hover:text-white"
+                                            range === r
+                                                ? theme.isLight ? "bg-white text-slate-950 shadow-sm" : "bg-white/10 text-white"
+                                                : theme.isLight ? "text-slate-400 hover:text-slate-600" : "text-white/40 hover:text-white"
                                         )}
                                     >
                                         {r === 'weekly' ? 'أسبوعي' : r === 'monthly' ? 'شهري' : 'سنوي'}
@@ -270,33 +297,42 @@ export function GroupEvaluationCard({ students, sessions, groupName }: { student
                                         <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                                <CartesianGrid
+                                    strokeDasharray="3 3"
+                                    vertical={false}
+                                    stroke={theme.isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)"}
+                                />
                                 <XAxis
                                     dataKey="name"
                                     fontSize={10}
                                     tickLine={false}
                                     axisLine={false}
-                                    tick={{ fill: 'rgba(255,255,255,0.4)', fontWeight: 600 }}
+                                    tick={{
+                                        fill: theme.isLight ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)',
+                                        fontWeight: 600
+                                    }}
                                 />
                                 <YAxis
                                     domain={[0, 100]}
                                     fontSize={10}
                                     tickLine={false}
                                     axisLine={false}
-                                    tick={{ fill: 'rgba(255,255,255,0.4)' }}
+                                    tick={{ fill: theme.isLight ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }}
                                     unit="%"
                                 />
                                 <Tooltip
-                                    cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 2 }}
+                                    cursor={{ stroke: theme.isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)', strokeWidth: 2 }}
                                     contentStyle={{
-                                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                        backgroundColor: theme.isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.9)',
                                         borderRadius: '16px',
-                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        border: theme.isLight ? '1px solid rgba(0,0,0,0.05)' : '1px solid rgba(255,255,255,0.1)',
                                         backdropFilter: 'blur(10px)',
                                         direction: 'rtl',
                                         fontSize: '12px',
-                                        padding: '12px'
+                                        padding: '12px',
+                                        boxShadow: theme.isLight ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : 'none'
                                     }}
+                                    labelStyle={{ color: theme.isLight ? '#64748b' : '#94a3b8', marginBottom: '4px', fontWeight: 'bold' }}
                                     itemStyle={{ color: 'hsl(var(--primary))' }}
                                     formatter={(value: number) => [`${value}%`, 'النتيجة']}
                                 />

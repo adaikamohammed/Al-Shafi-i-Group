@@ -152,6 +152,8 @@ export interface AppUser {
   adminAwards?: string;
   birthDate?: string;
   quranCompletedDate?: string;
+  achievements?: string;
+  futurePlans?: string;
   educationTimeline?: EducationEvent[];
   portalTheme?: string;
 }
