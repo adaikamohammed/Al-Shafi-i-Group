@@ -246,7 +246,7 @@ export default function SurahProgressPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="p-3 sm:p-6">
-                            <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2 sm:gap-3">
+                            <div className="grid grid-cols-[repeat(auto-fill,minmax(75px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-1.5 sm:gap-3">
                                 {allSurahs.map(surah => {
                                     const status = studentProgress[surah.id]?.status || 0;
                                     let buttonClass = "bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200";
@@ -260,14 +260,14 @@ export default function SurahProgressPage() {
                                                     variant="outline"
                                                     onClick={() => handleSurahClick(surah.id)}
                                                     disabled={!selectedStudentId || selectedStudent?.status === 'مطرود'}
-                                                    className={cn("h-auto justify-between transition-colors duration-300", buttonClass)}
+                                                    className={cn("h-auto justify-between transition-colors duration-300 px-1.5 py-1 sm:px-3 sm:py-2", buttonClass)}
                                                 >
                                                     <div className="flex items-center gap-1.5 overflow-hidden">
-                                                        {status === 1 && <Check className="h-3.5 w-3.5 shrink-0" />}
-                                                        {status === 2 && <CheckCircle className="h-3.5 w-3.5 shrink-0" />}
-                                                        <span className="truncate text-[10px] sm:text-xs">{surah.id}. {surah.name}</span>
+                                                        {status === 1 && <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />}
+                                                        {status === 2 && <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />}
+                                                        <span className="truncate text-[8px] xs:text-[9px] sm:text-xs font-medium">{surah.id}. {surah.name}</span>
                                                     </div>
-                                                    <span className="text-[10px] opacity-70 shrink-0">{surah.verses}</span>
+                                                    <span className="text-[8px] sm:text-[10px] opacity-70 shrink-0 hidden xs:inline">{surah.verses}</span>
                                                 </Button>
                                             </TooltipTrigger>
                                             <TooltipContent>
