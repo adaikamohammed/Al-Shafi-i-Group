@@ -12,8 +12,9 @@ import {
   Check, TrendingUp, Star
 } from 'lucide-react';
 import Link from 'next/link';
-import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { DailyChecklist } from '@/components/ui/DailyChecklist';
+import { ManagementDashboard } from '@/components/management/ManagementDashboard';
+import { canAccessPage } from '@/lib/permissions';
 import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
 import { HallOfFame } from '@/components/ui/HallOfFame';
 import { ImpactStats } from '@/components/ui/ImpactStats';
@@ -56,11 +57,15 @@ const navItems = [
 ];
 
 export default function HomePage() {
-  const { user, updateUserProfile, logout } = useAuth();
+  const { user, updateUserProfile, logout, isManagement, role } = useAuth();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
 
   const { students, dailySessions, loading } = useStudentContext();
+
+  const filteredNavItems = useMemo(() => {
+    return navItems.filter(item => canAccessPage(item.href, role));
+  }, [role]);
 
   const currentThemeId = user?.portalTheme || 'midnight';
   const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
@@ -180,7 +185,7 @@ export default function HomePage() {
             "text-6xl md:text-9xl font-headline font-black leading-tight",
             theme.isLight ? "text-slate-900" : "text-transparent bg-clip-text bg-gradient-to-b from-white via-white/90 to-white/30 drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]"
           )}>
-            {user?.group || "فوج 7"}
+            {isManagement ? "الإدارة" : (user?.group || "فوج 7")}
           </h1>
           <p className={cn(
             "text-xl md:text-3xl font-medium tracking-tight font-body",
@@ -195,63 +200,69 @@ export default function HomePage() {
           <ImpactStats />
         </div>
 
-        {/* Main Navigation Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 w-full max-w-7xl px-2">
-          {navItems.map((item, idx) => (
-            <motion.div
-              key={item.href}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: idx * 0.04 }}
-            >
-              <Link
-                href={item.href}
-                className={cn(
-                  "group relative flex flex-col items-center justify-center gap-6 p-8 rounded-[2rem]",
-                  "backdrop-blur-2xl border transition-all duration-500 hover:-translate-y-3 hover:scale-[1.02] shadow-2xl",
-                  theme.isLight ? "bg-white border-slate-100 hover:bg-slate-50 shadow-slate-200/50" : "bg-white/5 border-white/5 hover:bg-white/10 shadow-black/80",
-                  item.glow
-                )}
-              >
-                <div className={cn("absolute inset-0 rounded-[2rem] opacity-0 group-hover:opacity-10 transition-opacity blur-3xl", theme.preview)} />
-
-                <div className={cn("relative p-6 rounded-[1.8rem] bg-white/5 group-hover:scale-125 transition-transform duration-500 shadow-inner", item.color)}>
-                  <item.icon className="h-10 w-10" />
-                </div>
-                <span className={cn(
-                  "relative text-base font-headline font-bold text-center tracking-wide transition-colors",
-                  theme.isLight ? "text-slate-700 group-hover:text-amber-600" : "text-white group-hover:text-amber-200"
-                )}>
-                  {item.label}
-                </span>
-              </Link>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Middle Section: Daily Pulse & Evaluation */}
-        <div className="w-full max-w-7xl mt-24 space-y-20 px-2 lg:px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            <section className="space-y-8">
-              <div className="flex items-center gap-4 px-6 border-r-4 border-amber-400">
-                <LayoutDashboard className="h-7 w-7 text-amber-400" />
-                <h2 className={cn("text-3xl font-headline font-black tracking-tight", theme.isLight ? "text-slate-900" : "text-white")}>النبض اليومي</h2>
-              </div>
-              <div className="space-y-8">
-                <DailyInspiration />
-                <DailyChecklist />
-              </div>
-            </section>
-
-            <section className="space-y-8">
-              <div className="flex items-center gap-4 px-6 border-r-4 border-primary">
-                <Award className="h-7 w-7 text-primary" />
-                <h2 className={cn("text-3xl font-headline font-black tracking-tight", theme.isLight ? "text-slate-900" : "text-white")}>الرادار التحليلي</h2>
-              </div>
-              <GroupEvaluationCard students={students || []} sessions={dailySessions} groupName={user?.group} />
-            </section>
+        {isManagement ? (
+          <div className="w-full max-w-7xl">
+            <ManagementDashboard />
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 w-full max-w-7xl px-2">
+            {filteredNavItems.map((item, idx) => (
+              <motion.div
+                key={item.href}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: idx * 0.04 }}
+              >
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "group relative flex flex-col items-center justify-center gap-6 p-8 rounded-[2rem]",
+                    "backdrop-blur-2xl border transition-all duration-500 hover:-translate-y-3 hover:scale-[1.02] shadow-2xl",
+                    theme.isLight ? "bg-white border-slate-100 hover:bg-slate-50 shadow-slate-200/50" : "bg-white/5 border-white/5 hover:bg-white/10 shadow-black/80",
+                    item.glow
+                  )}
+                >
+                  <div className={cn("absolute inset-0 rounded-[2rem] opacity-0 group-hover:opacity-10 transition-opacity blur-3xl", theme.preview)} />
+
+                  <div className={cn("relative p-6 rounded-[1.8rem] bg-white/5 group-hover:scale-125 transition-transform duration-500 shadow-inner", item.color)}>
+                    <item.icon className="h-10 w-10" />
+                  </div>
+                  <span className={cn(
+                    "relative text-base font-headline font-bold text-center tracking-wide transition-colors",
+                    theme.isLight ? "text-slate-700 group-hover:text-amber-600" : "text-white group-hover:text-amber-200"
+                  )}>
+                    {item.label}
+                  </span>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        )}
+
+        {!isManagement && (
+          <div className="w-full max-w-7xl mt-24 space-y-20 px-2 lg:px-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+              <section className="space-y-8">
+                <div className="flex items-center gap-4 px-6 border-r-4 border-amber-400">
+                  <LayoutDashboard className="h-7 w-7 text-amber-400" />
+                  <h2 className={cn("text-3xl font-headline font-black tracking-tight", theme.isLight ? "text-slate-900" : "text-white")}>النبض اليومي</h2>
+                </div>
+                <div className="space-y-8">
+                  <DailyInspiration />
+                  <DailyChecklist />
+                </div>
+              </section>
+
+              <section className="space-y-8">
+                <div className="flex items-center gap-4 px-6 border-r-4 border-primary">
+                  <Award className="h-7 w-7 text-primary" />
+                  <h2 className={cn("text-3xl font-headline font-black tracking-tight", theme.isLight ? "text-slate-900" : "text-white")}>الرادار التحليلي</h2>
+                </div>
+                <GroupEvaluationCard students={students || []} sessions={dailySessions} groupName={user?.group} />
+              </section>
+            </div>
+          </div>
+        )}
 
         {/* Bottom Section: Milestones & Hall of Fame - Full Width */}
         <div className="w-full max-w-7xl mt-12 space-y-12 mb-32 px-2 lg:px-4">

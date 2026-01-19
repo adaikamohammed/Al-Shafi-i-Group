@@ -142,7 +142,7 @@ export interface AppUser {
   photoURL?: string | null;
   backgroundURL?: string | null;
   group?: string;
-  role?: 'sheikh' | 'super_admin';
+  role?: 'sheikh' | 'super_admin' | 'management';
   address?: string;
   maritalStatus?: 'متزوج' | 'أعزب';
   phone?: string;

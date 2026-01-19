@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { canAccessPage } from '@/lib/permissions';
 import { useStudentContext } from '@/context/StudentContext';
 import { CommandBar } from '@/components/ui/CommandBar';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
@@ -25,7 +26,7 @@ const BOTTOM_NAV_ITEMS_LOCAL = BOTTOM_NAV_ITEMS; // Just for clarity if needed, 
 
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading: authLoading, logout, isSuperAdmin, updateUserProfile } = useAuth();
+  const { user, loading: authLoading, logout, isSuperAdmin, isManagement, role, updateUserProfile } = useAuth();
   const { students } = useStudentContext();
   const router = useRouter();
   const pathname = usePathname();
@@ -49,13 +50,15 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     return NAV_GROUPS.map(group => ({
       ...group,
       items: group.items.filter(item => {
-        if (isSuperAdmin) {
-          return !['/reports/daily', '/points', '/settings'].includes(item.href);
-        }
-        return true;
+        // Use the permissions system to check access
+        return canAccessPage(item.href, role);
       })
     })).filter(group => group.items.length > 0);
-  }, [isSuperAdmin]);
+  }, [role]);
+
+  const filteredBottomNavItems = useMemo(() => {
+    return BOTTOM_NAV_ITEMS.filter(item => canAccessPage(item.href, role));
+  }, [role]);
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -209,7 +212,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         <SidebarSeparator className="mb-2 opacity-5" />
 
         <SidebarMenu className="gap-1">
-          {BOTTOM_NAV_ITEMS.map((item) => (
+          {filteredBottomNavItems.map((item) => (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild

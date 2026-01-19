@@ -93,7 +93,7 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user: authContextUser, loading: authLoading, isSuperAdmin } = useAuth();
+  const { user: authContextUser, loading: authLoading, isSuperAdmin, isManagement } = useAuth();
   const { toast } = useToast();
 
   const [students, setStudents] = useState<Student[]>([]);
@@ -171,7 +171,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     });
 
 
-    if (isSuperAdmin) {
+    if (isSuperAdmin || isManagement) {
       dataRef = ref(db, 'users');
       dataListener = onValue(dataRef, (snapshot) => {
         if (!snapshot.exists()) {
@@ -263,7 +263,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       off(preRegsRef, 'value', preRegsListener);
       off(allUsersRef, 'value', allUsersListener);
     };
-  }, [authContextUser, authLoading, isSuperAdmin]);
+  }, [authContextUser, authLoading, isSuperAdmin, isManagement]);
 
 
   // Hall of Fame Logic

@@ -18,8 +18,9 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 
-const sheikhInitialData: { [email: string]: { name: string; group: string; role: 'sheikh' | 'super_admin' } } = {
+const sheikhInitialData: { [email: string]: { name: string; group: string; role: 'sheikh' | 'super_admin' | 'management' } } = {
   "admin0@gmail.com": { name: "المدير العام", group: "كل الأفواج", role: "super_admin" },
+  "admin00@gmail.com": { name: "الإدارة", group: "كل الأفواج", role: "management" },
   "admin1@gmail.com": { name: "الشيخ زياد درويش", group: "فوج الشيخ زياد درويش", role: "sheikh" },
   "admin2@gmail.com": { name: "الشيخ عبد الحميد", group: "فوج الشيخ عبد الحميد", role: "sheikh" },
   "admin3@gmail.com": { name: "الشيخ فؤاد بن عمر", group: "فوج الشيخ فؤاد بن عمر", role: "sheikh" },
@@ -40,7 +41,8 @@ interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
   isSuperAdmin: boolean;
-  role: 'sheikh' | 'super_admin' | null;
+  isManagement: boolean;
+  role: 'sheikh' | 'super_admin' | 'management' | null;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   updateUserProfile: (data: UpdateProfileData) => Promise<void>;
@@ -52,9 +54,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<'sheikh' | 'super_admin' | null>(null);
+  const [role, setRole] = useState<'sheikh' | 'super_admin' | 'management' | null>(null);
   const { toast } = useToast();
   const isSuperAdmin = role === 'super_admin';
+  const isManagement = role === 'management';
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -223,7 +226,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isSuperAdmin, role, signUpWithEmail, signInWithEmail, updateUserProfile, logout }}>
+    <AuthContext.Provider value={{ user, loading, isSuperAdmin, isManagement, role, signUpWithEmail, signInWithEmail, updateUserProfile, logout }}>
       {children}
     </AuthContext.Provider>
   );
