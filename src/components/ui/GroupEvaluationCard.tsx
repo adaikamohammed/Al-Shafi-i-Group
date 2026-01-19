@@ -1,0 +1,319 @@
+"use client";
+
+import React, { useState, useMemo } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Bot, AlertTriangle, ArrowLeft, ArrowRight, Zap } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import {
+    format,
+    startOfWeek,
+    endOfWeek,
+    subWeeks,
+    eachMonthOfInterval,
+    startOfMonth,
+    endOfMonth,
+    getYear,
+    subYears,
+    startOfYear,
+    endOfYear,
+    eachQuarterOfInterval,
+    endOfQuarter,
+    addYears,
+    parseISO
+} from 'date-fns';
+import { ar } from 'date-fns/locale';
+import type { DailySession, Student } from '@/lib/types';
+import { Button } from './button';
+import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
+
+const calculatePeriodStats = (
+    startDate: Date,
+    endDate: Date,
+    activeStudents: Student[],
+    sessions: Record<string, Record<string, DailySession>>
+) => {
+    if (activeStudents.length === 0) {
+        return { attendance: 0, behavior: 0, review: 0, memorization: 0, commitment: 0 };
+    }
+
+    const periodSessions = Object.values(sessions)
+        .flatMap(day => Object.values(day))
+        .filter(s => {
+            if (!s.date) return false;
+            try {
+                const d = parseISO(s.date);
+                return d >= startDate && d <= endDate;
+            } catch { return false; }
+        });
+
+    const workSessions = periodSessions.filter(s => s.sessionType === 'حصة أساسية' || s.sessionType === 'حصة تعويضية');
+
+    let totalAttendance = 0;
+    let totalPossibleAttendance = 0;
+
+    let behaviorSum = 0;
+    let behaviorCount = 0;
+
+    let reviewSum = 0;
+    let reviewCount = 0;
+
+    let memorizationSum = 0;
+    let memorizationCount = 0;
+
+    const memorizationScoreMap: { [key: string]: number } = { 'ممتاز': 10, 'جيد جداً': 8, 'جيد': 6, 'متوسط': 4, 'ضعيف': 2, 'لا يوجد': 0 };
+    const behaviorScoreMap: { [key: string]: number } = { 'هادئ': 10, 'متوسط': 5, 'غير منضبط': 0 };
+
+    workSessions.forEach(session => {
+        const sessionDate = parseISO(session.date);
+        activeStudents.forEach(student => {
+            if (sessionDate >= student.registrationDate) {
+                totalPossibleAttendance++;
+                const record = session.records?.find(r => r.studentId === student.id);
+                if (record) {
+                    if (record.attendance === 'حاضر' || record.attendance === 'متأخر') {
+                        totalAttendance++;
+                    }
+
+                    if (record.behavior && record.behavior in behaviorScoreMap) {
+                        behaviorSum += behaviorScoreMap[record.behavior];
+                        behaviorCount++;
+                    }
+
+                    if (session.sessionType === 'حصة أساسية') {
+                        reviewCount++;
+                        if (record.review) {
+                            reviewSum++;
+                        }
+                    }
+
+                    if (record.memorization && record.memorization in memorizationScoreMap) {
+                        memorizationSum += memorizationScoreMap[record.memorization];
+                        memorizationCount++;
+                    }
+                }
+            }
+        });
+    });
+
+    const attendanceScore = totalPossibleAttendance > 0 ? (totalAttendance / totalPossibleAttendance) * 100 : 0;
+    const behaviorScore = behaviorCount > 0 ? (behaviorSum / behaviorCount) * 10 : 0;
+    const reviewScore = reviewCount > 0 ? (reviewSum / reviewCount) * 100 : 0;
+    const memorizationScore = memorizationCount > 0 ? (memorizationSum / memorizationCount) * 10 : 0;
+
+    const commitmentScore = (attendanceScore + behaviorScore + reviewScore + memorizationScore) / 4;
+
+    return {
+        attendance: attendanceScore,
+        behavior: behaviorScore,
+        review: reviewScore,
+        memorization: memorizationScore,
+        commitment: commitmentScore
+    };
+};
+
+export function GroupEvaluationCard({ students, sessions, groupName }: { students: Student[]; sessions: Record<string, Record<string, DailySession>>; groupName?: string | null; }) {
+    type ViewType = 'commitment' | 'attendance' | 'behavior' | 'review' | 'memorization';
+    type RangeType = 'weekly' | 'monthly' | 'seasonal' | 'yearly';
+
+    const [view, setView] = useState<ViewType>('commitment');
+    const [range, setRange] = useState<RangeType>('monthly');
+    const [displayYear, setDisplayYear] = useState(new Date());
+
+    const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
+
+    const chartData = useMemo(() => {
+        if (range === 'weekly') {
+            return Array.from({ length: 6 }).map((_, i) => {
+                const weekEndDate = endOfWeek(subWeeks(new Date(), i), { weekStartsOn: 6 });
+                const weekStartDate = startOfWeek(weekEndDate, { weekStartsOn: 6 });
+                const stats = calculatePeriodStats(weekStartDate, weekEndDate, activeStudents, sessions);
+                return { name: format(weekStartDate, 'dd/MM', { locale: ar }), ...stats };
+            }).reverse();
+        }
+        if (range === 'monthly') {
+            const months = eachMonthOfInterval({ start: startOfYear(displayYear), end: endOfYear(displayYear) });
+            return months.map(monthStart => {
+                const monthEnd = endOfMonth(monthStart);
+                const stats = calculatePeriodStats(monthStart, monthEnd, activeStudents, sessions);
+                return { name: format(monthStart, 'MMM', { locale: ar }), ...stats };
+            });
+        }
+        if (range === 'seasonal') {
+            const quarters = eachQuarterOfInterval({ start: startOfYear(displayYear), end: endOfYear(displayYear) });
+            return quarters.map((quarterStart, i) => {
+                const quarterEnd = endOfQuarter(quarterStart);
+                const stats = calculatePeriodStats(quarterStart, quarterEnd, activeStudents, sessions);
+                return { name: `الربع ${i + 1}`, ...stats };
+            });
+        }
+        if (range === 'yearly') {
+            return Array.from({ length: 5 }).map((_, i) => {
+                const yearDate = subYears(new Date(), i);
+                const yearStart = startOfYear(yearDate);
+                const yearEnd = endOfYear(yearDate);
+                const stats = calculatePeriodStats(yearStart, yearEnd, activeStudents, sessions);
+                return { name: format(yearStart, 'yyyy', { locale: ar }), ...stats };
+            }).reverse();
+        }
+        return [];
+    }, [range, activeStudents, sessions, displayYear]);
+
+    const processedChartData = useMemo(() => {
+        if (!chartData) return [];
+        return chartData.map(item => ({
+            name: item.name,
+            score: parseFloat(item[view]?.toFixed(1) || "0"),
+        }));
+    }, [view, chartData]);
+
+    const viewTitles: Record<ViewType, string> = {
+        commitment: "رادار الالتزام العام",
+        attendance: "معدل حضور الفوج",
+        behavior: "متوسط سلوك الطلاب",
+        review: "نسبة إتمام المراجعة",
+        memorization: "جودة أداء الحفظ"
+    };
+
+    if (activeStudents.length === 0 || Object.keys(sessions).length === 0) {
+        return (
+            <Card className="bg-white/5 border-none backdrop-blur-md">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <Bot className="h-6 w-6 text-primary" />
+                        <CardTitle className="text-white">الرادار التحليلي</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center justify-center text-center p-12">
+                    <AlertTriangle className="h-12 w-12 text-rose-500/50 mb-3" />
+                    <p className="font-bold text-white">بيانات غير مكتملة</p>
+                    <p className="text-sm text-white/40">يرجى تسجيل الطلاب وإدارة الجلسات لتفعيل الرادار.</p>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <Card className="bg-white/5 border-none backdrop-blur-md overflow-hidden relative">
+            <div className="absolute top-0 left-0 p-4 opacity-5 pointer-events-none">
+                <Zap className="h-24 w-24 text-primary" />
+            </div>
+
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-xl">
+                            <Bot className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-xl font-headline font-bold text-white">الرادار التحليلي للفوج</CardTitle>
+                            <CardDescription className="text-white/40 font-body">نمو أداء {groupName || 'الفوج'} خلال الفترات المحددة.</CardDescription>
+                        </div>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-2">
+                <div className="flex flex-col gap-6">
+                    {/* View Controls */}
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="p-1 bg-white/5 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
+                            {Object.entries(viewTitles).map(([key, title]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => setView(key as ViewType)}
+                                    className={cn(
+                                        "px-4 py-2 rounded-xl text-xs font-bold font-headline transition-all whitespace-nowrap",
+                                        view === key ? "bg-primary text-slate-950 shadow-lg shadow-primary/20" : "text-white/60 hover:text-white"
+                                    )}
+                                >
+                                    {title.split(' ')[1] || title}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <div className="flex p-1 bg-white/5 rounded-xl">
+                                {(['weekly', 'monthly', 'yearly'] as const).map((r) => (
+                                    <button
+                                        key={r}
+                                        onClick={() => setRange(r)}
+                                        className={cn(
+                                            "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                            range === r ? "bg-white/10 text-white" : "text-white/40 hover:text-white"
+                                        )}
+                                    >
+                                        {r === 'weekly' ? 'أسبوعي' : r === 'monthly' ? 'شهري' : 'سنوي'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Navigation for specific months */}
+                    {(range === 'monthly' || range === 'seasonal') && (
+                        <div className="flex items-center justify-center gap-8 py-2">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/40 hover:text-white" onClick={() => setDisplayYear(y => addYears(y, -1))}><ArrowRight className="h-4 w-4" /></Button>
+                            <span className="font-headline font-bold text-xl text-amber-400">{format(displayYear, 'yyyy')}</span>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/40 hover:text-white" onClick={() => setDisplayYear(y => addYears(y, 1))}><ArrowLeft className="h-4 w-4" /></Button>
+                        </div>
+                    )}
+                </div>
+
+                <div className="relative pt-4">
+                    <div className="h-[280px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={processedChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="chartGradientPortal" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                                <XAxis
+                                    dataKey="name"
+                                    fontSize={10}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tick={{ fill: 'rgba(255,255,255,0.4)', fontWeight: 600 }}
+                                />
+                                <YAxis
+                                    domain={[0, 100]}
+                                    fontSize={10}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tick={{ fill: 'rgba(255,255,255,0.4)' }}
+                                    unit="%"
+                                />
+                                <Tooltip
+                                    cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 2 }}
+                                    contentStyle={{
+                                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                        borderRadius: '16px',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        backdropFilter: 'blur(10px)',
+                                        direction: 'rtl',
+                                        fontSize: '12px',
+                                        padding: '12px'
+                                    }}
+                                    itemStyle={{ color: 'hsl(var(--primary))' }}
+                                    formatter={(value: number) => [`${value}%`, 'النتيجة']}
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="score"
+                                    stroke="hsl(var(--primary))"
+                                    strokeWidth={3}
+                                    fillOpacity={1}
+                                    fill="url(#chartGradientPortal)"
+                                    animationDuration={1500}
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}

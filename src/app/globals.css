@@ -1,0 +1,184 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200..1000&family=Tajawal:wght@200..900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-headline: 'Cairo', sans-serif;
+  --font-body: 'Tajawal', sans-serif;
+}
+
+body {
+  font-family: var(--font-body), sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  :root {
+    --background: 240 10% 98%;
+    --foreground: 222.2 84% 4.9%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    
+    --primary: 162 100% 24%; /* Rich Emerald Green */
+    --primary-foreground: 162 10% 98%;
+    
+    --secondary: 162 20% 94%;
+    --secondary-foreground: 162 100% 15%;
+    
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    
+    --accent: 45 93% 47%; /* Deep Gold */
+    --accent-foreground: 45 10% 5%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 162 100% 24%;
+    
+    --radius: 0.75rem;
+
+    --sidebar-background: 162 20% 98%;
+    --sidebar-foreground: 162 100% 10%;
+    --sidebar-primary: 162 100% 24%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 162 20% 92%;
+    --sidebar-accent-foreground: 162 100% 20%;
+    --sidebar-border: 162 20% 90%;
+    --sidebar-ring: 162 100% 24%;
+
+    --medal-gold: 45 100% 50%;
+    --medal-gold-foreground: 45 100% 10%;
+    --medal-silver: 210 20% 80%;
+    --medal-silver-foreground: 210 20% 10%;
+    --medal-bronze: 28 50% 60%;
+    --medal-bronze-foreground: 28 50% 10%;
+  }
+
+  .dark {
+    --background: 162 30% 4%; /* Very Deep Green-Black */
+    --foreground: 162 10% 98%;
+    
+    --card: 162 30% 6%;
+    --card-foreground: 162 10% 98%;
+    
+    --popover: 162 30% 6%;
+    --popover-foreground: 162 10% 98%;
+    
+    --primary: 162 80% 45%;
+    --primary-foreground: 162 10% 5%;
+    
+    --secondary: 162 20% 12%;
+    --secondary-foreground: 162 80% 90%;
+    
+    --muted: 162 20% 12%;
+    --muted-foreground: 162 10% 60%;
+    
+    --accent: 45 90% 50%;
+    --accent-foreground: 162 10% 5%;
+    
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 162 10% 98%;
+    
+    --border: 162 20% 15%;
+    --input: 162 20% 15%;
+    --ring: 162 80% 45%;
+
+    --sidebar-background: 162 30% 5%;
+    --sidebar-foreground: 162 10% 90%;
+    --sidebar-primary: 162 80% 45%;
+    --sidebar-primary-foreground: 162 10% 5%;
+    --sidebar-accent: 162 20% 10%;
+    --sidebar-accent-foreground: 162 80% 90%;
+    --sidebar-border: 162 20% 15%;
+    --sidebar-ring: 162 80% 45%;
+
+    --medal-gold: 45 80% 45%;
+    --medal-gold-foreground: 45 100% 95%;
+    --medal-silver: 210 10% 40%;
+    --medal-silver-foreground: 210 20% 95%;
+    --medal-bronze: 28 40% 45%;
+    --medal-bronze-foreground: 28 50% 95%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-headline);
+  }
+}
+
+/* Glassmorphism & Effects */
+.glass {
+  @apply bg-background/60 backdrop-blur-md border border-white/20;
+}
+
+.dark .glass {
+  @apply bg-black/40 border-white/10;
+}
+
+/* Animations */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in-up {
+  animation: fade-in-up 0.4s ease-out forwards;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-section, .printable-section * {
+    visibility: visible;
+  }
+  .printable-section {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-header-table th {
+    background-color: #004d40 !important;
+    color: white !important;
+  }
+  .print-header-table, .printable-section tr {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body {
+    color: black !important;
+    background-color: white !important;
+  }
+  @page {
+    size: A4 landscape;
+    margin: 1.5cm;
+  }
+}
+    
