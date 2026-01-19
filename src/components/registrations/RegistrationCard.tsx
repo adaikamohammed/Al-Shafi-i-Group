@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Phone, User, Calendar, MapPin, MoreHorizontal, Edit, Check, X, UserRound } from 'lucide-react';
+import { Phone, User, Calendar, MapPin, MoreHorizontal, Edit, Check, X, UserRound, Eye } from 'lucide-react';
 import { PreRegistration, PreRegistrationStatus } from '@/lib/types';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
