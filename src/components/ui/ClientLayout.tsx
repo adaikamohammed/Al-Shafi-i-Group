@@ -243,7 +243,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
               >
                 {sidebarContent}
               </Sidebar>
-              <main className="flex-1 p-6 transition-all duration-300 ease-in-out md:pr-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:pr-[var(--sidebar-width)] min-w-0">
+              <main className="flex-1 min-h-screen p-6 transition-all duration-300 ease-in-out min-w-0">
                 <div className="flex justify-between items-center mb-8">
                   <div className="flex items-center gap-4">
                     <SidebarTrigger className="h-10 w-10 rounded-xl hover:bg-white/5" />
