@@ -141,80 +141,156 @@ const calculateAge = (birthDate?: Date | string) => {
 
 const StudentProfileCard = ({ student, onEdit, isLocked, onStatusChange }: { student: PreRegistration, onEdit: () => void, isLocked: boolean, onStatusChange?: (id: string, status: PreRegistrationStatus) => void }) => {
     const headerColor = statusHeaderColors[student.status] || 'bg-gray-500';
+    const { toast } = useToast();
+
+    const generateWhatsAppMessage = () => {
+        return `السلام عليكم ورحمة الله وبركاته
+
+معك إدارة المدرسة القرآنية للإمام الشافعي بحي تكسبت/الوادي
+
+نرسل لكم هذه الرسالة لأنكم سجلتم ابنكم/ابنتكم *${student.fullName}* في المدرسة وقد حان دوره في القائمة.
+
+قمنا بالاتصال بكم على الرقم ${student.phone1} ولم نتمكن من الوصول إليكم.
+
+إذا كنتم مهتمين بإلحاق ابنكم/ابنتكم بالمدرسة، نرجو منكم التكرم بالحضور إلى الإدارة بين صلاتي المغرب والعشاء لاستكمال إجراءات التسجيل.
+
+نسأل الله أن يبارك في أبنائكم ويجعلهم من حفظة كتابه الكريم.
+
+والسلام عليكم ورحمة الله وبركاته
+إدارة المدرسة القرآنية للإمام الشافعي`;
+    };
+
+    const copyWhatsAppMessage = () => {
+        const message = generateWhatsAppMessage();
+        navigator.clipboard.writeText(message).then(() => {
+            toast({
+                title: "✅ تم النسخ",
+                description: "تم نسخ رسالة واتساب جاهزة للإرسال",
+            });
+        }).catch(() => {
+            toast({
+                title: "❌ خطأ",
+                description: "فشل نسخ الرسالة",
+                variant: "destructive"
+            });
+        });
+    };
+
+    const sendWhatsAppMessage = () => {
+        const message = generateWhatsAppMessage();
+        const phoneNumber = student.phone1.replace(/\s/g, '').replace(/^0/, '213');
+        const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+    };
 
     return (
-        <DialogContent className="sm:max-w-2xl p-0">
-            <DialogHeader className="p-6 pb-0">
+        <DialogContent className="max-w-full h-full md:max-w-2xl md:h-auto p-0 gap-0">
+            <DialogHeader className="p-4 md:p-6 pb-0">
                 <DialogTitle className="sr-only">بطاقة الطالب: {student.fullName}</DialogTitle>
                 <DialogDescription className="sr-only">عرض تفصيلي لبيانات الطالب.</DialogDescription>
             </DialogHeader>
-            <div className={cn("p-6 rounded-t-lg text-white", headerColor)}>
-                <div className="flex items-center gap-4">
-                    <Avatar className="w-20 h-20 border-4 border-white/50">
+            <div className={cn("p-4 md:p-6 text-white", headerColor)}>
+                <div className="flex items-center gap-3 md:gap-4">
+                    <Avatar className="w-16 h-16 md:w-20 md:h-20 border-4 border-white/50">
                         <AvatarImage src={student.photoURL} />
                         <AvatarFallback className={cn((student as any).gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
                             {(student as any).gender === 'أنثى' ? <UserRound /> : <UserIcon />}
                         </AvatarFallback>
                     </Avatar>
-                    <div>
-                        <h2 className="text-2xl font-bold">{student.fullName}</h2>
-                        <div className="flex items-center gap-4 text-sm opacity-90">
+                    <div className="flex-1">
+                        <h2 className="text-xl md:text-2xl font-bold">{student.fullName}</h2>
+                        <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm opacity-90 mt-1">
                             <span>رقم الصفحة: {student.pageNumber || 'N/A'}</span>
-                            <Badge variant="secondary">{student.status}</Badge>
+                            <Badge variant="secondary" className="text-xs">{student.status}</Badge>
                         </div>
                     </div>
                 </div>
             </div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <h3 className="font-semibold mb-2 border-b pb-1">المعلومات الشخصية والتعليمية</h3>
-                    <div className="space-y-2 text-sm">
-                        <p><strong className="min-w-[100px] inline-block">تاريخ الميلاد:</strong> {student.birthDate instanceof Date && isValid(student.birthDate) ? format(student.birthDate, 'yyyy/MM/dd') : (student.birthDate ? student.birthDate.toString() : 'غير محدد')}</p>
-                        <p><strong className="min-w-[100px] inline-block">العمر:</strong> {calculateAge(student.birthDate)} سنة</p>
-                        <p><strong className="min-w-[100px] inline-block">الجنس:</strong> {student.gender || 'غير محدد'}</p>
-                        <p><strong className="min-w-[100px] inline-block">المستوى الدراسي:</strong> {student.educationalLevel || 'غير محدد'}</p>
-                    </div>
-                </div>
-                <div>
-                    <h3 className="font-semibold mb-2 border-b pb-1">معلومات الاتصال</h3>
-                    <div className="space-y-2 text-sm">
-                        <p><strong className="min-w-[100px] inline-block">اسم الولي:</strong> {student.guardianName || 'غير محدد'}</p>
-                        <p><strong className="min-w-[100px] inline-block">رقم الهاتف 1:</strong> {student.phone1}</p>
-                        <p><strong className="min-w-[100px] inline-block">رقم الهاتف 2:</strong> {student.phone2 || 'لا يوجد'}</p>
-                        <p><strong className="min-w-[100px] inline-block">مقر السكن:</strong> {student.address || 'غير محدد'}</p>
-                    </div>
-                </div>
-                {(student.status === 'مرفوض' || student.status === 'مؤجل' || student.notes) && (
-                    <div className="md:col-span-2">
-                        <h3 className="font-semibold mb-2 border-b pb-1">{student.status === 'مرفوض' ? 'سبب الرفض' : student.status === 'مؤجل' ? 'سبب التأجيل' : 'ملاحظات'}</h3>
-                        <div className="p-3 bg-muted rounded-md text-sm">
-                            <p>{student.notes || 'لا توجد ملاحظات مسجلة.'}</p>
+            <div className="flex-1 overflow-y-auto p-4 md:p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                    <div>
+                        <h3 className="font-semibold mb-2 border-b pb-1 text-sm md:text-base">المعلومات الشخصية والتعليمية</h3>
+                        <div className="space-y-2 text-xs md:text-sm">
+                            <p><strong className="min-w-[100px] inline-block">تاريخ الميلاد:</strong> {student.birthDate instanceof Date && isValid(student.birthDate) ? format(student.birthDate, 'yyyy/MM/dd') : (student.birthDate ? student.birthDate.toString() : 'غير محدد')}</p>
+                            <p><strong className="min-w-[100px] inline-block">العمر:</strong> {calculateAge(student.birthDate)} سنة</p>
+                            <p><strong className="min-w-[100px] inline-block">الجنس:</strong> {student.gender || 'غير محدد'}</p>
+                            <p><strong className="min-w-[100px] inline-block">المستوى الدراسي:</strong> {student.educationalLevel || 'غير محدد'}</p>
                         </div>
                     </div>
-                )}
+                    <div>
+                        <h3 className="font-semibold mb-2 border-b pb-1 text-sm md:text-base">معلومات الاتصال</h3>
+                        <div className="space-y-2 text-xs md:text-sm">
+                            <p><strong className="min-w-[100px] inline-block">اسم الولي:</strong> {student.guardianName || 'غير محدد'}</p>
+                            <p><strong className="min-w-[100px] inline-block">رقم الهاتف 1:</strong> {student.phone1}</p>
+                            <p><strong className="min-w-[100px] inline-block">رقم الهاتف 2:</strong> {student.phone2 || 'لا يوجد'}</p>
+                            <p><strong className="min-w-[100px] inline-block">مقر السكن:</strong> {student.address || 'غير محدد'}</p>
+                        </div>
+                    </div>
+                    {(student.status === 'مرفوض' || student.status === 'مؤجل' || student.notes) && (
+                        <div className="md:col-span-2">
+                            <h3 className="font-semibold mb-2 border-b pb-1 text-sm md:text-base">{student.status === 'مرفوض' ? 'سبب الرفض' : student.status === 'مؤجل' ? 'سبب التأجيل' : 'ملاحظات'}</h3>
+                            <div className="p-3 bg-muted rounded-md text-xs md:text-sm">
+                                <p>{student.notes || 'لا توجد ملاحظات مسجلة.'}</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
-            <DialogFooter className="flex-col sm:flex-row gap-2 border-t p-6">
-                {student.status === 'مرشح' && onStatusChange && (
-                    <div className="flex gap-2 w-full sm:w-auto">
+            <DialogFooter className="flex-col gap-3 border-t p-4 md:p-6">
+                {/* WhatsApp Message Section */}
+                <div className="w-full space-y-2">
+                    <Label className="text-xs md:text-sm font-semibold">رسالة واتساب جاهزة للإرسال:</Label>
+                    <div className="flex gap-2">
                         <Button
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex-1 sm:flex-none"
-                            onClick={() => onStatusChange(student.id, 'تم الإنضمام')}
+                            type="button"
+                            variant="outline"
+                            className="flex-1 text-xs md:text-sm"
+                            onClick={copyWhatsAppMessage}
                         >
-                            <Check className="ml-2 h-4 w-4" />
-                            تم الانضمام
+                            <svg className="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            نسخ الرسالة
                         </Button>
                         <Button
-                            variant="destructive"
-                            className="font-bold flex-1 sm:flex-none"
-                            onClick={() => onStatusChange(student.id, 'مرفوض')}
+                            type="button"
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs md:text-sm"
+                            onClick={sendWhatsAppMessage}
                         >
-                            <X className="ml-2 h-4 w-4" />
-                            مرفوض
+                            <svg viewBox="0 0 24 24" className="ml-2 h-4 w-4 fill-current">
+                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                            </svg>
+                            إرسال عبر واتساب
                         </Button>
                     </div>
-                )}
-                <div className="flex gap-2 w-full sm:w-auto sm:mr-auto">
-                    <Button variant="secondary" className="flex-1 sm:flex-none" onClick={onEdit} disabled={isLocked}>تعديل البيانات</Button>
+                </div>
+                
+                <Separator />
+                
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-2 w-full">
+                    {student.status === 'مرشح' && onStatusChange && (
+                        <div className="flex gap-2 w-full sm:w-auto">
+                            <Button
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex-1 sm:flex-none text-xs md:text-sm"
+                                onClick={() => onStatusChange(student.id, 'تم الإنضمام')}
+                            >
+                                <Check className="ml-2 h-4 w-4" />
+                                تم الانضمام
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                className="font-bold flex-1 sm:flex-none text-xs md:text-sm"
+                                onClick={() => onStatusChange(student.id, 'مرفوض')}
+                            >
+                                <X className="ml-2 h-4 w-4" />
+                                مرفوض
+                            </Button>
+                        </div>
+                    )}
+                    <div className="flex gap-2 w-full sm:w-auto sm:mr-auto">
+                        <Button variant="secondary" className="flex-1 sm:flex-none text-xs md:text-sm" onClick={onEdit} disabled={isLocked}>تعديل البيانات</Button>
+                    </div>
                 </div>
             </DialogFooter>
         </DialogContent>
