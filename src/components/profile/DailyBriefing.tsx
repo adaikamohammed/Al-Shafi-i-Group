@@ -89,7 +89,7 @@ export function DailyBriefing({ students, dailySessions, sheikhName }: DailyBrie
                                 theme.isLight ? "text-primary" : "text-white"
                             )}>
                                 <Sparkles className={cn("h-6 w-6 animate-pulse", theme.isLight ? "text-primary" : "text-yellow-400")} />
-                                {greeting}، شيخ {sheikhName}
+                                {greeting}، {sheikhName}
                             </h2>
                             <p className={theme.isLight ? "text-slate-500 font-body text-lg" : "text-slate-300 font-body text-lg"}>إليك موجز سريع عن حالة الفوج اليوم:</p>
                         </div>

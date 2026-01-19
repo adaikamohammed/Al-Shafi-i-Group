@@ -104,8 +104,11 @@ export default function SurahProgressPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-3xl font-headline font-bold">متابعة الحفظ والإتقان</CardTitle>
-                        <CardDescription>
-                            حدد طالبًا، ثم انقر على السورة لتغيير حالتها: <span className="p-1 rounded-md bg-gray-200">غير محفوظة</span> &larr; <span className="p-1 rounded-md bg-green-200 text-green-800">محفوظة</span> &larr; <span className="p-1 rounded-md bg-green-600 text-white">متقنة</span>
+                        <CardDescription className="flex flex-wrap items-center gap-2 mt-2">
+                            <span>انقر على السورة لتغيير حالتها:</span>
+                            <Badge variant="secondary" className="bg-gray-200 text-gray-800 hover:bg-gray-200">غير محفوظة</Badge>
+                            <Badge variant="secondary" className="bg-green-200 text-green-800 hover:bg-green-200">محفوظة</Badge>
+                            <Badge variant="secondary" className="bg-green-600 text-white hover:bg-green-600">متقنة</Badge>
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -161,9 +164,9 @@ export default function SurahProgressPage() {
                             <CardTitle>لوحة شرف الحفظ</CardTitle>
                             <CardDescription>الترتيب حسب نقاط الإتقان: (المحفوظ * 1) + (المتقن * 3)</CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            <div className="overflow-x-auto">
-                                <Table>
+                        <CardContent className="p-0 sm:p-6">
+                            <div className="overflow-x-auto w-full">
+                                <Table className="min-w-[400px] sm:min-w-full">
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>الترتيب</TableHead>
@@ -242,8 +245,8 @@ export default function SurahProgressPage() {
                                 انقر على اسم السورة لتغيير حالة حفظها للطالب المحدد.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3">
+                        <CardContent className="p-3 sm:p-6">
+                            <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2 sm:gap-3">
                                 {allSurahs.map(surah => {
                                     const status = studentProgress[surah.id]?.status || 0;
                                     let buttonClass = "bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200";
@@ -259,12 +262,12 @@ export default function SurahProgressPage() {
                                                     disabled={!selectedStudentId || selectedStudent?.status === 'مطرود'}
                                                     className={cn("h-auto justify-between transition-colors duration-300", buttonClass)}
                                                 >
-                                                    <div className="flex items-center gap-2">
-                                                        {status === 1 && <Check className="h-4 w-4" />}
-                                                        {status === 2 && <CheckCircle className="h-4 w-4" />}
-                                                        <span>{surah.id}. {surah.name}</span>
+                                                    <div className="flex items-center gap-1.5 overflow-hidden">
+                                                        {status === 1 && <Check className="h-3.5 w-3.5 shrink-0" />}
+                                                        {status === 2 && <CheckCircle className="h-3.5 w-3.5 shrink-0" />}
+                                                        <span className="truncate text-[10px] sm:text-xs">{surah.id}. {surah.name}</span>
                                                     </div>
-                                                    <span className="text-xs opacity-70">{surah.verses}</span>
+                                                    <span className="text-[10px] opacity-70 shrink-0">{surah.verses}</span>
                                                 </Button>
                                             </TooltipTrigger>
                                             <TooltipContent>

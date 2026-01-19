@@ -28,7 +28,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signInWithEmail(loginEmail, loginPassword);
-      router.push('/');
+      router.push('/home');
     } catch (error: any) {
       console.error("Login Error Code:", error.code);
       let description = "فشل تسجيل الدخول. يرجى التأكد من صحة البريد الإلكتروني وكلمة المرور.";
@@ -41,8 +41,8 @@ export default function LoginPage() {
           description = "كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.";
           break;
         case 'auth/invalid-email':
-            description = "صيغة البريد الإلكتروني غير صالحة.";
-            break;
+          description = "صيغة البريد الإلكتروني غير صالحة.";
+          break;
         default:
           description = `حدث خطأ غير متوقع: ${error.message}`;
       }
@@ -52,33 +52,33 @@ export default function LoginPage() {
         variant: 'destructive',
       });
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (signupPassword.length < 6) {
-        toast({
-            title: "كلمة مرور ضعيفة",
-            description: "يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.",
-            variant: 'destructive',
-        });
-        return;
+      toast({
+        title: "كلمة مرور ضعيفة",
+        description: "يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.",
+        variant: 'destructive',
+      });
+      return;
     }
     setLoading(true);
     try {
       await signUpWithEmail(signupEmail, signupPassword, signupName);
-      router.push('/');
+      router.push('/home');
     } catch (error: any) {
-        console.error("Signup Error:", error.code, error.message);
-        toast({
-            title: "خطأ في إنشاء الحساب",
-            description: error.code === 'auth/email-already-in-use' ? "هذا البريد الإلكتروني مستخدم بالفعل." : "حدث خطأ غير متوقع.",
-            variant: 'destructive',
-        });
+      console.error("Signup Error:", error.code, error.message);
+      toast({
+        title: "خطأ في إنشاء الحساب",
+        description: error.code === 'auth/email-already-in-use' ? "هذا البريد الإلكتروني مستخدم بالفعل." : "حدث خطأ غير متوقع.",
+        variant: 'destructive',
+      });
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 

@@ -84,9 +84,11 @@ export interface DailyReport {
   authorName: string;
   authorId: string;
   category: string;
-  status: 'pending' | 'reviewed';
+  status: 'pending' | 'reviewed' | 'in_progress';
   adminNotes: string | null;
   isPinned: boolean;
+  priority?: 'normal' | 'urgent' | 'important';
+  hasNewReply?: boolean;
 }
 
 

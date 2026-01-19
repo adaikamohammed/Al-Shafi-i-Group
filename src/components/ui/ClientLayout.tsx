@@ -16,28 +16,12 @@ import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 import { PORTAL_THEMES } from '@/lib/themes';
 import { cn } from '@/lib/utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { NAV_GROUPS, BOTTOM_NAV_ITEMS } from '@/lib/navigation';
+import { ChevronLeft, ChevronRight, Layers } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-const allNavItems = [
-  { href: '/home', label: 'البوابة الرئيسية', icon: Home },
-  { href: '/', label: 'إدارة الطلبة', icon: Users },
-  { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus },
-  { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList },
-  { href: '/stats', label: 'المتابعة الأسبوعية', icon: Calendar },
-  { href: '/yearly-performance', label: 'رادار الأداء السنوي', icon: BarChart3 },
-  { href: '/student-history', label: 'رادار سجل الطالب', icon: LayoutDashboard },
-  { href: '/comparison', label: 'ساحة المقارنة', icon: Swords },
-  { href: '/dues', label: 'المستحقات المالية', icon: DollarSign },
-  { href: '/reports/daily', label: 'التقرير اليومي', icon: Edit },
-  { href: '/reports/student', label: 'تقرير الطالب', icon: FileText },
-  { href: '/ranking', label: 'ترتيب الطلبة', icon: Award },
-  { href: '/surahs', label: 'متابعة الحفظ', icon: BookCheck },
-  { href: '/points', label: 'نظام النقاط', icon: Gavel },
-  { href: '/league', label: 'دوري التميز', icon: Shield },
-  { href: '/data', label: 'البيانات', icon: ArrowRightLeft },
-  { href: '/guide', label: 'دليل الاستخدام', icon: HelpCircle },
-  { href: '/profile', label: 'الملف الشخصي', icon: UserCog, separator: true },
-  { href: '/settings', label: 'الإعدادات', icon: Settings },
-];
+const BOTTOM_NAV_ITEMS_LOCAL = BOTTOM_NAV_ITEMS; // Just for clarity if needed, but we use the import directly
+
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading, logout, isSuperAdmin, updateUserProfile } = useAuth();
@@ -51,11 +35,16 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   const currentThemeId = user?.portalTheme || 'midnight';
   const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
 
-  const navItems = useMemo(() => {
-    if (isSuperAdmin) {
-      return allNavItems.filter(item => !['/reports/daily', '/points', '/settings'].includes(item.href));
-    }
-    return allNavItems;
+  const filteredNavGroups = useMemo(() => {
+    return NAV_GROUPS.map(group => ({
+      ...group,
+      items: group.items.filter(item => {
+        if (isSuperAdmin) {
+          return !['/reports/daily', '/points', '/settings'].includes(item.href);
+        }
+        return true;
+      })
+    })).filter(group => group.items.length > 0);
   }, [isSuperAdmin]);
 
   useEffect(() => {
@@ -133,46 +122,117 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="px-2">
-        <SidebarMenu className="gap-1.5">
-          {navItems.map((item) => (
-            <React.Fragment key={item.href}>
-              {item.separator && <div className="my-2 border-t border-white/5 group-data-[collapsible=icon]:mx-2" />}
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname.startsWith(item.href) && (item.href !== '/' || pathname === '/')}
-                  tooltip={item.label}
-                  className={cn(
-                    "rounded-xl h-10 px-3 transition-all duration-300",
-                    theme.isLight ? "text-slate-600 hover:bg-amber-100 hover:text-amber-700" : "text-white/60 hover:bg-white/5 hover:text-white",
-                    "data-[active=true]:bg-primary data-[active=true]:text-primary-foreground shadow-sm"
-                  )}
-                >
-                  <Link href={item.href} className="flex items-center gap-3">
-                    <item.icon className="h-4 w-4 shrink-0" />
-                    <span className="font-bold text-xs tracking-tight group-data-[collapsible=icon]:hidden">{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
+      <SidebarContent className="px-2 custom-scrollbar overflow-y-auto py-4">
+        <SidebarMenu className="gap-4">
+          {filteredNavGroups.map((group) => {
+            const primaryItem = group.items.find(i => i.primary);
+            const mainIcon = primaryItem?.icon || group.items[0]?.icon || Layers;
+
+            return (
+              <SidebarMenuItem key={group.title}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton
+                      className={cn(
+                        "rounded-2xl h-12 w-full flex items-center gap-3 transition-all duration-500 border border-transparent shadow-sm hover:scale-[1.02] relative group/btn px-3",
+                        "group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center",
+                        theme.isLight
+                          ? "bg-white text-slate-600 hover:bg-white hover:text-primary hover:border-primary/20 shadow-slate-200/50"
+                          : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white hover:border-white/10"
+                      )}
+                      tooltip={group.title}
+                    >
+                      <div className={cn(
+                        "p-2 rounded-xl transition-all duration-500 shrink-0 flex items-center justify-center",
+                        "group-data-[collapsible=icon]:p-1 group-data-[collapsible=icon]:rounded-lg",
+                        theme.isLight ? "bg-slate-50 group-hover/btn:bg-primary/10" : "bg-white/5 group-hover/btn:bg-white/10"
+                      )}>
+                        {React.createElement(mainIcon, {
+                          className: "h-5 w-5 group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:w-4"
+                        })}
+                      </div>
+                      <span className="font-bold text-[11px] tracking-tight group-data-[collapsible=icon]:hidden whitespace-nowrap overflow-hidden font-headline">
+                        {group.title}
+                      </span>
+
+                      {/* Sub-items indicator badge */}
+                      <div className="absolute top-1.5 left-2 group-data-[collapsible=icon]:top-1 group-data-[collapsible=icon]:left-1 flex items-center justify-center">
+                        <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse opacity-40" />
+                      </div>
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+
+                  <DropdownMenuContent
+                    side="left"
+                    align="start"
+                    className={cn(
+                      "w-48 p-2 rounded-2xl border-none shadow-2xl animate-in slide-in-from-right-2 duration-300 rtl z-[100]",
+                      theme.isLight ? "bg-white/95 backdrop-blur-xl" : "bg-slate-950/95 backdrop-blur-xl"
+                    )}
+                    sideOffset={10}
+                  >
+                    <div className="mb-2 px-2 py-1">
+                      <p className="text-[10px] font-black text-primary uppercase tracking-widest opacity-60 font-headline">
+                        {group.title}
+                      </p>
+                    </div>
+                    {group.items.map((item) => (
+                      <DropdownMenuItem key={item.href} asChild>
+                        <Link
+                          href={item.href}
+                          className={cn(
+                            "flex items-center gap-3 p-2 rounded-xl transition-all mb-1 cursor-pointer",
+                            theme.isLight ? "hover:bg-slate-100" : "hover:bg-white/5",
+                            pathname === item.href && (theme.isLight ? "bg-primary/10 text-primary" : "bg-primary text-white")
+                          )}
+                        >
+                          <item.icon className={cn("h-4 w-4 shrink-0", item.primary && "text-primary")} />
+                          <span className={cn("font-bold text-[11px] font-body", item.primary && "text-primary")}>
+                            {item.label}
+                          </span>
+                        </Link>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </SidebarMenuItem>
-            </React.Fragment>
-          ))}
+            );
+          })}
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="p-2 gap-2">
-        <SidebarSeparator className="mb-2 opacity-10" />
+      <SidebarFooter className="p-2 gap-2 mt-auto">
+        <SidebarSeparator className="mb-2 opacity-5" />
 
+        <SidebarMenu className="gap-1">
+          {BOTTOM_NAV_ITEMS.map((item) => (
+            <SidebarMenuItem key={item.href}>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === item.href}
+                tooltip={item.label}
+                className={cn(
+                  "rounded-xl h-10 px-3 transition-all duration-300",
+                  theme.isLight ? "text-slate-600 hover:bg-slate-100" : "text-white/60 hover:bg-white/5 hover:text-white",
+                  "data-[active=true]:bg-primary data-[active=true]:text-primary-foreground shadow-md"
+                )}
+              >
+                <Link href={item.href} className="flex items-center gap-3">
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span className="font-bold text-[11px] tracking-tight group-data-[collapsible=icon]:hidden">{item.label}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
 
-        <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={logout}
               tooltip="تسجيل الخروج"
-              className="rounded-xl h-10 px-3 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
+              className="rounded-xl h-10 px-3 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 mt-2"
             >
               <LogOut className="h-4 w-4 shrink-0" />
-              <span className="font-bold text-xs group-data-[collapsible=icon]:hidden">تسجيل الخروج</span>
+              <span className="font-bold text-[11px] group-data-[collapsible=icon]:hidden">تسجيل الخروج</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

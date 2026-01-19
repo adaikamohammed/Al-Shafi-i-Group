@@ -139,7 +139,7 @@ const calculateAge = (birthDate?: Date | string) => {
     }
 };
 
-const StudentProfileCard = ({ student, onEdit, isLocked }: { student: PreRegistration, onEdit: () => void, isLocked: boolean }) => {
+const StudentProfileCard = ({ student, onEdit, isLocked, onStatusChange }: { student: PreRegistration, onEdit: () => void, isLocked: boolean, onStatusChange?: (id: string, status: PreRegistrationStatus) => void }) => {
     const headerColor = statusHeaderColors[student.status] || 'bg-gray-500';
 
     return (
@@ -193,8 +193,29 @@ const StudentProfileCard = ({ student, onEdit, isLocked }: { student: PreRegistr
                     </div>
                 )}
             </div>
-            <DialogFooter>
-                <Button variant="secondary" onClick={onEdit} disabled={isLocked}>تعديل</Button>
+            <DialogFooter className="flex-col sm:flex-row gap-2 border-t p-6">
+                {student.status === 'مرشح' && onStatusChange && (
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <Button
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex-1 sm:flex-none"
+                            onClick={() => onStatusChange(student.id, 'تم الإنضمام')}
+                        >
+                            <Check className="ml-2 h-4 w-4" />
+                            تم الانضمام
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            className="font-bold flex-1 sm:flex-none"
+                            onClick={() => onStatusChange(student.id, 'مرفوض')}
+                        >
+                            <X className="ml-2 h-4 w-4" />
+                            مرفوض
+                        </Button>
+                    </div>
+                )}
+                <div className="flex gap-2 w-full sm:w-auto sm:mr-auto">
+                    <Button variant="secondary" className="flex-1 sm:flex-none" onClick={onEdit} disabled={isLocked}>تعديل البيانات</Button>
+                </div>
             </DialogFooter>
         </DialogContent>
     );
@@ -866,6 +887,10 @@ export default function PreRegistrationPage() {
                         student={selectedStudent}
                         onEdit={() => handleEdit(selectedStudent)}
                         isLocked={isLocked}
+                        onStatusChange={(id, status) => {
+                            updatePreRegistration(id, { status }, true);
+                            setSelectedStudent(null);
+                        }}
                     />
                 </Dialog>
             )}
@@ -1092,6 +1117,8 @@ export default function PreRegistrationPage() {
                                                 }
                                             }}
                                             isSelected={selectedRows.includes(reg.id)}
+                                            onView={(reg) => setSelectedStudent(reg)}
+                                            onStatusChange={(id, status) => updatePreRegistration(id, { status }, true)}
                                         />
                                     ))
                                 ) : (
