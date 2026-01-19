@@ -162,34 +162,6 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
       <SidebarFooter className="p-2 gap-2">
         <SidebarSeparator className="mb-2 opacity-10" />
 
-        {/* Global Theme Switcher */}
-        <div className="px-2 mb-2">
-          <div className="flex items-center gap-2 mb-2 px-1 group-data-[collapsible=icon]:hidden">
-            <Palette className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">تغيير المظهر</span>
-          </div>
-          <div className="grid grid-cols-4 gap-1.5 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col">
-            {Object.values(PORTAL_THEMES).map((t) => (
-              <SidebarMenuItem key={t.id} className="list-none">
-                <SidebarMenuButton
-                  tooltip={t.name}
-                  onClick={() => {
-                    const profileData = { portalTheme: t.id };
-                    updateUserProfile(profileData);
-                  }}
-                  className={cn(
-                    "h-7 w-full p-0 flex items-center justify-center rounded-lg border transition-all hover:scale-105 active:scale-95",
-                    currentThemeId === t.id ? "ring-2 ring-primary border-transparent" : "border-white/10"
-                  )}
-                >
-                  <div className={cn("h-4 w-4 rounded-full shadow-inner flex items-center justify-center", t.preview)}>
-                    {currentThemeId === t.id && <Check className="h-2 w-2 text-white" />}
-                  </div>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </div>
-        </div>
 
         <SidebarMenu>
           <SidebarMenuItem>

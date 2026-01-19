@@ -133,17 +133,26 @@ export default function HomePage() {
                   مظهر البوابة
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56 bg-slate-900/95 backdrop-blur-2xl border-white/10 text-white rounded-2xl shadow-2xl" align="end">
-                <DropdownMenuLabel className="font-headline text-white/50 text-xs uppercase tracking-widest px-4 pt-3">اختر طابع البوابة</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-white/5" />
+              <DropdownMenuContent className={cn(
+                "w-56 backdrop-blur-2xl rounded-2xl shadow-2xl",
+                theme.isLight ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900/95 border-white/10 text-white"
+              )} align="end">
+                <DropdownMenuLabel className={cn(
+                  "font-headline text-xs uppercase tracking-widest px-4 pt-3",
+                  theme.isLight ? "text-slate-400" : "text-white/50"
+                )}>اختر طابع البوابة</DropdownMenuLabel>
+                <DropdownMenuSeparator className={theme.isLight ? "bg-slate-100" : "bg-white/5"} />
                 {Object.values(PORTAL_THEMES).map((t) => (
                   <DropdownMenuItem
                     key={t.id}
                     onClick={() => handleThemeChange(t.id)}
-                    className="flex items-center justify-between py-3 px-4 rounded-xl cursor-pointer hover:bg-white/5 focus:bg-white/5 transition-colors"
+                    className={cn(
+                      "flex items-center justify-between py-3 px-4 rounded-xl cursor-pointer transition-colors",
+                      theme.isLight ? "hover:bg-slate-50 focus:bg-slate-50" : "hover:bg-white/5 focus:bg-white/5"
+                    )}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={cn("h-4 w-4 rounded-full border border-white/20", t.preview)} />
+                      <div className={cn("h-4 w-4 rounded-full border", t.preview, theme.isLight ? "border-slate-200" : "border-white/20")} />
                       <span className={cn("font-medium", currentThemeId === t.id && "text-primary")}>{t.name}</span>
                     </div>
                     {currentThemeId === t.id && <Check className="h-4 w-4 text-primary" />}

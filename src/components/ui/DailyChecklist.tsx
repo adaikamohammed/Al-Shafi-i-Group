@@ -4,11 +4,13 @@ import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useStudentContext } from '@/context/StudentContext';
-import { format, subDays, startOfMonth, parseISO, getDate, getMonth, getYear, getDay, startOfWeek, getQuarter } from 'date-fns';
+import { format, parseISO, getDate, getYear, getDay, startOfWeek, getQuarter } from 'date-fns';
 import { ClipboardCheck, DollarSign, ArrowLeft, PartyPopper, AlertTriangle, BookOpenCheck, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/context/AuthContext';
+import { PORTAL_THEMES } from '@/lib/themes';
 
 interface Task {
     id: string;
@@ -20,8 +22,12 @@ interface Task {
 }
 
 export function DailyChecklist() {
+    const { user } = useAuth();
     const { dailySessions, students, payments } = useStudentContext();
     const activeStudents = useMemo(() => (students || []).filter(s => s.status === 'نشط'), [students]);
+
+    const currentThemeId = user?.portalTheme || 'midnight';
+    const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
 
     const tasks = useMemo(() => {
         const incompleteTasks: Task[] = [];
@@ -29,7 +35,6 @@ export function DailyChecklist() {
         const todayStr = format(today, 'yyyy-MM-dd');
         const currentHour = today.getHours();
 
-        // Task 1: Attendance
         if (currentHour >= 8 && !dailySessions[todayStr]) {
             incompleteTasks.push({
                 id: 'attendance',
@@ -41,7 +46,6 @@ export function DailyChecklist() {
             });
         }
 
-        // Task 2: Memorization Evaluation
         const todaysSession = dailySessions[todayStr] ? Object.values(dailySessions[todayStr])[0] : undefined;
         if (todaysSession && todaysSession.sessionType === 'حصة أساسية') {
             const unevaluatedCount = (todaysSession.records ?? []).filter(r => r.attendance === 'حاضر' && !r.memorization).length;
@@ -57,15 +61,14 @@ export function DailyChecklist() {
             }
         }
 
-        // Task 3: Financial Dues
-        const isBeginningOfMonth = getDate(today) <= 10; // Extended to 10th
+        const isBeginningOfMonth = getDate(today) <= 10;
         if (isBeginningOfMonth) {
             const currentQuarter = getQuarter(today);
             const currentYear = getYear(today);
 
             const studentsWithDues = activeStudents.filter(s => {
-                const regYear = getYear(s.registrationDate);
-                const regQuarter = getQuarter(s.registrationDate);
+                const regYear = getYear(new Date(s.registrationDate));
+                const regQuarter = getQuarter(new Date(s.registrationDate));
                 return regYear < currentYear || (regYear === currentYear && regQuarter <= currentQuarter);
             });
 
@@ -91,9 +94,8 @@ export function DailyChecklist() {
             }
         }
 
-        // Task 4: Weekly Performance Review
         const dayOfWeek = getDay(today);
-        if (dayOfWeek === 4 || dayOfWeek === 5) { // Thursday or Friday
+        if (dayOfWeek === 4 || dayOfWeek === 5) {
             const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 6 });
             const weeklySessions = Object.values(dailySessions ?? {}).flatMap(d => Object.values(d)).filter(s => s && s.date && parseISO(s.date) >= startOfCurrentWeek);
             let lowPerformingStudents = 0;
@@ -135,35 +137,47 @@ export function DailyChecklist() {
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="relative overflow-hidden p-8 rounded-[2.5rem] bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-md flex items-center gap-6"
+                className={cn(
+                    "relative overflow-hidden p-8 rounded-[2.5rem] border backdrop-blur-md flex items-center gap-6",
+                    theme.isLight ? "bg-emerald-50 border-emerald-100 shadow-xl shadow-emerald-200/20" : "bg-emerald-500/10 border-emerald-500/20"
+                )}
             >
                 <div className="absolute -top-4 -left-4 opacity-5">
                     <PartyPopper className="h-24 w-24 text-emerald-400" />
                 </div>
-                <div className="p-4 bg-emerald-500/20 rounded-[1.5rem] text-emerald-400 shadow-lg shadow-emerald-500/10 shrink-0">
+                <div className={cn(
+                    "p-4 rounded-[1.5rem] shadow-lg shrink-0",
+                    theme.isLight ? "bg-emerald-100 text-emerald-600" : "bg-emerald-500/20 text-emerald-400 shadow-emerald-500/10"
+                )}>
                     <PartyPopper className="h-8 w-8" />
                 </div>
                 <div>
-                    <h4 className="font-headline font-black text-2xl text-emerald-100">أحسنت يا شيخ! 🌟</h4>
-                    <p className="text-emerald-100/60 font-medium">لقد أتممت كافة المسؤوليات والمهام المطلوبة بنجاح باهر.</p>
+                    <h4 className={cn("font-headline font-black text-2xl", theme.isLight ? "text-emerald-800" : "text-emerald-100")}>أحسنت يا شيخ! 🌟</h4>
+                    <p className={cn("font-medium", theme.isLight ? "text-emerald-600/70" : "text-emerald-100/60")}>لقد أتممت كافة المسؤوليات والمهام المطلوبة بنجاح باهر.</p>
                 </div>
             </motion.div>
         );
     }
 
     return (
-        <Card className="bg-white/5 border-none backdrop-blur-md overflow-hidden relative">
+        <Card className={cn(
+            "border-none backdrop-blur-md overflow-hidden relative",
+            theme.isLight ? "bg-white shadow-2xl shadow-slate-200/50" : "bg-white/5"
+        )}>
             <div className="absolute top-0 left-0 p-4 opacity-5 pointer-events-none">
                 <Zap className="h-24 w-24 text-primary" />
             </div>
             <CardHeader className="pb-4">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-amber-400/10 rounded-xl">
-                        <Zap className="h-5 w-5 text-amber-400" />
+                    <div className={cn(
+                        "p-2 rounded-xl",
+                        theme.isLight ? "bg-amber-100" : "bg-amber-400/10"
+                    )}>
+                        <Zap className="h-5 w-5 text-amber-500" />
                     </div>
                     <div>
-                        <CardTitle className="text-xl font-headline font-bold text-white">قائمة المهام الذكية</CardTitle>
-                        <CardDescription className="text-white/40 font-body">إجراءات مقترحة بناءً على حالة البيانات الحالية.</CardDescription>
+                        <CardTitle className={cn("text-xl font-headline font-bold", theme.isLight ? "text-slate-900" : "text-white")}>قائمة المهام الذكية</CardTitle>
+                        <CardDescription className={theme.isLight ? "text-slate-400" : "text-white/40"}>إجراءات مقترحة بناءً على حالة البيانات الحالية.</CardDescription>
                     </div>
                 </div>
             </CardHeader>
@@ -175,31 +189,33 @@ export function DailyChecklist() {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: idx * 0.1 }}
                         className={cn(
-                            "group p-4 rounded-2xl flex items-center justify-between gap-4 transition-all duration-300 relative overflow-hidden",
-                            task.isUrgent ? 'bg-amber-500/10 border-r-4 border-amber-500' : 'bg-blue-500/10 border-r-4 border-blue-500'
+                            "group p-4 rounded-2xl flex items-center justify-between gap-4 transition-all duration-300 relative overflow-hidden border-r-4",
+                            task.isUrgent
+                                ? theme.isLight ? 'bg-amber-50 border-amber-500' : 'bg-amber-500/10 border-amber-500'
+                                : theme.isLight ? 'bg-blue-50 border-blue-500' : 'bg-blue-500/10 border-blue-500'
                         )}
                     >
                         <div className="flex items-center gap-4 relative z-10">
                             <div className={cn(
                                 "p-2.5 rounded-xl bg-white/5 shadow-inner",
-                                task.isUrgent ? 'text-amber-400' : 'text-blue-400'
+                                task.isUrgent ? 'text-amber-500' : 'text-blue-500'
                             )}>
                                 {task.icon}
                             </div>
-                            <p className="font-bold text-sm text-white/90 leading-tight pr-1 tracking-tight">{task.text}</p>
+                            <p className={cn(
+                                "font-bold text-sm leading-tight pr-1 tracking-tight",
+                                theme.isLight ? "text-slate-700" : "text-white/90"
+                            )}>{task.text}</p>
                         </div>
-                        <Button asChild size="sm" variant="ghost" className="h-10 px-4 rounded-xl text-white/60 hover:text-white hover:bg-white/5 relative z-10">
+                        <Button asChild size="sm" variant="ghost" className={cn(
+                            "h-10 px-4 rounded-xl relative z-10",
+                            theme.isLight ? "text-slate-400 hover:text-slate-900 hover:bg-slate-100" : "text-white/60 hover:text-white hover:bg-white/5"
+                        )}>
                             <Link href={task.link}>
                                 <span className="font-bold">{task.buttonText}</span>
                                 <ArrowLeft className="mr-2 h-4 w-4" />
                             </Link>
                         </Button>
-
-                        {/* Hover Gradient Effect */}
-                        <div className={cn(
-                            "absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity blur-2xl",
-                            task.isUrgent ? 'bg-amber-500' : 'bg-blue-500'
-                        )} />
                     </motion.div>
                 ))}
             </CardContent>
