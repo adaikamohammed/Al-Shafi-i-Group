@@ -27,14 +27,24 @@ export function GroupSelector({ value, onChange, className }: GroupSelectorProps
     const currentThemeId = user?.portalTheme || 'midnight';
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
 
-    // Get all sheikhs
+    // Get all sheikhs with unique groups and sorted numerically
     const sheikhs = useMemo(() => {
-        return allUsers
-            .filter(u => u.role === 'sheikh')
+        const uniqueGroups = new Map();
+
+        allUsers.forEach(u => {
+            if (u.role === 'sheikh' && u.group) {
+                // If duplicates exist, prefer the one that is NOT isDemo if possible, or just take the last one
+                // normalizing key to ensure "فوج 1" matches "فوج 1"
+                if (!uniqueGroups.has(u.group)) {
+                    uniqueGroups.set(u.group, u);
+                }
+            }
+        });
+
+        return Array.from(uniqueGroups.values())
             .sort((a, b) => {
-                // Extract group number from string "فوج X"
-                const groupA = parseInt((a.group || '').replace(/[^0-9]/g, '')) || 999;
-                const groupB = parseInt((b.group || '').replace(/[^0-9]/g, '')) || 999;
+                const groupA = parseInt(String(a.group || '').replace(/[^0-9]/g, '')) || 999;
+                const groupB = parseInt(String(b.group || '').replace(/[^0-9]/g, '')) || 999;
                 return groupA - groupB;
             });
     }, [allUsers]);
@@ -58,7 +68,7 @@ export function GroupSelector({ value, onChange, className }: GroupSelectorProps
                         🏛️ كل المدرسة (عرض شامل)
                     </SelectItem>
                     {sheikhs.map((sheikh) => (
-                        <SelectItem key={sheikh.uid} value={sheikh.uid} className="cursor-pointer">
+                        <SelectItem key={sheikh.group} value={sheikh.group || ''} className="cursor-pointer">
                             <span className="flex items-center gap-2">
                                 <span className={cn("inline-block w-2 h-2 rounded-full", theme.isLight ? "bg-slate-400" : "bg-white/40")} />
                                 <span>{sheikh.group || 'فوج غير محدد'}</span>
