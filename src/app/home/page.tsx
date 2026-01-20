@@ -4,22 +4,18 @@ import React, { useState, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { Porta } from 'lucide-react';
 import {
-  Loader2, Palette, LogOut, Users, ClipboardList, Calendar,
+  Loader2, Palette, Users, ClipboardList, Calendar,
   Swords, DollarSign, Edit, FileText, Award, BookCheck,
   Gavel, ArrowRightLeft, HelpCircle, UserCog, Settings,
   UserPlus, BarChart3, Shield, LayoutDashboard,
-  Check, TrendingUp, Star
+  TrendingUp, Star, PieChart
 } from 'lucide-react';
 import Link from 'next/link';
 import { DailyChecklist } from '@/components/ui/DailyChecklist';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
-import { ManagementDashboard } from '@/components/management/ManagementDashboard';
 import { canAccessPage } from '@/lib/permissions';
-import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
-import { HallOfFame } from '@/components/ui/HallOfFame';
-import { ImpactStats } from '@/components/ui/ImpactStats';
-import { RecentMilestones } from '@/components/ui/RecentMilestones';
 import { useStudentContext } from '@/context/StudentContext';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
@@ -35,6 +31,7 @@ import { PORTAL_THEMES } from '@/lib/themes';
 import { GlobalErrorBoundary } from '@/components/ui/GlobalErrorBoundary';
 
 const navItems = [
+  { href: '/insights', label: 'الرؤى والتحليلات', icon: PieChart, color: 'text-fuchsia-400', glow: 'group-hover:shadow-fuchsia-500/20' },
   { href: '/', label: 'إدارة الطلبة', icon: Users, color: 'text-blue-400', glow: 'group-hover:shadow-blue-500/20' },
   { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus, color: 'text-emerald-400', glow: 'group-hover:shadow-emerald-500/20' },
   { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList, color: 'text-sky-400', glow: 'group-hover:shadow-sky-500/20' },
@@ -198,98 +195,56 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          {/* Impact Stats */}
-          <div className="w-full max-w-7xl mb-16 px-2">
-            <ImpactStats />
-          </div>
+          {/* Impact Stats Removed */}
 
-          {isManagement ? (
-            <div className="w-full max-w-7xl">
-              <ManagementDashboard />
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 w-full max-w-7xl px-2">
-              {filteredNavItems.map((item, idx) => (
-                <motion.div
-                  key={item.href}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: idx * 0.04 }}
+          {/* Navigation Grid - Main Content */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 w-full max-w-7xl px-2">
+            {filteredNavItems.map((item, idx) => (
+              <motion.div
+                key={item.href}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: idx * 0.04 }}
+              >
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "group relative flex flex-col items-center justify-center gap-6 p-8 rounded-[2rem]",
+                    "backdrop-blur-2xl border transition-all duration-500 hover:-translate-y-3 hover:scale-[1.02] shadow-2xl",
+                    theme.isLight ? "bg-white border-slate-100 hover:bg-slate-50 shadow-slate-200/50" : "bg-white/5 border-white/5 hover:bg-white/10 shadow-black/80",
+                    item.glow
+                  )}
                 >
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      "group relative flex flex-col items-center justify-center gap-6 p-8 rounded-[2rem]",
-                      "backdrop-blur-2xl border transition-all duration-500 hover:-translate-y-3 hover:scale-[1.02] shadow-2xl",
-                      theme.isLight ? "bg-white border-slate-100 hover:bg-slate-50 shadow-slate-200/50" : "bg-white/5 border-white/5 hover:bg-white/10 shadow-black/80",
-                      item.glow
-                    )}
-                  >
-                    <div className={cn("absolute inset-0 rounded-[2rem] opacity-0 group-hover:opacity-10 transition-opacity blur-3xl", theme.preview)} />
+                  <div className={cn("absolute inset-0 rounded-[2rem] opacity-0 group-hover:opacity-10 transition-opacity blur-3xl", theme.preview)} />
 
-                    <div className={cn("relative p-6 rounded-[1.8rem] bg-white/5 group-hover:scale-125 transition-transform duration-500 shadow-inner", item.color)}>
-                      <item.icon className="h-10 w-10" />
-                    </div>
-                    <span className={cn(
-                      "relative text-base font-headline font-bold text-center tracking-wide transition-colors",
-                      theme.isLight ? "text-slate-700 group-hover:text-amber-600" : "text-white group-hover:text-amber-200"
-                    )}>
-                      {item.label}
-                    </span>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          )}
+                  <div className={cn("relative p-6 rounded-[1.8rem] bg-white/5 group-hover:scale-125 transition-transform duration-500 shadow-inner", item.color)}>
+                    <item.icon className="h-10 w-10" />
+                  </div>
+                  <span className={cn(
+                    "relative text-base font-headline font-bold text-center tracking-wide transition-colors",
+                    theme.isLight ? "text-slate-700 group-hover:text-amber-600" : "text-white group-hover:text-amber-200"
+                  )}>
+                    {item.label}
+                  </span>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
 
           {!isManagement && (
-            <div className="w-full max-w-7xl mt-24 space-y-20 px-2 lg:px-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                <section className="space-y-8">
-                  <div className="flex items-center gap-4 px-6 border-r-4 border-amber-400">
-                    <LayoutDashboard className="h-7 w-7 text-amber-400" />
-                    <h2 className={cn("text-3xl font-headline font-black tracking-tight", theme.isLight ? "text-slate-900" : "text-white")}>النبض اليومي</h2>
-                  </div>
-                  <div className="space-y-8">
-                    <DailyInspiration />
-                    <DailyChecklist />
-                  </div>
-                </section>
-
-                <section className="space-y-8">
-                  <div className="flex items-center gap-4 px-6 border-r-4 border-primary">
-                    <Award className="h-7 w-7 text-primary" />
-                    <h2 className={cn("text-3xl font-headline font-black tracking-tight", theme.isLight ? "text-slate-900" : "text-white")}>الرادار التحليلي</h2>
-                  </div>
-                  <GroupEvaluationCard students={students || []} sessions={dailySessions} groupName={user?.group} />
-                </section>
-              </div>
+            <div className="w-full max-w-7xl mt-12 space-y-20 px-2 lg:px-4 mb-24">
+              <section className="space-y-8">
+                <div className="flex items-center gap-4 px-6 border-r-4 border-amber-400">
+                  <LayoutDashboard className="h-7 w-7 text-amber-400" />
+                  <h2 className={cn("text-3xl font-headline font-black tracking-tight", theme.isLight ? "text-slate-900" : "text-white")}>النبض اليومي</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <DailyInspiration />
+                  <DailyChecklist />
+                </div>
+              </section>
             </div>
           )}
-
-          {/* Bottom Section: Milestones & Hall of Fame - Full Width */}
-          <div className="w-full max-w-7xl mt-12 space-y-12 mb-32 px-2 lg:px-4">
-            <div className={cn(
-              "backdrop-blur-xl p-8 lg:p-12 rounded-[2.5rem] border shadow-2xl space-y-16",
-              theme.isLight ? "bg-white border-slate-200" : "bg-white/5 border-white/10"
-            )}>
-              <section className="space-y-8">
-                <RecentMilestones />
-              </section>
-
-              <div className={cn("w-full h-px", theme.isLight ? "bg-slate-200" : "bg-white/10")} />
-
-              <section className="space-y-10">
-                <div className="flex items-center gap-4 px-6 border-r-4 border-yellow-500">
-                  <CrownIcon className="h-8 w-8 text-yellow-500" />
-                  <h2 className={cn("text-3xl font-headline font-black tracking-tight", theme.isLight ? "text-slate-900" : "text-white")}>لوحة الشرف الذهبية</h2>
-                </div>
-                <div className="w-full">
-                  <HallOfFame />
-                </div>
-              </section>
-            </div>
-          </div>
 
           {/* Footer */}
           <div className="py-12 text-center opacity-20 hover:opacity-100 transition-opacity duration-1000">
@@ -299,25 +254,4 @@ export default function HomePage() {
       </div>
     </GlobalErrorBoundary>
   );
-}
-
-// Simple Crown Icon helper if crown-icon is not in lucide
-function CrownIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" />
-      <path d="M12 17H12.01" />
-    </svg>
-  )
 }
