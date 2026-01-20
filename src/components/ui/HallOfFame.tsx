@@ -93,7 +93,8 @@ export function HallOfFame({ }: HallOfFameProps) {
     const { PORTAL_THEMES } = require('@/lib/themes');
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
 
-    if (contextLoading || !hallOfFame) {
+    // If loading is true, we still render with skeletons/spinners handled below, but if data is null we must use safe default
+    if (contextLoading && !hallOfFame) {
         return (
             <Card className={cn(
                 "border-none",
@@ -115,7 +116,25 @@ export function HallOfFame({ }: HallOfFameProps) {
         )
     }
 
-    const { commitmentKing, academicKing, behaviorKing, suraGuardian, persistentTeacher, givingRecord } = hallOfFame;
+    // DEFENSIVE: Use Default Object if hallOfFame is null/undefined
+    const safeHallOfFame = hallOfFame || {
+        commitmentKing: { name: '', streak: 0, photoURL: undefined },
+        academicKing: { name: '', streak: 0, photoURL: undefined },
+        behaviorKing: { name: '', streak: 0, photoURL: undefined },
+        suraGuardian: { name: '', count: 0, photoURL: undefined },
+        persistentTeacher: { streak: 0 },
+        givingRecord: { count: 0 }
+    };
+
+    // Ensure nested objects also exist (Double Safety)
+    const {
+        commitmentKing = { name: '', streak: 0 },
+        academicKing = { name: '', streak: 0 },
+        behaviorKing = { name: '', streak: 0 },
+        suraGuardian = { name: '', count: 0 },
+        persistentTeacher = { streak: 0 },
+        givingRecord = { count: 0 }
+    } = safeHallOfFame;
 
     return (
         <div className="space-y-6">

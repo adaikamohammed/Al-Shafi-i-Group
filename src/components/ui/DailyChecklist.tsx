@@ -35,7 +35,11 @@ export function DailyChecklist() {
         const todayStr = format(today, 'yyyy-MM-dd');
         const currentHour = today.getHours();
 
-        if (currentHour >= 8 && !dailySessions[todayStr]) {
+        const safeDailySessions = dailySessions || {};
+        const safeActiveStudents = activeStudents || [];
+        const safePayments = payments || [];
+
+        if (currentHour >= 8 && !safeDailySessions[todayStr]) {
             incompleteTasks.push({
                 id: 'attendance',
                 text: 'لم يتم رصد حضور وغياب الطلاب لليوم بعد.',
@@ -46,7 +50,7 @@ export function DailyChecklist() {
             });
         }
 
-        const todaysSession = dailySessions[todayStr] ? Object.values(dailySessions[todayStr])[0] : undefined;
+        const todaysSession = safeDailySessions[todayStr] ? Object.values(safeDailySessions[todayStr])[0] : undefined;
         if (todaysSession && todaysSession.sessionType === 'حصة أساسية') {
             const unevaluatedCount = (todaysSession.records ?? []).filter(r => r.attendance === 'حاضر' && !r.memorization).length;
             if (unevaluatedCount > 0) {
@@ -66,15 +70,17 @@ export function DailyChecklist() {
             const currentQuarter = getQuarter(today);
             const currentYear = getYear(today);
 
-            const studentsWithDues = activeStudents.filter(s => {
+            const studentsWithDues = safeActiveStudents.filter(s => {
+                if (!s.registrationDate) return false;
                 const regYear = getYear(new Date(s.registrationDate));
                 const regQuarter = getQuarter(new Date(s.registrationDate));
                 return regYear < currentYear || (regYear === currentYear && regQuarter <= currentQuarter);
             });
 
             const studentPaymentsThisQuarter = new Set(
-                (payments ?? [])
+                safePayments
                     .filter(p => {
+                        if (!p.date) return false;
                         const paymentDate = parseISO(p.date);
                         return getYear(paymentDate) === currentYear && getQuarter(paymentDate) === currentQuarter;
                     })
@@ -97,10 +103,10 @@ export function DailyChecklist() {
         const dayOfWeek = getDay(today);
         if (dayOfWeek === 4 || dayOfWeek === 5) {
             const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 6 });
-            const weeklySessions = Object.values(dailySessions ?? {}).flatMap(d => Object.values(d)).filter(s => s && s.date && parseISO(s.date) >= startOfCurrentWeek);
+            const weeklySessions = Object.values(safeDailySessions).flatMap(d => Object.values(d || {})).filter(s => s && s.date && parseISO(s.date) >= startOfCurrentWeek);
             let lowPerformingStudents = 0;
             const studentStats: { [key: string]: { absent: number, undisciplined: number } } = {};
-            activeStudents.forEach(s => studentStats[s.id] = { absent: 0, undisciplined: 0 });
+            safeActiveStudents.forEach(s => studentStats[s.id] = { absent: 0, undisciplined: 0 });
 
             weeklySessions.forEach(session => {
                 (session.records ?? []).forEach(record => {

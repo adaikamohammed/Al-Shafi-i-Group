@@ -20,7 +20,8 @@ import {
     eachQuarterOfInterval,
     endOfQuarter,
     addYears,
-    parseISO
+    parseISO,
+    isValid
 } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { DailySession, Student } from '@/lib/types';
@@ -34,83 +35,94 @@ const calculatePeriodStats = (
     activeStudents: Student[],
     sessions: Record<string, Record<string, DailySession>>
 ) => {
-    if (activeStudents.length === 0) {
+    // DEFENSIVE: Return zeros if no data
+    if (!activeStudents || activeStudents.length === 0 || !sessions) {
         return { attendance: 0, behavior: 0, review: 0, memorization: 0, commitment: 0 };
     }
 
-    const periodSessions = Object.values(sessions)
-        .flatMap(day => Object.values(day))
-        .filter(s => {
-            if (!s.date) return false;
-            try {
-                const d = parseISO(s.date);
-                return d >= startDate && d <= endDate;
-            } catch { return false; }
-        });
+    try {
+        const periodSessions = Object.values(sessions || {})
+            .flatMap(day => Object.values(day || {}))
+            .filter(s => {
+                if (!s || !s.date) return false;
+                try {
+                    const d = parseISO(s.date);
+                    return isValid(d) && d >= startDate && d <= endDate;
+                } catch { return false; }
+            });
 
-    const workSessions = periodSessions.filter(s => s.sessionType === 'حصة أساسية' || s.sessionType === 'حصة تعويضية');
+        const workSessions = periodSessions.filter(s => s.sessionType === 'حصة أساسية' || s.sessionType === 'حصة تعويضية');
 
-    let totalAttendance = 0;
-    let totalPossibleAttendance = 0;
+        let totalAttendance = 0;
+        let totalPossibleAttendance = 0;
 
-    let behaviorSum = 0;
-    let behaviorCount = 0;
+        let behaviorSum = 0;
+        let behaviorCount = 0;
 
-    let reviewSum = 0;
-    let reviewCount = 0;
+        let reviewSum = 0;
+        let reviewCount = 0;
 
-    let memorizationSum = 0;
-    let memorizationCount = 0;
+        let memorizationSum = 0;
+        let memorizationCount = 0;
 
-    const memorizationScoreMap: { [key: string]: number } = { 'ممتاز': 10, 'جيد جداً': 8, 'جيد': 6, 'متوسط': 4, 'ضعيف': 2, 'لا يوجد': 0 };
-    const behaviorScoreMap: { [key: string]: number } = { 'هادئ': 10, 'متوسط': 5, 'غير منضبط': 0 };
+        const memorizationScoreMap: { [key: string]: number } = { 'ممتاز': 10, 'جيد جداً': 8, 'جيد': 6, 'متوسط': 4, 'ضعيف': 2, 'لا يوجد': 0 };
+        const behaviorScoreMap: { [key: string]: number } = { 'هادئ': 10, 'متوسط': 5, 'غير منضبط': 0 };
 
-    workSessions.forEach(session => {
-        const sessionDate = parseISO(session.date);
-        activeStudents.forEach(student => {
-            if (sessionDate >= student.registrationDate) {
-                totalPossibleAttendance++;
-                const record = session.records?.find(r => r.studentId === student.id);
-                if (record) {
-                    if (record.attendance === 'حاضر' || record.attendance === 'متأخر') {
-                        totalAttendance++;
-                    }
+        workSessions.forEach(session => {
+            if (!session.records) return;
+            const sessionDate = parseISO(session.date);
 
-                    if (record.behavior && record.behavior in behaviorScoreMap) {
-                        behaviorSum += behaviorScoreMap[record.behavior];
-                        behaviorCount++;
-                    }
+            activeStudents.forEach(student => {
+                // Check if student exists and has registration date
+                if (student && student.registrationDate && isValid(new Date(student.registrationDate))) {
+                    if (sessionDate >= new Date(student.registrationDate)) {
+                        totalPossibleAttendance++;
+                        const record = session.records?.find(r => r.studentId === student.id);
+                        if (record) {
+                            if (record.attendance === 'حاضر' || record.attendance === 'متأخر') {
+                                totalAttendance++;
+                            }
 
-                    if (session.sessionType === 'حصة أساسية') {
-                        reviewCount++;
-                        if (record.review) {
-                            reviewSum++;
+                            if (record.behavior && record.behavior in behaviorScoreMap) {
+                                behaviorSum += behaviorScoreMap[record.behavior];
+                                behaviorCount++;
+                            }
+
+                            if (session.sessionType === 'حصة أساسية') {
+                                reviewCount++;
+                                if (record.review) {
+                                    reviewSum++;
+                                }
+                            }
+
+                            if (record.memorization && record.memorization in memorizationScoreMap) {
+                                memorizationSum += memorizationScoreMap[record.memorization];
+                                memorizationCount++;
+                            }
                         }
                     }
-
-                    if (record.memorization && record.memorization in memorizationScoreMap) {
-                        memorizationSum += memorizationScoreMap[record.memorization];
-                        memorizationCount++;
-                    }
                 }
-            }
+            });
         });
-    });
 
-    const attendanceScore = totalPossibleAttendance > 0 ? (totalAttendance / totalPossibleAttendance) * 100 : 0;
-    const behaviorScore = behaviorCount > 0 ? (behaviorSum / behaviorCount) * 10 : 0;
-    const reviewScore = reviewCount > 0 ? (reviewSum / reviewCount) * 100 : 0;
-    const memorizationScore = memorizationCount > 0 ? (memorizationSum / memorizationCount) * 10 : 0;
+        const attendanceScore = totalPossibleAttendance > 0 ? (totalAttendance / totalPossibleAttendance) * 100 : 0;
+        const behaviorScore = behaviorCount > 0 ? (behaviorSum / behaviorCount) * 10 : 0;
+        const reviewScore = reviewCount > 0 ? (reviewSum / reviewCount) * 100 : 0;
+        const memorizationScore = memorizationCount > 0 ? (memorizationSum / memorizationCount) * 10 : 0;
 
-    const commitmentScore = (attendanceScore + behaviorScore + reviewScore + memorizationScore) / 4;
+        const commitmentScore = (attendanceScore + behaviorScore + reviewScore + memorizationScore) / 4;
 
-    return {
-        attendance: attendanceScore,
-        behavior: behaviorScore,
-        review: reviewScore,
-        memorization: memorizationScore,
-        commitment: commitmentScore
-    };
+        return {
+            attendance: attendanceScore || 0,
+            behavior: behaviorScore || 0,
+            review: reviewScore || 0,
+            memorization: memorizationScore || 0,
+            commitment: commitmentScore || 0
+        };
+    } catch (error) {
+        console.error("Error calculating stats:", error);
+        return { attendance: 0, behavior: 0, review: 0, memorization: 0, commitment: 0 };
+    }
 };
 
 export function GroupEvaluationCard({ students, sessions, groupName }: { students: Student[]; sessions: Record<string, Record<string, DailySession>>; groupName?: string | null; }) {
