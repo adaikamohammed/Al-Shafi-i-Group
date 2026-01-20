@@ -1,0 +1,16 @@
+# Task: Management Expansion - Filtering & Aggregation
+
+- [ ] Phase 1: Core Filtering Component
+    - [ ] Create `src/components/management/GroupSelector.tsx`
+- [ ] Phase 2: Upgrade Management Dashboard
+    - [ ] Update [src/components/management/ManagementDashboard.tsx](file:///g:/Al-Shafi-i-Group-main/Al-Shafi-i-Group-main/src/components/management/ManagementDashboard.tsx) to include `GroupSelector`
+    - [ ] Implement filtering logic for stats cards in Dashboard
+- [ ] Phase 3: Update Management Pages
+    - [ ] Update [/management/groups/page.tsx](file:///g:/Al-Shafi-i-Group-main/Al-Shafi-i-Group-main/src/app/management/groups/page.tsx) to support specific group view
+    - [ ] Update [/management/sheikhs/page.tsx](file:///g:/Al-Shafi-i-Group-main/Al-Shafi-i-Group-main/src/app/management/sheikhs/page.tsx)
+- [ ] Phase 4: Integrate with Main Data Pages
+    - [ ] Update `/data/page.tsx` (Students List) to support management filtering
+    - [ ] Update `/stats/page.tsx` (Statistics) to support management filtering
+- [ ] Phase 5: Verification
+    - [ ] Verify global stats (all students)
+    - [ ] Verify filtered stats (specific group)

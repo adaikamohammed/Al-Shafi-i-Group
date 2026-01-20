@@ -12,6 +12,8 @@ import { format, startOfWeek, endOfWeek, addDays, subDays, parseISO } from 'date
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import type { Student, DailySession, DailyRecord, PerformanceLevel, Covenant } from '@/lib/types';
+import { useAuth } from '@/context/AuthContext';
+import { GroupSelector } from '@/components/management/GroupSelector';
 
 
 const getAttendanceColor = (status?: string) => {
@@ -133,16 +135,24 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
 
 export default function WeeklyFollowUpPage() {
     const { students, dailySessions, loading } = useStudentContext();
+    const { isManagement } = useAuth();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
+    const [selectedGroup, setSelectedGroup] = useState<string>('all');
     const [currentDate, setCurrentDate] = useState(new Date());
 
     const activeStudents = useMemo(() => {
-        const filtered = (students ?? []).filter(s => s.status === 'نشط');
+        let filtered = (students ?? []).filter(s => s.status === 'نشط');
+
+        // Management Group Filter
+        if (isManagement && selectedGroup !== 'all') {
+            filtered = filtered.filter(s => s.ownerId === selectedGroup);
+        }
+
         if (selectedStudentId !== 'all') {
             return filtered.filter(s => s.id === selectedStudentId);
         }
         return filtered.sort((a, b) => a.fullName.localeCompare(b.fullName));
-    }, [students, selectedStudentId]);
+    }, [students, selectedStudentId, selectedGroup, isManagement]);
 
     const weekDates = useMemo(() => {
         const start = startOfWeek(currentDate, { weekStartsOn: 6 }); // Saturday
@@ -217,14 +227,15 @@ export default function WeeklyFollowUpPage() {
                         </span>
                         <Button variant="outline" size="icon" onClick={handleNextWeek}><ArrowLeft className="h-4 w-4" /></Button>
                     </div>
-                    <div className="flex gap-2 w-full md:w-auto">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        {isManagement && <GroupSelector value={selectedGroup} onChange={setSelectedGroup} />}
                         <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
                             <SelectTrigger className="w-full md:w-[200px]">
                                 <SelectValue placeholder="اختر طالبًا" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">كل الطلبة النشطين</SelectItem>
-                                {(students ?? []).filter(s => s.status === 'نشط').map(student => (
+                                {activeStudents.map(student => (
                                     <SelectItem key={student.id} value={student.id}>
                                         {student.fullName}
                                     </SelectItem>

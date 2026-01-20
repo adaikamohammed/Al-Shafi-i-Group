@@ -22,6 +22,7 @@ import { format } from 'date-fns';
 import { StudentTable } from './student/StudentTable';
 import { StudentForm } from './student/StudentForm';
 import { StudentProfileCard } from './student/StudentProfileCard';
+import { GroupSelector } from './management/GroupSelector';
 
 // Refactored Hooks
 import { useStudentStats } from '@/hooks/useStudentStats';
@@ -30,8 +31,9 @@ const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ا
 
 export default function StudentManagement() {
     const router = useRouter();
-    const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings, addStudent } = useStudentContext();
-    const { user, isSuperAdmin } = useAuth();
+    const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings, addStudent, allUsers } = useStudentContext();
+    const { user, isSuperAdmin, isManagement } = useAuth();
+    const [selectedGroup, setSelectedGroup] = useState<string>('all');
     const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
     const [isEditStudentDialogOpen, setEditStudentDialogOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -77,7 +79,7 @@ export default function StudentManagement() {
     }
 
     const handleExportStudents = () => {
-        const dataToExport = (students ?? []).map(s => ({
+        const dataToExport = filteredStudents.map(s => ({
             "الاسم الكامل": s.fullName,
             "الفوج": s.groupName || 'غير محدد',
             "اسم الولي": s.guardianName,
@@ -107,7 +109,12 @@ export default function StudentManagement() {
     }
 
     const filteredStudents = useMemo(() => {
-        let sortableStudents = isSuperAdmin ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
+        let sortableStudents = isSuperAdmin || isManagement ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
+
+        // Management Filter
+        if (isManagement && selectedGroup !== 'all') {
+            sortableStudents = sortableStudents.filter(s => s.ownerId === selectedGroup);
+        }
         sortableStudents = sortableStudents.filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
         if (statusFilter !== 'all') sortableStudents = sortableStudents.filter(s => s.status === statusFilter);
         if (levelFilter.length > 0) sortableStudents = sortableStudents.filter(s => s.educationalLevel && levelFilter.includes(s.educationalLevel));
@@ -128,9 +135,15 @@ export default function StudentManagement() {
             return 0;
         });
         return sortableStudents;
-    }, [students, searchTerm, statusFilter, levelFilter, user, isSuperAdmin, sortConfig]);
+    }, [students, searchTerm, statusFilter, levelFilter, user, isSuperAdmin, isManagement, selectedGroup, sortConfig]);
 
-    const allStudents = useMemo(() => isSuperAdmin ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid), [students, user, isSuperAdmin]);
+    const allStudents = useMemo(() => {
+        let list = isSuperAdmin || isManagement ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
+        if (isManagement && selectedGroup !== 'all') {
+            list = list.filter(s => s.ownerId === selectedGroup);
+        }
+        return list;
+    }, [students, user, isSuperAdmin, isManagement, selectedGroup]);
 
     if (loading) {
         return <div className="flex items-center justify-center h-full"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -191,7 +204,8 @@ export default function StudentManagement() {
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
                     <h1 className="text-3xl font-headline font-bold">إدارة الطلبة</h1>
                     <div className="flex w-full sm:w-auto items-center gap-2">
-                        {!isSuperAdmin && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
+                        {isManagement && <GroupSelector value={selectedGroup} onChange={setSelectedGroup} className="w-[200px]" />}
+                        {!isSuperAdmin && !isManagement && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
                             <DialogTrigger asChild><Button className="w-full sm:w-auto"><PlusCircle className="ml-2 h-4 w-4" />إضافة طالب جديد</Button></DialogTrigger>
                             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl">
                                 <StudentForm addStudent={addStudent} onSuccess={() => setAddStudentDialogOpen(false)} onCancel={() => setAddStudentDialogOpen(false)} />

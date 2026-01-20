@@ -1,0 +1,80 @@
+# خطة توسيع صلاحيات ومميزات حساب الإدارة (Management Expansion Plan)
+
+## الهدف العام
+تمكين حساب الإدارة (`admin00`) من العرض الشامل والتفصيلي لبيانات المدرسة، مع إمكانية:
+1. عرض إحصائيات المدرسة ككل (School-wide Stats).
+2. تصفية البيانات (Filtering) لعرض فوج محدد (من 1 إلى 9) في جميع الصفحات الرئيسية (الطلاب، الإحصائيات، الترتيب).
+3. التنقل السلس بين النظرة الشاملة والنظرة التفصيلية لكل فوج.
+
+---
+
+## 🏗️ المرحلة 1: تحضير بنية البيانات (Data Architecture)
+
+### 1.1 التأكد من توفر البيانات (تم جزئياً)
+- [x] [StudentContext](file:///g:/Al-Shafi-i-Group-main/Al-Shafi-i-Group-main/src/context/StudentContext.tsx#812-819) يجلب كل الطلاب للإدارة (`ref(db, 'users')`).
+- [ ] التأكد من سهولة الوصول لبيانات "اسم الفوج" و "الشيخ المسؤول" لكل طالب لغرض التصفية.
+    - سنستخدم `ownerId` للطالب لربطه ببيانات الشيخ من `allUsers`.
+
+### 1.2 إنشاء مكون "محدد الفوج" (Group Filter Component)
+- **المكون**: `GroupSelector.tsx`
+- **الوظيفة**: قائمة منسدلة (Select) تحتوي على:
+    - "كل المدرسة" (الافتراضي)
+    - قائمة الأفواج (فوج 1 - الشيخ س، فوج 2 - الشيخ ص...)
+- **البيانات**: تستمد القائمة من `allUsers` (المشايخ فقط).
+
+---
+
+## 🎨 المرحلة 2: تطوير لوحة التحكم الرئيسية (Dashboard Upgrade)
+
+### 2.1 تحويل [ManagementDashboard](file:///g:/Al-Shafi-i-Group-main/Al-Shafi-i-Group-main/src/components/management/ManagementDashboard.tsx#50-227) إلى واجهة تفاعلية
+- **الحالة (State)**: إضافة `selectedGroupId` للتحكم في البيانات المعروضة.
+- **بطاقات الإحصائيات (Stats Cards)**:
+    - تحديث الأرقام بناءً على الفوج المختار (إجمالي الطلاب، الحفظ، الحضور).
+- **الرسوم البيانية**:
+    - إضافة رسم بياني للمقارنة بين الأفواج (Bar Chart) يظهر عند اختيار "كل المدرسة".
+    - إظهار تفاصيل تطور الفوج عند اختيار فوج محدد.
+
+---
+
+## 📊 المرحلة 3: دمج التصفية في الصفحات الرئيسية
+
+### 3.1 صفحة إدارة الطلاب (`/data`)
+- إضافة `GroupSelector` في الشريط العلوي للإدارة.
+- تصفية جدول الطلاب لعرض طلاب الفوج المختار فقط.
+
+### 3.2 صفحة الإحصائيات (`/stats`)
+- تمكين الإدارة من رؤية إحصائيات فوج معين بدلاً من رؤية إحصائيات "حساب الإدارة" الفارغة.
+- عند اختيار "كل المدرسة"، عرض متوسطات الأداء للمدرسة.
+
+### 3.3 صفحة الترتيب (`/ranking`)
+- إمكانية ترتيب الطلاب على مستوى المدرسة (Global Ranking) أو على مستوى الفوج (Local Ranking).
+
+---
+
+## 🛠️ التنفيذ التقني (خطوات العمل)
+
+### ملف: `src/components/management/GroupSelector.tsx` [NEW]
+```typescript
+// مكون يعرض قائمة المشايخ/الأفواج ويسمح بالاختيار
+// Props: value, onChange, showAllOption
+```
+
+### تحديث: [src/components/management/ManagementDashboard.tsx](file:///g:/Al-Shafi-i-Group-main/Al-Shafi-i-Group-main/src/components/management/ManagementDashboard.tsx) [MODIFY]
+- استيراد `GroupSelector`.
+- استخدام `useMemo` لحساب الإحصائيات بناءً على الفوج المختار.
+
+### تحديث: `src/app/data/page.tsx` (مثال) [MODIFY]
+```typescript
+const filteredStudents = useMemo(() => {
+  if (!isManagement || selectedGroup === 'all') return students;
+  return students.filter(s => s.ownerId === selectedGroup);
+}, [students, selectedGroup, isManagement]);
+```
+
+---
+
+## ✅ معايير القبول (Acceptance Criteria)
+1. عند دخول الإدارة، تظهر إحصائيات كل المدرسة افتراضياً.
+2. يمكن اختيار "فوج الشيخ زياد" فتتغير كل الأرقام لتخص هذا الفوج فقط.
+3. صفحة "إدارة الطلاب" تظهر كل الطلاب افتراضياً، ويمكن تصفيتهم حسب الفوج.
+4. البيانات دقيقة ومتطابقة مع ما يراه شيخ الفوج في حسابه.

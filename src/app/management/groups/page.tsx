@@ -9,10 +9,12 @@ import { ProtectedPage } from '@/components/ui/ProtectedPage';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
 import { PORTAL_THEMES } from '@/lib/themes';
+import { GroupSelector } from '@/components/management/GroupSelector';
 
 export default function GroupsMonitoringPage() {
     const { students, allUsers } = useStudentContext();
     const { user } = useAuth();
+    const [selectedGroup, setSelectedGroup] = React.useState<string>('all');
 
     const currentThemeId = user?.portalTheme || 'midnight';
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
@@ -47,8 +49,15 @@ export default function GroupsMonitoringPage() {
             if (student.status === 'نشط') groups[gName].activeCount++;
         });
 
-        return Object.values(groups);
-    }, [students, allUsers]);
+        return Object.values(groups).filter(g => {
+            if (selectedGroup === 'all') return true;
+            // Find the sheikh UID for this group if possible, or filter by what we have.
+            // Our GroupSelector returns UID. 'groups' keys are Group Names.
+            // We need to match UID to GroupName.
+            const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
+            return selectedSheikh ? g.groupName === selectedSheikh.group : true;
+        });
+    }, [students, allUsers, selectedGroup]);
 
     return (
         <ProtectedPage>
@@ -58,6 +67,7 @@ export default function GroupsMonitoringPage() {
                         <h1 className="text-3xl md:text-4xl font-headline font-bold">مراقبة الأفواج</h1>
                         <p className="text-muted-foreground font-body text-lg">نظرة شاملة على جميع المجموعات التعليمية والمشايخ.</p>
                     </div>
+                    <GroupSelector value={selectedGroup} onChange={setSelectedGroup} />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

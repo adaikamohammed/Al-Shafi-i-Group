@@ -15,6 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useAuth } from '@/context/AuthContext';
+import { GroupSelector } from '@/components/management/GroupSelector';
 
 
 interface StudentScore {
@@ -46,8 +48,10 @@ interface StudentScore {
 
 export default function RankingPage() {
     const { students, dailySessions, loading, settings } = useStudentContext();
+    const { isManagement } = useAuth();
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+    const [selectedGroup, setSelectedGroup] = useState<string>('all');
 
     const pointsConfig = settings.points;
 
@@ -69,8 +73,13 @@ export default function RankingPage() {
 
         const studentScores: Record<string, StudentScore> = {};
 
+        let studentsToRank = students ?? [];
+        if (isManagement && selectedGroup !== 'all') {
+            studentsToRank = studentsToRank.filter(s => s.ownerId === selectedGroup);
+        }
+
         // Initialize all students, active or not
-        (students ?? []).forEach(student => {
+        studentsToRank.forEach(student => {
             studentScores[student.id] = {
                 id: student.id,
                 name: student.fullName,
@@ -187,7 +196,8 @@ export default function RankingPage() {
             <div className="space-y-6">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                     <h1 className="text-3xl font-headline font-bold">لوحة شرف الطلبة</h1>
-                    <div className="flex gap-2 w-full md:w-auto">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        {isManagement && <GroupSelector value={selectedGroup} onChange={setSelectedGroup} />}
                         <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
                             <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
                             <SelectContent>

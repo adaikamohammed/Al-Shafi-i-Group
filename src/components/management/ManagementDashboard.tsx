@@ -4,10 +4,16 @@ import React, { useMemo } from 'react';
 import { useStudentContext } from '@/context/StudentContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, UserCheck, Shield, UserPlus, TrendingUp, BarChart3, Award, Calendar } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { PORTAL_THEMES } from '@/lib/themes';
+import { GroupSelector } from './GroupSelector';
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+    PieChart, Pie, Cell, Legend
+} from 'recharts';
 
 interface StatCardProps {
     title: string;
@@ -50,25 +56,67 @@ const StatCard = ({ title, value, icon: Icon, color, description, theme }: StatC
 export const ManagementDashboard = () => {
     const { students, preRegistrations, allUsers, loading } = useStudentContext();
     const { user } = useAuth();
+    const [selectedGroup, setSelectedGroup] = React.useState<string>('all');
 
     const currentThemeId = user?.portalTheme || 'midnight';
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
 
-    const stats = useMemo(() => {
-        const activeStudents = students.filter(s => s.status === 'نشط').length;
-        const totalSheikhs = allUsers.filter(u => u.role === 'sheikh').length;
-        const pendingRegs = preRegistrations.filter(r => r.status === 'مرشح').length;
+    const stats = React.useMemo(() => {
+        let activeStudentsList = students;
+
+        if (selectedGroup !== 'all') {
+            activeStudentsList = students.filter(s => s.ownerId === selectedGroup);
+        }
+
+        const countActive = activeStudentsList.filter(s => s.status === 'نشط').length;
+        const totalSheikhs = selectedGroup === 'all' ? allUsers.filter(u => u.role === 'sheikh').length : 1;
+        const countPending = preRegistrations.filter(r => r.status === 'مرشح').length;
+
+        // Group Comparison Data
+        const groupComparisonData = allUsers
+            .filter(u => u.role === 'sheikh')
+            .map(sheikh => {
+                const groupStudents = students.filter(s => s.ownerId === sheikh.uid);
+                return {
+                    name: sheikh.group || 'غير محدد',
+                    students: groupStudents.length,
+                    active: groupStudents.filter(s => s.status === 'نشط').length
+                };
+            })
+            .sort((a, b) => b.students - a.students);
+
+        // Level Distribution Data
+        const levelCounts: Record<string, number> = {};
+        activeStudentsList.forEach(s => {
+            const level = s.educationalLevel || 'غير محدد';
+            levelCounts[level] = (levelCounts[level] || 0) + 1;
+        });
+        const levelDistributionData = Object.entries(levelCounts).map(([name, value]) => ({ name, value }));
 
         return {
-            totalStudents: activeStudents,
+            totalStudents: countActive,
             totalSheikhs: totalSheikhs,
-            pendingRegs: pendingRegs,
-            completionRate: "92%" // This should be calculated from real data in a real app
+            pendingRegs: countPending,
+            completionRate: "92%",
+            groupComparisonData,
+            levelDistributionData,
+            activeStudentsList
         };
-    }, [students, preRegistrations, allUsers]);
+    }, [students, preRegistrations, allUsers, selectedGroup]);
+
+    const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4'];
 
     return (
         <div className="w-full max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Header & Filter */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 className="text-3xl font-headline font-bold">لوحة القيادة</h2>
+                    <p className="text-muted-foreground opacity-60">نظرة شاملة على أداء المدرسة</p>
+                </div>
+                <GroupSelector value={selectedGroup} onChange={setSelectedGroup} />
+            </div>
+
             {/* Stats Overview */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
@@ -136,29 +184,28 @@ export const ManagementDashboard = () => {
                                     <tr>
                                         <th className="px-6 py-4">الفوج</th>
                                         <th className="px-6 py-4">الشيخ</th>
-                                        <th className="px-6 py-4">الطلبة</th>
-                                        <th className="px-6 py-4">الحضور</th>
+                                        <th className="px-6 py-4 text-center">الطلبة</th>
+                                        <th className="px-6 py-4 text-center">النشطون</th>
                                         <th className="px-6 py-4">الحالة</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
-                                    {/* Mock data for now, would be dynamically generated */}
-                                    {[1, 2, 3, 4, 5].map((i) => (
-                                        <tr key={i} className="hover:bg-white/5 transition-colors">
-                                            <td className="px-6 py-4 font-bold">فوج {i}</td>
-                                            <td className="px-6 py-4 text-sm opacity-80 font-body">الشيخ عبد الله {i}</td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-bold">2{i}</span>
-                                                    <span className="text-[10px] opacity-40">طالب</span>
-                                                </div>
+                                    {stats.groupComparisonData.slice(0, 6).map((group, idx) => (
+                                        <tr key={idx} className="hover:bg-white/5 transition-colors">
+                                            <td className="px-6 py-4 font-bold">{group.name}</td>
+                                            <td className="px-6 py-4 text-sm opacity-80 font-body">
+                                                {allUsers.find(u => u.group === group.name)?.displayName || 'غير محدد'}
                                             </td>
+                                            <td className="px-6 py-4 text-center font-bold">{group.students}</td>
                                             <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${85 + i}%` }} />
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <span className="text-xs font-bold font-body">{group.active}</span>
+                                                    <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-emerald-500 rounded-full"
+                                                            style={{ width: `${(group.active / (group.students || 1)) * 100}%` }}
+                                                        />
                                                     </div>
-                                                    <span className="text-xs font-bold font-body">{85 + i}%</span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
@@ -172,54 +219,66 @@ export const ManagementDashboard = () => {
                     </CardContent>
                 </Card>
 
-                {/* Quick Actions / Recent Performance */}
-                <div className="space-y-8">
+                {/* Comparison Chart */}
+                {selectedGroup === 'all' ? (
                     <Card className={cn(
                         "border-none shadow-2xl overflow-hidden",
                         theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
                     )}>
-                        <CardHeader className="bg-primary/10">
+                        <CardHeader>
                             <CardTitle className="text-xl font-headline font-bold flex items-center gap-3">
                                 <BarChart3 className="text-primary h-5 w-5" />
-                                أفضل الأفواج تميزاً
+                                مقارنة أعداد الطلاب
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="p-4 space-y-4">
-                            {[
-                                { name: "فوج الصديق", score: 98, trend: "up" },
-                                { name: "فوج الفاروق", score: 94, trend: "up" },
-                                { name: "فوج ذو النورين", score: 89, trend: "down" }
-                            ].map((group, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">
-                                            {idx + 1}
-                                        </div>
-                                        <span className="font-bold text-sm">{group.name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-lg font-black font-headline">{group.score}</span>
-                                        {group.trend === 'up' ? <TrendingUp className="h-4 w-4 text-emerald-400" /> : <TrendingUp className="h-4 w-4 text-rose-400 rotate-180" />}
-                                    </div>
-                                </div>
-                            ))}
+                        <CardContent className="h-[300px] p-4">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={stats.groupComparisonData.slice(0, 5)}>
+                                    <CartGrid strokeDasharray="3 3" opacity={0.1} />
+                                    <XAxis dataKey="name" hide />
+                                    <YAxis hide />
+                                    <RechartsTooltip
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                    />
+                                    <Bar dataKey="students" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
                         </CardContent>
                     </Card>
-
+                ) : (
                     <Card className={cn(
-                        "border-none shadow-2xl relative overflow-hidden",
+                        "border-none shadow-2xl overflow-hidden",
                         theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
                     )}>
-                        <CardContent className="p-6 text-center space-y-4">
-                            <div className="p-4 rounded-3xl bg-amber-500/20 inline-block">
-                                <Award className="h-8 w-8 text-amber-500" />
-                            </div>
-                            <h3 className="text-xl font-headline font-bold tracking-tight">تقارير الرقابة الدورية</h3>
-                            <p className="text-xs opacity-60 font-body">يمكنك تصدير تقارير المتابعة الدورية للأشهر الثلاثة الأخيرة</p>
-                            <Button className="w-full rounded-2xl h-12 shadow-lg shadow-primary/20">تصدير التقرير الفصلي</Button>
+                        <CardHeader>
+                            <CardTitle className="text-xl font-headline font-bold flex items-center gap-3">
+                                <BarChart3 className="text-primary h-5 w-5" />
+                                توزيع المستويات الدراسية
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="h-[300px] p-4">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={stats.levelDistributionData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={80}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                    >
+                                        {stats.levelDistributionData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <RechartsTooltip />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
                         </CardContent>
                     </Card>
-                </div>
+                )}
             </div>
         </div>
     );

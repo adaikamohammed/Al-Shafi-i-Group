@@ -93,7 +93,7 @@ interface StudentContextType {
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-  const { user: authContextUser, loading: authLoading, isSuperAdmin, isManagement } = useAuth();
+  const { user: authContextUser, loading: authLoading, isSuperAdmin, isManagement, role } = useAuth();
   const { toast } = useToast();
 
   const [students, setStudents] = useState<Student[]>([]);
@@ -132,15 +132,24 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     let dataListener: () => void;
     let preRegsListener: () => void;
 
-    const allUsersRef = ref(db, 'users');
-    const allUsersListener = onValue(allUsersRef, (snapshot) => {
-      const usersData = snapshot.val();
-      const usersArray = usersData ? Object.entries(usersData).map(([uid, data]: [string, any]) => ({
-        uid,
-        ...data.profile
-      })) : [];
-      setAllUsers(usersArray);
-    });
+    // Only fetch allUsers list for management/super_admin or if specifically needed
+    let allUsersRef: DatabaseReference | null = null;
+    let allUsersListener: (() => void) | null = null;
+
+    if (isSuperAdmin || isManagement) {
+      console.log(`[StudentContext] Setting up allUsers listener for role: ${role}`);
+      allUsersRef = ref(db, 'users');
+      allUsersListener = onValue(allUsersRef, (snapshot) => {
+        const usersData = snapshot.val();
+        const usersArray = usersData ? Object.entries(usersData).map(([uid, data]: [string, any]) => ({
+          uid,
+          ...data.profile
+        })) : [];
+        setAllUsers(usersArray);
+      }, (error) => {
+        console.error(`Firebase read failed for allUsers (role: ${role}): ${error.message}`);
+      });
+    }
 
 
     const processStudentData = (studentData: any, uid: string, groupName?: string): Student => ({
@@ -160,15 +169,21 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       birthDate: preReg.birthDate && isValid(parseISO(preReg.birthDate)) ? parseISO(preReg.birthDate) : preReg.birthDate,
     });
 
-    // Listener for pre_registrations
-    preRegsRef = ref(db, 'pre_registrations');
-    preRegsListener = onValue(preRegsRef, (snapshot) => {
-      const data = snapshot.val();
-      const preRegsArray: PreRegistration[] = data ? Object.entries(data).map(([id, r]) => processPreRegData({ id, ...(r as any) })) : [];
-      setPreRegistrations(preRegsArray);
-    }, (error) => {
-      console.error(`Firebase read failed for pre_registrations: ${error.message}`);
-    });
+    // Only fetch pre_registrations for management/super_admin
+    if (isSuperAdmin || isManagement) {
+      preRegsRef = ref(db, 'pre_registrations');
+      preRegsListener = onValue(preRegsRef, (snapshot) => {
+        const data = snapshot.val();
+        const preRegsArray: PreRegistration[] = data ? Object.entries(data).map(([id, r]) => processPreRegData({ id, ...(r as any) })) : [];
+        setPreRegistrations(preRegsArray);
+      }, (error) => {
+        if (error.message.includes('permission_denied')) {
+          console.warn(`[StudentContext] Permission denied for ${role} on /pre_registrations.`);
+        } else {
+          console.error(`Firebase read failed for pre_registrations: ${error.message}`);
+        }
+      });
+    }
 
 
     if (isSuperAdmin || isManagement) {
@@ -222,7 +237,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setSettingsState(finalSettings);
         setLoading(false);
       }, (error) => {
-        console.error(`Firebase read failed for super_admin: ${error.message}`);
+        if (error.message.includes('permission_denied')) {
+          console.warn(`[StudentContext] Permission denied for ${role} on /users. Falling back to personal data.`);
+        } else {
+          console.error(`Firebase read failed for ${role}: ${error.message}`);
+        }
         setLoading(false);
       });
 
@@ -259,9 +278,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
 
     return () => {
-      off(dataRef, 'value', dataListener);
-      off(preRegsRef, 'value', preRegsListener);
-      off(allUsersRef, 'value', allUsersListener);
+      if (dataRef && dataListener) off(dataRef, 'value', dataListener);
+      if (preRegsRef && preRegsListener) off(preRegsRef, 'value', preRegsListener);
+      if (allUsersRef && allUsersListener) off(allUsersRef, 'value', allUsersListener);
     };
   }, [authContextUser, authLoading, isSuperAdmin, isManagement]);
 
