@@ -54,9 +54,15 @@ const StatCard = ({ title, value, icon: Icon, color, description, theme }: StatC
 );
 
 export const ManagementDashboard = () => {
-    const { students, preRegistrations, allUsers, loading } = useStudentContext();
+    const { students, preRegistrations, allUsers, loading, generateDemoData } = useStudentContext();
     const { user } = useAuth();
     const [selectedGroup, setSelectedGroup] = React.useState<string>('all');
+
+    React.useEffect(() => {
+        const handleGenerate = () => generateDemoData();
+        window.addEventListener('GENERATE_DEMO_DATA', handleGenerate);
+        return () => window.removeEventListener('GENERATE_DEMO_DATA', handleGenerate);
+    }, [generateDemoData]);
 
     const currentThemeId = user?.portalTheme || 'midnight';
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
@@ -114,7 +120,21 @@ export const ManagementDashboard = () => {
                     <h2 className="text-3xl font-headline font-bold">لوحة القيادة</h2>
                     <p className="text-muted-foreground opacity-60">نظرة شاملة على أداء المدرسة</p>
                 </div>
-                <GroupSelector value={selectedGroup} onChange={setSelectedGroup} />
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            if (window.confirm('هل أنت متأكد من توليد بيانات تجريبية؟ سيتم إضافة مشايخ وطلاب وهميين.')) {
+                                window.dispatchEvent(new CustomEvent('GENERATE_DEMO_DATA'));
+                            }
+                        }}
+                        className="gap-2 border-dashed border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-600"
+                    >
+                        <Shield className="h-4 w-4" />
+                        تهيئة النظام
+                    </Button>
+                    <GroupSelector value={selectedGroup} onChange={setSelectedGroup} />
+                </div>
             </div>
 
             {/* Stats Overview */}
@@ -234,7 +254,7 @@ export const ManagementDashboard = () => {
                         <CardContent className="h-[300px] p-4">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={stats.groupComparisonData.slice(0, 5)}>
-                                    <CartGrid strokeDasharray="3 3" opacity={0.1} />
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
                                     <XAxis dataKey="name" hide />
                                     <YAxis hide />
                                     <RechartsTooltip

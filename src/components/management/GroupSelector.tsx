@@ -31,7 +31,12 @@ export function GroupSelector({ value, onChange, className }: GroupSelectorProps
     const sheikhs = useMemo(() => {
         return allUsers
             .filter(u => u.role === 'sheikh')
-            .sort((a, b) => (a.group || '').localeCompare(b.group || ''));
+            .sort((a, b) => {
+                // Extract group number from string "فوج X"
+                const groupA = parseInt((a.group || '').replace(/[^0-9]/g, '')) || 999;
+                const groupB = parseInt((b.group || '').replace(/[^0-9]/g, '')) || 999;
+                return groupA - groupB;
+            });
     }, [allUsers]);
 
     return (

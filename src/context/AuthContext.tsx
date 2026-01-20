@@ -21,15 +21,15 @@ import { format, parseISO } from 'date-fns';
 const sheikhInitialData: { [email: string]: { name: string; group: string; role: 'sheikh' | 'super_admin' | 'management' } } = {
   "admin0@gmail.com": { name: "المدير العام", group: "كل الأفواج", role: "super_admin" },
   "admin00@gmail.com": { name: "الإدارة", group: "كل الأفواج", role: "management" },
-  "admin1@gmail.com": { name: "الشيخ زياد درويش", group: "فوج الشيخ زياد درويش", role: "sheikh" },
-  "admin2@gmail.com": { name: "الشيخ عبد الحميد", group: "فوج الشيخ عبد الحميد", role: "sheikh" },
-  "admin3@gmail.com": { name: "الشيخ فؤاد بن عمر", group: "فوج الشيخ فؤاد بن عمر", role: "sheikh" },
-  "admin4@gmail.com": { name: "الشيخ أحمد بن عمر", group: "فوج الشيخ أحمد بن عمر", role: "sheikh" },
-  "admin5@gmail.com": { name: "الشيخ إبراهيم مراد", group: "فوج الشيخ إبراهيم مراد", role: "sheikh" },
-  "admin6@gmail.com": { name: "الشيخ سفيان نصيرة", group: "فوج الشيخ سفيان نصيرة", role: "sheikh" },
-  "admin7@gmail.com": { name: "الشيخ محمد منصور", group: "فوج الشيخ محمد منصور", role: "sheikh" },
-  "admin8@gmail.com": { name: "الشيخ عبد الحق نصيرة", group: "فوج الشيخ عبد الحق نصيرة", role: "sheikh" },
-  "admin9@gmail.com": { name: "الشيخ صهيب نصيب", group: "فوج الشيخ صهيب نصيب", role: "sheikh" },
+  "admin1@gmail.com": { name: "الشيخ زياد درويش", group: "فوج 1", role: "sheikh" },
+  "admin2@gmail.com": { name: "الشيخ عبد الحميد", group: "فوج 2", role: "sheikh" },
+  "admin3@gmail.com": { name: "الشيخ فؤاد بن عمر", group: "فوج 3", role: "sheikh" },
+  "admin4@gmail.com": { name: "الشيخ أحمد بن عمر", group: "فوج 4", role: "sheikh" },
+  "admin5@gmail.com": { name: "الشيخ إبراهيم مراد", group: "فوج 5", role: "sheikh" },
+  "admin6@gmail.com": { name: "الشيخ سفيان نصيرة", group: "فوج 6", role: "sheikh" },
+  "admin7@gmail.com": { name: "الشيخ محمد منصور", group: "فوج 7", role: "sheikh" },
+  "admin8@gmail.com": { name: "الشيخ عبد الحق نصيرة", group: "فوج 8", role: "sheikh" },
+  "admin9@gmail.com": { name: "الشيخ صهيب نصيب", group: "فوج 9", role: "sheikh" },
 };
 
 export interface UpdateProfileData extends Partial<AppUser> {

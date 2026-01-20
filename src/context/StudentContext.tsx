@@ -88,6 +88,7 @@ interface StudentContextType {
   addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
   updatePaymentStatus: (paymentId: string, status: PaymentStatus, amount: number) => Promise<void>;
   saveSettings: (newSettings: AppSettings) => Promise<void>;
+  generateDemoData: () => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -821,8 +822,83 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     await set(settingsRef, newSettings);
   };
 
+  const generateDemoData = async () => {
+    if (!isManagement && !isSuperAdmin) return;
+
+    setLoading(true);
+    try {
+      const demoSheikhs = [
+        { name: "الشيخ زياد درويش", group: "فوج 1", email: "admin1@gmail.com" },
+        { name: "الشيخ عبد الحميد", group: "فوج 2", email: "admin2@gmail.com" },
+        { name: "الشيخ فؤاد بن عمر", group: "فوج 3", email: "admin3@gmail.com" },
+        { name: "الشيخ أحمد بن عمر", group: "فوج 4", email: "admin4@gmail.com" },
+        { name: "الشيخ إبراهيم مراد", group: "فوج 5", email: "admin5@gmail.com" },
+        { name: "الشيخ سفيان نصيرة", group: "فوج 6", email: "admin6@gmail.com" },
+        { name: "الشيخ محمد منصور", group: "فوج 7", email: "admin7@gmail.com" },
+        { name: "الشيخ عبد الحق نصيرة", group: "فوج 8", email: "admin8@gmail.com" },
+        { name: "الشيخ صهيب نصيب", group: "فوج 9", email: "admin9@gmail.com" },
+      ];
+
+      const updates: any = {};
+
+      demoSheikhs.forEach((sheikh, index) => {
+        const fakeUid = `demo_sheikh_${index + 1}`;
+
+        // 1. Create Profile
+        updates[`users/${fakeUid}/profile`] = {
+          displayName: sheikh.name,
+          email: sheikh.email,
+          group: sheikh.group,
+          role: 'sheikh',
+          joinDate: new Date().toISOString(),
+          isDemo: true
+        };
+
+        // 2. Create Dummy Students for each Sheikh (3 students each)
+        for (let i = 1; i <= 3; i++) {
+          const studentId = uuidv4();
+          updates[`users/${fakeUid}/students/${studentId}`] = {
+            id: studentId,
+            fullName: `طالب ${i} - ${sheikh.group}`,
+            birthDate: new Date(2010, 0, 1).toISOString(),
+            registrationDate: new Date().toISOString(),
+            status: 'نشط',
+            educationalLevel: 'متوسط',
+            subscriptionTier: 'فئة الأصاغر',
+            ownerId: fakeUid,
+            groupName: sheikh.group,
+            memorizedSurahsCount: Math.floor(Math.random() * 10),
+            updatedAt: new Date().toISOString(),
+            photoURL: ''
+          };
+        }
+      });
+
+      await update(ref(db), updates);
+      toast({
+        title: "✅ تمت تهيئة البيانات",
+        description: "تم إنشاء بيانات تجريبية للمشايخ والطلاب بنجاح."
+      });
+    } catch (error: any) {
+      console.error("Error generating demo data:", error);
+      toast({
+        title: "❌ خطأ",
+        description: "حدث خطأ أثناء إنشاء البيانات التجريبية.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <StudentContext.Provider value={{ students, preRegistrations, allUsers, dailySessions, dailyReports, loading, surahProgress, payments, settings, hallOfFame, addStudent, updateStudent, deleteStudent, deleteAllStudents, deleteMultipleStudents, addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange, importStudents, importPreRegistrations, updatePreRegistration, bulkUpdatePreRegistrations, deleteAllPreRegistrations, deleteMultiplePreRegistrations, saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, updatePaymentStatus, saveSettings }}>
+    <StudentContext.Provider value={{
+      students, preRegistrations, allUsers, dailySessions, dailyReports, loading, surahProgress, payments, settings, hallOfFame,
+      addStudent, updateStudent, deleteStudent, deleteAllStudents, deleteMultipleStudents,
+      addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange,
+      importStudents, importPreRegistrations, updatePreRegistration, bulkUpdatePreRegistrations, deleteAllPreRegistrations, deleteMultiplePreRegistrations,
+      saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, updatePaymentStatus, saveSettings, generateDemoData
+    }}>
       {children}
     </StudentContext.Provider>
   );

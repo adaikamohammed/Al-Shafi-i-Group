@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { DailyChecklist } from '@/components/ui/DailyChecklist';
+import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { ManagementDashboard } from '@/components/management/ManagementDashboard';
 import { canAccessPage } from '@/lib/permissions';
 import { GroupEvaluationCard } from '@/components/ui/GroupEvaluationCard';
