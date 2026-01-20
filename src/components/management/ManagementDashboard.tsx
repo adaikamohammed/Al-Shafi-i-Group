@@ -69,6 +69,19 @@ export const ManagementDashboard = () => {
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
 
     const stats = React.useMemo(() => {
+        // DEFENSIVE CHECK: Ensure arrays exist before processing
+        if (!students || !allUsers || !preRegistrations) {
+            return {
+                totalStudents: 0,
+                totalSheikhs: 0,
+                pendingRegs: 0,
+                completionRate: "0%",
+                groupComparisonData: [],
+                levelDistributionData: [],
+                activeStudentsList: []
+            };
+        }
+
         let activeStudentsList = students;
 
         // Filter by Group Name handling duplicates merging
@@ -78,8 +91,8 @@ export const ManagementDashboard = () => {
 
         const countActive = activeStudentsList.filter(s => s.status === 'نشط').length;
 
-        // CORRECTION: Count unique groups as "Sheikhs" count to avoid duplicates (18 vs 9)
-        const uniqueGroupsSet = new Set(allUsers.filter(u => u.role === 'sheikh' && u.group).map(u => u.group));
+        // SAFEGUARD: Ensure u.group is a string
+        const uniqueGroupsSet = new Set(allUsers.filter(u => u.role === 'sheikh' && u.group).map(u => String(u.group)));
         const totalSheikhs = selectedGroup === 'all' ? uniqueGroupsSet.size : 1;
 
         const countPending = preRegistrations.filter(r => r.status === 'مرشح').length;
@@ -94,11 +107,10 @@ export const ManagementDashboard = () => {
                 name: groupName || 'غير محدد',
                 students: groupStudents.length,
                 active: activeCount,
-                // Mock performance metric for UI visualization
                 performance: Math.round((activeCount / (groupStudents.length || 1)) * 100)
             };
         })
-            // STRICT SORT: Group 1 -> 9
+            // STRICT SAFE SORT
             .sort((a, b) => {
                 const groupA = parseInt(String(a.name || '').replace(/[^0-9]/g, '')) || 999;
                 const groupB = parseInt(String(b.name || '').replace(/[^0-9]/g, '')) || 999;
@@ -283,38 +295,74 @@ export const ManagementDashboard = () => {
 
                 {/* Side Stats */}
                 <div className="space-y-6">
-                    {/* Charts Card */}
-                    <Card className={cn(
-                        "border-none shadow-xl h-full min-h-[400px]",
-                        theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
-                    )}>
-                        <CardHeader>
-                            <CardTitle className="text-lg font-bold">توزيع المستويات</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-[300px] w-full mt-4">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={stats.levelDistributionData}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={60}
-                                            outerRadius={90}
-                                            paddingAngle={4}
-                                            dataKey="value"
-                                        >
-                                            {stats.levelDistributionData.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none' }} />
-                                        <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    {/* Comparison Chart */}
+                    {selectedGroup === 'all' ? (
+                        <Card className={cn(
+                            "border-none shadow-2xl overflow-hidden",
+                            theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
+                        )}>
+                            <CardHeader>
+                                <CardTitle className="text-xl font-headline font-bold flex items-center gap-3">
+                                    <BarChart3 className="text-primary h-5 w-5" />
+                                    مقارنة أعداد الطلاب
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="h-[300px] p-4">
+                                {stats.groupComparisonData && stats.groupComparisonData.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={stats.groupComparisonData.slice(0, 5)}>
+                                            <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                                            <XAxis dataKey="name" hide />
+                                            <YAxis hide />
+                                            <RechartsTooltip
+                                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                            />
+                                            <Bar dataKey="students" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full opacity-50 text-sm">لا توجد بيانات للعرض</div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <Card className={cn(
+                            "border-none shadow-2xl overflow-hidden",
+                            theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
+                        )}>
+                            <CardHeader>
+                                <CardTitle className="text-xl font-headline font-bold flex items-center gap-3">
+                                    <BarChart3 className="text-primary h-5 w-5" />
+                                    توزيع المستويات الدراسية
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="h-[300px] p-4">
+                                {stats.levelDistributionData && stats.levelDistributionData.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={stats.levelDistributionData}
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={60}
+                                                outerRadius={80}
+                                                paddingAngle={5}
+                                                dataKey="value"
+                                            >
+                                                {stats.levelDistributionData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                ))}
+                                            </Pie>
+                                            <RechartsTooltip />
+                                            <Legend />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full opacity-50 text-sm">لا توجد بيانات للعرض</div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             </div>
         </div>

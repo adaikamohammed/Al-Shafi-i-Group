@@ -16,13 +16,18 @@ export function RecentMilestones() {
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
 
     const milestones = useMemo(() => {
+        if (!students) return [];
         return students
-            .filter(s => s.memorizedSurahsCount > 0)
-            .sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0))
+            .filter(s => (s.memorizedSurahsCount || 0) > 0)
+            .sort((a, b) => {
+                const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+                const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+                return dateB - dateA;
+            })
             .slice(0, 3)
             .map(s => ({
                 id: s.id,
-                name: s.fullName,
+                name: s.fullName || 'فاعل خير',
                 photo: s.photoURL,
                 achievement: `أتمّ حفظ ${s.memorizedSurahsCount} سور بامتياز`,
                 date: 'اليوم'
