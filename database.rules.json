@@ -1,10 +1,8 @@
 {
     "rules": {
         "users": {
-            // يسمح للمشايخ والإدارة والسوبر أدمن بقراءة القوائم
             ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'sheikh' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin')",
             "$uid": {
-                // القراءة والكتابة لصاحب الحساب أو للإدارة والسوبر أدمن
                 ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin')",
                 ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin')"
             }
@@ -20,12 +18,10 @@
         },
         "students": {
             ".read": "auth != null",
-            // الكتابة للمشايخ والإدارة
             ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'sheikh' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin')"
         },
         "dailyReports": {
             ".read": "auth != null",
-            // الكتابة للمشايخ والإدارة
             ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'sheikh' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin')",
             ".indexOn": [
                 "studentId"

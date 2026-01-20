@@ -59,9 +59,9 @@ export const ManagementDashboard = () => {
     const [selectedGroup, setSelectedGroup] = React.useState<string>('all');
 
     React.useEffect(() => {
-        const handleGenerate = () => generateDemoData();
-        window.addEventListener('GENERATE_DEMO_DATA', handleGenerate);
-        return () => window.removeEventListener('GENERATE_DEMO_DATA', handleGenerate);
+        const handleGenerate = () => generateDemoData(); // using the existing function name but new logic
+        window.addEventListener('INITIALIZE_STRUCTURE', handleGenerate);
+        return () => window.removeEventListener('INITIALIZE_STRUCTURE', handleGenerate);
     }, [generateDemoData]);
 
     const currentThemeId = user?.portalTheme || 'midnight';
