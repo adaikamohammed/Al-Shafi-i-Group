@@ -57,7 +57,9 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   }, [role]);
 
   const filteredBottomNavItems = useMemo(() => {
-    return BOTTOM_NAV_ITEMS.filter(item => canAccessPage(item.href, role));
+    return BOTTOM_NAV_ITEMS
+      .filter(item => item.href !== '/home') // Explicitly remove home
+      .filter(item => canAccessPage(item.href, role));
   }, [role]);
 
   useEffect(() => {

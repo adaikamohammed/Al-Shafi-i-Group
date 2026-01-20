@@ -8,7 +8,6 @@ export interface PagePermission {
 }
 
 export const PAGE_PERMISSIONS: PagePermission[] = [
-    { path: '/home', label: 'الرئيسية', icon: 'Home', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/data', label: 'إدارة الطلبة', icon: 'Users', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/sessions', label: 'الحصص اليومية', icon: 'Calendar', allowedRoles: ['sheikh', 'super_admin'] },
     { path: '/registrations', label: 'التسجيلات', icon: 'UserPlus', allowedRoles: ['sheikh', 'super_admin', 'management'] },
