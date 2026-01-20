@@ -76,7 +76,11 @@ export const ManagementDashboard = () => {
         }
 
         const countActive = activeStudentsList.filter(s => s.status === 'نشط').length;
-        const totalSheikhs = selectedGroup === 'all' ? allUsers.filter(u => u.role === 'sheikh').length : 1;
+
+        // Fix: Count unique groups for Total Sheikhs
+        const uniqueSheikhGroups = new Set(allUsers.filter(u => u.role === 'sheikh' && u.group).map(u => u.group));
+        const totalSheikhs = selectedGroup === 'all' ? uniqueSheikhGroups.size : 1;
+
         const countPending = preRegistrations.filter(r => r.status === 'مرشح').length;
 
         // Group Comparison Data
