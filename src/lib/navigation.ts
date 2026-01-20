@@ -74,7 +74,6 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 export const BOTTOM_NAV_ITEMS = [
-    { href: '/home', label: 'البوابة الرئيسية', icon: Home },
     { href: '/profile', label: 'الملف الشخصي', icon: UserCog },
     { href: '/settings', label: 'الإعدادات', icon: Settings },
 ];

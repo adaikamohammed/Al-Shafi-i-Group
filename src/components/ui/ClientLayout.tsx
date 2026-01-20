@@ -314,10 +314,12 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                 <div className="flex justify-between items-center mb-8">
                   <div className="flex items-center gap-4">
                     <SidebarTrigger className="h-10 w-10 rounded-xl hover:bg-white/5" />
-                    {pathname !== '/home' && (
-                      <h2 className="font-headline text-xl font-black text-primary/80 tracking-widest">
-                        المدرسة القرآنية للشافعي
-                      </h2>
+                    {pathname !== '/sessions' && (
+                      <Link href="/sessions">
+                        <h2 className="font-headline text-xl font-black text-primary/80 tracking-widest hover:text-primary transition-colors cursor-pointer">
+                          المدرسة القرآنية للشافعي
+                        </h2>
+                      </Link>
                     )}
                   </div>
                   <Button
