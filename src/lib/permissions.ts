@@ -8,6 +8,7 @@ export interface PagePermission {
 }
 
 export const PAGE_PERMISSIONS: PagePermission[] = [
+    { path: '/home', label: 'الرئيسية', icon: 'Home', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/data', label: 'إدارة الطلبة', icon: 'Users', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/sessions', label: 'الحصص اليومية', icon: 'Calendar', allowedRoles: ['sheikh', 'super_admin'] },
     { path: '/registrations', label: 'التسجيلات', icon: 'UserPlus', allowedRoles: ['sheikh', 'super_admin', 'management'] },
@@ -23,7 +24,6 @@ export const PAGE_PERMISSIONS: PagePermission[] = [
     { path: '/student-history', label: 'تاريخ الطالب', icon: 'History', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/profile', label: 'الملف الشخصي', icon: 'User', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/settings', label: 'الإعدادات', icon: 'Settings', allowedRoles: ['sheikh', 'super_admin'] },
-    { path: '/insights', label: 'الرؤى والتحليلات', icon: 'PieChart', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/guide', label: 'الدليل', icon: 'HelpCircle', allowedRoles: ['sheikh', 'super_admin', 'management'] },
 ];
 

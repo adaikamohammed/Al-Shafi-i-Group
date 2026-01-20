@@ -43,8 +43,8 @@ export function GroupSelector({ value, onChange, className }: GroupSelectorProps
 
         return Array.from(uniqueGroups.values())
             .sort((a, b) => {
-                const groupA = parseInt(String(a.group || '').replace(/[^0-9]/g, '')) || 999;
-                const groupB = parseInt(String(b.group || '').replace(/[^0-9]/g, '')) || 999;
+                const groupA = parseInt((a.group || '').replace(/[^0-9]/g, '')) || 999;
+                const groupB = parseInt((b.group || '').replace(/[^0-9]/g, '')) || 999;
                 return groupA - groupB;
             });
     }, [allUsers]);

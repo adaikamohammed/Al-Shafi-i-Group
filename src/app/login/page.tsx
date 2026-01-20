@@ -28,7 +28,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signInWithEmail(loginEmail, loginPassword);
-      router.push('/sessions');
+      router.push('/home');
     } catch (error: any) {
       console.error("Login Error Code:", error.code);
       let description = "فشل تسجيل الدخول. يرجى التأكد من صحة البريد الإلكتروني وكلمة المرور.";
@@ -69,7 +69,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signUpWithEmail(signupEmail, signupPassword, signupName);
-      router.push('/sessions');
+      router.push('/home');
     } catch (error: any) {
       console.error("Signup Error:", error.code, error.message);
       toast({

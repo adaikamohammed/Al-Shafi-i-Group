@@ -57,19 +57,17 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   }, [role]);
 
   const filteredBottomNavItems = useMemo(() => {
-    return BOTTOM_NAV_ITEMS
-      .filter(item => item.href !== '/home') // Explicitly remove home
-      .filter(item => canAccessPage(item.href, role));
+    return BOTTOM_NAV_ITEMS.filter(item => canAccessPage(item.href, role));
   }, [role]);
 
   useEffect(() => {
-    // FORCE UNREGISTER SERVICE WORKER TO CLEAR CACHE
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function (registrations) {
-        for (let registration of registrations) {
-          registration.unregister();
-          console.log('Service Worker Unregistered to clear cache');
-        }
+    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js').then(registration => {
+          console.log('SW registered: ', registration);
+        }).catch(registrationError => {
+          console.log('SW registration failed: ', registrationError);
+        });
       });
     }
   }, []);
@@ -316,12 +314,10 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                 <div className="flex justify-between items-center mb-8">
                   <div className="flex items-center gap-4">
                     <SidebarTrigger className="h-10 w-10 rounded-xl hover:bg-white/5" />
-                    {pathname !== '/sessions' && (
-                      <Link href="/sessions">
-                        <h2 className="font-headline text-xl font-black text-primary/80 tracking-widest hover:text-primary transition-colors cursor-pointer">
-                          المدرسة القرآنية للشافعي
-                        </h2>
-                      </Link>
+                    {pathname !== '/home' && (
+                      <h2 className="font-headline text-xl font-black text-primary/80 tracking-widest">
+                        المدرسة القرآنية للشافعي
+                      </h2>
                     )}
                   </div>
                   <Button

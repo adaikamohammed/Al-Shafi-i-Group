@@ -17,8 +17,7 @@ import {
     Shield,
     UserPlus,
     Home,
-    UserCog,
-    PieChart
+    UserCog
 } from 'lucide-react';
 
 export interface NavItem {
@@ -46,7 +45,6 @@ export const NAV_GROUPS: NavGroup[] = [
     {
         title: 'بوصلة المتابعة',
         items: [
-            { href: '/insights', label: 'الرؤى والتحليلات', icon: PieChart },
             { href: '/stats', label: 'المتابعة الأسبوعية', icon: Calendar },
             { href: '/student-history', label: 'سجل الطالب', icon: LayoutDashboard },
             { href: '/yearly-performance', label: 'الأداء السنوي', icon: BarChart3 },
@@ -74,6 +72,7 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 export const BOTTOM_NAV_ITEMS = [
+    { href: '/home', label: 'البوابة الرئيسية', icon: Home },
     { href: '/profile', label: 'الملف الشخصي', icon: UserCog },
     { href: '/settings', label: 'الإعدادات', icon: Settings },
 ];

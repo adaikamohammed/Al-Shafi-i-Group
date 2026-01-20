@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/command";
 import {
   Users, ClipboardList, BarChart3, Settings, Award, BookCheck,
-  FileText, User, ChevronsRight, DollarSign, ArrowRightLeft, HelpCircle, PieChart
+  FileText, User, ChevronsRight, DollarSign, ArrowRightLeft, HelpCircle
 } from 'lucide-react';
 import type { Student } from '@/lib/types';
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
@@ -26,7 +26,6 @@ interface CommandBarProps {
 }
 
 const mainActions = [
-  { name: "الرؤى والتحليلات", icon: <PieChart className="ml-2 h-4 w-4" />, href: "/insights" },
   { name: "إدارة الطلبة", icon: <Users className="ml-2 h-4 w-4" />, href: "/" },
   { name: "الحصص اليومية", icon: <ClipboardList className="ml-2 h-4 w-4" />, href: "/sessions" },
   { name: "المستحقات المالية", icon: <DollarSign className="ml-2 h-4 w-4" />, href: "/dues" },

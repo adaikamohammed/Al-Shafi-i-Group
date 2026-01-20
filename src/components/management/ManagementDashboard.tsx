@@ -53,14 +53,13 @@ const StatCard = ({ title, value, icon: Icon, color, description, theme }: StatC
     </Card>
 );
 
-
 export const ManagementDashboard = () => {
     const { students, preRegistrations, allUsers, loading, generateDemoData } = useStudentContext();
     const { user } = useAuth();
     const [selectedGroup, setSelectedGroup] = React.useState<string>('all');
 
     React.useEffect(() => {
-        const handleGenerate = () => generateDemoData();
+        const handleGenerate = () => generateDemoData(); // using the existing function name but new logic
         window.addEventListener('INITIALIZE_STRUCTURE', handleGenerate);
         return () => window.removeEventListener('INITIALIZE_STRUCTURE', handleGenerate);
     }, [generateDemoData]);
@@ -69,55 +68,42 @@ export const ManagementDashboard = () => {
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
 
     const stats = React.useMemo(() => {
-        // DEFENSIVE CHECK: Ensure arrays exist before processing
-        if (!students || !allUsers || !preRegistrations) {
-            return {
-                totalStudents: 0,
-                totalSheikhs: 0,
-                pendingRegs: 0,
-                completionRate: "0%",
-                groupComparisonData: [],
-                levelDistributionData: [],
-                activeStudentsList: []
-            };
-        }
-
         let activeStudentsList = students;
 
-        // Filter by Group Name handling duplicates merging
+        // Filter by Group Name instead of Owner ID to handle duplicates/merges
         if (selectedGroup !== 'all') {
             activeStudentsList = students.filter(s => s.groupName === selectedGroup);
         }
 
         const countActive = activeStudentsList.filter(s => s.status === 'نشط').length;
-
-        // SAFEGUARD: Ensure u.group is a string
-        const uniqueGroupsSet = new Set(allUsers.filter(u => u.role === 'sheikh' && u.group).map(u => String(u.group)));
-        const totalSheikhs = selectedGroup === 'all' ? uniqueGroupsSet.size : 1;
-
+        const totalSheikhs = selectedGroup === 'all' ? allUsers.filter(u => u.role === 'sheikh').length : 1;
         const countPending = preRegistrations.filter(r => r.status === 'مرشح').length;
 
         // Group Comparison Data
-        const uniqueGroups = Array.from(uniqueGroupsSet);
+        // 1. Get unique group names
+        const uniqueGroups = Array.from(new Set(allUsers.filter(u => u.role === 'sheikh' && u.group).map(u => u.group)));
 
         const groupComparisonData = uniqueGroups.map(groupName => {
+            // Find primary sheikh for display name (just pick one)
+            const representativeSheikh = allUsers.find(u => u.group === groupName && u.role === 'sheikh');
+
+            // CRITICAL: Filter students by groupName string, effectively merging all duplicates
             const groupStudents = students.filter(s => s.groupName === groupName);
-            const activeCount = groupStudents.filter(s => s.status === 'نشط').length;
+
             return {
                 name: groupName || 'غير محدد',
                 students: groupStudents.length,
-                active: activeCount,
-                performance: Math.round((activeCount / (groupStudents.length || 1)) * 100)
+                active: groupStudents.filter(s => s.status === 'نشط').length
             };
         })
-            // STRICT SAFE SORT
+            // Sort by Group Number (1-9)
             .sort((a, b) => {
-                const groupA = parseInt(String(a.name || '').replace(/[^0-9]/g, '')) || 999;
-                const groupB = parseInt(String(b.name || '').replace(/[^0-9]/g, '')) || 999;
+                const groupA = parseInt((a.name || '').replace(/[^0-9]/g, '')) || 999;
+                const groupB = parseInt((b.name || '').replace(/[^0-9]/g, '')) || 999;
                 return groupA - groupB;
             });
 
-        // Level Distribution
+        // Level Distribution Data
         const levelCounts: Record<string, number> = {};
         activeStudentsList.forEach(s => {
             const level = s.educationalLevel || 'غير محدد';
@@ -139,231 +125,192 @@ export const ManagementDashboard = () => {
     const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4'];
 
     return (
-        <div className="w-full max-w-[1600px] mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 p-2 md:p-6">
-            {/* Header Section with Dark/Glass effect */}
-            <div className={cn(
-                "rounded-3xl p-8 border shadow-2xl relative overflow-hidden",
-                theme.isLight
-                    ? "bg-gradient-to-br from-slate-900 to-slate-800 text-white border-slate-800"
-                    : "bg-gradient-to-br from-indigo-950/50 to-purple-950/50 border-white/10"
-            )}>
-                {/* Background Pattern */}
-                <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-                    <div className="absolute right-0 top-0 bg-blue-500 w-[300px] h-[300px] rounded-full blur-[100px]" />
-                    <div className="absolute left-0 bottom-0 bg-purple-500 w-[300px] h-[300px] rounded-full blur-[100px]" />
+        <div className="w-full max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Header & Filter */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 className="text-3xl font-headline font-bold">لوحة القيادة</h2>
+                    <p className="text-muted-foreground opacity-60">نظرة شاملة على أداء المدرسة</p>
                 </div>
-
-                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                    <div>
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs font-medium mb-3 border border-white/10">
-                            <Shield className="w-3 h-3" />
-                            <span>بوابة الإدارة المركزية</span>
-                        </div>
-                        <h1 className="text-4xl md:text-5xl font-black font-headline tracking-tight mb-2">
-                            لوحة التحكم
-                        </h1>
-                        <p className="text-lg opacity-80 max-w-xl font-body leading-relaxed">
-                            نظرة تحليلية شاملة لأداء المدرسة القرآنية، متابعة المشايخ، وإدارة شؤون الطلبة بدقة.
-                        </p>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                        <div className="bg-white/10 p-1 rounded-2xl flex items-center gap-2 backdrop-blur-md border border-white/10">
-                            <GroupSelector value={selectedGroup} onChange={setSelectedGroup} className="w-[200px]" />
-                        </div>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                if (window.confirm('هل أنت متأكد من تهيئة الهيكل التنظيمي للنظام؟ (سيتم ضبط حسابات المشايخ والأفواج)')) {
-                                    window.dispatchEvent(new CustomEvent('INITIALIZE_STRUCTURE'));
-                                }
-                            }}
-                            className="h-12 px-6 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-bold border-0 shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all hover:scale-105"
-                        >
-                            <Shield className="h-5 w-5 ml-2" />
-                            بناء الهيكلية
-                        </Button>
-                    </div>
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            if (window.confirm('هل أنت متأكد من توليد بيانات تجريبية؟ سيتم إضافة مشايخ وطلاب وهميين.')) {
+                                window.dispatchEvent(new CustomEvent('GENERATE_DEMO_DATA'));
+                            }
+                        }}
+                        className="gap-2 border-dashed border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-600"
+                    >
+                        <Shield className="h-4 w-4" />
+                        تهيئة النظام
+                    </Button>
+                    <GroupSelector value={selectedGroup} onChange={setSelectedGroup} />
                 </div>
             </div>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {/* Stats Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
-                    title="الطلبة النشطون"
+                    title="إجمالي الطلبة النشطين"
                     value={stats.totalStudents}
                     icon={Users}
-                    color="bg-blue-600"
-                    description="مقيد في النظام"
+                    color="bg-blue-500"
+                    description="طالب مسجل حالياً"
                     theme={theme}
                 />
                 <StatCard
-                    title="الكادر التعليمي"
-                    value={stats.totalSheikhs} // This is now deduped (9)
-                    icon={Award}
-                    color="bg-purple-600"
-                    description="فوج تعليمي" // Changed text to reflect "Group" focus
+                    title="عدد المشايخ"
+                    value={stats.totalSheikhs}
+                    icon={UserCheck}
+                    color="bg-emerald-500"
+                    description="شيخ يدرس في المدرسة"
                     theme={theme}
                 />
                 <StatCard
-                    title="طلبات التسجيل"
+                    title="تسجيلات مرشحة"
                     value={stats.pendingRegs}
                     icon={UserPlus}
                     color="bg-amber-500"
-                    description="في قاعة الانتظار"
+                    description="في انتظار المراجعة"
                     theme={theme}
                 />
                 <StatCard
-                    title="الأداء العام"
+                    title="معدل الحفظ العام"
                     value={stats.completionRate}
                     icon={TrendingUp}
-                    color="bg-emerald-600"
-                    description="نسبة الحضور والإتقان"
+                    color="bg-purple-500"
+                    description="نسبة إتقان السور المقررة"
                     theme={theme}
                 />
             </div>
 
+            {/* Main Sections Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Monitoring Table - Takes 2/3 width */}
+                {/* Groups Overview */}
                 <Card className={cn(
-                    "lg:col-span-2 border-none shadow-xl overflow-hidden flex flex-col",
+                    "lg:col-span-2 border-none shadow-2xl",
                     theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
                 )}>
-                    <CardHeader className="border-b border-gray-100/10 pb-6 pt-6">
+                    <CardHeader className="border-b border-white/5">
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle className="text-xl font-bold flex items-center gap-2">
-                                    <BarChart3 className="w-5 h-5 text-primary" />
-                                    مراقبة أداء الأفواج
+                                <CardTitle className="text-2xl font-headline font-bold flex items-center gap-3">
+                                    <Shield className="text-primary h-6 w-6" />
+                                    مراقبة الأفواج
                                 </CardTitle>
-                                <CardDescription>ترتيب الأفواج حسب النشاط والعدد (1-9)</CardDescription>
+                                <CardDescription className="opacity-60">نظرة عامة على أداء المجموعات التعليمية</CardDescription>
                             </div>
+                            <Button variant="ghost" className="rounded-xl hover:bg-white/10" asChild>
+                                <a href="/management/groups">عرض كل الأفواج</a>
+                            </Button>
                         </div>
                     </CardHeader>
-                    <div className="flex-1 overflow-x-auto min-h-[400px]">
-                        <table className="w-full text-right">
-                            <thead className={cn(
-                                "text-xs font-bold uppercase tracking-wider opacity-70",
-                                theme.isLight ? "bg-slate-50/50" : "bg-black/20"
-                            )}>
-                                <tr>
-                                    <th className="px-6 py-4">الترتيب</th>
-                                    <th className="px-6 py-4">الفوج</th>
-                                    <th className="px-6 py-4">المشرف</th>
-                                    <th className="px-6 py-4 text-center">التعداد</th>
-                                    <th className="px-6 py-4">مؤشر النشاط</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100/10">
-                                {stats.groupComparisonData.map((group, idx) => (
-                                    <tr key={idx} className="group hover:bg-primary/5 transition-colors">
-                                        <td className="px-6 py-4 font-mono opacity-50">#{idx + 1}</td>
-                                        <td className="px-6 py-4 font-bold text-lg">{group.name}</td>
-                                        <td className="px-6 py-4 text-sm opacity-80">
-                                            {allUsers.find(u => u.group === group.name)?.displayName || 'غير محدد'}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col items-center justify-center gap-1">
-                                                <span className="font-bold text-lg">{group.students}</span>
-                                                <span className="text-[10px] opacity-60">طالب</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="w-full max-w-[120px]">
-                                                <div className="flex justify-between text-xs mb-1">
-                                                    <span className="font-bold text-emerald-500">{group.performance}%</span>
-                                                </div>
-                                                <div className="h-2 bg-gray-200/20 rounded-full overflow-hidden">
-                                                    <div
-                                                        className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full"
-                                                        style={{ width: `${group.performance}%` }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </td>
+                    <CardContent className="p-0">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-right">
+                                <thead className={cn(
+                                    "text-xs uppercase tracking-wider opacity-60",
+                                    theme.isLight ? "bg-slate-50" : "bg-white/5"
+                                )}>
+                                    <tr>
+                                        <th className="px-6 py-4">الفوج</th>
+                                        <th className="px-6 py-4">الشيخ</th>
+                                        <th className="px-6 py-4 text-center">الطلبة</th>
+                                        <th className="px-6 py-4 text-center">النشطون</th>
+                                        <th className="px-6 py-4">الحالة</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        {stats.groupComparisonData.length === 0 && (
-                            <div className="p-12 text-center opacity-50">
-                                لا توجد بيانات أفواج حالياً. اضغط "بناء الهيكلية" للبدء.
-                            </div>
-                        )}
-                    </div>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {stats.groupComparisonData.map((group, idx) => (
+                                        <tr key={idx} className="hover:bg-white/5 transition-colors">
+                                            <td className="px-6 py-4 font-bold">{group.name}</td>
+                                            <td className="px-6 py-4 text-sm opacity-80 font-body">
+                                                {allUsers.find(u => u.group === group.name)?.displayName || 'غير محدد'}
+                                            </td>
+                                            <td className="px-6 py-4 text-center font-bold">{group.students}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <span className="text-xs font-bold font-body">{group.active}</span>
+                                                    <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-emerald-500 rounded-full"
+                                                            style={{ width: `${(group.active / (group.students || 1)) * 100}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">نشط</span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </CardContent>
                 </Card>
 
-                {/* Side Stats */}
-                <div className="space-y-6">
-                    {/* Comparison Chart */}
-                    {selectedGroup === 'all' ? (
-                        <Card className={cn(
-                            "border-none shadow-2xl overflow-hidden",
-                            theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
-                        )}>
-                            <CardHeader>
-                                <CardTitle className="text-xl font-headline font-bold flex items-center gap-3">
-                                    <BarChart3 className="text-primary h-5 w-5" />
-                                    مقارنة أعداد الطلاب
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="h-[300px] p-4">
-                                {stats.groupComparisonData && stats.groupComparisonData.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={stats.groupComparisonData.slice(0, 5)}>
-                                            <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                                            <XAxis dataKey="name" hide />
-                                            <YAxis hide />
-                                            <RechartsTooltip
-                                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                                            />
-                                            <Bar dataKey="students" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="flex items-center justify-center h-full opacity-50 text-sm">لا توجد بيانات للعرض</div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <Card className={cn(
-                            "border-none shadow-2xl overflow-hidden",
-                            theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
-                        )}>
-                            <CardHeader>
-                                <CardTitle className="text-xl font-headline font-bold flex items-center gap-3">
-                                    <BarChart3 className="text-primary h-5 w-5" />
-                                    توزيع المستويات الدراسية
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="h-[300px] p-4">
-                                {stats.levelDistributionData && stats.levelDistributionData.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={stats.levelDistributionData}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={80}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                            >
-                                                {stats.levelDistributionData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                ))}
-                                            </Pie>
-                                            <RechartsTooltip />
-                                            <Legend />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="flex items-center justify-center h-full opacity-50 text-sm">لا توجد بيانات للعرض</div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
+                {/* Comparison Chart */}
+                {selectedGroup === 'all' ? (
+                    <Card className={cn(
+                        "border-none shadow-2xl overflow-hidden",
+                        theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
+                    )}>
+                        <CardHeader>
+                            <CardTitle className="text-xl font-headline font-bold flex items-center gap-3">
+                                <BarChart3 className="text-primary h-5 w-5" />
+                                مقارنة أعداد الطلاب
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="h-[300px] p-4">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={stats.groupComparisonData.slice(0, 5)}>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                                    <XAxis dataKey="name" hide />
+                                    <YAxis hide />
+                                    <RechartsTooltip
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                    />
+                                    <Bar dataKey="students" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <Card className={cn(
+                        "border-none shadow-2xl overflow-hidden",
+                        theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
+                    )}>
+                        <CardHeader>
+                            <CardTitle className="text-xl font-headline font-bold flex items-center gap-3">
+                                <BarChart3 className="text-primary h-5 w-5" />
+                                توزيع المستويات الدراسية
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="h-[300px] p-4">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={stats.levelDistributionData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={80}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                    >
+                                        {stats.levelDistributionData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <RechartsTooltip />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
         </div>
     );

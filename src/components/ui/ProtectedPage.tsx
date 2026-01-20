@@ -13,7 +13,7 @@ export const ProtectedPage = ({ children }: { children: React.ReactNode }) => {
 
     useEffect(() => {
         if (!loading && !canAccessPage(pathname, role)) {
-            router.push('/sessions');
+            router.push('/home');
         }
     }, [role, loading, pathname, router]);
 
