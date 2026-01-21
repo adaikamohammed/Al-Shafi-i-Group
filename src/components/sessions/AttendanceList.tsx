@@ -1,5 +1,3 @@
-"use client";
-
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,18 +5,23 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Check, X, Clock, Star, MessageSquare } from 'lucide-react';
+import { Check, X, Clock, Star, MessageSquare, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Student } from '@/lib/types';
+import { Student, AttendanceStatus, PerformanceLevel, BehaviorLevel } from '@/lib/types';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useAuth } from '@/context/AuthContext';
+import { surahs } from '@/lib/surahs';
 
 export interface AttendanceRecord {
     studentId: string;
-    attendance: 'حاضر' | 'غياب' | 'متأخر' | '';
-    memorization: string;
-    behavior: string;
+    attendance: AttendanceStatus;
+    memorization: PerformanceLevel;
+    behavior: BehaviorLevel;
     notes: string;
     review: boolean;
+    surahId?: number;
+    fromVerse?: number;
+    toVerse?: number;
 }
 
 interface AttendanceListProps {
@@ -30,7 +33,8 @@ interface AttendanceListProps {
 }
 
 export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = 'full', sessionType }: AttendanceListProps) => {
-
+    const { user } = useAuth();
+    const isAdmin5 = user?.email === 'admin5@gmail.com';
     const isActivitySession = sessionType === 'حصة أنشطة';
 
     const getStatusColor = (status: string) => {
@@ -46,6 +50,7 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
         <div className="space-y-4" dir="rtl">
             {students.map((student) => {
                 const record = records[student.id] || { attendance: '', memorization: '', behavior: '', notes: '', review: false };
+                const selectedSurah = surahs.find(s => s.id === record.surahId);
 
                 return (
                     <Card key={student.id} className={cn(
@@ -111,11 +116,11 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                     {/* Evaluation (Only if Present/Late) - Show in 'evaluation' or 'full' mode */}
                                     {(record.attendance === 'حاضر' || record.attendance === 'متأخر') && (viewMode === 'full' || viewMode === 'evaluation') && (
                                         <div className={cn("space-y-2 md:space-y-3", (viewMode === 'evaluation' || !isActivitySession) ? "col-span-1 md:col-span-1" : "")}>
-                                            <div className="flex gap-1 md:gap-2 items-center">
+                                            <div className="flex flex-wrap gap-1 md:gap-2 items-center">
                                                 {!isActivitySession && (
                                                     <>
                                                         <Select value={record.memorization} onValueChange={(val) => onUpdateRecord(student.id, 'memorization', val)} dir="rtl">
-                                                            <SelectTrigger className="h-8 md:h-9 text-[10px] md:text-xs font-bold w-[100px] md:w-[120px]">
+                                                            <SelectTrigger className="h-8 md:h-9 text-[10px] md:text-xs font-bold w-[90px] md:w-[110px]">
                                                                 <SelectValue placeholder="الحفظ" />
                                                             </SelectTrigger>
                                                             <SelectContent>
@@ -141,7 +146,7 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                                 )}
 
                                                 <Select value={record.behavior} onValueChange={(val) => onUpdateRecord(student.id, 'behavior', val)} dir="rtl">
-                                                    <SelectTrigger className="h-8 md:h-9 text-[10px] md:text-xs font-bold flex-1 md:w-auto md:min-w-[100px]">
+                                                    <SelectTrigger className="h-8 md:h-9 text-[10px] md:text-xs font-bold w-[80px] md:w-[100px]">
                                                         <SelectValue placeholder="السلوك" />
                                                     </SelectTrigger>
                                                     <SelectContent>

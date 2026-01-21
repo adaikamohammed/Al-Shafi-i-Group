@@ -9,14 +9,16 @@ import { getYear, getMonth, format, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
+import { surahs } from '@/lib/surahs';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, FileText, UserCheck, AlertTriangle, Trophy, Download, Trash2, Copy, MoreVertical, Dot, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Loader2, Save, FileText, UserCheck, AlertTriangle, Trophy, Download, Trash2, Copy, MoreVertical, Dot, ChevronRight, ChevronLeft, BookOpen } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ProtectedPage } from '@/components/ui/ProtectedPage';
@@ -28,9 +30,31 @@ import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
 
 export default function DailySessionsPage() {
   const { user, isSuperAdmin } = useAuth();
-  const { students, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById } = useStudentContext();
+  const { students, dailySessions, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById } = useStudentContext();
   const { toast } = useToast();
   const router = useRouter();
+
+  const isAdmin5 = user?.email === 'admin5@gmail.com';
+
+  const globalProgress = useMemo(() => {
+    if (!isAdmin5 || !dailySessions) return null;
+    const allSessions = Object.values(dailySessions).flatMap(day => Object.values(day as Record<string, any>));
+    const sortedSessions = allSessions
+      .filter(s => s.sessionType === 'حصة أساسية' && s.surahId)
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    const latest = sortedSessions[0];
+    if (!latest) return { surahId: 26, fromVerse: 1, toVerse: 1, surahName: 'الشعراء', totalVerses: 227 };
+
+    const surah = surahs.find(s => s.id === latest.surahId);
+    return {
+      surahId: latest.surahId,
+      fromVerse: latest.fromVerse,
+      toVerse: latest.toVerse,
+      surahName: surah?.name || '',
+      totalVerses: surah?.verses || 100
+    };
+  }, [dailySessions, isAdmin5]);
 
   // State
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -97,10 +121,16 @@ export default function DailySessionsPage() {
         if (isActivity) {
           return { ...baseInfo, 'نوع النشاط': session.activityType, 'وصف النشاط': session.activityDescription };
         } else {
+          const surah = (session.surahId)
+            ? surahs.find(s => s.id === session.surahId)
+            : (record.surahId ? surahs.find(s => s.id === record.surahId) : null);
           return {
             ...baseInfo,
             'التقييم': record.memorization || '',
-            'مراجعة': record.review ? 'نعم' : 'لا'
+            'مراجعة': record.review ? 'نعم' : 'لا',
+            'السورة': surah ? surah.name : '',
+            'من آية': (session.fromVerse || record.fromVerse) || '',
+            'إلى آية': (session.toVerse || record.toVerse) || ''
           };
         }
       });
@@ -140,6 +170,35 @@ export default function DailySessionsPage() {
             <span className="font-bold text-emerald-800 font-headline">الدوري نشط</span>
           </div>
         </div>
+
+        {isAdmin5 && globalProgress && (
+          <div className="bg-card p-6 rounded-2xl shadow-sm border space-y-4 animate-in fade-in slide-in-from-top-4 duration-1000">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-emerald-100 rounded-xl text-emerald-700">
+                  <BookOpen className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-headline font-bold">التقدم الحالي في السورة</h2>
+                  <p className="text-muted-foreground text-sm font-body">متابعة الحفظ الجماعي للفوج</p>
+                </div>
+              </div>
+              <div className="text-left">
+                <span className="text-2xl font-bold text-emerald-600 font-headline">{globalProgress.surahName}</span>
+                <p className="text-xs text-muted-foreground">الآية {globalProgress.toVerse} من {globalProgress.totalVerses}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold text-muted-foreground px-1">
+                <span>0%</span>
+                <span>{Math.round((globalProgress.toVerse / globalProgress.totalVerses) * 100)}%</span>
+                <span>100%</span>
+              </div>
+              <Progress value={(globalProgress.toVerse / globalProgress.totalVerses) * 100} className="h-3 bg-emerald-50" />
+            </div>
+          </div>
+        )}
 
         <SessionCalendar
           currentDate={currentDate}

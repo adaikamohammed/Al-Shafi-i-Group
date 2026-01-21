@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useStudentContext } from '@/context/StudentContext';
+import { useAuth } from '@/context/AuthContext';
 import { surahs as allSurahs } from '@/lib/surahs';
 import { cn } from '@/lib/utils';
 import { Loader2, AlertTriangle, CheckCircle, Award, Check } from 'lucide-react';
@@ -18,7 +19,7 @@ import { SurahStatsChart } from '@/components/profile/SurahStatsChart';
 
 
 export default function SurahProgressPage() {
-    const { students, surahProgress, toggleSurahStatus, loading } = useStudentContext();
+    const { students, dailySessions, surahProgress, toggleSurahStatus, loading } = useStudentContext();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
 
     const studentsToShow = useMemo(() => (students ?? []).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
@@ -98,6 +99,27 @@ export default function SurahProgressPage() {
     }
 
 
+    const { user } = useAuth();
+    const isAdmin5 = user?.email === 'admin5@gmail.com';
+
+    const lastSessionProgress = useMemo(() => {
+        if (!selectedStudentId || !dailySessions) return null;
+
+        // Find the latest session for this student that has surah data
+        const studentRecords = Object.values(dailySessions as Record<string, any>)
+            .flatMap(day => Object.values(day as Record<string, any>))
+            .filter((s: any) => s.records && s.records.some((r: any) => r.studentId === selectedStudentId && r.surahId))
+            .sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+
+        if (studentRecords.length === 0) return null;
+
+        const latestSession: any = studentRecords[0];
+        const record = latestSession.records.find((r: any) => r.studentId === selectedStudentId && r.surahId);
+        const surah = record ? allSurahs.find(s => s.id === record.surahId) : null;
+
+        return record && surah ? { ...record, surahName: surah.name, date: latestSession.date } : null;
+    }, [dailySessions, selectedStudentId]);
+
     return (
         <TooltipProvider>
             <div className="space-y-6">
@@ -113,24 +135,44 @@ export default function SurahProgressPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                            <div className="max-w-md">
-                                <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="اختر طالبًا..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {studentsToShow.map(student => (
-                                            <SelectItem key={student.id} value={student.id}>
-                                                {student.fullName}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                            <div className="flex flex-col gap-4">
+                                <div className="max-w-md">
+                                    <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="اختر طالبًا..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {studentsToShow.map(student => (
+                                                <SelectItem key={student.id} value={student.id}>
+                                                    {student.fullName}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {isAdmin5 && lastSessionProgress && (
+                                    <div className="bg-primary/5 p-3 rounded-xl border border-primary/10 animate-in fade-in slide-in-from-right-4 duration-500">
+                                        <div className="flex items-center gap-2 text-primary font-bold mb-1">
+                                            <Award className="h-4 w-4" />
+                                            <span className="text-sm font-headline">آخر ما تم تسجيله:</span>
+                                        </div>
+                                        <div className="text-sm font-body">
+                                            سورة <span className="font-bold underlineDecoration-primary">{lastSessionProgress?.surahName}</span>
+                                            {lastSessionProgress?.fromVerse && lastSessionProgress?.toVerse && (
+                                                <> (من الآية <span className="font-bold">{lastSessionProgress?.fromVerse}</span> إلى <span className="font-bold">{lastSessionProgress?.toVerse}</span>)</>
+                                            )}
+                                            <span className="text-xs text-muted-foreground mr-2 opacity-70">
+                                                - بتاريخ {lastSessionProgress?.date}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             {selectedStudent && (
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-sm font-medium">
-                                        <span>تقدم الطالب: {selectedStudent.fullName}</span>
+                                        <span>تقدم الطالب: {selectedStudent?.fullName}</span>
                                         <span className="text-muted-foreground">{progressCounts.total} من {allSurahs.length} سورة</span>
                                     </div>
                                     <Tooltip>

@@ -50,9 +50,9 @@ export interface Student {
   expulsionHistory?: ExpulsionRecord[];
 }
 
-export type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "تعويض";
-export type PerformanceLevel = "ممتاز" | "جيد جداً" | "جيد" | "متوسط" | "ضعيف" | "لا يوجد";
-export type BehaviorLevel = "هادئ" | "متوسط" | "غير منضبط";
+export type AttendanceStatus = "حاضر" | "غياب" | "متأخر" | "تعويض" | "";
+export type PerformanceLevel = "ممتاز" | "جيد جدا" | "جيد جداً" | "جيد" | "متوسط" | "مقبول" | "ضعيف" | "لم يحفظ" | "لا يوجد" | "";
+export type BehaviorLevel = "هادئ" | "متوسط" | "مقبول" | "غير منضبط" | "مشاغب" | "";
 export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة" | "حصة تعويضية" | "غياب الشيخ";
 
 export interface DailyRecord {
@@ -63,6 +63,9 @@ export interface DailyRecord {
   review: boolean | null;
   behavior: BehaviorLevel | null;
   notes?: string;
+  surahId?: number;
+  fromVerse?: number;
+  toVerse?: number;
 }
 
 // A day can have multiple sessions
@@ -74,6 +77,12 @@ export interface DailySession {
   records: DailyRecord[];
   teacherAbsenceReason?: string;
   substituteTeacher?: string;
+  activityType?: string | null;
+  activityDescription?: string | null;
+  surahId?: number;
+  fromVerse?: number;
+  toVerse?: number;
+  isReview?: boolean;
 }
 
 export interface DailyReport {
