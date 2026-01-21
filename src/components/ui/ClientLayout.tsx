@@ -3,7 +3,7 @@
 import '../../app/globals.css';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarSeparator, useSidebar } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield, UserPlus, UserCog, Home, PanelRight, PanelLeft, Palette, Check } from 'lucide-react';
+import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield, UserPlus, UserCog, Home, PanelRight, PanelLeft, Palette, Check, MoonStar } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 const BOTTOM_NAV_ITEMS_LOCAL = BOTTOM_NAV_ITEMS; // Just for clarity if needed, but we use the import directly
 
+
+import { DateDisplay } from '@/components/ui/DateDisplay';
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading, logout, isSuperAdmin, isManagement, role, updateUserProfile } = useAuth();
@@ -212,25 +214,29 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         <SidebarSeparator className="mb-2 opacity-5" />
 
         <SidebarMenu className="gap-1">
-          {filteredBottomNavItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === item.href}
-                tooltip={item.label}
-                className={cn(
-                  "rounded-xl h-10 px-3 transition-all duration-300",
-                  theme.isLight ? "text-slate-600 hover:bg-slate-100" : "text-white/60 hover:bg-white/5 hover:text-white",
-                  "data-[active=true]:bg-primary data-[active=true]:text-primary-foreground shadow-md"
-                )}
-              >
-                <Link href={item.href} className="flex items-center gap-3">
-                  <item.icon className="h-4 w-4 shrink-0" />
-                  <span className="font-bold text-[11px] tracking-tight group-data-[collapsible=icon]:hidden">{item.label}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {filteredBottomNavItems.map((item) => {
+            const Icon = (currentThemeId === 'ramadan' && item.href === '/home') ? MoonStar : item.icon;
+
+            return (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === item.href}
+                  tooltip={item.label}
+                  className={cn(
+                    "rounded-xl h-10 px-3 transition-all duration-300",
+                    theme.isLight ? "text-slate-600 hover:bg-slate-100" : "text-white/60 hover:bg-white/5 hover:text-white",
+                    "data-[active=true]:bg-primary data-[active=true]:text-primary-foreground shadow-md"
+                  )}
+                >
+                  <Link href={item.href} className="flex items-center gap-3">
+                    <Icon className={cn("h-4 w-4 shrink-0", currentThemeId === 'ramadan' && item.href === '/home' && "text-amber-500")} />
+                    <span className="font-bold text-[11px] tracking-tight group-data-[collapsible=icon]:hidden">{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
 
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -255,7 +261,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider defaultOpen={true}>
       <div className={cn(
         "min-h-screen w-full relative transition-colors duration-700 font-body",
-        theme.isLight ? "bg-slate-50 text-slate-900" : "bg-slate-950 text-white dark"
+        theme.isLight ? "bg-slate-50 text-slate-900" : "bg-slate-950 text-white dark",
+        currentThemeId === 'ramadan' && "ramadan-pattern"
       )}>
         {/* Global Theme Gradient */}
         <div className={cn("fixed inset-0 bg-gradient-to-tr transition-all duration-1000 opacity-20 pointer-events-none", theme.gradient)} />
@@ -320,6 +327,11 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                       </h2>
                     )}
                   </div>
+
+                  <div className="hidden md:block">
+                    <DateDisplay />
+                  </div>
+
                   <Button
                     onClick={() => setCommandBarOpen(true)}
                     variant="outline"

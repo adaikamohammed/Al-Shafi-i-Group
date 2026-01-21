@@ -6,13 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, ArrowLeft, ArrowRight, Calendar, CheckCircle, TrendingUp, User, ShieldAlert, Info, AlertCircle, Bookmark, Award, LayoutDashboard } from 'lucide-react';
+import { Loader2, ArrowLeft, ArrowRight, Calendar, CheckCircle, TrendingUp, User, ShieldAlert, Info, AlertCircle, Bookmark, Award, LayoutDashboard, Link } from 'lucide-react';
 import { format, getYear, getDay, startOfYear, addDays, parseISO, getMonth, getDaysInMonth, startOfMonth, endOfMonth, getQuarter, setYear, setMonth, addMonths, subMonths, endOfYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
 
 // Helper function to get color based on student's day data
 const getStudentDayColor = (dayData: any, viewType: 'attendance' | 'evaluation' = 'attendance') => {
@@ -190,7 +191,8 @@ const StudentStatWidget = ({ title, value, unit, icon, colorClass }: { title: st
 );
 
 function StudentHistoryContent() {
-    const { students, dailySessions, loading } = useStudentContext();
+    const { students, dailySessions, loading, shareStudentRecord } = useStudentContext();
+    const { toast } = useToast();
     const searchParams = useSearchParams();
     const studentIdParam = searchParams.get('studentId');
 
@@ -378,12 +380,44 @@ function StudentHistoryContent() {
                                         <h3 className="text-2xl font-black font-headline text-primary">{selectedStudent?.fullName}</h3>
                                         <p className="text-muted-foreground font-bold">{selectedStudent?.group || 'غير محدد'}</p>
                                     </div>
-                                    <div className="flex flex-wrap justify-center gap-2">
+                                    <div className="flex flex-wrap justify-center items-center gap-2">
                                         {selectedStudent?.dailyMemorizationAmount && (
                                             <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200 py-1 px-3 rounded-lg font-bold">
                                                 وِرد {selectedStudent.dailyMemorizationAmount}
                                             </Badge>
                                         )}
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 rounded-lg gap-2 text-xs font-bold border-primary/20 hover:bg-primary hover:text-white transition-all shadow-sm"
+                                            onClick={async () => {
+                                                try {
+                                                    const historySnapshot = {
+                                                        student: selectedStudent,
+                                                        studentData: studentData,
+                                                        stats: stats,
+                                                        generatedAt: new Date().toISOString()
+                                                    };
+                                                    await shareStudentRecord(selectedStudentId, historySnapshot);
+
+                                                    const url = `${window.location.origin}/record/${selectedStudentId}`;
+                                                    navigator.clipboard.writeText(url);
+                                                    toast({
+                                                        title: "✅ تم نسخ الرابط",
+                                                        description: "يمكن الآن لولي الأمر مشاهدة السجل عبر هذا الرابط.",
+                                                    });
+                                                } catch (error) {
+                                                    toast({
+                                                        title: "❌ خطأ",
+                                                        description: "فشل في توليد رابط المشاركة.",
+                                                        variant: "destructive"
+                                                    });
+                                                }
+                                            }}
+                                        >
+                                            <Link className="h-3 w-3" />
+                                            نسخ رابط الولي
+                                        </Button>
                                     </div>
                                     <div className="pt-4 border-t border-dashed space-y-3">
                                         <div className="flex justify-between items-center bg-red-50/50 p-3 rounded-xl border border-red-100/50">

@@ -9,7 +9,7 @@ import {
   Swords, DollarSign, Edit, FileText, Award, BookCheck,
   Gavel, ArrowRightLeft, HelpCircle, UserCog, Settings,
   UserPlus, BarChart3, Shield, LayoutDashboard,
-  Check, TrendingUp, Star
+  Check, TrendingUp, Star, MoonStar, Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
 import { DailyChecklist } from '@/components/ui/DailyChecklist';
@@ -42,6 +42,7 @@ const navItems = [
   { href: '/yearly-performance', label: 'رادار الأداء السنوي', icon: BarChart3, color: 'text-purple-400', glow: 'group-hover:shadow-purple-500/20' },
   { href: '/comparison', label: 'ساحة المقارنة', icon: Swords, color: 'text-rose-400', glow: 'group-hover:shadow-rose-500/20' },
   { href: '/dues', label: 'المستحقات المالية', icon: DollarSign, color: 'text-amber-400', glow: 'group-hover:shadow-amber-500/20' },
+  { href: '/management/monitoring', label: 'نظام المراقبة', icon: BarChart3, color: 'text-emerald-500', glow: 'group-hover:shadow-emerald-500/20' },
   { href: '/reports/daily', label: 'التقرير اليومي', icon: Edit, color: 'text-pink-400', glow: 'group-hover:shadow-pink-500/20' },
 
   { href: '/reports/student', label: 'تقرير الطالب', icon: FileText, color: 'text-orange-400', glow: 'group-hover:shadow-orange-500/20' },
@@ -118,7 +119,11 @@ export default function HomePage() {
             "flex items-center gap-3 backdrop-blur-md px-4 py-2 rounded-xl border shadow-lg",
             theme.isLight ? "bg-white border-slate-200" : "bg-white/5 border-white/10"
           )}>
-            <TrendingUp className="h-4 w-4 text-emerald-400" />
+            {currentThemeId === 'ramadan' ? (
+              <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
+            ) : (
+              <TrendingUp className="h-4 w-4 text-emerald-400" />
+            )}
             <span className={cn("text-sm font-bold opacity-80", theme.isLight ? "text-slate-600" : "text-white")}>
               حالة النظام: <span className="text-emerald-400">مستقر</span>
             </span>
@@ -179,7 +184,11 @@ export default function HomePage() {
             "inline-flex items-center gap-3 px-8 py-3 rounded-full border mb-2 backdrop-blur-md shadow-inner",
             theme.isLight ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-white/5 border-white/10 text-amber-200"
           )}>
-            <Star className={cn("h-5 w-5", theme.isLight ? "text-amber-600 fill-amber-600" : "text-amber-300 fill-amber-300")} />
+            {currentThemeId === 'ramadan' ? (
+              <MoonStar className={cn("h-5 w-5 animate-pulse", theme.isLight ? "text-amber-600 fill-amber-600" : "text-amber-300 fill-amber-300")} />
+            ) : (
+              <Star className={cn("h-5 w-5", theme.isLight ? "text-amber-600 fill-amber-600" : "text-amber-300 fill-amber-300")} />
+            )}
             <span className="text-sm font-headline font-black tracking-widest lowercase">المدرسة القرآنية للإمام الشافعي</span>
           </div>
           <h1 className={cn(

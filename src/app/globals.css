@@ -148,6 +148,19 @@ body {
   animation: fade-in-up 0.4s ease-out forwards;
 }
 
+/* Ramadan Theme Specifics */
+.ramadan-pattern {
+  background-color: transparent;
+  background-image: 
+    radial-gradient(circle at 100% 50%, transparent 20%, rgba(245, 158, 11, 0.03) 21%, rgba(245, 158, 11, 0.03) 34%, transparent 35%, transparent),
+    radial-gradient(circle at 0% 50%, transparent 20%, rgba(245, 158, 11, 0.03) 21%, rgba(245, 158, 11, 0.03) 34%, transparent 35%, transparent);
+  background-size: 100px 100px;
+}
+
+.ramadan-card {
+  @apply border-amber-500/10 bg-gradient-to-br from-white via-white to-amber-50/30;
+}
+
 @media print {
   body * {
     visibility: hidden;
@@ -181,4 +194,3 @@ body {
     margin: 1.5cm;
   }
 }
-    

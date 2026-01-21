@@ -89,6 +89,7 @@ interface StudentContextType {
   updatePaymentStatus: (paymentId: string, status: PaymentStatus, amount: number) => Promise<void>;
   saveSettings: (newSettings: AppSettings) => Promise<void>;
   generateDemoData: () => Promise<void>;
+  shareStudentRecord: (studentId: string, historyData: any) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -891,13 +892,26 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const shareStudentRecord = async (studentId: string, historyData: any) => {
+    try {
+      const shareRef = ref(db, `public_student_reports/${studentId}`);
+      await set(shareRef, {
+        ...historyData,
+        sharedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error sharing student record:", error);
+      throw error;
+    }
+  };
+
   return (
     <StudentContext.Provider value={{
       students, preRegistrations, allUsers, dailySessions, dailyReports, loading, surahProgress, payments, settings, hallOfFame,
       addStudent, updateStudent, deleteStudent, deleteAllStudents, deleteMultipleStudents,
       addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange,
       importStudents, importPreRegistrations, updatePreRegistration, bulkUpdatePreRegistrations, deleteAllPreRegistrations, deleteMultiplePreRegistrations,
-      saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, updatePaymentStatus, saveSettings, generateDemoData
+      saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, updatePaymentStatus, saveSettings, generateDemoData, shareStudentRecord
     }}>
       {children}
     </StudentContext.Provider>

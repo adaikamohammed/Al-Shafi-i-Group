@@ -1,5 +1,11 @@
 {
     "rules": {
+        "public_student_reports": {
+            "$studentId": {
+                ".read": "true",
+                ".write": "auth != null"
+            }
+        },
         "users": {
             ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'sheikh' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin')",
             "$uid": {
@@ -18,14 +24,11 @@
         },
         "students": {
             ".read": "auth != null",
-            ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'sheikh' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin')"
+            ".write": "auth != null"
         },
         "dailyReports": {
             ".read": "auth != null",
-            ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'sheikh' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin')",
-            ".indexOn": [
-                "studentId"
-            ]
+            ".write": "auth != null"
         }
     }
 }

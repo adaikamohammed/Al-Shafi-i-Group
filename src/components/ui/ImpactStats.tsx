@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useStudentContext } from '@/context/StudentContext';
-import { BookOpen, Users, Star, Clock } from 'lucide-react';
+import { BookOpen, Users, Star, Clock, Moon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { PORTAL_THEMES } from '@/lib/themes';
@@ -21,6 +21,15 @@ export function ImpactStats() {
         const totalSessions = Object.values(dailySessions).reduce((acc, day) => acc + Object.keys(day).length, 0);
         const totalSurahs = students.reduce((acc, s) => acc + (s.memorizedSurahsCount || 0), 0);
         const topPerformers = activeStudents.filter(s => s.memorizedSurahsCount > 5).length;
+
+        if (currentThemeId === 'ramadan') {
+            return [
+                { label: "طالباً تحت إشرافك", value: total, icon: Users, color: "text-emerald-600", bg: "bg-emerald-100" },
+                { label: "سورة تم حفظها", value: totalSurahs, icon: BookOpen, color: "text-amber-600", bg: "bg-amber-100" },
+                { label: "حصة تم عقدها", value: totalSessions, icon: Moon, color: "text-emerald-600", bg: "bg-emerald-100" },
+                { label: "نجوم رمضانية", value: topPerformers, icon: Star, color: "text-amber-600", bg: "bg-amber-100" },
+            ];
+        }
 
         return [
             { label: "طالباً تحت إشرافك", value: total, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },

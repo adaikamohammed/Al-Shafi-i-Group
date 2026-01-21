@@ -17,7 +17,8 @@ import {
     Shield,
     UserPlus,
     Home,
-    UserCog
+    UserCog,
+    MoonStar
 } from 'lucide-react';
 
 export interface NavItem {
@@ -63,6 +64,8 @@ export const NAV_GROUPS: NavGroup[] = [
     {
         title: 'النافذة الإدارية',
         items: [
+            { href: '/management/monitoring', label: 'نظام المراقبة', icon: BarChart3, primary: true },
+            { href: '/occasions', label: 'المناسبات الدينية', icon: MoonStar },
             { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus },
             { href: '/data', label: 'إدارة البيانات', icon: ArrowRightLeft },
             { href: '/dues', label: 'المستحقات (فصلي)', icon: DollarSign },

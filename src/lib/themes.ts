@@ -57,5 +57,13 @@ export const PORTAL_THEMES: Record<string, PortalTheme> = {
         accent: "amber",
         preview: "bg-white",
         isLight: true
+    },
+    ramadan: {
+        id: "ramadan",
+        name: "رمضان المبارك (روحاني)",
+        gradient: "from-emerald-50 via-white to-amber-50",
+        accent: "emerald",
+        preview: "bg-gradient-to-r from-emerald-100 to-amber-100",
+        isLight: true
     }
 };
