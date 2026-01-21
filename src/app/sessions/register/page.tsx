@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useStudentContext } from '@/context/StudentContext';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, subDays, isSameDay } from 'date-fns';
+import { format, parse, parseISO, subDays, isSameDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -31,7 +31,7 @@ function RegisterSessionContent() {
     const dateParam = searchParams.get('date');
     const sessionNumParam = searchParams.get('session');
 
-    const [selectedDay] = useState<Date>(dateParam ? parseISO(dateParam) : new Date());
+    const [selectedDay] = useState<Date>(dateParam ? parse(dateParam, 'yyyy-MM-dd', new Date()) : new Date());
     const [sessionToOpen] = useState<1 | 2>(sessionNumParam === '2' ? 2 : 1);
 
     const [sessionType, setSessionType] = useState<'حصة أساسية' | 'حصة تعويضية' | 'يوم عطلة' | 'غياب الشيخ' | 'حصة أنشطة'>('حصة أساسية');
@@ -168,7 +168,21 @@ function RegisterSessionContent() {
             });
             return newRecords;
         });
-        toast({ title: "تم", description: "تم تفعيل 'مراجعة' لجميع الحاضرين" });
+        toast({ title: "تم", description: "تم تفعيل وضع المراجعة للجميع." });
+    };
+
+    const handleMarkAllGood = () => {
+        setAttendanceRecords(prev => {
+            const newRecords = { ...prev };
+            activeStudents.forEach(student => {
+                const existing = newRecords[student.id] || { studentId: student.id, attendance: 'حاضر' as AttendanceStatus, memorization: '' as PerformanceLevel, behavior: '' as BehaviorLevel, notes: '', review: false };
+                if (existing.attendance === 'حاضر' || existing.attendance === 'متأخر') {
+                    newRecords[student.id] = { ...existing, memorization: 'جيد' };
+                }
+            });
+            return newRecords;
+        });
+        toast({ title: "تم", description: "تم تقييم جميع الحاضرين بـ 'جيد'" });
     };
 
     const handleSaveSession = async () => {
@@ -264,7 +278,7 @@ function RegisterSessionContent() {
 
             const allSessions = Object.values(dailySessions || {}).flatMap(day => Object.values(day as Record<string, any>));
             const weekSessions = allSessions.filter(s => {
-                const sDate = parseISO(s.date);
+                const sDate = parse(s.date, 'yyyy-MM-dd', new Date());
                 return sDate >= lastSatDate && sDate <= lastWedDate && s.sessionType === 'حصة أساسية' && s.surahId;
             }).sort((a, b) => a.date.localeCompare(b.date));
 
@@ -297,11 +311,20 @@ function RegisterSessionContent() {
         return { daily: dailyMessage, harvest: harvestMessage };
     }, [isAdmin5, sessionType, selectedDay, surahId, fromVerse, toVerse, activeStudents, attendanceRecords, dailySessions]);
 
-    const handleCopyMessage = () => {
-        navigator.clipboard.writeText(whatsappMessage);
-        setCopied(true);
-        toast({ title: "تم النسخ", description: "تم نسخ رسالة الواتساب إلى الحافظة." });
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopyDaily = () => {
+        navigator.clipboard.writeText(messages.daily);
+        setCopiedDaily(true);
+        toast({ title: "تم النسخ", description: "تم نسخ رسالة الورد اليومي." });
+        setTimeout(() => setCopiedDaily(false), 2000);
+    };
+
+    const handleCopyHarvest = () => {
+        if (messages.harvest) {
+            navigator.clipboard.writeText(messages.harvest);
+            setCopiedHarvest(true);
+            toast({ title: "تم النسخ", description: "تم نسخ رسالة الحصيلة الأسبوعية." });
+            setTimeout(() => setCopiedHarvest(false), 2000);
+        }
     };
 
     const handleDelete = async () => {
@@ -369,6 +392,9 @@ function RegisterSessionContent() {
                             </Button>
                             <Button onClick={handleMarkAllReview} variant="secondary" className="bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 h-10 rounded-xl flex-1 md:flex-none font-bold text-xs">
                                 <RotateCcw className="ml-2 h-4 w-4" /> مراجعة الجميع
+                            </Button>
+                            <Button onClick={handleMarkAllGood} variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 h-10 rounded-xl flex-1 md:flex-none font-bold text-xs">
+                                <CheckCircle className="ml-2 h-4 w-4" /> جيد الجميع
                             </Button>
                         </div>
                     )}

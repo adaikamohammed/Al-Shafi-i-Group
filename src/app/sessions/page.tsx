@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useStudentContext } from '@/context/StudentContext';
 import { useToast } from '@/hooks/use-toast';
-import { getYear, getMonth, format, parseISO } from 'date-fns';
+import { getYear, getMonth, format, parse, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
@@ -94,7 +94,7 @@ export default function DailySessionsPage() {
       return;
     }
 
-    const date = parseISO(session.date);
+    const date = parse(session.date, 'yyyy-MM-dd', new Date());
     const dayName = format(date, 'EEEE', { locale: ar });
     const readableDate = format(date, 'dd/MM/yyyy');
 
