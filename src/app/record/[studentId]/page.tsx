@@ -233,7 +233,22 @@ export default function PublicStudentRecordPage() {
     const currentMonth = getMonth(currentDate);
     const currentQuarter = Math.floor(currentMonth / 3) + 1;
 
-    const { stats, displayStats } = useMemo(() => {
+    const statsTitle = useMemo(() => {
+        switch (viewMode) {
+            case 'year': return `إحصائيات سنة ${currentYear}`;
+            case 'quarter': return `إحصائيات الربع ${currentQuarter} - ${currentYear}`;
+            default: return `إحصائيات شهر ${format(currentDate, 'MMMM yyyy', { locale: ar })}`;
+        }
+    }, [viewMode, currentDate, currentYear, currentQuarter]);
+
+    const handleDateNavigation = (direction: 'prev' | 'next') => {
+        const amount = direction === 'next' ? 1 : -1;
+        if (viewMode === 'year') setCurrentDate(d => setYear(d, getYear(d) + amount));
+        else if (viewMode === 'month') setCurrentDate(d => addMonths(d, amount));
+        else if (viewMode === 'quarter') setCurrentDate(d => addMonths(d, amount * 3));
+    };
+
+    const { stats: periodStats } = useMemo(() => {
         if (!studentData) return { stats: { attendanceRate: 0, totalPresent: 0, totalAbsent: 0, totalLate: 0, avgEval: '---' }, displayStats: snapshot?.stats };
 
         let startDate: Date;
@@ -288,10 +303,9 @@ export default function PublicStudentRecordPage() {
         };
 
         return {
-            stats: calculatedStats,
-            displayStats: calculatedStats
+            stats: calculatedStats
         };
-    }, [studentData, viewMode, currentDate, currentYear, currentQuarter, snapshot]);
+    }, [studentData, viewMode, currentDate, currentYear, currentQuarter]);
 
     if (loading) {
         return (
@@ -392,21 +406,21 @@ export default function PublicStudentRecordPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <StatWidget
                             title="معدل الانضباط العام"
-                            value={stats.attendanceRate}
+                            value={snapshot?.stats?.attendanceRate || '0'}
                             unit="%"
                             icon={<CheckCircle className="h-7 w-7 text-emerald-600" />}
                             colorClass="bg-emerald-50"
                         />
                         <StatWidget
                             title="التقييم السائد"
-                            value={stats.avgEval}
+                            value={snapshot?.stats?.avgEval || '---'}
                             unit=""
                             icon={<Award className="h-7 w-7 text-amber-600" />}
                             colorClass="bg-amber-50"
                         />
                         <StatWidget
                             title="إجمالي أيام الغياب"
-                            value={stats.totalAbsent}
+                            value={snapshot?.stats?.totalAbsent || '0'}
                             unit="يوم"
                             icon={<AlertCircle className="h-7 w-7 text-red-600" />}
                             colorClass="bg-red-50"
@@ -449,17 +463,17 @@ export default function PublicStudentRecordPage() {
                                 </div>
                                 <div className="flex items-center justify-center gap-8 flex-wrap">
                                     <div className="text-center">
-                                        <span className="block text-2xl font-black text-emerald-600">{stats.totalPresent}</span>
+                                        <span className="block text-2xl font-black text-emerald-600">{periodStats.totalPresent}</span>
                                         <span className="text-[10px] font-black opacity-50 uppercase">حضور</span>
                                     </div>
                                     <div className="w-px h-8 bg-muted border-dotted border-l" />
                                     <div className="text-center">
-                                        <span className="block text-2xl font-black text-amber-600">{stats.totalLate}</span>
+                                        <span className="block text-2xl font-black text-amber-600">{periodStats.totalLate}</span>
                                         <span className="text-[10px] font-black opacity-50 uppercase">تأخر</span>
                                     </div>
                                     <div className="w-px h-8 bg-muted border-dotted border-l" />
                                     <div className="text-center">
-                                        <span className="block text-2xl font-black text-red-600">{stats.totalAbsent}</span>
+                                        <span className="block text-2xl font-black text-red-600">{periodStats.totalAbsent}</span>
                                         <span className="text-[10px] font-black opacity-50 uppercase">غياب</span>
                                     </div>
                                 </div>

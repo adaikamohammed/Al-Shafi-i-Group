@@ -1,14 +1,19 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { AuthWrapper } from '@/components/ui/AuthWrapper';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
   title: 'مدير مدرسة الشافعي',
   description: 'إدارة مدرسة الإمام الشافعي القرآنية',
   manifest: '/manifest.json',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1.0,
   themeColor: '#808000',
-  viewport: 'width=device-width, initial-scale=1.0',
 };
 
 export default function RootLayout({
@@ -24,9 +29,11 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <AuthWrapper>
-          {children}
-        </AuthWrapper>
+        <ErrorBoundary>
+          <AuthWrapper>
+            {children}
+          </AuthWrapper>
+        </ErrorBoundary>
         <Toaster />
       </body>
     </html>
