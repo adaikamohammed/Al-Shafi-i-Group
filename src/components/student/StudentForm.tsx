@@ -31,6 +31,15 @@ interface StudentFormProps {
     updateStudent?: (id: string, data: any, ownerId: string) => void;
 }
 
+const PRESET_AVATARS = [
+    { id: 'smart', path: '/avatars/smart.png', label: 'طالب ذكي' },
+    { id: 'excited', path: '/avatars/excited.png', label: 'طالب متحمس' },
+    { id: 'playful', path: '/avatars/playful.png', label: 'طالب مشاغب' },
+    { id: 'studious', path: '/avatars/studious.png', label: 'طالب مجتهد' },
+    { id: 'creative', path: '/avatars/creative.png', label: 'طالب مبدع' },
+    { id: 'athletic', path: '/avatars/athletic.png', label: 'طالب رياضي' },
+];
+
 export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateStudent }: StudentFormProps) => {
     const { settings } = useStudentContext();
     const { user, isSuperAdmin } = useAuth();
@@ -42,6 +51,7 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
     const [originalCovenants, setOriginalCovenants] = useState<Covenant[]>(student?.covenants || []);
     const [photoPreview, setPhotoPreview] = useState<string | null>(student?.photoURL || null);
     const [photoFile, setPhotoFile] = useState<File | null>(null);
+    const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -64,6 +74,8 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        setSelectedAvatarId(null);
 
         // Compression logic using Canvas
         const reader = new FileReader();
@@ -110,6 +122,13 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
         reader.readAsDataURL(file);
     };
 
+    const handleSelectPresetAvatar = (avatar: typeof PRESET_AVATARS[0]) => {
+        setPhotoFile(null);
+        setSelectedAvatarId(avatar.id);
+        setPhotoPreview(avatar.path);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -146,6 +165,7 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
                 notes: data.notes,
                 covenants: covenants,
                 photoFile: photoFile,
+                photoURL: selectedAvatarId ? photoPreview : (student?.photoURL || null),
                 ownerId: student?.ownerId || user?.uid || ''
             };
 
@@ -198,7 +218,7 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
     return (
         <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                <div className="flex flex-col items-center gap-4 py-4 bg-primary/5 rounded-2xl border border-primary/10 transition-all hover:bg-primary/10 relative overflow-hidden group">
+                <div className="flex flex-col items-center gap-6 py-6 bg-primary/5 rounded-2xl border border-primary/10 transition-all hover:bg-primary/10 relative overflow-hidden group">
                     <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
 
                     <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
@@ -217,11 +237,39 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
                             </div>
                         )}
                     </div>
-                    <div className="text-center z-0">
-                        <Button type="button" variant="link" onClick={() => fileInputRef.current?.click()} className="text-primary font-headline font-bold">
-                            {photoPreview ? 'تغيير صورة الطالب' : 'إضافة صورة الطالب'}
-                        </Button>
-                        <p className="text-[10px] text-muted-foreground font-body">الحد الأقصى: 500 كيلوبايت (JPG/PNG)</p>
+
+                    <div className="w-full px-6 space-y-4">
+                        <div className="text-center">
+                            <Label className="font-headline font-bold text-primary mb-2 block">أو اختر صورة رمزية سريعة</Label>
+                            <div className="flex flex-wrap items-center justify-center gap-3 mt-2">
+                                {PRESET_AVATARS.map((avatar) => (
+                                    <button
+                                        key={avatar.id}
+                                        type="button"
+                                        onClick={() => handleSelectPresetAvatar(avatar)}
+                                        className={cn(
+                                            "relative w-14 h-14 rounded-full border-2 transition-all hover:scale-110",
+                                            selectedAvatarId === avatar.id ? "border-primary ring-2 ring-primary/20 scale-110" : "border-transparent opacity-70 hover:opacity-100"
+                                        )}
+                                        title={avatar.label}
+                                    >
+                                        <img src={avatar.path} alt={avatar.label} className="w-full h-full rounded-full object-cover" />
+                                        {selectedAvatarId === avatar.id && (
+                                            <div className="absolute -top-1 -right-1 bg-primary text-white rounded-full p-0.5">
+                                                <PlusCircle className="w-3 h-3 fill-current" />
+                                            </div>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="text-center z-0 pt-2 border-t border-primary/10">
+                            <Button type="button" variant="link" onClick={() => fileInputRef.current?.click()} className="text-primary font-headline font-bold h-auto p-0">
+                                {photoPreview ? 'رفع صورة مخصصة من الجهاز' : 'إضافة صورة من الجهاز'}
+                            </Button>
+                            <p className="text-[10px] text-muted-foreground font-body">الحد الأقصى: 500 كيلوبايت (JPG/PNG)</p>
+                        </div>
                     </div>
                 </div>
 

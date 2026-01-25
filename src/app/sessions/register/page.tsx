@@ -247,9 +247,23 @@ function RegisterSessionContent() {
         const getRecitedList = () => activeStudents
             .filter(s => {
                 const record = attendanceRecords[s.id];
-                return record && record.memorization && record.memorization !== "لم يحفظ" && record.memorization !== "لا يوجد" && (record.attendance === 'حاضر' || record.attendance === 'متأخر');
+                return record && record.memorization && record.memorization !== "لا يوجد" && (record.attendance === 'حاضر' || record.attendance === 'متأخر');
             })
-            .map(s => `${s.fullName} : ${attendanceRecords[s.id].memorization || ''}`);
+            .map(s => `*${s.fullName}* : ${attendanceRecords[s.id].memorization || ''}`);
+
+        const getLateList = () => activeStudents
+            .filter(s => {
+                const record = attendanceRecords[s.id];
+                return record && record.attendance === 'متأخر';
+            })
+            .map(s => `*${s.fullName}*`);
+
+        const getAbsentList = () => activeStudents
+            .filter(s => {
+                const record = attendanceRecords[s.id];
+                return record && record.attendance === 'غياب';
+            })
+            .map(s => `*${s.fullName}*`);
 
         const header = "السلام عليكم ورحمة الله وبركاته";
         const dateLine = `اليوم ${dateStr}`;
@@ -263,6 +277,18 @@ function RegisterSessionContent() {
             dailyContent = `قائمة الطلبة الذين إستظهروا من الآية (${pad(fromVerse)}) إلى الآية (${pad(toVerse)}) من سورة ${currentSurah?.name || ''} :\n`;
         }
         dailyContent += recitedStudents.length > 0 ? recitedStudents.join('\n') : "لا يوجد";
+
+        const lateStudents = getLateList();
+        const absentStudents = getAbsentList();
+
+        if (lateStudents.length > 0) {
+            dailyContent += `\n-------------\nقائمة الطلبة المتأخرين :\n${lateStudents.join('\n')}`;
+        }
+
+        if (absentStudents.length > 0) {
+            dailyContent += `\n-------------\nقائمة الطلبة الغائبين :\n${absentStudents.join('\n')}`;
+        }
+
         const dailyMessage = `${header}\n${dateLine}\n${dailyContent}`;
 
         // Message 2: Weekly Harvest (Only on Saturday)
@@ -299,7 +325,7 @@ function RegisterSessionContent() {
                     const hasRecited = record && record.memorization && record.memorization !== "لم يحفظ" && record.memorization !== "لا يوجد";
                     return isPresent && !hasRecited;
                 })
-                .map(s => s.fullName);
+                .map(s => `*${s.fullName}*`);
 
             if (notRecitedStudents.length > 0) {
                 harvestContent += `\n\nقائمة الطلاب الذين لم يستظهروا الحصيلة الأسبوعية :\n`;

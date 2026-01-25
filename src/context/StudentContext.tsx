@@ -585,7 +585,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const originalStudent = students.find(s => s.id === studentId);
     if (!originalStudent) return;
 
-    let finalPhotoURL = originalStudent.photoURL;
+    // Prioritize new photoURL from updatedData (might be a preset avatar)
+    let finalPhotoURL = updatedData.photoURL !== undefined ? updatedData.photoURL : originalStudent.photoURL;
 
     if (updatedData.photoFile) {
       const imageRef = storageRef(storage, `student_photos/${studentId}`);
