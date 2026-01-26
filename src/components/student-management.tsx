@@ -158,6 +158,10 @@ export default function StudentManagement() {
                 {!isSuperAdmin && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
                     <DialogTrigger asChild><Button><PlusCircle className="ml-2 h-4 w-4" />إضافة طالب جديد</Button></DialogTrigger>
                     <DialogContent className="sm:max-w-[600px]">
+                        <DialogHeader>
+                            <DialogTitle>إضافة طالب جديد</DialogTitle>
+                            <DialogDescription>أدخل معلومات الطالب الجديد هنا لإضافته إلى النظام.</DialogDescription>
+                        </DialogHeader>
                         <StudentForm addStudent={addStudent} onSuccess={() => setAddStudentDialogOpen(false)} onCancel={() => setAddStudentDialogOpen(false)} />
                     </DialogContent>
                 </Dialog>}
@@ -209,6 +213,10 @@ export default function StudentManagement() {
                         {!isSuperAdmin && !isManagement && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
                             <DialogTrigger asChild><Button className="w-full sm:w-auto"><PlusCircle className="ml-2 h-4 w-4" />إضافة طالب جديد</Button></DialogTrigger>
                             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl">
+                                <DialogHeader className="p-6 pb-0">
+                                    <DialogTitle>إضافة طالب جديد</DialogTitle>
+                                    <DialogDescription>أدخل معلومات الطالب الجديد هنا لإضافته إلى النظام.</DialogDescription>
+                                </DialogHeader>
                                 <StudentForm addStudent={addStudent} onSuccess={() => setAddStudentDialogOpen(false)} onCancel={() => setAddStudentDialogOpen(false)} />
                             </DialogContent>
                         </Dialog>}
