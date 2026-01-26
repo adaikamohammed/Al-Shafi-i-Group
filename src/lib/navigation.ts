@@ -18,7 +18,8 @@ import {
     UserPlus,
     Home,
     UserCog,
-    MoonStar
+    MoonStar,
+    Activity
 } from 'lucide-react';
 
 export interface NavItem {
@@ -48,6 +49,7 @@ export const NAV_GROUPS: NavGroup[] = [
         items: [
             { href: '/stats', label: 'المتابعة الأسبوعية', icon: Calendar },
             { href: '/student-history', label: 'سجل الطالب', icon: LayoutDashboard },
+            { href: '/logs', label: 'سجل النشاطات', icon: Activity },
             { href: '/yearly-performance', label: 'الأداء السنوي', icon: BarChart3 },
             { href: '/reports/student', label: 'تقارير الطلاب', icon: FileText },
         ]

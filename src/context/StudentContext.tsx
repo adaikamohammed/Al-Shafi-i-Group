@@ -12,6 +12,7 @@ import { ref, set, onValue, off, remove, DatabaseReference, update, get } from '
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
 import { sanitizeData } from '@/lib/utils';
+import { logActivity } from '@/lib/activityLogger';
 
 const DEFAULT_POINTS_CONFIG: PointsConfig = {
   attendance: { 'حاضر': 5, 'متأخر': 2, 'تعويض': 1.5, 'غائب': -10 },
@@ -67,8 +68,8 @@ interface StudentContextType {
   settings: AppSettings;
   hallOfFame: HallOfFameData | null;
   loading: boolean;
-  addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string }) => void;
-  updateStudent: (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => void;
+  addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string }) => Promise<void>;
+  updateStudent: (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => Promise<void>;
   deleteStudent: (studentId: string, ownerId: string) => void;
   deleteAllStudents: () => void;
   deleteMultipleStudents: (studentsToDelete: { id: string, ownerId: string }[]) => void;
@@ -444,7 +445,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }, [hallOfFame, toast]);
 
 
-  const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string }) => {
+  const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string }): Promise<void> => {
     if (!authContextUser) return;
 
     const ownerId = (isSuperAdmin || isManagement) ? studentData.ownerId : authContextUser.uid;
@@ -473,7 +474,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       photoURL: photoURL
     };
     const studentRef = ref(db, `users/${ownerId}/students/${studentId}`);
-    set(studentRef, {
+    const studentOp = set(studentRef, {
       ...newStudent,
       birthDate: newStudent.birthDate ? newStudent.birthDate.toISOString() : null,
       registrationDate: newStudent.registrationDate.toISOString(),
@@ -482,8 +483,21 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     });
 
     const surahProgressRef = ref(db, `users/${ownerId}/surahProgress/${studentId}`);
-    set(surahProgressRef, {});
+    const progressOp = set(surahProgressRef, {});
 
+    await Promise.all([studentOp, progressOp]);
+
+    // Log action
+    logActivity(
+      'ADD_STUDENT',
+      authContextUser.uid,
+      `تم إضافة طالب جديد: ${newStudent.fullName}`,
+      studentId,
+      newStudent.fullName,
+      authContextUser.displayName || 'Unknown',
+      newStudent.groupName,
+      ownerId
+    );
   };
 
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
@@ -578,7 +592,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: `🗑️ تم حذف ${ids.length} تسجيل`, description: "تم حذف التسجيلات المحددة بنجاح." });
   };
 
-  const updateStudent = async (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => {
+  const updateStudent = async (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string): Promise<void> => {
     if (!authContextUser) return;
 
     const studentOwnerId = (isSuperAdmin || isManagement) ? ownerId : authContextUser.uid;
@@ -609,7 +623,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const sanitizedData = sanitizeData(finalData);
 
     const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
-    set(studentRef, {
+    await set(studentRef, {
       ...sanitizedData,
       birthDate: sanitizedData.birthDate ? sanitizedData.birthDate.toISOString() : null,
       registrationDate: sanitizedData.registrationDate.toISOString(),
@@ -617,6 +631,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       covenants: Object.keys(covenantsObject).length > 0 ? covenantsObject : null
     });
 
+    // Log action
+    logActivity(
+      'UPDATE_STUDENT',
+      authContextUser.uid,
+      `تم تحديث بيانات الطالب: ${finalData.fullName}`,
+      studentId,
+      finalData.fullName,
+      authContextUser.displayName || 'Unknown',
+      finalData.groupName,
+      studentOwnerId
+    );
   };
 
   const deleteStudent = async (studentId: string, ownerId: string) => {
@@ -629,9 +654,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     await remove(studentRef);
 
     if (studentToDelete) {
-      if (studentToDelete) {
-        // Log removed
-      }
+      // Log action
+      logActivity(
+        'DELETE_STUDENT',
+        authContextUser.uid,
+        `تم حذف الطالب: ${studentToDelete.fullName}`,
+        studentId,
+        studentToDelete.fullName,
+        authContextUser.displayName || 'Unknown',
+        studentToDelete.groupName,
+        studentOwnerId
+      );
     }
 
     // Delete photo from storage
@@ -687,14 +720,40 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     // The issue might be that logActivity runs BEFORE set finishes?
     // No, both are async.
 
-    set(sessionRef, session).catch(e => console.error("Error saving session:", e));
+    set(sessionRef, session).then(() => {
+      // Log action
+      logActivity(
+        'ADD_SESSION',
+        authContextUser.uid,
+        `تم تسجيل حصة جديدة بتاريخ: ${session.date}`,
+        session.id,
+        session.sessionType,
+        authContextUser.displayName || 'Unknown',
+        authContextUser.group || 'غير محدد',
+        authContextUser.uid
+      );
+    }).catch(e => console.error("Error saving session:", e));
   };
 
   const deleteDailySession = (sessionId: string) => {
     if (!authContextUser || isSuperAdmin) return;
     const date = sessionId.substring(0, 10);
     const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${date}/${sessionId}`);
-    remove(sessionRef);
+    const sessionToDelete = dailySessions[date]?.[sessionId];
+    remove(sessionRef).then(() => {
+      if (sessionToDelete) {
+        logActivity(
+          'DELETE_SESSION',
+          authContextUser.uid,
+          `تم حذف حصة بتاريخ: ${sessionToDelete.date}`,
+          sessionId,
+          sessionToDelete.sessionType,
+          authContextUser.displayName || 'Unknown',
+          authContextUser.group || 'غير محدد',
+          authContextUser.uid
+        );
+      }
+    });
   }
 
   const getSessionsForDay = (date: string): DailySession[] => {
@@ -781,7 +840,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const currentEntry = studentProgressMap[surahId] || { status: 0 };
     const currentStatus = currentEntry.status;
 
-    const nextStatus = (currentStatus + 1) % 3;
+    const nextStatus = ((currentStatus + 1) % 3) as 0 | 1 | 2;
 
     const newEntry: SurahMasteryEntry = { status: nextStatus };
 
@@ -792,10 +851,38 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       newEntry.completedAt = currentEntry.completedAt || new Date().toISOString();
     }
 
+    const progressRef = ref(db, `users/${studentOwnerId}/surahProgress/${studentId}/${surahId}`);
+
     if (nextStatus === 0) {
-      delete studentProgressMap[surahId];
+      remove(progressRef).then(() => {
+        const student = students.find(s => s.id === studentId);
+        logActivity(
+          'UPDATE_SURAH_PROGRESS',
+          authContextUser.uid,
+          `تم حذف حالة السورة (ID: ${surahId})`,
+          studentId,
+          student?.fullName || 'غير معروف',
+          authContextUser.displayName || 'Unknown',
+          student?.groupName || 'غير محدد',
+          studentOwnerId
+        );
+      });
+      delete studentProgressMap[surahId]; // Keep local map in sync
     } else {
-      studentProgressMap[surahId] = newEntry;
+      set(progressRef, newEntry).then(() => {
+        const student = students.find(s => s.id === studentId);
+        logActivity(
+          'UPDATE_SURAH_PROGRESS',
+          authContextUser.uid,
+          `تحديث حالة السورة (ID: ${surahId})`,
+          studentId,
+          student?.fullName || 'غير معروف',
+          authContextUser.displayName || 'Unknown',
+          student?.groupName || 'غير محدد',
+          studentOwnerId
+        );
+      });
+      studentProgressMap[surahId] = newEntry; // Keep local map in sync
     }
 
     const pointsMemorized = settings.points.surah['memorized'];

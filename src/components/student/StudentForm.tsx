@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PlusCircle, Trash2, ShieldAlert, Calendar as CalendarIcon, User as UserIcon, Phone, Award, Loader2, ImagePlus, Camera, RefreshCcw, X } from 'lucide-react';
+import { PlusCircle, Trash2, ShieldAlert, Calendar as CalendarIcon, User as UserIcon, Phone, Award, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,76 +50,8 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
     const [covenants, setCovenants] = useState<Covenant[]>(student?.covenants || []);
     const [originalCovenants, setOriginalCovenants] = useState<Covenant[]>(student?.covenants || []);
     const [photoPreview, setPhotoPreview] = useState<string | null>(student?.photoURL || null);
-    const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isCameraOpen, setIsCameraOpen] = useState(false);
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        return () => {
-            if (videoRef.current?.srcObject) {
-                const stream = videoRef.current.srcObject as MediaStream;
-                stream.getTracks().forEach(track => track.stop());
-            }
-        };
-    }, []);
-
-    const startCamera = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user', width: { ideal: 1024 }, height: { ideal: 1024 } }
-            });
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                setIsCameraOpen(true);
-            }
-        } catch (err) {
-            console.error("Error accessing camera:", err);
-            toast({ title: "خطأ في الكاميرا", description: "تعذر الوصول إلى الكاميرا. يرجى التأكد من منح الأذونات اللازمة.", variant: "destructive" });
-        }
-    };
-
-    const stopCamera = () => {
-        if (videoRef.current?.srcObject) {
-            const stream = videoRef.current.srcObject as MediaStream;
-            stream.getTracks().forEach(track => track.stop());
-            videoRef.current.srcObject = null;
-        }
-        setIsCameraOpen(false);
-    };
-
-    const capturePhoto = () => {
-        if (videoRef.current && canvasRef.current) {
-            const video = videoRef.current;
-            const canvas = canvasRef.current;
-            const context = canvas.getContext('2d');
-
-            if (context) {
-                // Set canvas size to match video aspect ratio (square crop)
-                const size = Math.min(video.videoWidth, video.videoHeight);
-                canvas.width = 500;
-                canvas.height = 500;
-
-                const startX = (video.videoWidth - size) / 2;
-                const startY = (video.videoHeight - size) / 2;
-
-                context.drawImage(video, startX, startY, size, size, 0, 0, 500, 500);
-
-                canvas.toBlob((blob) => {
-                    if (blob) {
-                        const file = new File([blob], `captured_student_${Date.now()}.jpg`, { type: 'image/jpeg' });
-                        setPhotoFile(file);
-                        setPhotoPreview(URL.createObjectURL(file));
-                        setSelectedAvatarId(null);
-                        stopCamera();
-                    }
-                }, 'image/jpeg', 0.8);
-            }
-        }
-    };
 
     useEffect(() => {
         if (birthDate) {
@@ -137,62 +69,10 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
     };
 
 
-    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setSelectedAvatarId(null);
-
-        // Compression logic using Canvas
-        const reader = new FileReader();
-        reader.onload = (loadEvent) => {
-            const img = new Image();
-            img.src = loadEvent.target?.result as string;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 500;
-                const MAX_HEIGHT = 500;
-                let width = img.width;
-                let height = img.height;
-
-                if (width > height) {
-                    if (width > MAX_WIDTH) {
-                        height *= MAX_WIDTH / width;
-                        width = MAX_WIDTH;
-                    }
-                } else {
-                    if (height > MAX_HEIGHT) {
-                        width *= MAX_HEIGHT / height;
-                        height = MAX_HEIGHT;
-                    }
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return;
-
-                ctx.drawImage(img, 0, 0, width, height);
-                canvas.toBlob((blob) => {
-                    if (blob) {
-                        const compressedFile = new File([blob], file.name, {
-                            type: 'image/jpeg',
-                            lastModified: Date.now()
-                        });
-                        setPhotoFile(compressedFile);
-                        setPhotoPreview(URL.createObjectURL(compressedFile));
-                    }
-                }, 'image/jpeg', 0.8);
-            };
-        };
-        reader.readAsDataURL(file);
-    };
 
     const handleSelectPresetAvatar = (avatar: typeof PRESET_AVATARS[0]) => {
-        setPhotoFile(null);
         setSelectedAvatarId(avatar.id);
         setPhotoPreview(avatar.path);
-        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
 
@@ -214,7 +94,7 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
                 }
             });
 
-            const studentData: Partial<Student> & { photoFile?: File | null } = {
+            const studentData: Partial<Student> = {
                 fullName: data.fullName,
                 gender: data.gender,
                 pageNumber: data.pageNumber,
@@ -230,7 +110,6 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
                 dailyMemorizationAmount: data.memorizationAmount,
                 notes: data.notes,
                 covenants: covenants,
-                photoFile: photoFile,
                 photoURL: selectedAvatarId ? photoPreview : (student?.photoURL || null),
                 ownerId: student?.ownerId || user?.uid || ''
             };
@@ -285,114 +164,41 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
         <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
                 <div className="flex flex-col items-center gap-6 py-6 bg-primary/5 rounded-2xl border border-primary/10 transition-all hover:bg-primary/10 relative overflow-hidden group">
-                    <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
+                    <div className="relative group">
+                        <Avatar className="w-28 h-28 border-4 border-background shadow-xl ring-2 ring-primary/20 transition-transform">
+                            <AvatarImage src={photoPreview || undefined} />
+                            <AvatarFallback className="bg-primary/5 text-primary text-3xl font-headline font-bold">
+                                {student?.fullName?.charAt(0) || '?'}
+                            </AvatarFallback>
+                        </Avatar>
+                    </div>
 
-                    {!isCameraOpen ? (
-                        <div className="relative group">
-                            <div className="relative cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                                <Avatar className="w-28 h-28 border-4 border-background shadow-xl ring-2 ring-primary/20 transition-transform group-hover:scale-105">
-                                    <AvatarImage src={photoPreview || undefined} />
-                                    <AvatarFallback className="bg-primary/5 text-primary text-3xl font-headline font-bold">
-                                        {student?.fullName?.charAt(0) || '?'}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <ImagePlus className="text-white h-8 w-8" />
-                                </div>
-                            </div>
-
-                            <Button
-                                type="button"
-                                size="icon"
-                                variant="secondary"
-                                onClick={startCamera}
-                                className="absolute -bottom-2 -right-2 rounded-full w-10 h-10 shadow-lg border-2 border-background animate-in zoom-in"
-                                title="التقاط صورة"
-                            >
-                                <Camera className="h-5 w-5 text-primary" />
-                            </Button>
-                        </div>
-                    ) : (
-                        <div className="relative w-full max-w-[300px] aspect-square rounded-2xl overflow-hidden bg-black shadow-2xl border-4 border-background ring-2 ring-primary/20">
-                            <video
-                                ref={videoRef}
-                                autoPlay
-                                playsInline
-                                className="w-full h-full object-cover -scale-x-100"
-                            />
-                            <canvas ref={canvasRef} className="hidden" />
-
-                            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4 px-4">
-                                <Button
-                                    type="button"
-                                    variant="destructive"
-                                    size="icon"
-                                    onClick={stopCamera}
-                                    className="rounded-full w-12 h-12 shadow-lg"
-                                >
-                                    <X className="h-6 w-6" />
-                                </Button>
-                                <Button
-                                    type="button"
-                                    onClick={capturePhoto}
-                                    className="rounded-full w-16 h-16 bg-white hover:bg-slate-100 text-primary border-4 border-primary/30 shadow-xl"
-                                >
-                                    <div className="w-8 h-8 rounded-full border-4 border-primary animate-pulse" />
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    size="icon"
-                                    onClick={startCamera} // Refresh camera
-                                    className="rounded-full w-12 h-12 shadow-lg"
-                                >
-                                    <RefreshCcw className="h-6 w-6" />
-                                </Button>
+                    <div className="w-full px-6 space-y-4">
+                        <div className="text-center">
+                            <Label className="font-headline font-bold text-primary mb-2 block">اختر صورة رمزية سريعة</Label>
+                            <div className="flex flex-wrap items-center justify-center gap-3 mt-2">
+                                {PRESET_AVATARS.map((avatar) => (
+                                    <button
+                                        key={avatar.id}
+                                        type="button"
+                                        onClick={() => handleSelectPresetAvatar(avatar)}
+                                        className={cn(
+                                            "relative w-14 h-14 rounded-full border-2 transition-all hover:scale-110",
+                                            selectedAvatarId === avatar.id ? "border-primary ring-2 ring-primary/20 scale-110" : "border-transparent opacity-70 hover:opacity-100"
+                                        )}
+                                        title={avatar.label}
+                                    >
+                                        <img src={avatar.path} alt={avatar.label} className="w-full h-full rounded-full object-cover" />
+                                        {selectedAvatarId === avatar.id && (
+                                            <div className="absolute -top-1 -right-1 bg-primary text-white rounded-full p-0.5">
+                                                <PlusCircle className="w-3 h-3 fill-current" />
+                                            </div>
+                                        )}
+                                    </button>
+                                ))}
                             </div>
                         </div>
-                    )}
-
-                    {!isCameraOpen && (
-                        <div className="w-full px-6 space-y-4">
-                            <div className="text-center">
-                                <Label className="font-headline font-bold text-primary mb-2 block">أو اختر صورة رمزية سريعة</Label>
-                                <div className="flex flex-wrap items-center justify-center gap-3 mt-2">
-                                    {PRESET_AVATARS.map((avatar) => (
-                                        <button
-                                            key={avatar.id}
-                                            type="button"
-                                            onClick={() => handleSelectPresetAvatar(avatar)}
-                                            className={cn(
-                                                "relative w-14 h-14 rounded-full border-2 transition-all hover:scale-110",
-                                                selectedAvatarId === avatar.id ? "border-primary ring-2 ring-primary/20 scale-110" : "border-transparent opacity-70 hover:opacity-100"
-                                            )}
-                                            title={avatar.label}
-                                        >
-                                            <img src={avatar.path} alt={avatar.label} className="w-full h-full rounded-full object-cover" />
-                                            {selectedAvatarId === avatar.id && (
-                                                <div className="absolute -top-1 -right-1 bg-primary text-white rounded-full p-0.5">
-                                                    <PlusCircle className="w-3 h-3 fill-current" />
-                                                </div>
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="text-center z-0 pt-2 border-t border-primary/10">
-                                <div className="flex justify-center gap-4">
-                                    <Button type="button" variant="link" onClick={() => fileInputRef.current?.click()} className="text-primary font-headline font-bold h-auto p-0">
-                                        {photoPreview ? 'رفع صورة من الجهاز' : 'إضافة صورة من الجهاز'}
-                                    </Button>
-                                    <span className="text-muted-foreground">|</span>
-                                    <Button type="button" variant="link" onClick={startCamera} className="text-primary font-headline font-bold h-auto p-0">
-                                        التقاط صورة الآن
-                                    </Button>
-                                </div>
-                                <p className="text-[10px] text-muted-foreground font-body">الحد الأقصى: 500 كيلوبايت (JPG/PNG)</p>
-                            </div>
-                        </div>
-                    )}
+                    </div>
                 </div>
 
                 {/* Primary Data Section */}

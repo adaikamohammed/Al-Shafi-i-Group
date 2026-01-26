@@ -10,6 +10,7 @@ export type ActivityAction =
     | 'DELETE_SESSION'
     | 'SAVE_REPORT'
     | 'DELETE_REPORT'
+    | 'UPDATE_SURAH_PROGRESS'
     | 'UPDATE_PRE_REGISTRATION'
     | 'DELETE_PRE_REGISTRATION';
 
@@ -31,10 +32,14 @@ export const logActivity = async (
     targetId: string,
     targetName: string,
     actorName: string = 'Unknown',
-    groupName: string = ''
+    groupName: string = '',
+    ownerId?: string // User specific logging
 ) => {
     try {
-        const logsRef = ref(db, 'activity_logs');
+        const targetOwnerId = ownerId || actorId;
+        if (!targetOwnerId) return;
+
+        const logsRef = ref(db, `users/${targetOwnerId}/activity_logs`);
 
         // Sanitize data to ensure no undefined values
         const safeLog: LogEntry = {
@@ -48,7 +53,7 @@ export const logActivity = async (
             groupName: groupName || ''
         };
 
-        console.log('[ActivityLogger] Pushing log:', safeLog); // Debug log
+        console.log(`[ActivityLogger] Pushing log to users/${targetOwnerId}/activity_logs:`, safeLog);
 
         await push(logsRef, safeLog);
     } catch (error: any) {

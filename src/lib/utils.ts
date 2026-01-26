@@ -8,6 +8,8 @@ export function cn(...inputs: ClassValue[]) {
 export function sanitizeData(obj: any): any {
   if (obj === undefined) return null;
   if (obj === null || typeof obj !== 'object') return obj;
+  if (obj instanceof Date) return obj;
+
 
   if (Array.isArray(obj)) {
     return obj.map(item => sanitizeData(item));
