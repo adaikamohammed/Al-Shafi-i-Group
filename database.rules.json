@@ -29,6 +29,10 @@
         "dailyReports": {
             ".read": "auth != null",
             ".write": "auth != null"
+        },
+        "activity_logs": {
+            ".read": "auth != null",
+            ".write": "auth != null"
         }
     }
 }

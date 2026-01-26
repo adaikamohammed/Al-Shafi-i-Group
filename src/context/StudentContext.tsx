@@ -483,6 +483,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     const surahProgressRef = ref(db, `users/${ownerId}/surahProgress/${studentId}`);
     set(surahProgressRef, {});
+
   };
 
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
@@ -615,6 +616,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       updatedAt: sanitizedData.updatedAt.toISOString(),
       covenants: Object.keys(covenantsObject).length > 0 ? covenantsObject : null
     });
+
   };
 
   const deleteStudent = async (studentId: string, ownerId: string) => {
@@ -623,7 +625,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     if (!studentOwnerId) return;
 
     const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
+    const studentToDelete = students.find(s => s.id === studentId);
     await remove(studentRef);
+
+    if (studentToDelete) {
+      if (studentToDelete) {
+        // Log removed
+      }
+    }
 
     // Delete photo from storage
     try {
@@ -671,7 +680,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const addDailySession = (session: DailySession) => {
     if (!authContextUser || isSuperAdmin) return;
     const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${session.date}/${session.id}`);
-    set(sessionRef, session);
+
+    // Use async/await implicitly or strictly? The function isn't async.
+    // Let's make it a fire-and-forget but ensuring order if possible?
+    // Actually, set returns a promise. We should chain it or just let it run.
+    // The issue might be that logActivity runs BEFORE set finishes?
+    // No, both are async.
+
+    set(sessionRef, session).catch(e => console.error("Error saving session:", e));
   };
 
   const deleteDailySession = (sessionId: string) => {
@@ -745,6 +761,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     };
 
     await set(reportRef, fullReportData);
+
   }
 
   const deleteDailyReport = async (reportId: string, date: string) => {
