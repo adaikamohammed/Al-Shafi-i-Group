@@ -32,7 +32,7 @@ const statusVariant: { [key in 'نشط' | 'مطرود']: "default" | "destructiv
 
 export default function DuesPage() {
     const { students, payments, addPayment, updatePaymentStatus, loading, settings, saveSettings } = useStudentContext();
-    const { isSuperAdmin } = useAuth();
+    const { isSuperAdmin, isManagement } = useAuth();
     const { toast } = useToast();
     const [currentYear, setCurrentYear] = useState(getYear(new Date()));
     const [searchTerm, setSearchTerm] = useState('');
@@ -102,7 +102,7 @@ export default function DuesPage() {
 
         // Index payments by studentId for O(1) lookup
         const paymentsByStudent = (payments ?? []).reduce((acc, p) => {
-            if (getYear(parseISO(p.date)) === currentYear) {
+            if (p.date && getYear(parseISO(p.date)) === currentYear) {
                 if (!acc[p.studentId]) acc[p.studentId] = [];
                 acc[p.studentId].push(p);
             }
@@ -115,7 +115,7 @@ export default function DuesPage() {
             const paymentStatusByQuarter: Record<number, { status: PaymentStatus, paymentId?: string }> = {};
 
             for (let q = 1; q <= 4; q++) {
-                const paymentForQuarter = studentPayments.find(p => getQuarter(parseISO(p.date)) === q);
+                const paymentForQuarter = studentPayments.find(p => p.date && getQuarter(parseISO(p.date)) === q);
                 if (paymentForQuarter) {
                     paymentStatusByQuarter[q] = { status: paymentForQuarter.status, paymentId: paymentForQuarter.id };
                 } else {
@@ -185,14 +185,14 @@ export default function DuesPage() {
 
 
     const handlePaymentAction = React.useCallback(async (student: Student, quarter: number, status: PaymentStatus) => {
-        if (isSuperAdmin) return;
+        if (isSuperAdmin) return; // Only super_admin is read-only
 
         const tier = student.subscriptionTier || 'فئة الأصاغر';
         const amount = prices[tier] || 0;
         const monthOfQuarter = (quarter - 1) * 3;
         const paymentDate = new Date(currentYear, monthOfQuarter, 1);
 
-        const existingPayment = (payments ?? []).find(p => p.studentId === student.id && getQuarter(parseISO(p.date)) === quarter && getYear(parseISO(p.date)) === currentYear);
+        const existingPayment = (payments ?? []).find(p => p.date && p.studentId === student.id && getQuarter(parseISO(p.date)) === quarter && getYear(parseISO(p.date)) === currentYear);
 
         try {
             if (existingPayment) {
@@ -343,7 +343,7 @@ export default function DuesPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="w-1/4">اسم الطالب</TableHead>
-                                    {isSuperAdmin && <TableHead>الفوج</TableHead>}
+                                    {(isSuperAdmin || isManagement) && <TableHead>الفوج</TableHead>}
                                     <TableHead>الحالة</TableHead>
                                     <TableHead>الفئة</TableHead>
                                     {[1, 2, 3, 4].map(q => <TableHead key={q} className="text-center">{quarterNames[q.toString()]}</TableHead>)}
@@ -356,12 +356,13 @@ export default function DuesPage() {
                                         key={student.id}
                                         student={student}
                                         isSuperAdmin={isSuperAdmin}
+                                        isManagement={isManagement}
                                         prices={prices}
                                         onPaymentAction={handlePaymentAction}
                                     />
                                 )) : (
                                     <TableRow>
-                                        <TableCell colSpan={isSuperAdmin ? 8 : 7} className="h-24 text-center">
+                                        <TableCell colSpan={(isSuperAdmin || isManagement) ? 8 : 7} className="h-24 text-center">
                                             لا يوجد طلبة مطابقون لخيارات البحث الحالية.
                                         </TableCell>
                                     </TableRow>
@@ -369,7 +370,7 @@ export default function DuesPage() {
                             </TableBody>
                             <TableFooter>
                                 <TableRow className="bg-muted/30">
-                                    <TableCell colSpan={isSuperAdmin ? 4 : 3} className="font-semibold">حقوق التسجيل الإجمالية للفصل</TableCell>
+                                    <TableCell colSpan={(isSuperAdmin || isManagement) ? 4 : 3} className="font-semibold">حقوق التسجيل الإجمالية للفصل</TableCell>
                                     {[1, 2, 3, 4].map(q => (
                                         <TableCell key={`reg-fee-${q}`} className="text-center p-1">
                                             <Input
@@ -384,7 +385,7 @@ export default function DuesPage() {
                                     <TableCell></TableCell>
                                 </TableRow>
                                 <TableRow className="bg-amber-100 dark:bg-amber-800/20 font-bold text-base border-t-2 border-amber-300">
-                                    <TableCell colSpan={isSuperAdmin ? 4 : 3}>الإجمالي النهائي للفصل</TableCell>
+                                    <TableCell colSpan={(isSuperAdmin || isManagement) ? 4 : 3}>الإجمالي النهائي للفصل</TableCell>
                                     {[1, 2, 3, 4].map(q => (
                                         <TableCell key={`total-footer-${q}`} className="text-center text-lg text-amber-800 dark:text-amber-200 transition-colors">
                                             {totalsByQuarter[q].revenue.toLocaleString()} د.ج
@@ -410,6 +411,7 @@ const PaymentRow = React.memo(({
 }: {
     student: any,
     isSuperAdmin: boolean,
+    isManagement: boolean,
     prices: any,
     onPaymentAction: (s: any, q: number, st: PaymentStatus) => void
 }) => {

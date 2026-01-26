@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Link from 'next/link';
 import { MatchOfTheWeek } from '@/components/ui/MatchOfTheWeek';
+import { ManagementLeagueView } from '@/components/management/ManagementLeagueView';
+import { useAuth } from '@/context/AuthContext';
 
 
 const FormIcon = ({ status }: { status: AttendanceStatus }) => {
@@ -33,6 +35,7 @@ const FormIcon = ({ status }: { status: AttendanceStatus }) => {
 
 export default function LeaguePage() {
     const { students, dailySessions, loading } = useStudentContext();
+    const { isManagement, isSuperAdmin } = useAuth();
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [isFlipped, setIsFlipped] = useState(false);
@@ -56,7 +59,7 @@ export default function LeaguePage() {
                 }
             })
         ).sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
-        
+
         const stats: Omit<LeagueStat, 'rank' | 'previousRank' | 'movement'>[] = activeStudents.map(student => {
             let wins = 0, draws = 0, losses = 0;
             const form: AttendanceStatus[] = [];
@@ -79,7 +82,7 @@ export default function LeaguePage() {
                             losses++;
                             break;
                     }
-                    
+
                     if (record.memorization === 'ممتاز') {
                         goalsFor += 2;
                     } else if (record.memorization === 'جيد جداً') {
@@ -139,6 +142,61 @@ export default function LeaguePage() {
 
     }, [activeStudents, dailySessions, selectedMonth, selectedYear]);
 
+    // Group statistics for management view
+    const groupLeagueStats = useMemo(() => {
+        if (!isManagement && !isSuperAdmin) return [];
+
+        const groups = activeStudents.reduce((acc, student) => {
+            const groupName = student.groupName || 'غير محدد';
+            if (!acc[groupName]) {
+                acc[groupName] = {
+                    groupName,
+                    sheikhName: groupName.includes('فوج') ? groupName : groupName,
+                    students: [],
+                    totalStudents: 0,
+                    activeStudents: 0,
+                };
+            }
+            acc[groupName].students.push(student);
+            acc[groupName].totalStudents++;
+            acc[groupName].activeStudents++;
+            return acc;
+        }, {} as Record<string, any>);
+
+        return Object.values(groups).map((group: any) => {
+            const groupPlayers = leagueTable.filter(player =>
+                group.students.some((s: any) => s.id === player.studentId)
+            );
+
+            const averagePoints = groupPlayers.length > 0
+                ? groupPlayers.reduce((sum, p) => sum + p.points, 0) / groupPlayers.length
+                : 0;
+
+            const totalWins = groupPlayers.reduce((sum, p) => sum + p.wins, 0);
+            const totalGoals = groupPlayers.reduce((sum, p) => sum + p.goalsFor, 0);
+            const totalPlayed = groupPlayers.reduce((sum, p) => sum + p.played, 0);
+            const winRate = totalPlayed > 0 ? (totalWins / totalPlayed) * 100 : 0;
+
+            const topPlayers = groupPlayers
+                .sort((a, b) => b.points - a.points)
+                .slice(0, 3)
+                .map(p => ({ name: p.studentName, points: p.points }));
+
+            return {
+                groupName: group.groupName,
+                sheikhName: group.sheikhName,
+                totalStudents: group.totalStudents,
+                activeStudents: group.activeStudents,
+                averagePoints,
+                totalWins,
+                totalGoals,
+                winRate,
+                topPlayers,
+                players: groupPlayers,
+            };
+        }).sort((a, b) => b.averagePoints - a.averagePoints);
+    }, [activeStudents, leagueTable, isManagement, isSuperAdmin]);
+
     useEffect(() => {
         const newRankMap = new Map<string, number>();
         leagueTable.forEach((stat) => {
@@ -147,7 +205,7 @@ export default function LeaguePage() {
         previousRankingRef.current = newRankMap;
     }, [leagueTable]);
 
-     const topScorers = useMemo(() => {
+    const topScorers = useMemo(() => {
         return [...leagueTable]
             .filter(s => s.goalsFor > 0)
             .sort((a, b) => b.goalsFor - a.goalsFor)
@@ -160,64 +218,64 @@ export default function LeaguePage() {
             .sort((a, b) => b.assists - a.assists)
             .slice(0, 10);
     }, [leagueTable]);
-    
+
     const starOfTheMonth = useMemo(() => {
-    if (!leagueTable || leagueTable.length === 0 || !dailySessions) return null;
+        if (!leagueTable || leagueTable.length === 0 || !dailySessions) return null;
 
-    const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(daySessions =>
-        Object.values(daySessions).filter(session => {
-            if (!session?.date || session.sessionType === 'يوم عطلة' || session.sessionType === 'حصة أنشطة') return false;
-            try {
-                const sessionDate = parseISO(session.date);
-                return getMonth(sessionDate) === selectedMonth && getYear(sessionDate) === selectedYear;
-            } catch (e) {
-                return false;
-            }
-        })
-    );
+        const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(daySessions =>
+            Object.values(daySessions).filter(session => {
+                if (!session?.date || session.sessionType === 'يوم عطلة' || session.sessionType === 'حصة أنشطة') return false;
+                try {
+                    const sessionDate = parseISO(session.date);
+                    return getMonth(sessionDate) === selectedMonth && getYear(sessionDate) === selectedYear;
+                } catch (e) {
+                    return false;
+                }
+            })
+        );
 
-    const star = leagueTable
-        .filter(s => s.played > 0)
-        .reduce((best, current) => {
-            const currentScore = current.points + current.goalsFor + current.assists;
-            const bestScore = best ? (best.points + best.goalsFor + best.assists) : -1;
+        const star = leagueTable
+            .filter(s => s.played > 0)
+            .reduce((best, current) => {
+                const currentScore = current.points + current.goalsFor + current.assists;
+                const bestScore = best ? (best.points + best.goalsFor + best.assists) : -1;
 
-            if (currentScore > bestScore) {
-                return current;
-            }
-            if (currentScore === bestScore) {
-                if (current.losses < best.losses) {
+                if (currentScore > bestScore) {
                     return current;
                 }
-            }
-            return best;
-        }, leagueTable[0]);
+                if (currentScore === bestScore) {
+                    if (current.losses < best.losses) {
+                        return current;
+                    }
+                }
+                return best;
+            }, leagueTable[0]);
 
-    if (!star) return null;
+        if (!star) return null;
 
-    // Overall Rating Calculation
-    const totalPossibleSessions = sessionsInMonth.length;
-    
-    const attendanceScore = totalPossibleSessions > 0 ? (star.wins / totalPossibleSessions) * 100 : 0;
-    
-    const maxGoals = totalPossibleSessions > 0 ? totalPossibleSessions * 2 : 1;
-    const memorizationScore = (star.goalsFor / maxGoals) * 100;
-    
-    const maxAssists = totalPossibleSessions > 0 ? totalPossibleSessions * 2 : 1;
-    const behaviorScore = (star.assists / maxAssists) * 100;
+        // Overall Rating Calculation
+        const totalPossibleSessions = sessionsInMonth.length;
 
-    const tajweedScore = 85; // Placeholder
-    const akhlaqScore = 90; // Placeholder
+        const attendanceScore = totalPossibleSessions > 0 ? (star.wins / totalPossibleSessions) * 100 : 0;
 
-    const overallAverage = (attendanceScore + memorizationScore + behaviorScore + tajweedScore + akhlaqScore) / 5;
-    const overallRating = Math.min(99, Math.round((overallAverage / 100) * 99));
+        const maxGoals = totalPossibleSessions > 0 ? totalPossibleSessions * 2 : 1;
+        const memorizationScore = (star.goalsFor / maxGoals) * 100;
 
-    return {
-        ...star,
-        overallRating,
-        stats: { MEM: star.goalsFor, BEH: star.assists, ATT: star.wins, TAJ: 8.5 }
-    };
-}, [leagueTable, dailySessions, selectedMonth, selectedYear]);
+        const maxAssists = totalPossibleSessions > 0 ? totalPossibleSessions * 2 : 1;
+        const behaviorScore = (star.assists / maxAssists) * 100;
+
+        const tajweedScore = 85; // Placeholder
+        const akhlaqScore = 90; // Placeholder
+
+        const overallAverage = (attendanceScore + memorizationScore + behaviorScore + tajweedScore + akhlaqScore) / 5;
+        const overallRating = Math.min(99, Math.round((overallAverage / 100) * 99));
+
+        return {
+            ...star,
+            overallRating,
+            stats: { MEM: star.goalsFor, BEH: star.assists, ATT: star.wins, TAJ: 8.5 }
+        };
+    }, [leagueTable, dailySessions, selectedMonth, selectedYear]);
 
 
     if (loading) {
@@ -239,7 +297,7 @@ export default function LeaguePage() {
             </div>
         );
     }
-    
+
     return (
         <TooltipProvider>
             <div className="space-y-6">
@@ -255,18 +313,18 @@ export default function LeaguePage() {
                     </CardHeader>
                     <CardContent>
                         <div className="flex gap-2">
-                             <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
+                            <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
                                 <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
                                 <SelectContent>
-                                    {Array.from({length: 12}, (_, i) => (
-                                        <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', {locale: ar})}</SelectItem>
+                                    {Array.from({ length: 12 }, (_, i) => (
+                                        <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', { locale: ar })}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                             <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
                                 <SelectTrigger className="w-full md:w-[120px]"><SelectValue placeholder="السنة" /></SelectTrigger>
                                 <SelectContent>
-                                    {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
                                         <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
                                     ))}
                                 </SelectContent>
@@ -274,6 +332,9 @@ export default function LeaguePage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Management Group Comparison View */}
+                {(isManagement || isSuperAdmin) && <ManagementLeagueView groupStats={groupLeagueStats} />}
 
                 <MatchOfTheWeek leagueTable={leagueTable} />
 
@@ -314,7 +375,7 @@ export default function LeaguePage() {
                                             } else {
                                                 rankDisplay = rank;
                                             }
-                                            
+
                                             if (rank > totalPlayers - 3 && totalPlayers > 5 && rank > 3) {
                                                 rowClass = 'bg-red-100 dark:bg-red-900/30';
                                             }
@@ -331,7 +392,7 @@ export default function LeaguePage() {
                                                             <span className="font-medium">{s.studentName}</span>
                                                         </Link>
                                                     </TableCell>
-                                                     <TableCell className="text-center font-semibold">
+                                                    <TableCell className="text-center font-semibold">
                                                         <Tooltip>
                                                             <TooltipTrigger>
                                                                 <div className="flex items-center justify-center gap-1">
@@ -387,7 +448,7 @@ export default function LeaguePage() {
                             </CardContent>
                         </Card>
                     </div>
-                     <div className="space-y-6">
+                    <div className="space-y-6">
                         {starOfTheMonth && leagueTable.length > 0 && (
                             <div className="w-full max-w-sm mx-auto [perspective:1000px]">
                                 <div

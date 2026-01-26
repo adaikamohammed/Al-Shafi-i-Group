@@ -804,22 +804,42 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const addPayment = async (paymentData: Omit<Payment, 'id'>) => {
-    if (!authContextUser || isSuperAdmin) throw new Error("User cannot add payments");
+    if (!authContextUser) throw new Error("User not authenticated");
+
+    // Find the student's owner
     const studentOwnerId = students.find(s => s.id === paymentData.studentId)?.ownerId;
-    if (authContextUser.uid !== studentOwnerId) return;
+    if (!studentOwnerId) throw new Error("Student not found");
+
+    // Allow if user is the owner, or if user is management/super_admin
+    if (!isSuperAdmin && !isManagement && authContextUser.uid !== studentOwnerId) {
+      throw new Error("Not authorized to add payment for this student");
+    }
 
     const paymentId = uuidv4();
     const newPayment: Payment = {
       ...paymentData,
       id: paymentId,
     };
-    const paymentRef = ref(db, `users/${authContextUser.uid}/payments/${paymentId}`);
+    const paymentRef = ref(db, `users/${studentOwnerId}/payments/${paymentId}`);
     await set(paymentRef, newPayment);
   };
 
   const updatePaymentStatus = async (paymentId: string, status: PaymentStatus, amount: number) => {
-    if (!authContextUser || isSuperAdmin) throw new Error("User cannot update payment status");
-    const paymentRef = ref(db, `users/${authContextUser.uid}/payments/${paymentId}`);
+    if (!authContextUser) throw new Error("User not authenticated");
+
+    // Find the payment to get its owner
+    const payment = payments.find(p => p.id === paymentId);
+    if (!payment) throw new Error("Payment not found");
+
+    const student = students.find(s => s.id === payment.studentId);
+    if (!student) throw new Error("Student not found");
+
+    // Allow if user is the owner, or if user is management/super_admin
+    if (!isSuperAdmin && !isManagement && authContextUser.uid !== student.ownerId) {
+      throw new Error("Not authorized to update this payment");
+    }
+
+    const paymentRef = ref(db, `users/${student.ownerId}/payments/${paymentId}`);
     await update(paymentRef, { status, amount });
   }
 

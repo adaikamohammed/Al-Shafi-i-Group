@@ -16,11 +16,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { SurahStatsChart } from '@/components/profile/SurahStatsChart';
+import { GroupComparisonCard } from '@/components/management/GroupComparisonCard';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ManagementSurahsView } from '@/components/management/ManagementSurahsView';
 
 
 export default function SurahProgressPage() {
     const { students, dailySessions, surahProgress, toggleSurahStatus, loading } = useStudentContext();
+    const { isManagement, isSuperAdmin } = useAuth();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+    const [selectedGroupForDetails, setSelectedGroupForDetails] = useState<string | null>(null);
 
     const studentsToShow = useMemo(() => (students ?? []).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
 
@@ -64,40 +69,78 @@ export default function SurahProgressPage() {
         }).sort((a, b) => b.masteryScore - a.masteryScore);
     }, [studentsToShow, surahProgress]);
 
+    // Group statistics for management view
+    const groupStats = useMemo(() => {
+        if (!isManagement && !isSuperAdmin) return [];
+
+        const groups = studentsToShow.reduce((acc, student) => {
+            const groupName = student.groupName || 'غير محدد';
+            if (!acc[groupName]) {
+                acc[groupName] = {
+                    groupName,
+                    sheikhName: groupName.includes('فوج') ? groupName : groupName,
+                    students: [],
+                    totalStudents: 0,
+                    activeStudents: 0,
+                };
+            }
+            acc[groupName].students.push(student);
+            acc[groupName].totalStudents++;
+            if (student.status === 'نشط') {
+                acc[groupName].activeStudents++;
+            }
+            return acc;
+        }, {} as Record<string, any>);
+
+        return Object.values(groups).map((group: any) => {
+            const groupProgress = group.students.map((student: any) => {
+                const progress = surahProgress ? (surahProgress[student.id] || {}) : {};
+                const memorizedCount = Object.values(progress).filter((entry: any) => entry.status === 1).length;
+                const masteredCount = Object.values(progress).filter((entry: any) => entry.status === 2).length;
+                const masteryScore = (memorizedCount * 1) + (masteredCount * 3);
+                return {
+                    ...student,
+                    memorizedCount,
+                    masteredCount,
+                    masteryScore,
+                };
+            });
+
+            const activeGroupProgress = groupProgress.filter((s: any) => s.status === 'نشط');
+            const averageMasteryScore = activeGroupProgress.length > 0
+                ? activeGroupProgress.reduce((sum: number, s: any) => sum + s.masteryScore, 0) / activeGroupProgress.length
+                : 0;
+
+            const totalMemorized = groupProgress.reduce((sum: number, s: any) => sum + s.memorizedCount, 0);
+            const totalMastered = groupProgress.reduce((sum: number, s: any) => sum + s.masteredCount, 0);
+            const totalSurahs = groupProgress.reduce((sum: number, s: any) => sum + s.memorizedCount + s.masteredCount, 0);
+            const progressPercentage = (totalSurahs / (allSurahs.length * group.totalStudents)) * 100;
+
+            const topStudents = groupProgress
+                .sort((a: any, b: any) => b.masteryScore - a.masteryScore)
+                .slice(0, 3)
+                .map((s: any) => ({ name: s.fullName, score: s.masteryScore }));
+
+            return {
+                groupName: group.groupName,
+                sheikhName: group.sheikhName,
+                totalStudents: group.totalStudents,
+                activeStudents: group.activeStudents,
+                averageMasteryScore,
+                totalMemorized,
+                totalMastered,
+                progressPercentage,
+                topStudents,
+                students: groupProgress,
+            };
+        }).sort((a, b) => b.averageMasteryScore - a.averageMasteryScore);
+    }, [studentsToShow, surahProgress, isManagement, isSuperAdmin]);
+
 
     const handleSurahClick = (surahId: number) => {
         if (!selectedStudent) return;
         toggleSurahStatus(selectedStudent.id, surahId);
     };
-
-    React.useEffect(() => {
-        if (studentsToShow.length > 0 && !selectedStudentId) {
-            const firstActive = studentsToShow.find(s => s.status === 'نشط');
-            setSelectedStudentId(firstActive ? firstActive.id : studentsToShow[0].id);
-        }
-    }, [studentsToShow, selectedStudentId]);
-
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-                <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            </div>
-        );
-    }
-
-    if (studentsToShow.length === 0) {
-        return (
-            <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
-                <AlertTriangle className="h-16 w-16 text-yellow-400" />
-                <h1 className="text-3xl font-headline font-bold text-center">لا يوجد طلبة لعرض بياناتهم</h1>
-                <p className="text-muted-foreground text-center">
-                    يرجى إضافة طلبة أولاً من صفحة "إدارة الطلبة".
-                </p>
-            </div>
-        );
-    }
-
 
     const { user } = useAuth();
     const isAdmin5 = user?.email === 'admin5@gmail.com';
@@ -119,6 +162,33 @@ export default function SurahProgressPage() {
 
         return record && surah ? { ...record, surahName: surah.name, date: latestSession.date } : null;
     }, [dailySessions, selectedStudentId]);
+
+    React.useEffect(() => {
+        if (studentsToShow.length > 0 && !selectedStudentId) {
+            const firstActive = studentsToShow.find(s => s.status === 'نشط');
+            setSelectedStudentId(firstActive ? firstActive.id : studentsToShow[0].id);
+        }
+    }, [studentsToShow, selectedStudentId]);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    if (studentsToShow.length === 0) {
+        return (
+            <div className="space-y-6 flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+                <AlertTriangle className="h-16 w-16 text-yellow-400" />
+                <h1 className="text-3xl font-headline font-bold text-center">لا يوجد طلبة لعرض بياناتهم</h1>
+                <p className="text-muted-foreground text-center">
+                    يرجى إضافة طلبة أولاً من صفحة "إدارة الطلبة".
+                </p>
+            </div>
+        );
+    }
 
     return (
         <TooltipProvider>
@@ -199,6 +269,9 @@ export default function SurahProgressPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Management Group Comparison View */}
+                {(isManagement || isSuperAdmin) && <ManagementSurahsView groupStats={groupStats} />}
 
                 <div className="grid md:grid-cols-3 gap-6">
                     <Card className="md:col-span-1">
