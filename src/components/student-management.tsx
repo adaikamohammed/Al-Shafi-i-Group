@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -333,7 +334,7 @@ export default function StudentManagement() {
                         </DialogContent>
                     </Dialog>
                 )}
-                {selectedRows.length > 0 && !isSuperAdmin && (
+                {selectedRows.length > 0 && (!isSuperAdmin || isManagement) && (
                     <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-auto p-2 bg-background/95 border-t shadow-lg z-50 rounded-t-lg">
                         <div className="container mx-auto flex justify-between items-center gap-4">
                             <p className="font-semibold text-sm">{selectedRows.length} طلاب محددون</p>

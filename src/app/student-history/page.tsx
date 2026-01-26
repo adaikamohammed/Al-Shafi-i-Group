@@ -237,12 +237,12 @@ function StudentHistoryContent() {
                 isHoliday,
                 isSheikhAbsentNoSub,
                 isSheikhAbsentWithSub,
-                attendance: studentRecord?.attendance,
-                memorization: studentRecord?.memorization,
-                behavior: studentRecord?.behavior,
-                notes: studentRecord?.notes,
-                sessionType: studentRecord?.sessionType,
-                sessionNumber: studentRecord?.sessionNumber
+                attendance: studentRecord?.attendance || null,
+                memorization: studentRecord?.memorization || null,
+                behavior: studentRecord?.behavior || null,
+                notes: studentRecord?.notes || null,
+                sessionType: studentRecord?.sessionType || null,
+                sessionNumber: studentRecord?.sessionNumber || null
             };
         });
 

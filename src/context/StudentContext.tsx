@@ -11,6 +11,7 @@ import { db, storage } from '@/lib/firebase';
 import { ref, set, onValue, off, remove, DatabaseReference, update, get } from 'firebase/database';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
+import { sanitizeData } from '@/lib/utils';
 
 const DEFAULT_POINTS_CONFIG: PointsConfig = {
   attendance: { 'حاضر': 5, 'متأخر': 2, 'تعويض': 1.5, 'غائب': -10 },
@@ -446,7 +447,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const addStudent = async (studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string }) => {
     if (!authContextUser) return;
 
-    const ownerId = isSuperAdmin ? studentData.ownerId : authContextUser.uid;
+    const ownerId = (isSuperAdmin || isManagement) ? studentData.ownerId : authContextUser.uid;
     if (!ownerId) return;
 
     const studentId = uuidv4();
@@ -579,7 +580,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const updateStudent = async (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => {
     if (!authContextUser) return;
 
-    const studentOwnerId = isSuperAdmin ? ownerId : authContextUser.uid;
+    const studentOwnerId = (isSuperAdmin || isManagement) ? ownerId : authContextUser.uid;
     if (!studentOwnerId) return;
 
     const originalStudent = students.find(s => s.id === studentId);
@@ -604,25 +605,21 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }, {} as Record<string, Covenant>);
 
     // Clean up undefined values before sending to Firebase
-    Object.keys(finalData).forEach(key => {
-      if (finalData[key as keyof typeof finalData] === undefined) {
-        (finalData as any)[key] = null;
-      }
-    });
+    const sanitizedData = sanitizeData(finalData);
 
     const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
     set(studentRef, {
-      ...finalData,
-      birthDate: finalData.birthDate ? finalData.birthDate.toISOString() : null,
-      registrationDate: finalData.registrationDate.toISOString(),
-      updatedAt: finalData.updatedAt.toISOString(),
+      ...sanitizedData,
+      birthDate: sanitizedData.birthDate ? sanitizedData.birthDate.toISOString() : null,
+      registrationDate: sanitizedData.registrationDate.toISOString(),
+      updatedAt: sanitizedData.updatedAt.toISOString(),
       covenants: Object.keys(covenantsObject).length > 0 ? covenantsObject : null
     });
   };
 
   const deleteStudent = async (studentId: string, ownerId: string) => {
     if (!authContextUser) return;
-    const studentOwnerId = isSuperAdmin ? ownerId : authContextUser.uid;
+    const studentOwnerId = (isSuperAdmin || isManagement) ? ownerId : authContextUser.uid;
     if (!studentOwnerId) return;
 
     const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
@@ -640,20 +637,28 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const deleteAllStudents = () => {
-    if (!authContextUser || isSuperAdmin) return;
+    if (!authContextUser) return;
 
-    students.forEach(student => {
-      if (student.ownerId === authContextUser.uid) {
+    if (isSuperAdmin || isManagement) {
+      // For admins, delete all students currently in the list
+      students.forEach(student => {
         deleteStudent(student.id, student.ownerId);
-      }
-    });
+      });
+    } else {
+      // For sheikhs, only delete their own students
+      students.forEach(student => {
+        if (student.ownerId === authContextUser.uid) {
+          deleteStudent(student.id, student.ownerId);
+        }
+      });
+    }
   }
 
   const deleteMultipleStudents = (studentsToDelete: { id: string, ownerId: string }[]) => {
     if (!authContextUser) return;
     const updates: { [key: string]: null } = {};
     studentsToDelete.forEach(({ id, ownerId }) => {
-      if (isSuperAdmin || ownerId === authContextUser.uid) {
+      if (isSuperAdmin || isManagement || ownerId === authContextUser.uid) {
         updates[`/users/${ownerId}/students/${id}`] = null;
         updates[`/users/${ownerId}/surahProgress/${id}`] = null;
       }
@@ -753,7 +758,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     if (!authContextUser) return;
 
     const studentOwnerId = students.find(s => s.id === studentId)?.ownerId;
-    if (!studentOwnerId || (!isSuperAdmin && authContextUser.uid !== studentOwnerId)) return;
+    if (!studentOwnerId || (!isSuperAdmin && !isManagement && authContextUser.uid !== studentOwnerId)) return;
 
     const studentProgressMap: SurahMastery = { ...(surahProgress[studentId] || {}) };
     const currentEntry = studentProgressMap[surahId] || { status: 0 };
@@ -896,8 +901,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const shareStudentRecord = async (studentId: string, historyData: any) => {
     try {
       const shareRef = ref(db, `public_student_reports/${studentId}`);
+      const sanitizedHistory = sanitizeData(historyData);
       await set(shareRef, {
-        ...historyData,
+        ...sanitizedHistory,
         sharedAt: new Date().toISOString()
       });
     } catch (error) {
