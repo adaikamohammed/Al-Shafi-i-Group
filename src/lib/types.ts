@@ -99,6 +99,8 @@ export interface DailyReport {
   isPinned: boolean;
   priority?: 'normal' | 'urgent' | 'important';
   hasNewReply?: boolean;
+  audioURL?: string;
+  imageURL?: string;
 }
 
 

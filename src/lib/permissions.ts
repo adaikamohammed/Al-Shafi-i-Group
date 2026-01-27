@@ -26,7 +26,7 @@ export const PAGE_PERMISSIONS: PagePermission[] = [
     { path: '/logs', label: 'سجل النشاطات', icon: 'Activity', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/settings', label: 'الإعدادات', icon: 'Settings', allowedRoles: ['sheikh', 'super_admin'] },
     { path: '/management/monitoring', label: 'نظام المراقبة', icon: 'BarChart3', allowedRoles: ['super_admin', 'management'] },
-    { path: '/admin/entry-permit', label: 'إذن دخول', icon: 'FileText', allowedRoles: ['super_admin', 'management'] },
+    { path: '/admin/admin-docs', label: 'الأوصال الإدارية', icon: 'ClipboardList', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/guide', label: 'الدليل', icon: 'HelpCircle', allowedRoles: ['sheikh', 'super_admin', 'management'] },
 ];
 

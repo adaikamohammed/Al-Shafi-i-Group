@@ -15,7 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, Edit } from 'lucide-react';
+import { Save, Edit, ClipboardList, Trash2 } from 'lucide-react';
+import { ReceiptDesign } from '@/components/admin/ReceiptDesign';
 
 // Helper function to get color based on student's day data
 const getStudentDayColor = (dayData: any, viewType: 'attendance' | 'evaluation' = 'attendance') => {
@@ -193,7 +194,7 @@ const StudentStatWidget = ({ title, value, unit, icon, colorClass }: { title: st
 );
 
 function StudentHistoryContent() {
-    const { students, allUsers, dailySessions, loading, shareStudentRecord, updateStudent } = useStudentContext();
+    const { students, allUsers, dailySessions, loading, shareStudentRecord, updateStudent, adminLogs } = useStudentContext();
     const { toast } = useToast();
     const searchParams = useSearchParams();
     const studentIdParam = searchParams.get('studentId');
@@ -204,6 +205,7 @@ function StudentHistoryContent() {
     const [viewType, setViewType] = useState<'attendance' | 'evaluation'>('attendance');
     const [sheikhNotes, setSheikhNotes] = useState<string>('');
     const [isSavingNotes, setIsSavingNotes] = useState(false);
+    const [adminFilterDate, setAdminFilterDate] = useState<string>(''); // For filtering admin logs
 
     useEffect(() => {
         if (studentIdParam) {
@@ -770,6 +772,76 @@ function StudentHistoryContent() {
                                 </CardContent>
                             </Card>
                         </div>
+
+                        {/* Administrative Documents Section - Moved Outside Grid for Full Width */}
+                        <Card className="shadow-2xl border-none rounded-[3rem] overflow-hidden bg-white/80 backdrop-blur-xl mt-6">
+                            <CardHeader className="bg-primary/5 border-b p-8 flex flex-col md:flex-row items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <ClipboardList className="h-6 w-6 text-primary" />
+                                    <CardTitle className="font-black text-2xl">الأوصال والمستندات الإدارية</CardTitle>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-4">
+                                    <div className="flex items-center gap-2 bg-white/40 border border-primary/10 rounded-full px-4 py-2">
+                                        <Calendar className="h-4 w-4 text-primary" />
+                                        <input
+                                            type="date"
+                                            value={adminFilterDate}
+                                            onChange={(e) => setAdminFilterDate(e.target.value)}
+                                            className="bg-transparent border-none text-sm font-black text-primary focus:ring-0 outline-none"
+                                            dir="rtl"
+                                            aria-label="Filter by date"
+                                            title="تصفية حسب التاريخ"
+                                        />
+                                        {adminFilterDate && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 w-6 p-0 rounded-full hover:bg-primary/10"
+                                                onClick={() => setAdminFilterDate('')}
+                                            >
+                                                ×
+                                            </Button>
+                                        )}
+                                    </div>
+                                    <CardDescription className="font-bold text-md opacity-70">سجل المستندات الرسمية الصادرة.</CardDescription>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    {adminLogs && adminLogs.filter(log => log.studentId === selectedStudent?.id).length > 0 ? (
+                                        adminLogs
+                                            .filter(log => {
+                                                if (log.studentId !== selectedStudent?.id) return false;
+                                                if (!adminFilterDate) return true;
+                                                return log.date === adminFilterDate;
+                                            })
+                                            .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+                                            .map(log => (
+                                                <div key={log.id} className="relative group">
+                                                    <div className="transform scale-[0.98] origin-top border shadow-lg rounded-xl overflow-hidden bg-white transition-all group-hover:scale-100 group-hover:shadow-2xl">
+                                                        <ReceiptDesign
+                                                            log={log as any}
+                                                            isHistory={true}
+                                                            qrCodeUrl={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/record/${log.studentId}`)}`}
+                                                        />
+                                                    </div>
+                                                    <div className="absolute inset-x-0 bottom-4 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Badge className="bg-primary text-white px-4 py-1.5 rounded-full font-black text-[10px] shadow-lg">
+                                                            {format(parseISO(log.date), 'd MMMM yyyy', { locale: ar })}
+                                                        </Badge>
+                                                    </div>
+                                                </div>
+                                            ))
+                                    ) : (
+                                        <div className="col-span-full flex flex-col items-center justify-center py-24 text-muted-foreground bg-muted/20 rounded-[3rem] border-4 border-dashed">
+                                            <ClipboardList className="h-16 w-16 text-muted-foreground/20 mb-4" />
+                                            <p className="font-black text-xl">لا توجد مستندات إدارية مسجلة</p>
+                                            <p className="font-bold opacity-50">لم يتم إصدار أي أوصال لهذا الطالب بعد.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center py-32 bg-card rounded-[3rem] border-4 border-dashed border-primary/10 shadow-inner group">

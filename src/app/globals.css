@@ -19,32 +19,34 @@ body {
   :root {
     --background: 240 10% 98%;
     --foreground: 222.2 84% 4.9%;
-    
+
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
-    
+
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    
-    --primary: 162 100% 24%; /* Rich Emerald Green */
+
+    --primary: 162 100% 24%;
+    /* Rich Emerald Green */
     --primary-foreground: 162 10% 98%;
-    
+
     --secondary: 162 20% 94%;
     --secondary-foreground: 162 100% 15%;
-    
+
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    
-    --accent: 45 93% 47%; /* Deep Gold */
+
+    --accent: 45 93% 47%;
+    /* Deep Gold */
     --accent-foreground: 45 10% 5%;
-    
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    
+
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 162 100% 24%;
-    
+
     --radius: 0.75rem;
 
     --sidebar-background: 162 20% 98%;
@@ -65,30 +67,31 @@ body {
   }
 
   .dark {
-    --background: 162 30% 4%; /* Very Deep Green-Black */
+    --background: 162 30% 4%;
+    /* Very Deep Green-Black */
     --foreground: 162 10% 98%;
-    
+
     --card: 162 30% 6%;
     --card-foreground: 162 10% 98%;
-    
+
     --popover: 162 30% 6%;
     --popover-foreground: 162 10% 98%;
-    
+
     --primary: 162 80% 45%;
     --primary-foreground: 162 10% 5%;
-    
+
     --secondary: 162 20% 12%;
     --secondary-foreground: 162 80% 90%;
-    
+
     --muted: 162 20% 12%;
     --muted-foreground: 162 10% 60%;
-    
+
     --accent: 45 90% 50%;
     --accent-foreground: 162 10% 5%;
-    
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 162 10% 98%;
-    
+
     --border: 162 20% 15%;
     --input: 162 20% 15%;
     --ring: 162 80% 45%;
@@ -115,10 +118,17 @@ body {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
-  h1, h2, h3, h4, h5, h6 {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-headline);
   }
 }
@@ -138,6 +148,7 @@ body {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -151,7 +162,7 @@ body {
 /* Ramadan Theme Specifics */
 .ramadan-pattern {
   background-color: transparent;
-  background-image: 
+  background-image:
     radial-gradient(circle at 100% 50%, transparent 20%, rgba(245, 158, 11, 0.03) 21%, rgba(245, 158, 11, 0.03) 34%, transparent 35%, transparent),
     radial-gradient(circle at 0% 50%, transparent 20%, rgba(245, 158, 11, 0.03) 21%, rgba(245, 158, 11, 0.03) 34%, transparent 35%, transparent);
   background-size: 100px 100px;
@@ -161,34 +172,116 @@ body {
   @apply border-amber-500/10 bg-gradient-to-br from-white via-white to-amber-50/30;
 }
 
+@layer components {
+  .receipt-container {
+    @apply w-[79mm] bg-white border-none px-[5mm] py-8 relative overflow-hidden ring-1 ring-black/5 shadow-none;
+    font-family: var(--font-body);
+    min-height: 400px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .receipt-history-mode {
+    @apply w-full border border-primary/10 shadow-lg rounded-3xl p-6 bg-white;
+  }
+
+  .receipt-header {
+    @apply flex flex-col items-center justify-center border-b-2 border-primary/20 pb-4 mb-4 text-center;
+  }
+
+  .receipt-title {
+    @apply text-2xl font-[900] text-primary mb-1;
+    font-family: var(--font-headline);
+  }
+
+  .receipt-ticket-number {
+    @apply mt-2 bg-primary/5 text-primary px-4 py-1.5 rounded-full text-sm font-[900] border border-primary/20;
+  }
+
+  .receipt-body {
+    @apply space-y-5;
+    width: 100%;
+    /* Should be 69mm due to container padding */
+  }
+
+  .receipt-field {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .receipt-field-label {
+    @apply text-[11px] text-muted-foreground font-[900] uppercase opacity-70 tracking-tight;
+  }
+
+  .receipt-field-value {
+    @apply text-lg font-[950] text-foreground leading-tight;
+  }
+
+  .receipt-stats-grid {
+    @apply grid grid-cols-2 gap-4 bg-primary/5 p-4 rounded-2xl border-2 border-dotted border-primary/20;
+  }
+
+  .receipt-stat-item {
+    @apply flex flex-col items-center justify-center;
+  }
+
+  .receipt-stat-label {
+    @apply text-[10px] text-muted-foreground font-[900] mb-1.5;
+  }
+
+  .receipt-stat-value {
+    @apply text-xl font-[950] text-primary;
+  }
+
+  .receipt-qr-section {
+    @apply flex items-end justify-between border-t-2 border-dotted border-primary/20 pt-6 mt-6;
+  }
+
+  .receipt-qr-image {
+    @apply w-20 h-20 border-2 border-primary/10 rounded-xl p-1 bg-white shadow-sm;
+  }
+
+  .receipt-footer {
+    @apply text-[11px] text-center font-[900] text-muted-foreground/80 mt-6 pt-4 border-t border-primary/10 leading-relaxed;
+  }
+}
+
 @media print {
   body * {
     visibility: hidden;
   }
-  .printable-section, .printable-section * {
+
+  .printable-section,
+  .printable-section * {
     visibility: visible;
   }
+
   .printable-section {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
   }
+
   .no-print {
     display: none !important;
   }
+
   .print-header-table th {
     background-color: #004d40 !important;
     color: white !important;
   }
-  .print-header-table, .printable-section tr {
+
+  .print-header-table,
+  .printable-section tr {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+
   body {
     color: black !important;
     background-color: white !important;
   }
+
   @page {
     size: A4 landscape;
     margin: 1.5cm;

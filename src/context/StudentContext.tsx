@@ -94,6 +94,7 @@ interface StudentContextType {
   generateDemoData: () => Promise<void>;
   shareStudentRecord: (studentId: string, historyData: any) => Promise<void>;
   saveAdminLog: (log: Omit<AdminLog, 'id' | 'timestamp'>) => Promise<void>;
+  deleteAdminLog: (log: AdminLog) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -1048,18 +1049,65 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     await set(logRef, log);
 
+    // Sync with public report if it exists
+    try {
+      const publicReportRef = ref(db, `public_student_reports/${logData.studentId}`);
+      const publicReportSnap = await get(publicReportRef);
+      if (publicReportSnap.exists()) {
+        const publicAdminLogsRef = ref(db, `public_student_reports/${logData.studentId}/adminLogs/${logId}`);
+        await set(publicAdminLogsRef, log);
+      }
+    } catch (error) {
+      console.error("Error syncing with public report:", error);
+    }
+
     toast({
       title: "✅ تم الحفظ والطباعة",
       description: `تم تسجيل الوصل في النظام بنجاح.`,
     });
   };
 
+  const deleteAdminLog = async (log: AdminLog) => {
+    if (!authContextUser) return;
+
+    try {
+      // 1. Delete from student history (personal logs of the creator)
+      const ownerId = log.details?.ownerId || authContextUser.uid;
+      const logRef = ref(db, `users/${ownerId}/admin_logs/${log.id}`);
+      await remove(logRef);
+
+      // 2. Delete from public reports if syncing
+      const publicLogRef = ref(db, `public_student_reports/${log.studentId}/adminLogs/${log.id}`);
+      await remove(publicLogRef);
+
+      toast({
+        title: "🗑️ تم الحذف",
+        description: "تم حذف الوصل من السجلات بنجاح.",
+      });
+    } catch (error) {
+      console.error("Error deleting admin log:", error);
+      toast({
+        title: "❌ خطأ في الحذف",
+        description: "حدث خطأ أثناء محاولة حذف الوصل.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const shareStudentRecord = async (studentId: string, historyData: any) => {
     try {
       const shareRef = ref(db, `public_student_reports/${studentId}`);
+
+      // Also fetch and include admin logs for this student
+      const studentAdminLogs = (adminLogs || []).filter(log => log.studentId === studentId);
+
       const sanitizedHistory = sanitizeData(historyData);
       await set(shareRef, {
         ...sanitizedHistory,
+        adminLogs: studentAdminLogs.reduce((acc: any, log) => {
+          acc[log.id] = log;
+          return acc;
+        }, {}),
         sharedAt: new Date().toISOString()
       });
     } catch (error) {
@@ -1077,6 +1125,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, updatePaymentStatus, saveSettings, generateDemoData,
       shareStudentRecord,
       saveAdminLog,
+      deleteAdminLog,
       adminLogs,
     }}>
       {children}

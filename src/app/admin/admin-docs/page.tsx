@@ -14,10 +14,14 @@ import { ar } from 'date-fns/locale';
 import { Student, AdminLog } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
+import { ReceiptDesign } from '@/components/admin/ReceiptDesign';
+import { useToast } from '@/hooks/use-toast';
+import { Trash2 } from 'lucide-react';
 
 export default function AdminDocsPage() {
-    const { students, allUsers, saveAdminLog, adminLogs, dailySessions } = useStudentContext();
+    const { students, allUsers, saveAdminLog, deleteAdminLog, adminLogs, dailySessions } = useStudentContext();
     const { user: currentUser } = useAuth();
+    const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     const [activeTab, setActiveTab] = useState('summon');
@@ -119,7 +123,8 @@ export default function AdminDocsPage() {
                     absenceDays: entryAbsenceDays,
                     reason: entryAbsenceReason,
                     punishment: entryPunishment,
-                    stats: stats30Days
+                    stats: stats30Days,
+                    ticketNumber: ticketNumber
                 };
                 break;
         }
@@ -131,8 +136,13 @@ export default function AdminDocsPage() {
             type: logType,
             date: format(new Date(), 'yyyy-MM-dd'),
             sheikhName: selectedSheikhName,
-            groupName: selectedStudent.groupName,
-            details: { ...details, ownerId: selectedStudent.ownerId }
+            groupName: selectedStudent.groupName || 'بدون فوج',
+            details: {
+                ...details,
+                ownerId: selectedStudent.ownerId,
+                guardianName: selectedStudent.guardianName,
+                guardianPhone: selectedStudent.phone1
+            }
         });
 
         // Trigger print
@@ -166,6 +176,23 @@ export default function AdminDocsPage() {
         const groups = new Set(allUsers.filter(u => u.role === 'sheikh').map(u => u.group));
         return Array.from(groups).filter(Boolean);
     }, [allUsers]);
+
+    const ticketNumber = useMemo(() => {
+        const nextNum = adminLogs.length + 1;
+        return `Ticket ${nextNum.toString().padStart(6, '0')}`;
+    }, [adminLogs]);
+
+    const studentRecordLink = useMemo(() => {
+        if (!selectedStudent) return '';
+        // Using window.location.origin to get the current base URL
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        return `${origin}/record/${selectedStudent.id}`;
+    }, [selectedStudent]);
+
+    const qrCodeUrl = useMemo(() => {
+        if (!studentRecordLink) return '';
+        return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(studentRecordLink)}`;
+    }, [studentRecordLink]);
 
     return (
         <div className="max-w-6xl mx-auto space-y-8 pb-20 p-4 md:p-8">
@@ -387,160 +414,32 @@ export default function AdminDocsPage() {
 
                             <div className="sticky top-24 w-full flex flex-col items-center gap-6">
                                 {/* THE RECEIPT TARGET */}
-                                <div
-                                    id="printable-receipt"
-                                    className="w-[300px] bg-white text-black p-5 shadow-2xl font-body"
-                                    style={{ minHeight: '400px', direction: 'rtl' }}
-                                >
-                                    {/* Receipt Header */}
-                                    <div className="text-center border-b-2 border-black pb-4 mb-4">
-                                        <h2 className="text-xl font-black mb-1">
-                                            {activeTab === 'summon' && 'استدعاء ولي أمر'}
-                                            {activeTab === 'exit' && 'إذن خروج استثنائي'}
-                                            {activeTab === 'absence' && 'إشعار غياب مسبق'}
-                                            {activeTab === 'payment' && 'وصل استلام مبلغ'}
-                                            {activeTab === 'entry' && 'إذن دخول للحلقة'}
-                                        </h2>
-                                        <p className="text-xs font-bold">المدرسة القرآنية للإمام الشافعي</p>
-                                        <p className="text-[10px]">حي تكسبت الغربية / الوادي</p>
-                                    </div>
-
-                                    {selectedStudent ? (
-                                        <div className="space-y-4">
-                                            {/* Student Info */}
-                                            <div className="space-y-2 text-xs py-2 border-b border-gray-100">
-                                                <div className="flex justify-between">
-                                                    <span className="font-bold">الطالب:</span>
-                                                    <span className="font-black">{selectedStudent.fullName}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="font-bold">الشيخ:</span>
-                                                    <span>{selectedSheikhName}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="font-bold">ولي الأمر:</span>
-                                                    <span className="text-[10px]">{selectedStudent.guardianName} ({selectedStudent.phone1})</span>
-                                                </div>
-                                            </div>
-
-                                            {/* Tab Specific Content */}
-                                            <div className="space-y-3 py-4 min-h-[150px]">
-                                                {activeTab === 'summon' && (
-                                                    <div className="space-y-4">
-                                                        <div className="p-2 border-r-4 border-black bg-gray-50">
-                                                            <p className="text-[10px] font-bold text-gray-500 mb-1">موعد الحضور المقرر:</p>
-                                                            <p className="text-sm font-black">{summonDate || '......'}</p>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <p className="text-[10px] font-bold text-gray-500">سبب الاستدعاء:</p>
-                                                            <p className="text-xs leading-relaxed">{summonReason || 'المقابلة من أجل مصلحة الطالب التربوية.'}</p>
-                                                        </div>
-                                                        <p className="text-[10px] italic mt-4 opacity-70">يرجى من ولي الأمر الالتزام بالموعد المحدد أعلاه.</p>
-                                                    </div>
-                                                )}
-
-                                                {activeTab === 'exit' && (
-                                                    <div className="space-y-4">
-                                                        <div className="flex justify-between items-center p-2 border-2 border-black border-dashed">
-                                                            <span className="text-xs font-bold">وقت الخروج:</span>
-                                                            <span className="text-lg font-black">{exitTime || '......'}</span>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <p className="text-[10px] font-bold text-gray-500">سبب الخروج:</p>
-                                                            <p className="text-xs">{exitReason || '......'}</p>
-                                                        </div>
-                                                        <div className="p-2 bg-gray-50 text-[9px] border border-gray-100 rounded">
-                                                            <strong>إشعار للشيخ:</strong> يسمح للطالب بالمغادرة بناءً على طلب الإدارة.
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {activeTab === 'absence' && (
-                                                    <div className="space-y-4">
-                                                        <div className="p-2 border border-black bg-gray-50">
-                                                            <p className="text-[10px] font-bold mb-1">أيام الغياب المصرح بها:</p>
-                                                            <p className="text-sm font-black text-rose-700">{absenceDates || '......'}</p>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <p className="text-[10px] font-bold text-gray-500">السبب:</p>
-                                                            <p className="text-xs">{absenceReason || '......'}</p>
-                                                        </div>
-                                                        <div className="pt-2 border-t border-gray-100">
-                                                            <p className="text-[9px] font-bold text-gray-400">تحت إشراف الشيخ: {selectedSheikhName}</p>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {activeTab === 'payment' && (
-                                                    <div className="space-y-5">
-                                                        <div className="text-center p-4 bg-gray-50 border-y border-black border-dashed">
-                                                            <p className="text-sm font-black underline mb-3 uppercase tracking-wider">{paymentTitle}</p>
-                                                            <div className="text-2xl font-black">
-                                                                {paymentAmount ? `${Number(paymentAmount).toLocaleString()} د.ج` : '...... د.ج'}
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-[10px] leading-relaxed space-y-2">
-                                                            <p>• تم استلام المبلغ المذكور في خزينة المدرسة.</p>
-                                                            <p className="font-bold">• وصل موجه لولي الأمر وللشيخ المسؤول لتسوية الوضعية.</p>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {activeTab === 'entry' && (
-                                                    <div className="space-y-4">
-                                                        <div className="space-y-2 text-xs">
-                                                            <div className="flex justify-between border-b pb-1">
-                                                                <span className="font-bold">أيام الغياب:</span>
-                                                                <span className="font-black text-rose-600">{entryAbsenceDays || '......'}</span>
-                                                            </div>
-                                                            <div className="flex justify-between border-b pb-1">
-                                                                <span className="font-bold">السبب:</span>
-                                                                <span>{entryAbsenceReason || '......'}</span>
-                                                            </div>
-                                                            {entryPunishment && (
-                                                                <div className="flex justify-between bg-gray-100 p-1 font-bold">
-                                                                    <span className="text-rose-700">العقوبة:</span>
-                                                                    <span>{entryPunishment}</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="p-2 border-2 border-black border-dashed">
-                                                            <p className="text-center text-[9px] font-black uppercase mb-1">موجز آخر 30 يوم</p>
-                                                            <div className="flex justify-around text-center">
-                                                                <div><div className="font-bold text-xs">{stats30Days.absences}</div><div className="text-[8px]">غياب</div></div>
-                                                                <div><div className="font-bold text-xs">{stats30Days.lates}</div><div className="text-[8px]">تأخر</div></div>
-                                                                <div><div className="font-bold text-xs">{stats30Days.total}</div><div className="text-[8px]">الحضور</div></div>
-                                                            </div>
-                                                        </div>
-                                                        <p className="text-[9px] text-center italic opacity-70 underline">هذا الوصل يسمح للطالب بالالتحاق بحلقته.</p>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Footer Info */}
-                                            <div className="flex justify-between items-end border-t border-black pt-4 mt-8">
-                                                <div className="text-[10px]">
-                                                    <p className="font-bold">حرر في:</p>
-                                                    <p>{format(new Date(), 'yyyy/MM/dd HH:mm', { locale: ar })}</p>
-                                                </div>
-                                                <div className="text-center">
-                                                    <div className="h-12 w-24 border border-black flex items-center justify-center text-[10px] font-bold mb-1 rounded-sm rotate-1 flex-col">
-                                                        <span>ختم</span>
-                                                        <span>الإدارة</span>
-                                                    </div>
-                                                    <p className="text-[8px] opacity-70 font-mono">ID: {selectedStudent.id.substring(0, 8)}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="h-[300px] flex flex-col items-center justify-center text-gray-200 gap-4">
-                                            <div className="p-4 rounded-full bg-gray-50 border-2 border-dashed border-gray-100">
-                                                <User className="h-12 w-12 opacity-20" />
-                                            </div>
-                                            <p className="text-sm font-bold opacity-30">يرجى اختيار طالب للمعاينة</p>
-                                        </div>
-                                    )}
-                                </div>
+                                {selectedStudent && (
+                                    <ReceiptDesign
+                                        log={{
+                                            type: activeTab as any,
+                                            studentName: selectedStudent.fullName,
+                                            sheikhName: selectedSheikhName,
+                                            groupName: selectedStudent.groupName || 'بدون فوج',
+                                            details: {
+                                                ... (activeTab === 'summon' ? { date: summonDate, reason: summonReason } : {}),
+                                                ... (activeTab === 'exit' ? { time: exitTime, reason: exitReason } : {}),
+                                                ... (activeTab === 'absence' ? { dates: absenceDates, reason: absenceReason } : {}),
+                                                ... (activeTab === 'payment' ? { title: paymentTitle, amount: paymentAmount } : {}),
+                                                ... (activeTab === 'entry' ? {
+                                                    absenceDays: entryAbsenceDays,
+                                                    reason: entryAbsenceReason,
+                                                    punishment: entryPunishment,
+                                                    stats: stats30Days
+                                                } : {}),
+                                                ticketNumber,
+                                                guardianName: selectedStudent.guardianName,
+                                                guardianPhone: selectedStudent.phone1
+                                            }
+                                        }}
+                                        qrCodeUrl={qrCodeUrl}
+                                    />
+                                )}
 
                                 {selectedStudent && (
                                     <div className="w-full max-w-[300px] space-y-3">
@@ -621,53 +520,55 @@ export default function AdminDocsPage() {
                             </CardContent>
                         </Card>
 
-                        {/* Logs List */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {/* Logs List - Receipt Style */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 justify-items-center">
                             {filteredLogs.length > 0 ? filteredLogs.map(log => (
-                                <motion.div key={log.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                    <Card className="border-white/5 bg-white/[0.03] hover:bg-white/[0.05] transition-all group border-r-4"
-                                        style={{
-                                            borderRightColor:
-                                                log.type === 'summon' ? '#fbbf24' :
-                                                    log.type === 'exit' ? '#60a5fa' :
-                                                        log.type === 'absence' ? '#f87171' :
-                                                            log.type === 'payment' ? '#34d399' : '#a78bfa'
-                                        }}>
-                                        <CardContent className="p-4 space-y-3">
-                                            <div className="flex justify-between items-start">
-                                                <Badge variant="outline" className="text-[10px] font-black uppercase tracking-tighter">
-                                                    {log.type === 'summon' && 'استدعاء'}
-                                                    {log.type === 'exit' && 'خروج'}
-                                                    {log.type === 'absence' && 'غياب'}
-                                                    {log.type === 'payment' && 'سداد'}
-                                                    {log.type === 'entry' && 'دخول'}
-                                                </Badge>
-                                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                                    <Clock className="h-3 w-3" />
-                                                    {format(new Date(log.timestamp), 'yyyy/MM/dd HH:mm')}
-                                                </div>
-                                            </div>
+                                <motion.div
+                                    key={log.id}
+                                    layout
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="relative group"
+                                >
+                                    {/* Receipt Component */}
+                                    <div className="transform scale-[0.85] origin-top transition-transform group-hover:scale-[0.9] shadow-xl">
+                                        <ReceiptDesign
+                                            log={log}
+                                            isHistory={true}
+                                            qrCodeUrl={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/record/${log.studentId}`)}`}
+                                        />
+                                    </div>
 
-                                            <div>
-                                                <div className="font-black text-sm text-primary">{log.studentName}</div>
-                                                <div className="text-[10px] text-muted-foreground">{log.sheikhName} | {log.groupName}</div>
-                                            </div>
+                                    {/* Overlay Actions */}
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4 rounded-3xl backdrop-blur-[2px]">
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            className="font-black gap-2 w-32"
+                                            onClick={() => {
+                                                toast({ title: "معاينة السجل", description: "يمكنك رؤية تفاصيل الوصل في البطاقة." });
+                                            }}
+                                        >
+                                            <FileText className="h-4 w-4" />
+                                            تفاصيل
+                                        </Button>
 
-                                            <div className="p-2 rounded bg-black/20 text-[11px] leading-relaxed">
-                                                {log.type === 'summon' && <p><strong>موعد الحضور:</strong> {log.details.date}</p>}
-                                                {log.type === 'exit' && <p><strong>وقت الخروج:</strong> {log.details.time}</p>}
-                                                {log.type === 'absence' && <p><strong>الأيام:</strong> {log.details.dates}</p>}
-                                                {log.type === 'payment' && <p><strong>المبلغ:</strong> {Number(log.details.amount).toLocaleString()} د.ج ({log.details.title})</p>}
-                                                {log.type === 'entry' && (
-                                                    <div className="space-y-1">
-                                                        <p><strong>الغياب:</strong> {log.details.absenceDays}</p>
-                                                        {log.details.punishment && <p className="text-rose-400 font-bold"><strong>العقوبة:</strong> {log.details.punishment}</p>}
-                                                    </div>
-                                                )}
-                                                {log.details.reason && <p className="mt-1 opacity-70"><strong>السبب:</strong> {log.details.reason}</p>}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+                                        {(currentUser?.email === 'admin00@gmail.com' || currentUser?.email === 'admin0@gmail.com') && (
+                                            <Button
+                                                variant="destructive"
+                                                size="sm"
+                                                className="font-black gap-2 w-32"
+                                                onClick={() => {
+                                                    if (confirm('هل أنت متأكد من حذف هذا الوصل؟ سيتم حذفه من سجل الطالب والولي أيضاً.')) {
+                                                        deleteAdminLog(log);
+                                                    }
+                                                }}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                                حذف الوصل
+                                            </Button>
+                                        )}
+                                    </div>
                                 </motion.div>
                             )) : (
                                 <div className="col-span-full h-40 flex flex-col items-center justify-center text-muted-foreground bg-white/5 rounded-2xl border border-dashed border-white/10">
@@ -684,13 +585,19 @@ export default function AdminDocsPage() {
             <style jsx global>{`
                 @media print {
                     body * { visibility: hidden; }
-                    #printable-receipt, #printable-receipt * { visibility: visible; }
+                    #printable-receipt, #printable-receipt * { 
+                        visibility: visible; 
+                        font-weight: 800 !important;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    #printable-receipt h2 { font-weight: 900 !important; }
                     #printable-receipt {
                         position: fixed;
-                        left: 0;
+                        right: 0;
                         top: 0;
-                        width: 80mm;
-                        padding: 5mm;
+                        width: 79mm;
+                        padding: 2mm 5mm;
                         margin: 0;
                         box-shadow: none;
                         border: none;
@@ -699,7 +606,10 @@ export default function AdminDocsPage() {
                         z-index: 9999;
                         direction: rtl;
                     }
-                    @page { size: auto; margin: 0mm; }
+                    @page { 
+                        size: 79mm auto; 
+                        margin: 0mm; 
+                    }
                 }
             `}</style>
         </div>

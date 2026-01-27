@@ -30,6 +30,8 @@ import {
 } from 'lucide-react';
 import { format, getYear, getDay, startOfYear, addDays, parseISO, getMonth, getDaysInMonth, startOfMonth, endOfMonth, getQuarter, setYear, setMonth, addMonths, endOfYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { ReceiptDesign } from '@/components/admin/ReceiptDesign';
+import { ClipboardList } from 'lucide-react';
 
 // --- Copied Components & Helpers from student-history ---
 
@@ -210,6 +212,7 @@ export default function PublicStudentRecordPage() {
     const [viewMode, setViewMode] = useState<'year' | 'quarter' | 'month'>('year');
     const [viewType, setViewType] = useState<'attendance' | 'evaluation'>('attendance');
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [adminFilterDate, setAdminFilterDate] = useState<string>(''); // For filtering admin logs
 
     useEffect(() => {
         if (!studentId) return;
@@ -644,6 +647,75 @@ export default function PublicStudentRecordPage() {
                             </CardContent>
                         </Card>
                     </div>
+
+                    {/* Administrative Documents Section */}
+                    <Card className="shadow-2xl border-none rounded-[3rem] overflow-hidden bg-white/80 backdrop-blur-xl">
+                        <CardHeader className="bg-primary/5 border-b p-8">
+                            <CardTitle className="flex items-center gap-3 font-black text-2xl">
+                                <ClipboardList className="h-6 w-6 text-primary" />
+                                والأوصال والمستندات الإدارية
+                            </CardTitle>
+                            <div className="flex flex-wrap items-center gap-4 mt-4 md:mt-0">
+                                <div className="flex items-center gap-2 bg-white/40 border border-primary/10 rounded-full px-4 py-2">
+                                    <Calendar className="h-4 w-4 text-primary" />
+                                    <input
+                                        type="date"
+                                        value={adminFilterDate}
+                                        onChange={(e) => setAdminFilterDate(e.target.value)}
+                                        className="bg-transparent border-none text-sm font-black text-primary focus:ring-0 outline-none"
+                                        dir="rtl"
+                                        aria-label="Filter by date"
+                                        title="تصفية حسب التاريخ"
+                                    />
+                                    {adminFilterDate && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 w-6 p-0 rounded-full hover:bg-primary/10"
+                                            onClick={() => setAdminFilterDate('')}
+                                        >
+                                            ×
+                                        </Button>
+                                    )}
+                                </div>
+                                <CardDescription className="font-bold text-md opacity-70">سجل الوثائق الرسمية الصادرة من الإدارة.</CardDescription>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
+                                {snapshot?.adminLogs && Object.values(snapshot.adminLogs).length > 0 ? (
+                                    Object.values(snapshot.adminLogs as any)
+                                        .filter((log: any) => {
+                                            if (!adminFilterDate) return true;
+                                            return log.date === adminFilterDate;
+                                        })
+                                        .sort((a: any, b: any) => b.timestamp.localeCompare(a.timestamp))
+                                        .map((log: any) => (
+                                            <div key={log.id} className="relative group">
+                                                <div className="transform scale-[0.98] origin-top border shadow-lg rounded-xl overflow-hidden bg-white transition-all group-hover:scale-100 group-hover:shadow-2xl">
+                                                    <ReceiptDesign
+                                                        log={log}
+                                                        isHistory={true}
+                                                        qrCodeUrl={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/record/${log.studentId}`)}`}
+                                                    />
+                                                </div>
+                                                <div className="absolute inset-x-0 bottom-4 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Badge className="bg-primary text-white px-4 py-1.5 rounded-full font-black text-[10px] shadow-lg">
+                                                        {format(parseISO(log.date), 'd MMMM yyyy', { locale: ar })}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                        ))
+                                ) : (
+                                    <div className="col-span-full flex flex-col items-center justify-center py-24 text-muted-foreground bg-muted/20 rounded-[3rem] border-4 border-dashed">
+                                        <ClipboardList className="h-20 w-20 text-primary/20 mb-6" />
+                                        <p className="font-black text-xl mb-2">لا توجد مستندات إدارية</p>
+                                        <p className="text-sm font-medium opacity-60">لم يتم إصدار أي أوصال إدارية لهذا الطالب حتى الآن.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     <div className="pt-12 pb-6 text-center space-y-4">
                         <div className="h-px w-24 bg-primary/20 mx-auto" />
