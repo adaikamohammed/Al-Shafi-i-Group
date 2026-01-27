@@ -74,7 +74,7 @@ interface StudentContextType {
   deleteStudent: (studentId: string, ownerId: string) => void;
   deleteAllStudents: () => void;
   deleteMultipleStudents: (studentsToDelete: { id: string, ownerId: string }[]) => void;
-  addDailySession: (session: DailySession) => void;
+  addDailySession: (session: DailySession) => Promise<void>;
   deleteDailySession: (sessionId: string) => void;
   getSessionsForDay: (date: string) => DailySession[];
   getSessionById: (sessionId: string) => DailySession | undefined;
@@ -95,6 +95,7 @@ interface StudentContextType {
   shareStudentRecord: (studentId: string, historyData: any) => Promise<void>;
   saveAdminLog: (log: Omit<AdminLog, 'id' | 'timestamp'>) => Promise<void>;
   deleteAdminLog: (log: AdminLog) => Promise<void>;
+  getNextTicketNumber: () => Promise<number>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -723,19 +724,25 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: `🗑️ تم حذف ${studentsToDelete.length} طالب`, description: "تم حذف الطلاب المحددين بنجاح." });
   };
 
-  const addDailySession = (session: DailySession) => {
+  const addDailySession = async (session: DailySession): Promise<void> => {
     if (!authContextUser || isSuperAdmin) return;
-    const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${session.date}/${session.id}`);
 
-    // Use async/await implicitly or strictly? The function isn't async.
-    // Let's make it a fire-and-forget but ensuring order if possible?
-    // Actually, set returns a promise. We should chain it or just let it run.
-    // The issue might be that logActivity runs BEFORE set finishes?
-    // No, both are async.
+    // OPTIMISTIC UPDATE: تحديث الـ state المحلي فوراً
+    setDailySessions(prev => ({
+      ...prev,
+      [session.date]: {
+        ...prev[session.date],
+        [session.id]: session
+      }
+    }));
 
-    set(sessionRef, session).then(() => {
-      // Log action
-      logActivity(
+    try {
+      // الحفظ في Firebase
+      const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${session.date}/${session.id}`);
+      await set(sessionRef, session);
+
+      // تسجيل النشاط
+      await logActivity(
         'ADD_SESSION',
         authContextUser.uid,
         `تم تسجيل حصة جديدة بتاريخ: ${session.date}`,
@@ -745,7 +752,22 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         authContextUser.group || 'غير محدد',
         authContextUser.uid
       );
-    }).catch(e => console.error("Error saving session:", e));
+    } catch (error) {
+      console.error("Error saving session:", error);
+
+      // ROLLBACK: إزالة التحديث المتفائل عند الفشل
+      setDailySessions(prev => {
+        const updated = { ...prev };
+        if (updated[session.date]) {
+          const dateSessions = { ...updated[session.date] };
+          delete dateSessions[session.id];
+          updated[session.date] = dateSessions;
+        }
+        return updated;
+      });
+
+      throw error; // إعادة رمي الخطأ للتعامل معه في المكون
+    }
   };
 
   const deleteDailySession = (sessionId: string) => {
@@ -1035,6 +1057,29 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const getNextTicketNumber = async (): Promise<number> => {
+    if (!authContextUser) return 0;
+
+    const ownerId = authContextUser.uid;
+    const ticketCounterRef = ref(db, `users/${ownerId}/settings/lastTicketNumber`);
+
+    try {
+      // Get current value
+      const snapshot = await get(ticketCounterRef);
+      const currentNumber = snapshot.exists() ? snapshot.val() : 0;
+      const nextNumber = currentNumber + 1;
+
+      // Update with new value
+      await set(ticketCounterRef, nextNumber);
+
+      return nextNumber;
+    } catch (error) {
+      console.error("Error getting next ticket number:", error);
+      // Fallback to timestamp-based number if Firebase fails
+      return Date.now() % 1000000;
+    }
+  };
+
   const saveAdminLog = async (logData: Omit<AdminLog, 'id' | 'timestamp'>): Promise<void> => {
     if (!authContextUser) return;
     const logId = uuidv4();
@@ -1126,6 +1171,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       shareStudentRecord,
       saveAdminLog,
       deleteAdminLog,
+      getNextTicketNumber,
       adminLogs,
     }}>
       {children}

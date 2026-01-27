@@ -54,7 +54,7 @@ export interface Student {
 export type AttendanceStatus = "حاضر" | "غياب" | "متأخر" | "تعويض" | "";
 export type PerformanceLevel = "ممتاز" | "جيد جدا" | "جيد جداً" | "جيد" | "متوسط" | "مقبول" | "ضعيف" | "لم يحفظ" | "لا يوجد" | "";
 export type BehaviorLevel = "هادئ" | "متوسط" | "مقبول" | "غير منضبط" | "مشاغب" | "";
-export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة" | "حصة تعويضية" | "غياب الشيخ";
+export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة" | "حصة تعويضية" | "غياب الشيخ" | "حصة إضافية";
 
 export interface DailyRecord {
   sessionId: string; // To link record to a specific session on a given date

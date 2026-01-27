@@ -135,8 +135,14 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                                             <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={(e) => onDeleteSession(e, session.id)}>
                                                 <Trash2 className="ml-2 h-3 w-3" /> حذف
                                             </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
                                         </React.Fragment>
                                     ))}
+                                    {sessions.some(s => s.sessionNumber === 1) && !sessions.some(s => s.sessionNumber === 2) && (
+                                        <DropdownMenuItem onClick={() => onDayClick(day, 2)}>
+                                            <Copy className="ml-2 h-3 w-3" /> إضافة حصة إضافية
+                                        </DropdownMenuItem>
+                                    )}
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>

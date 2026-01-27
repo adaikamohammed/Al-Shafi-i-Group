@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Trash2 } from 'lucide-react';
 
 export default function AdminDocsPage() {
-    const { students, allUsers, saveAdminLog, deleteAdminLog, adminLogs, dailySessions } = useStudentContext();
+    const { students, allUsers, saveAdminLog, deleteAdminLog, getNextTicketNumber, adminLogs, dailySessions } = useStudentContext();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState('');
@@ -97,25 +97,29 @@ export default function AdminDocsPage() {
     const handlePrint = async () => {
         if (!selectedStudent) return;
 
-        let details: any = {};
+        // Get next ticket number from Firebase
+        const nextTicketNum = await getNextTicketNumber();
+        const ticketNumber = `TKT-${nextTicketNum.toString().padStart(6, '0')}`;
+
+        let details: any = { ticketNumber };
         let logType: AdminLog['type'] = 'summon';
 
         switch (activeTab) {
             case 'summon':
                 logType = 'summon';
-                details = { date: summonDate, reason: summonReason };
+                details = { date: summonDate, reason: summonReason, ticketNumber };
                 break;
             case 'exit':
                 logType = 'exit';
-                details = { time: exitTime, reason: exitReason };
+                details = { time: exitTime, reason: exitReason, ticketNumber };
                 break;
             case 'absence':
                 logType = 'absence';
-                details = { dates: absenceDates, reason: absenceReason };
+                details = { dates: absenceDates, reason: absenceReason, ticketNumber };
                 break;
             case 'payment':
                 logType = 'payment';
-                details = { title: paymentTitle, amount: paymentAmount };
+                details = { title: paymentTitle, amount: paymentAmount, ticketNumber };
                 break;
             case 'entry':
                 logType = 'entry';
@@ -177,10 +181,6 @@ export default function AdminDocsPage() {
         return Array.from(groups).filter(Boolean);
     }, [allUsers]);
 
-    const ticketNumber = useMemo(() => {
-        const nextNum = adminLogs.length + 1;
-        return `Ticket ${nextNum.toString().padStart(6, '0')}`;
-    }, [adminLogs]);
 
     const studentRecordLink = useMemo(() => {
         if (!selectedStudent) return '';
@@ -432,7 +432,7 @@ export default function AdminDocsPage() {
                                                     punishment: entryPunishment,
                                                     stats: stats30Days
                                                 } : {}),
-                                                ticketNumber,
+                                                ticketNumber: 'TKT-######',
                                                 guardianName: selectedStudent.guardianName,
                                                 guardianPhone: selectedStudent.phone1
                                             }

@@ -10,6 +10,7 @@ import {
     startOfWeek,
     endOfWeek,
     subWeeks,
+    addDays,
     eachMonthOfInterval,
     startOfMonth,
     endOfMonth,
@@ -48,7 +49,7 @@ const calculatePeriodStats = (
             } catch { return false; }
         });
 
-    const workSessions = periodSessions.filter(s => s.sessionType === 'حصة أساسية' || s.sessionType === 'حصة تعويضية');
+    const workSessions = periodSessions.filter(s => s.sessionType === 'حصة أساسية' || s.sessionType === 'حصة تعويضية' || s.sessionType === 'حصة إضافية');
 
     let totalAttendance = 0;
     let totalPossibleAttendance = 0;
@@ -81,7 +82,7 @@ const calculatePeriodStats = (
                         behaviorCount++;
                     }
 
-                    if (session.sessionType === 'حصة أساسية') {
+                    if (session.sessionType === 'حصة أساسية' || session.sessionType === 'حصة إضافية') {
                         reviewCount++;
                         if (record.review) {
                             reviewSum++;
@@ -120,7 +121,7 @@ export function GroupEvaluationCard({ students, sessions, groupName }: { student
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
 
     type ViewType = 'commitment' | 'attendance' | 'behavior' | 'review' | 'memorization';
-    type RangeType = 'weekly' | 'monthly' | 'seasonal' | 'yearly';
+    type RangeType = 'daily' | 'weekly' | 'monthly' | 'seasonal' | 'yearly';
 
     const [view, setView] = useState<ViewType>('commitment');
     const [range, setRange] = useState<RangeType>('monthly');
@@ -129,6 +130,18 @@ export function GroupEvaluationCard({ students, sessions, groupName }: { student
     const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
 
     const chartData = useMemo(() => {
+        if (range === 'daily') {
+            // Get start of the current week (Saturday)
+            const currentObj = new Date();
+            const weekStart = startOfWeek(currentObj, { weekStartsOn: 6 }); // 6 = Saturday
+
+            return Array.from({ length: 7 }).map((_, i) => {
+                const dayDate = addDays(weekStart, i);
+                // For daily stats, start and end is the same day
+                const stats = calculatePeriodStats(dayDate, dayDate, activeStudents, sessions);
+                return { name: format(dayDate, 'EEEE', { locale: ar }), ...stats };
+            });
+        }
         if (range === 'weekly') {
             return Array.from({ length: 6 }).map((_, i) => {
                 const weekEndDate = endOfWeek(subWeeks(new Date(), i), { weekStartsOn: 6 });
@@ -174,11 +187,19 @@ export function GroupEvaluationCard({ students, sessions, groupName }: { student
     }, [view, chartData]);
 
     const viewTitles: Record<ViewType, string> = {
-        commitment: "رادار الالتزام العام",
-        attendance: "معدل حضور الفوج",
-        behavior: "متوسط سلوك الطلاب",
-        review: "نسبة إتمام المراجعة",
-        memorization: "جودة أداء الحفظ"
+        commitment: "التقييم العام",
+        attendance: "نسبة الحضور",
+        behavior: "السلوك",
+        review: "المراجعة",
+        memorization: "جودة الحفظ"
+    };
+
+    const viewDescriptions: Record<ViewType, string> = {
+        commitment: "متوسط شامل يجمع بين الحضور، السلوك، الحفظ والمراجعة.",
+        attendance: "نسبة التزام الطلاب بالحضور في الحلقات المجدولة.",
+        behavior: "تقييم انضباط الطلاب وسلوكهم العام أثناء الحلقة.",
+        review: "مدى إنجاز الطلاب لمحفوظاتهم السابقة (السابقي والماضي).",
+        memorization: "جودة حفظ الدروس الجديدة ودقة التسميع."
     };
 
     if (activeStudents.length === 0 || Object.keys(sessions).length === 0) {
@@ -259,7 +280,7 @@ export function GroupEvaluationCard({ students, sessions, groupName }: { student
                                 "flex p-1 rounded-xl",
                                 theme.isLight ? "bg-slate-50" : "bg-white/5"
                             )}>
-                                {(['weekly', 'monthly', 'yearly'] as const).map((r) => (
+                                {(['daily', 'weekly', 'monthly', 'yearly'] as const).map((r) => (
                                     <button
                                         key={r}
                                         onClick={() => setRange(r)}
@@ -270,11 +291,19 @@ export function GroupEvaluationCard({ students, sessions, groupName }: { student
                                                 : theme.isLight ? "text-slate-400 hover:text-slate-600" : "text-white/40 hover:text-white"
                                         )}
                                     >
-                                        {r === 'weekly' ? 'أسبوعي' : r === 'monthly' ? 'شهري' : 'سنوي'}
+                                        {r === 'daily' ? 'يومي' : r === 'weekly' ? 'أسبوعي' : r === 'monthly' ? 'شهري' : 'سنوي'}
                                     </button>
                                 ))}
                             </div>
                         </div>
+                    </div>
+
+                    {/* Description Text */}
+                    <div className={cn(
+                        "text-xs px-1",
+                        theme.isLight ? "text-slate-500" : "text-white/50"
+                    )}>
+                        {viewDescriptions[view]}
                     </div>
 
                     {/* Navigation for specific months */}

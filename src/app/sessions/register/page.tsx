@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useStudentContext } from '@/context/StudentContext';
 import { useToast } from '@/hooks/use-toast';
+import { useDebounce } from '@/hooks/use-debounce';
 import { format, parse, parseISO, subDays, isSameDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -13,11 +14,13 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Loader2, Save, FileText, UserCheck, AlertTriangle, ArrowRight, Trash2, BookOpen, Smile, RotateCcw, TimerOff, MessageSquare, CheckCircle, Copy, Trophy } from 'lucide-react';
+import { Loader2, Save, FileText, UserCheck, AlertTriangle, ArrowRight, Trash2, BookOpen, Smile, RotateCcw, TimerOff, MessageSquare, CheckCircle, Copy, Trophy, Cloud, RefreshCw } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AttendanceList, AttendanceRecord } from '@/components/sessions/AttendanceList';
 import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
 import { surahs } from '@/lib/surahs';
+import { db } from '@/lib/firebase';
+import { ref as dbRef, get } from 'firebase/database';
 
 function RegisterSessionContent() {
     const { user, isSuperAdmin } = useAuth();
@@ -34,7 +37,7 @@ function RegisterSessionContent() {
     const [selectedDay] = useState<Date>(dateParam ? parse(dateParam, 'yyyy-MM-dd', new Date()) : new Date());
     const [sessionToOpen] = useState<1 | 2>(sessionNumParam === '2' ? 2 : 1);
 
-    const [sessionType, setSessionType] = useState<'حصة أساسية' | 'حصة تعويضية' | 'يوم عطلة' | 'غياب الشيخ' | 'حصة أنشطة'>('حصة أساسية');
+    const [sessionType, setSessionType] = useState<'حصة أساسية' | 'حصة تعويضية' | 'يوم عطلة' | 'غياب الشيخ' | 'حصة أنشطة' | 'حصة إضافية'>('حصة أساسية');
     const [teacherAbsenceReason, setTeacherAbsenceReason] = useState('');
     const [substituteTeacher, setSubstituteTeacher] = useState('');
     const [activityType, setActivityType] = useState('');
@@ -45,6 +48,11 @@ function RegisterSessionContent() {
     const [isReview, setIsReview] = useState(false);
     const [attendanceRecords, setAttendanceRecords] = useState<Record<string, AttendanceRecord>>({});
     const [isSaving, setIsSaving] = useState(false);
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const [isDirty, setIsDirty] = useState(false);
+    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const activeStudents = useMemo(() =>
         (students ?? []).filter(s => {
@@ -53,71 +61,137 @@ function RegisterSessionContent() {
         }).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')),
         [students, isSuperAdmin, user]);
 
+    const DRAFT_KEY = useMemo(() => {
+        return selectedDay ? `session_draft_${format(selectedDay, 'yyyy-MM-dd')}_s${sessionToOpen}` : null;
+    }, [selectedDay, sessionToOpen]);
+
+    // حماية من إعادة التحميل: نتتبع آخر جلسة تم تحميلها
+    const lastLoadedSessionRef = useRef<string | null>(null);
+
     useEffect(() => {
-        if (!loading && selectedDay) {
+        if (!loading && selectedDay && user) {
             const dateStr = format(selectedDay, 'yyyy-MM-dd');
-            const daySessions = getSessionsForDay(dateStr);
-            const existingSession = daySessions.find(s => s.sessionNumber === sessionToOpen);
+            const sessionKey = `${dateStr}-s${sessionToOpen}`;
 
-            if (existingSession) {
-                setSessionType(existingSession.sessionType as any);
-                setTeacherAbsenceReason(existingSession.teacherAbsenceReason || '');
-                setSubstituteTeacher(existingSession.substituteTeacher || '');
-                setActivityType(existingSession.activityType || '');
-                setActivityDescription(existingSession.activityDescription || '');
-                if (existingSession.surahId) setSurahId(existingSession.surahId);
-                if (existingSession.fromVerse) setFromVerse(existingSession.fromVerse);
-                if (existingSession.toVerse) setToVerse(existingSession.toVerse);
-                if (existingSession.isReview) setIsReview(existingSession.isReview);
-
-                const records: any = {};
-                existingSession.records?.forEach((record: any) => {
-                    records[record.studentId] = {
-                        attendance: record.attendance,
-                        memorization: record.memorization,
-                        behavior: record.behavior,
-                        notes: record.notes,
-                        review: record.review,
-                        surahId: record.surahId,
-                        fromVerse: record.fromVerse,
-                        toVerse: record.toVerse
-                    };
-                });
-                setAttendanceRecords(records);
-            } else {
-                setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة تعويضية');
-
-                // Logic for admin5 auto-increment
-                if (isAdmin5 && sessionToOpen === 1) {
-                    const allSessions = Object.values(dailySessions || {}).flatMap(day => Object.values(day as Record<string, any>));
-                    const sortedSessions = allSessions
-                        .filter(s => s.sessionType === 'حصة أساسية' && s.surahId && !s.isReview)
-                        .sort((a, b) => b.date.localeCompare(a.date));
-
-                    const latestSession = sortedSessions[0];
-                    if (latestSession) {
-                        const currentSurah = surahs.find(s => s.id === latestSession.surahId);
-                        if (latestSession.toVerse && currentSurah && latestSession.toVerse < currentSurah.verses) {
-                            setSurahId(latestSession.surahId);
-                            setFromVerse(latestSession.toVerse + 1);
-                            setToVerse(latestSession.toVerse + 1);
-                        } else {
-                            // Finish surah -> next surah
-                            setSurahId((latestSession.surahId % 114) + 1);
-                            setFromVerse(1);
-                            setToVerse(1);
-                        }
-                    } else {
-                        setSurahId(26); // Initial
-                        setFromVerse(1);
-                        setToVerse(1);
-                    }
-                }
+            // إذا كانت هذه الجلسة نفسها التي تم تحميلها سابقاً، لا نعيد التحميل
+            if (lastLoadedSessionRef.current === sessionKey && !isInitialLoad) {
+                return;
             }
+
+            lastLoadedSessionRef.current = sessionKey;
+
+            // ✅ قراءة مباشرة من Firebase (ليس من Context)
+            const loadFromFirebase = async () => {
+                try {
+                    const sessionsRef = dbRef(db, `users/${user.uid}/dailySessions/${dateStr}`);
+                    const snapshot = await get(sessionsRef);
+
+                    let existingSession = null;
+                    if (snapshot.exists()) {
+                        const sessions = snapshot.val();
+                        existingSession = Object.values(sessions).find((s: any) => s.sessionNumber === sessionToOpen);
+                    }
+
+                    if (existingSession) {
+                        const session = existingSession as any;
+                        // DB Data Exists - Load from Firebase
+                        setCurrentSessionId(session.id); // LOCK ID
+                        setSessionType(session.sessionType as any);
+                        setTeacherAbsenceReason(session.teacherAbsenceReason || '');
+                        setSubstituteTeacher(session.substituteTeacher || '');
+                        setActivityType(session.activityType || '');
+                        setActivityDescription(session.activityDescription || '');
+                        if (session.surahId) setSurahId(session.surahId);
+                        if (session.fromVerse) setFromVerse(session.fromVerse);
+                        if (session.toVerse) setToVerse(session.toVerse);
+                        if (session.isReview) setIsReview(session.isReview);
+
+                        const records: any = {};
+                        session.records?.forEach((record: any) => {
+                            records[record.studentId] = {
+                                attendance: record.attendance,
+                                memorization: record.memorization,
+                                behavior: record.behavior,
+                                notes: record.notes,
+                                review: record.review,
+                                surahId: record.surahId,
+                                fromVerse: record.fromVerse,
+                                toVerse: record.toVerse
+                            };
+                        });
+                        setAttendanceRecords(records);
+                    } else {
+                        // No DB Data - Check LocalStorage Draft
+                        const savedDraft = DRAFT_KEY ? localStorage.getItem(DRAFT_KEY) : null;
+                        if (savedDraft) {
+                            try {
+                                const draft = JSON.parse(savedDraft);
+                                setCurrentSessionId(draft.id || null);
+                                setSessionType(draft.sessionType || 'حصة أساسية');
+                                setTeacherAbsenceReason(draft.teacherAbsenceReason || '');
+                                setSubstituteTeacher(draft.substituteTeacher || '');
+                                setActivityType(draft.activityType || '');
+                                setActivityDescription(draft.activityDescription || '');
+                                setSurahId(draft.surahId || 26);
+                                setFromVerse(draft.fromVerse || 1);
+                                setToVerse(draft.toVerse || 1);
+                                setIsReview(draft.isReview || false);
+                                setAttendanceRecords(draft.attendanceRecords || {});
+                                toast({ title: "مسودة محفوظة", description: "تم استرجاع بيانات غير محفوظة من المتصفح." });
+                            } catch (e) {
+                                console.error("Failed to parse draft", e);
+                            }
+                        } else {
+                            setCurrentSessionId(null); // Truly new
+                            setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة إضافية');
+
+                            // Logic for admin5 auto-increment
+                            if (isAdmin5 && sessionToOpen === 1) {
+                                const allSessions = Object.values(dailySessions || {}).flatMap(day => Object.values(day as Record<string, any>));
+                                const sortedSessions = allSessions
+                                    .filter(s => s.sessionType === 'حصة أساسية' && s.surahId && !s.isReview)
+                                    .sort((a, b) => b.date.localeCompare(a.date));
+
+                                const latestSession = sortedSessions[0];
+                                if (latestSession) {
+                                    const currentSurah = surahs.find(s => s.id === latestSession.surahId);
+                                    if (latestSession.toVerse && currentSurah && latestSession.toVerse < currentSurah.verses) {
+                                        setSurahId(latestSession.surahId);
+                                        setFromVerse(latestSession.toVerse + 1);
+                                        setToVerse(latestSession.toVerse + 1);
+                                    } else {
+                                        setSurahId((latestSession.surahId % 114) + 1);
+                                        setFromVerse(1);
+                                        setToVerse(1);
+                                    }
+                                } else {
+                                    setSurahId(26);
+                                    setFromVerse(1);
+                                    setToVerse(1);
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error loading session from Firebase:", error);
+                    toast({ title: "خطأ", description: "فشل تحميل البيانات من الخادم.", variant: "destructive" });
+                } finally {
+                    setIsInitialLoad(false);
+                    setIsDirty(false);
+                }
+            };
+
+            loadFromFirebase();
         }
-    }, [loading, selectedDay, sessionToOpen, getSessionsForDay, dailySessions, isAdmin5]);
+    }, [loading, selectedDay, sessionToOpen, user, isInitialLoad]);
+
+    const handleSessionTypeChange = (val: any) => {
+        setSessionType(val);
+        setIsDirty(true);
+    };
 
     const handleUpdateRecord = (studentId: string, field: keyof AttendanceRecord, value: any) => {
+        setIsDirty(true);
         setAttendanceRecords(prev => ({
             ...prev,
             [studentId]: {
@@ -129,6 +203,7 @@ function RegisterSessionContent() {
     };
 
     const handleMarkAllPresent = () => {
+        setIsDirty(true);
         setAttendanceRecords(prev => {
             const newRecords = { ...prev };
             activeStudents.forEach(student => {
@@ -144,6 +219,7 @@ function RegisterSessionContent() {
     };
 
     const handleMarkAllQuiet = () => {
+        setIsDirty(true);
         setAttendanceRecords(prev => {
             const newRecords = { ...prev };
             activeStudents.forEach(student => {
@@ -158,6 +234,7 @@ function RegisterSessionContent() {
     };
 
     const handleMarkAllReview = () => {
+        setIsDirty(true);
         setAttendanceRecords(prev => {
             const newRecords = { ...prev };
             activeStudents.forEach(student => {
@@ -172,6 +249,7 @@ function RegisterSessionContent() {
     };
 
     const handleMarkAllGood = () => {
+        setIsDirty(true);
         setAttendanceRecords(prev => {
             const newRecords = { ...prev };
             activeStudents.forEach(student => {
@@ -185,48 +263,218 @@ function RegisterSessionContent() {
         toast({ title: "تم", description: "تم تقييم جميع الحاضرين بـ 'جيد'" });
     };
 
-    const handleSaveSession = async () => {
-        setIsSaving(true);
-        try {
-            const dateStr = format(selectedDay, 'yyyy-MM-dd');
+    // Auto-Save Implementation
+    const sessionData = useMemo(() => ({
+        sessionType,
+        teacherAbsenceReason,
+        substituteTeacher,
+        activityType,
+        activityDescription,
+        surahId,
+        fromVerse,
+        toVerse,
+        isReview,
+        attendanceRecords
+    }), [sessionType, teacherAbsenceReason, substituteTeacher, activityType, activityDescription, surahId, fromVerse, toVerse, isReview, attendanceRecords]);
+
+    const debouncedSessionData = useDebounce(sessionData, 1500); // Auto-save after 1.5s of inactivity
+
+    // Shared Save Logic
+    const performSave = async (data: typeof sessionData): Promise<void> => {
+        if (!selectedDay || !user) return;
+        const dateStr = format(selectedDay, 'yyyy-MM-dd');
+
+        // Use LOCKED ID if available, otherwise find existing or generate deterministic
+        let id = currentSessionId;
+
+        if (!id) {
             const existingSessions = getSessionsForDay(dateStr);
             const existingSession = existingSessions.find(s => s.sessionNumber === sessionToOpen);
-            const id = existingSession ? existingSession.id : `${dateStr}-s${sessionToOpen}-${Date.now()}`;
+            id = existingSession ? existingSession.id : `${dateStr}-s${sessionToOpen}`;
+            setCurrentSessionId(id); // Lock it for future saves in this session
+        }
 
-            const recordsArray = Object.entries(attendanceRecords).map(([studentId, data]) => ({
-                ...data,
-                sessionId: id,
-                surahId: isAdmin5 ? surahId : (data.surahId || null),
-                fromVerse: isAdmin5 ? fromVerse : (data.fromVerse || null),
-                toVerse: isAdmin5 ? toVerse : (data.toVerse || null),
-            })).filter(r => r.attendance);
+        // ✅ CRITICAL: قراءة البيانات القديمة من Firebase ودمجها مع الجديدة
+        let existingRecords: any[] = [];
+        try {
+            const sessionsRef = dbRef(db, `users/${user.uid}/dailySessions/${dateStr}`);
+            const snapshot = await get(sessionsRef);
+            if (snapshot.exists()) {
+                const sessions = snapshot.val();
+                const existingSession = Object.values(sessions).find((s: any) => s.id === id);
+                if (existingSession && (existingSession as any).records) {
+                    existingRecords = (existingSession as any).records;
+                }
+            }
+        } catch (error) {
+            console.error("Error reading existing records:", error);
+        }
 
-            const sessionData: any = {
-                id,
-                date: dateStr,
-                sessionNumber: sessionToOpen,
-                sessionType,
-                teacherAbsenceReason: sessionType === 'غياب الشيخ' ? teacherAbsenceReason : null,
-                substituteTeacher: (sessionType === 'غياب الشيخ' && substituteTeacher) ? substituteTeacher : null,
-                activityType: (sessionType === 'حصة أنشطة' && activityType) ? activityType : null,
-                activityDescription: (sessionType === 'حصة أنشطة' && activityDescription) ? activityDescription : null,
-                surahId: isAdmin5 ? surahId : null,
-                fromVerse: isAdmin5 ? fromVerse : null,
-                toVerse: isAdmin5 ? toVerse : null,
-                isReview: isAdmin5 ? isReview : false,
-                records: recordsArray
+        // دمج البيانات القديمة مع الجديدة
+        const mergedRecords: Record<string, any> = {};
+
+        // أولاً: تحميل جميع البيانات القديمة
+        existingRecords.forEach((record: any) => {
+            mergedRecords[record.studentId] = record;
+        });
+
+        // ثانياً: تحديث/إضافة البيانات الجديدة
+        Object.entries(data.attendanceRecords).forEach(([studentId, d]: [string, any]) => {
+            if (d.attendance) { // فقط إذا كان هناك attendance
+                mergedRecords[studentId] = {
+                    ...d,
+                    sessionId: id,
+                    studentId,
+                    surahId: isAdmin5 ? data.surahId : (d.surahId || null),
+                    fromVerse: isAdmin5 ? data.fromVerse : (d.fromVerse || null),
+                    toVerse: isAdmin5 ? data.toVerse : (d.toVerse || null),
+                };
+            }
+        });
+
+        // تحويل إلى array
+        const recordsArray = Object.values(mergedRecords);
+
+        const sessionPayload: any = {
+            id,
+            date: dateStr,
+            sessionNumber: sessionToOpen,
+            sessionType: data.sessionType,
+            teacherAbsenceReason: data.sessionType === 'غياب الشيخ' ? data.teacherAbsenceReason : null,
+            substituteTeacher: (data.sessionType === 'غياب الشيخ' && data.substituteTeacher) ? data.substituteTeacher : null,
+            activityType: (data.sessionType === 'حصة أنشطة' && data.activityType) ? data.activityType : null,
+            activityDescription: (data.sessionType === 'حصة أنشطة' && data.activityDescription) ? data.activityDescription : null,
+            surahId: isAdmin5 ? data.surahId : null,
+            fromVerse: isAdmin5 ? data.fromVerse : null,
+            toVerse: isAdmin5 ? data.toVerse : null,
+            isReview: isAdmin5 ? data.isReview : false,
+            records: recordsArray
+        };
+
+        await addDailySession(sessionPayload);
+    };
+
+    // Save Draft to LocalStorage whenever debounced data changes
+    useEffect(() => {
+        if (DRAFT_KEY && debouncedSessionData && (isDirty || currentSessionId)) {
+            const draft = {
+                ...debouncedSessionData,
+                id: currentSessionId // IMPORTANT: Persist the ID
             };
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        }
+    }, [debouncedSessionData, DRAFT_KEY, isDirty, currentSessionId]);
 
-            await addDailySession(sessionData);
+    // Auto-Save Effect
+    useEffect(() => {
+        if (loading || isInitialLoad || !isDirty) return;
+
+        const autoSave = async () => {
+            setIsSaving(true);
+            try {
+                await performSave(debouncedSessionData);
+                setLastSaved(new Date());
+                setIsDirty(false);
+            } catch (error) {
+                console.error("Auto-save failed:", error);
+            } finally {
+                setIsSaving(false);
+            }
+        };
+
+        autoSave();
+    }, [debouncedSessionData]); // Dependencies handled by useDebounce
+
+    const handleReturn = async () => {
+        if (isDirty || isSaving) {
+            setIsSaving(true);
+            try {
+                await performSave(sessionData); // Force final save
+                toast({ title: "تم الحفظ", description: "تم حفظ التغييرات قبل الخروج." });
+            } catch (e) {
+                console.error("Save on exit failed", e);
+                toast({ title: "تنبيه", description: "قد لا تكون بعض التغييرات محفوظة.", variant: "destructive" });
+            } finally {
+                setIsSaving(false);
+            }
+        } else if (lastSaved) {
+            toast({ title: "محفوظ", description: "جميع البيانات محفوظة." });
+        }
+        router.push('/sessions');
+    };
+
+    // Manual Refresh: إعادة تحميل البيانات مباشرة من Firebase
+    const handleRefresh = async () => {
+        if (!user || !selectedDay) return;
+
+        setIsRefreshing(true);
+        try {
+            const dateStr = format(selectedDay, 'yyyy-MM-dd');
+            const sessionsRef = dbRef(db, `users/${user.uid}/dailySessions/${dateStr}`);
+            const snapshot = await get(sessionsRef);
+
+            if (snapshot.exists()) {
+                const sessions = snapshot.val();
+                const existingSession = Object.values(sessions).find((s: any) => s.sessionNumber === sessionToOpen);
+
+                if (existingSession) {
+                    const session = existingSession as any;
+                    // تحميل البيانات المحدثة
+                    setCurrentSessionId(session.id);
+                    setSessionType(session.sessionType);
+                    setTeacherAbsenceReason(session.teacherAbsenceReason || '');
+                    setSubstituteTeacher(session.substituteTeacher || '');
+                    setActivityType(session.activityType || '');
+                    setActivityDescription(session.activityDescription || '');
+                    if (session.surahId) setSurahId(session.surahId);
+                    if (session.fromVerse) setFromVerse(session.fromVerse);
+                    if (session.toVerse) setToVerse(session.toVerse);
+                    if (session.isReview) setIsReview(session.isReview);
+
+                    const records: any = {};
+                    session.records?.forEach((record: any) => {
+                        records[record.studentId] = {
+                            attendance: record.attendance,
+                            memorization: record.memorization,
+                            behavior: record.behavior,
+                            notes: record.notes,
+                            review: record.review,
+                            surahId: record.surahId,
+                            fromVerse: record.fromVerse,
+                            toVerse: record.toVerse
+                        };
+                    });
+                    setAttendanceRecords(records);
+
+                    setIsDirty(false);
+                    setLastSaved(new Date());
+                    toast({ title: "✅ تم التحديث", description: "تم تحميل أحدث البيانات من الخادم بنجاح." });
+                } else {
+                    toast({ title: "تنبيه", description: "لم يتم العثور على بيانات لهذه الحصة.", variant: "destructive" });
+                }
+            } else {
+                toast({ title: "تنبيه", description: "لا توجد حصص مسجلة في هذا التاريخ.", variant: "destructive" });
+            }
+        } catch (error) {
+            console.error("Refresh error:", error);
+            toast({ title: "خطأ", description: "فشل تحميل البيانات. يرجى المحاولة مرة أخرى.", variant: "destructive" });
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
+
+    const handleManualSaveAndExit = async () => {
+        setIsSaving(true);
+        try {
+            await performSave(sessionData); // Save immediate state
             toast({
-                title: "تم الحفظ بنجاح",
-                description: `تم تسجيل بيانات الحصة ${sessionToOpen} ليوم ${format(selectedDay, 'dd/MM/yyyy')}`,
+                title: "تم الحفظ",
+                description: `تم حفظ بيانات الحصة بنجاح.`,
             });
             router.push('/sessions');
         } catch (error) {
             console.error("Error saving session:", error);
             toast({ title: "خطأ", description: "حدث خطأ أثناء حفظ البيانات.", variant: "destructive" });
-        } finally {
             setIsSaving(false);
         }
     };
@@ -235,46 +483,46 @@ function RegisterSessionContent() {
     const [copiedHarvest, setCopiedHarvest] = useState(false);
 
     const messages = useMemo(() => {
-        if (!isAdmin5 || (sessionType !== 'حصة أساسية' && sessionType !== 'حصة تعويضية')) return { daily: "", harvest: "" };
+        if (!isAdmin5 || (sessionType !== 'حصة أساسية' && sessionType !== 'حصة تعويضية' && sessionType !== 'حصة إضافية')) return { daily: "", harvest: "" };
 
         const dateStr = format(selectedDay, 'EEEE dd-MM-yyyy', { locale: ar });
         const dayOfWeek = format(selectedDay, 'EEEE', { locale: ar });
         const isSaturday = dayOfWeek === "السبت";
         const currentSurah = surahs.find(s => s.id === surahId);
         const isCompletion = toVerse === currentSurah?.verses;
-        const pad = (num: number) => num < 10 ? `0${num}` : num.toString();
+        const pad = (num: number) => num < 10 ? `0${num} ` : num.toString();
 
         const getRecitedList = () => activeStudents
             .filter(s => {
                 const record = attendanceRecords[s.id];
                 return record && record.memorization && record.memorization !== "لا يوجد" && (record.attendance === 'حاضر' || record.attendance === 'متأخر');
             })
-            .map(s => `*${s.fullName}* : ${attendanceRecords[s.id].memorization || ''}`);
+            .map(s => `* ${s.fullName}* : ${attendanceRecords[s.id].memorization || ''} `);
 
         const getLateList = () => activeStudents
             .filter(s => {
                 const record = attendanceRecords[s.id];
                 return record && record.attendance === 'متأخر';
             })
-            .map(s => `*${s.fullName}*`);
+            .map(s => `* ${s.fullName}* `);
 
         const getAbsentList = () => activeStudents
             .filter(s => {
                 const record = attendanceRecords[s.id];
                 return record && record.attendance === 'غياب';
             })
-            .map(s => `*${s.fullName}*`);
+            .map(s => `* ${s.fullName}* `);
 
         const header = "السلام عليكم ورحمة الله وبركاته";
-        const dateLine = `اليوم ${dateStr}`;
+        const dateLine = `اليوم ${dateStr} `;
         const recitedStudents = getRecitedList();
 
         // Message 1: Daily Progress
         let dailyContent = "";
         if (isCompletion) {
-            dailyContent = `قائمة الطلبة الذين إستظهروا سورة ${currentSurah?.name || ''} :\n`;
+            dailyContent = `قائمة الطلبة الذين إستظهروا سورة ${currentSurah?.name || ''} : \n`;
         } else {
-            dailyContent = `قائمة الطلبة الذين إستظهروا من الآية (${pad(fromVerse)}) إلى الآية (${pad(toVerse)}) من سورة ${currentSurah?.name || ''} :\n`;
+            dailyContent = `قائمة الطلبة الذين إستظهروا من الآية(${pad(fromVerse)}) إلى الآية(${pad(toVerse)}) من سورة ${currentSurah?.name || ''} : \n`;
         }
         dailyContent += recitedStudents.length > 0 ? recitedStudents.join('\n') : "لا يوجد";
 
@@ -282,14 +530,14 @@ function RegisterSessionContent() {
         const absentStudents = getAbsentList();
 
         if (lateStudents.length > 0) {
-            dailyContent += `\n-------------\nقائمة الطلبة المتأخرين :\n${lateStudents.join('\n')}`;
+            dailyContent += `\n-------------\nقائمة الطلبة المتأخرين: \n${lateStudents.join('\n')} `;
         }
 
         if (absentStudents.length > 0) {
-            dailyContent += `\n-------------\nقائمة الطلبة الغائبين :\n${absentStudents.join('\n')}`;
+            dailyContent += `\n-------------\nقائمة الطلبة الغائبين: \n${absentStudents.join('\n')} `;
         }
 
-        const dailyMessage = `${header}\n${dateLine}\n${dailyContent}`;
+        const dailyMessage = `${header} \n${dateLine} \n${dailyContent} `;
 
         // Message 2: Weekly Harvest (Only on Saturday)
         let harvestMessage = "";
@@ -315,7 +563,7 @@ function RegisterSessionContent() {
                 harvestSurah = hSurah ? hSurah.name : harvestSurah;
             }
 
-            let harvestContent = `قائمة الطلاب الذين إستظهروا الحصيلة الأسبوعية / سورة ${harvestSurah} من الآية (${pad(harvestFrom)}) إلى (${pad(harvestTo)}) :\n`;
+            let harvestContent = `قائمة الطلاب الذين إستظهروا الحصيلة الأسبوعية / سورة ${harvestSurah} من الآية(${pad(harvestFrom)}) إلى(${pad(harvestTo)}) : \n`;
             harvestContent += recitedStudents.length > 0 ? recitedStudents.join('\n') : "لا يوجد";
 
             const notRecitedStudents = activeStudents
@@ -325,13 +573,13 @@ function RegisterSessionContent() {
                     const hasRecited = record && record.memorization && record.memorization !== "لم يحفظ" && record.memorization !== "لا يوجد";
                     return isPresent && !hasRecited;
                 })
-                .map(s => `*${s.fullName}*`);
+                .map(s => `* ${s.fullName}* `);
 
             if (notRecitedStudents.length > 0) {
-                harvestContent += `\n\nقائمة الطلاب الذين لم يستظهروا الحصيلة الأسبوعية :\n`;
+                harvestContent += `\n\nقائمة الطلاب الذين لم يستظهروا الحصيلة الأسبوعية: \n`;
                 harvestContent += notRecitedStudents.join('\n');
             }
-            harvestMessage = `${header}\n${dateLine}\n${harvestContent}`;
+            harvestMessage = `${header} \n${dateLine} \n${harvestContent} `;
         }
 
         return { daily: dailyMessage, harvest: harvestMessage };
@@ -381,34 +629,57 @@ function RegisterSessionContent() {
                             <FileText className="h-6 w-6 text-primary" />
                             تسجيل حصة: {format(selectedDay, 'd MMMM yyyy', { locale: ar })}
                         </h1>
-                        <p className="text-xs text-muted-foreground font-body">
-                            رقم الحصة: <span className="font-bold text-primary">{sessionToOpen}</span> (يوم {format(selectedDay, 'EEEE', { locale: ar })})
-                        </p>
+                        <div className="flex items-center gap-3">
+                            <p className="text-xs text-muted-foreground font-body">
+                                رقم الحصة: <span className="font-bold text-primary">{sessionToOpen}</span> (يوم {format(selectedDay, 'EEEE', { locale: ar })})
+                            </p>
+                            {isSaving ? (
+                                <span className="text-[10px] text-primary flex items-center gap-1 bg-primary/5 px-2 py-0.5 rounded-full animate-pulse">
+                                    <Cloud className="h-3 w-3" /> جاري الحفظ...
+                                </span>
+                            ) : lastSaved ? (
+                                <span className="text-[10px] text-green-600 flex items-center gap-1 bg-green-50 px-2 py-0.5 rounded-full transition-all">
+                                    <Cloud className="h-3 w-3" /> تم الحفظ
+                                </span>
+                            ) : null}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleRefresh}
+                                disabled={isRefreshing || isSaving}
+                                className="h-7 rounded-lg text-[10px] font-bold"
+                                title="تحديث البيانات من الخادم"
+                            >
+                                <RefreshCw className={cn("h-3 w-3 ml-1", isRefreshing && "animate-spin")} />
+                                {isRefreshing ? "جاري التحديث..." : "تحديث"}
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </header>
 
             <section className="bg-card p-4 rounded-2xl shadow-sm border space-y-4">
-                {(sessionType === 'حصة أساسية' || sessionType === 'حصة تعويضية') && (
+                {(sessionType === 'حصة أساسية' || sessionType === 'حصة تعويضية' || sessionType === 'حصة إضافية') && (
                     <SessionStatsWidget students={activeStudents} records={attendanceRecords} />
                 )}
 
                 <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
                     <div className="space-y-1 flex-1 w-full">
                         <Label className="text-xs text-muted-foreground font-bold">نوع الحصة</Label>
-                        <Select value={sessionType} onValueChange={(val: any) => setSessionType(val)} dir="rtl">
+                        <Select value={sessionType} onValueChange={handleSessionTypeChange} dir="rtl">
                             <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="حصة أساسية">حصة أساسية</SelectItem>
                                 <SelectItem value="حصة أنشطة">حصة أنشطة 🏃‍♂️</SelectItem>
                                 {sessionToOpen === 2 && <SelectItem value="حصة تعويضية">حصة تعويضية</SelectItem>}
+                                {sessionToOpen === 2 && <SelectItem value="حصة إضافية">حصة إضافية ➕</SelectItem>}
                                 <SelectItem value="يوم عطلة">يوم عطلة</SelectItem>
                                 <SelectItem value="غياب الشيخ">غياب الشيخ</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
 
-                    {(sessionType === 'حصة أساسية' || sessionType === 'حصة تعويضية' || sessionType === 'حصة أنشطة' || (sessionType === 'غياب الشيخ' && substituteTeacher)) && (
+                    {(sessionType === 'حصة أساسية' || sessionType === 'حصة تعويضية' || sessionType === 'حصة إضافية' || sessionType === 'حصة أنشطة' || (sessionType === 'غياب الشيخ' && substituteTeacher)) && (
                         <div className="flex flex-wrap gap-2 w-full md:w-auto justify-end">
                             <Button onClick={handleMarkAllPresent} variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 h-10 rounded-xl flex-1 md:flex-none font-bold text-xs">
                                 <UserCheck className="ml-2 h-4 w-4" /> تحضير الجميع
@@ -426,7 +697,7 @@ function RegisterSessionContent() {
                     )}
                 </div>
 
-                {isAdmin5 && (sessionType === 'حصة أساسية' || sessionType === 'حصة تعويضية') && (
+                {isAdmin5 && (sessionType === 'حصة أساسية' || sessionType === 'حصة تعويضية' || sessionType === 'حصة إضافية') && (
                     <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200 space-y-3 animate-in fade-in slide-in-from-top-2 duration-500">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-emerald-800 font-bold">
@@ -604,15 +875,13 @@ function RegisterSessionContent() {
             <footer className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-md border-t p-4 z-50">
                 <div className="container mx-auto max-w-4xl flex items-center justify-between gap-4">
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => router.push('/sessions')} className="h-11 rounded-xl px-6">إلغاء</Button>
+                        <Button variant="outline" onClick={handleReturn} className="h-11 rounded-xl px-6">
+                            <ArrowRight className="ml-2 h-4 w-4" /> رجوع
+                        </Button>
                         <Button variant="destructive" onClick={handleDelete} className="h-11 rounded-xl px-4 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200">
                             <Trash2 className="h-4 w-4" />
                         </Button>
                     </div>
-                    <Button onClick={handleSaveSession} disabled={isSaving} className="min-w-[160px] h-11 rounded-xl font-bold shadow-lg shadow-primary/20">
-                        {isSaving ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <Save className="ml-2 h-5 w-5" />}
-                        حفظ بيانات الحصة
-                    </Button>
                 </div>
             </footer>
         </div>

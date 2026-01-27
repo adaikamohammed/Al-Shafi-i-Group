@@ -182,20 +182,20 @@ body {
   }
 
   .receipt-history-mode {
-    @apply w-full border border-primary/10 shadow-lg rounded-3xl p-6 bg-white;
+    @apply w-full border border-black/10 shadow-lg rounded-3xl p-6 bg-white;
   }
 
   .receipt-header {
-    @apply flex flex-col items-center justify-center border-b-2 border-primary/20 pb-4 mb-4 text-center;
+    @apply flex flex-col items-center justify-center border-b-2 border-black/20 pb-4 mb-4 text-center;
   }
 
   .receipt-title {
-    @apply text-2xl font-[900] text-primary mb-1;
+    @apply text-2xl font-[900] text-black mb-1;
     font-family: var(--font-headline);
   }
 
   .receipt-ticket-number {
-    @apply mt-2 bg-primary/5 text-primary px-4 py-1.5 rounded-full text-sm font-[900] border border-primary/20;
+    @apply mt-2 bg-black/5 text-black px-4 py-1.5 rounded-full text-sm font-[900] border border-black/20;
   }
 
   .receipt-body {
@@ -209,15 +209,15 @@ body {
   }
 
   .receipt-field-label {
-    @apply text-[11px] text-muted-foreground font-[900] uppercase opacity-70 tracking-tight;
+    @apply text-[13px] text-black font-[900] uppercase opacity-70 tracking-tight;
   }
 
   .receipt-field-value {
-    @apply text-lg font-[950] text-foreground leading-tight;
+    @apply text-lg font-[950] text-black leading-tight;
   }
 
   .receipt-stats-grid {
-    @apply grid grid-cols-2 gap-4 bg-primary/5 p-4 rounded-2xl border-2 border-dotted border-primary/20;
+    @apply grid grid-cols-2 gap-4 bg-black/5 p-4 rounded-2xl border-2 border-dotted border-black/20;
   }
 
   .receipt-stat-item {
@@ -225,23 +225,23 @@ body {
   }
 
   .receipt-stat-label {
-    @apply text-[10px] text-muted-foreground font-[900] mb-1.5;
+    @apply text-[10px] text-black font-[900] mb-1.5;
   }
 
   .receipt-stat-value {
-    @apply text-xl font-[950] text-primary;
+    @apply text-xl font-[950] text-black;
   }
 
   .receipt-qr-section {
-    @apply flex items-end justify-between border-t-2 border-dotted border-primary/20 pt-6 mt-6;
+    @apply flex items-end justify-between border-t-2 border-dotted border-black/20 pt-6 mt-6;
   }
 
   .receipt-qr-image {
-    @apply w-20 h-20 border-2 border-primary/10 rounded-xl p-1 bg-white shadow-sm;
+    @apply w-20 h-20 border-2 border-black/10 rounded-xl p-1 bg-white shadow-sm;
   }
 
   .receipt-footer {
-    @apply text-[11px] text-center font-[900] text-muted-foreground/80 mt-6 pt-4 border-t border-primary/10 leading-relaxed;
+    @apply text-[11px] text-center font-[900] text-black/80 mt-6 pt-4 border-t border-black/10 leading-relaxed;
   }
 }
 
