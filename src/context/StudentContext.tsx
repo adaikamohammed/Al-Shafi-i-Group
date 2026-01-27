@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry, AdminLog } from '@/lib/types';
 import { isWithinInterval, parseISO, isValid, isAfter, subDays } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -67,6 +67,7 @@ interface StudentContextType {
   payments: Payment[];
   settings: AppSettings;
   hallOfFame: HallOfFameData | null;
+  adminLogs: AdminLog[];
   loading: boolean;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string }) => Promise<void>;
   updateStudent: (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => Promise<void>;
@@ -92,6 +93,7 @@ interface StudentContextType {
   saveSettings: (newSettings: AppSettings) => Promise<void>;
   generateDemoData: () => Promise<void>;
   shareStudentRecord: (studentId: string, historyData: any) => Promise<void>;
+  saveAdminLog: (log: Omit<AdminLog, 'id' | 'timestamp'>) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -107,6 +109,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [dailyReports, setDailyReports] = useState<{ [date: string]: { [reportId: string]: DailyReport } }>({});
   const [surahProgress, setSurahProgress] = useState<Record<string, SurahMastery>>({});
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [adminLogs, setAdminLogs] = useState<AdminLog[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
 
@@ -126,6 +129,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setSettingsState(DEFAULT_SETTINGS);
       setPreRegistrations([]);
       setAllUsers([]);
+      setAdminLogs([]);
       return;
     }
 
@@ -203,6 +207,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
         let allProgress: Record<string, SurahMastery> = {};
         let allPayments: Payment[] = [];
+        let allAdminLogs: AdminLog[] = [];
         let finalSettings: AppSettings = DEFAULT_SETTINGS;
 
         if (allUsersData[authContextUser.uid]?.settings) {
@@ -232,12 +237,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             const userPayments = Object.entries(userData.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) }));
             allPayments.push(...userPayments);
           }
+          if (userData.admin_logs) {
+            const userLogs = Object.entries(userData.admin_logs).map(([id, l]) => ({ id, ...(l as Omit<AdminLog, 'id'>) }));
+            allAdminLogs.push(...userLogs);
+          }
         }
         setStudents(allStudents);
         setDailySessions(allSessions);
         setDailyReports(allReports);
         setSurahProgress(allProgress);
         setPayments(allPayments);
+        setAdminLogs(allAdminLogs);
         setSettingsState(finalSettings);
         setLoading(false);
       }, (error) => {
@@ -266,6 +276,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           );
         }
         const paymentsArray = data.payments ? Object.entries(data.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : [];
+        const adminLogsArray = data.admin_logs ? Object.entries(data.admin_logs).map(([id, l]) => ({ id, ...(l as Omit<AdminLog, 'id'>) })) : [];
         const userSettings = data.settings ? { ...DEFAULT_SETTINGS, ...data.settings } : DEFAULT_SETTINGS;
 
         setStudents(userStudents);
@@ -273,6 +284,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setDailyReports(data.dailyReports || {});
         setSurahProgress(data.surahProgress || {});
         setPayments(paymentsArray);
+        setAdminLogs(adminLogsArray);
         setSettingsState(userSettings);
         setLoading(false);
       }, (error) => {
@@ -1022,6 +1034,26 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const saveAdminLog = async (logData: Omit<AdminLog, 'id' | 'timestamp'>): Promise<void> => {
+    if (!authContextUser) return;
+    const logId = uuidv4();
+    const log: AdminLog = {
+      ...logData,
+      id: logId,
+      timestamp: new Date().toISOString()
+    };
+
+    const ownerId = (isSuperAdmin || isManagement) ? logData.details.ownerId || authContextUser.uid : authContextUser.uid;
+    const logRef = ref(db, `users/${ownerId}/admin_logs/${logId}`);
+
+    await set(logRef, log);
+
+    toast({
+      title: "✅ تم الحفظ والطباعة",
+      description: `تم تسجيل الوصل في النظام بنجاح.`,
+    });
+  };
+
   const shareStudentRecord = async (studentId: string, historyData: any) => {
     try {
       const shareRef = ref(db, `public_student_reports/${studentId}`);
@@ -1042,7 +1074,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       addStudent, updateStudent, deleteStudent, deleteAllStudents, deleteMultipleStudents,
       addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange,
       importStudents, importPreRegistrations, updatePreRegistration, bulkUpdatePreRegistrations, deleteAllPreRegistrations, deleteMultiplePreRegistrations,
-      saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, updatePaymentStatus, saveSettings, generateDemoData, shareStudentRecord
+      saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, updatePaymentStatus, saveSettings, generateDemoData,
+      shareStudentRecord,
+      saveAdminLog,
+      adminLogs,
     }}>
       {children}
     </StudentContext.Provider>

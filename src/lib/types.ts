@@ -43,6 +43,7 @@ export interface Student {
   memorizedSurahsCount: number;
   dailyMemorizationAmount: MemorizationAmount;
   notes?: string;
+  sheikhNotes?: string;
   updatedAt: Date;
   covenants?: Covenant[];
   expulsionDate?: string | null;
@@ -240,7 +241,7 @@ export interface HallOfFameData {
 }
 
 
-export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "مرشح";
+export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "مرشح" | "تم الإتصال";
 
 export interface PreRegistration {
   id: string;
@@ -279,9 +280,14 @@ export interface LeagueStat {
   movement: number;
 }
 
-
-
-
-
-
-
+export interface AdminLog {
+  id: string;
+  studentId: string;
+  studentName: string;
+  type: 'summon' | 'exit' | 'absence' | 'payment' | 'entry';
+  date: string; // ISO string for the relevant action date
+  sheikhName: string;
+  groupName: string;
+  details: any; // Flexible depending on type
+  timestamp: string; // ISO string for record creation
+}

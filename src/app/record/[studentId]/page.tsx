@@ -24,7 +24,9 @@ import {
     ArrowLeft,
     ArrowRight,
     MapPin,
-    Phone
+    Phone,
+    Users as UsersIcon,
+    Edit
 } from 'lucide-react';
 import { format, getYear, getDay, startOfYear, addDays, parseISO, getMonth, getDaysInMonth, startOfMonth, endOfMonth, getQuarter, setYear, setMonth, addMonths, endOfYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -371,10 +373,17 @@ export default function PublicStudentRecordPage() {
                             <div className="flex-1 text-center md:text-right space-y-4">
                                 <div>
                                     <h2 className="text-4xl font-black font-headline text-primary mb-1">{student?.fullName}</h2>
-                                    <p className="text-xl text-muted-foreground font-bold flex items-center justify-center md:justify-start gap-2">
-                                        <MapPin className="h-4 w-4 text-primary/60" />
-                                        {student?.groupName || 'المجموعة الأساسية'}
-                                    </p>
+                                    <div className="flex flex-col md:flex-row items-center md:items-end gap-2 md:gap-4 justify-center md:justify-start">
+                                        <p className="text-xl text-muted-foreground font-bold flex items-center gap-2">
+                                            <UsersIcon className="h-4 w-4 text-primary/60" />
+                                            {student?.groupName || 'المجموعة الأساسية'}
+                                        </p>
+                                        <span className="hidden md:block text-muted-foreground/30">•</span>
+                                        <p className="text-lg text-primary/70 font-black flex items-center gap-2">
+                                            <User className="h-4 w-4 text-primary/40" />
+                                            {student?.sheikhName || 'غير محدد'}
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <div className="flex flex-wrap justify-center md:justify-start gap-3">
@@ -401,6 +410,25 @@ export default function PublicStudentRecordPage() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Sheikh's Special Notes */}
+                    {student?.sheikhNotes && (
+                        <Card className="shadow-xl border-none rounded-[2.5rem] bg-gradient-to-br from-primary/5 via-white to-primary/5 border-r-8 border-r-primary overflow-hidden">
+                            <CardContent className="p-8">
+                                <div className="flex flex-col md:flex-row items-start gap-6">
+                                    <div className="bg-primary/10 p-4 rounded-2xl">
+                                        <Edit className="h-8 w-8 text-primary" />
+                                    </div>
+                                    <div className="space-y-2 flex-1 text-right">
+                                        <h3 className="text-xl font-black font-headline text-primary">توجيهات الشيخ لولي الأمر</h3>
+                                        <p className="text-lg font-bold text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                                            {student.sheikhNotes}
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* Stats Overview */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -440,9 +468,9 @@ export default function PublicStudentRecordPage() {
 
                             <div className="flex flex-wrap items-center justify-center gap-4">
                                 <div className="flex items-center bg-white p-1.5 rounded-[1.5rem] shadow-sm border">
-                                    <Button variant={viewMode === 'year' ? 'primary' : 'ghost'} onClick={() => setViewMode('year')} className={cn("h-9 px-6 rounded-2xl font-black text-xs", viewMode === 'year' ? "bg-primary text-white" : "")}>سنوي</Button>
-                                    <Button variant={viewMode === 'quarter' ? 'primary' : 'ghost'} onClick={() => setViewMode('quarter')} className={cn("h-9 px-6 rounded-2xl font-black text-xs", viewMode === 'quarter' ? "bg-primary text-white" : "")}>فصلي</Button>
-                                    <Button variant={viewMode === 'month' ? 'primary' : 'ghost'} onClick={() => setViewMode('month')} className={cn("h-9 px-6 rounded-2xl font-black text-xs", viewMode === 'month' ? "bg-primary text-white" : "")}>شهري</Button>
+                                    <Button variant={viewMode === 'year' ? 'default' : 'ghost'} onClick={() => setViewMode('year')} className={cn("h-9 px-6 rounded-2xl font-black text-xs", viewMode === 'year' ? "bg-primary text-white" : "")}>سنوي</Button>
+                                    <Button variant={viewMode === 'quarter' ? 'default' : 'ghost'} onClick={() => setViewMode('quarter')} className={cn("h-9 px-6 rounded-2xl font-black text-xs", viewMode === 'quarter' ? "bg-primary text-white" : "")}>فصلي</Button>
+                                    <Button variant={viewMode === 'month' ? 'default' : 'ghost'} onClick={() => setViewMode('month')} className={cn("h-9 px-6 rounded-2xl font-black text-xs", viewMode === 'month' ? "bg-primary text-white" : "")}>شهري</Button>
                                 </div>
                                 <div className="flex items-center bg-muted/50 p-1.5 rounded-[1.5rem] border border-dotted border-primary/30">
                                     <Button variant={viewType === 'attendance' ? 'secondary' : 'ghost'} onClick={() => setViewType('attendance')} className={cn("h-8 px-4 rounded-xl flex items-center gap-2 font-black text-[10px]", viewType === 'attendance' ? "bg-emerald-500 text-white" : "")}>
@@ -619,11 +647,9 @@ export default function PublicStudentRecordPage() {
 
                     <div className="pt-12 pb-6 text-center space-y-4">
                         <div className="h-px w-24 bg-primary/20 mx-auto" />
-                        <h3 className="text-xl font-black font-headline text-primary opacity-60">مجموعة الإمام الشافعي لتحفيظ القرآن</h3>
+                        <h3 className="text-xl font-black font-headline text-primary opacity-60">المدرسة القرآنية للإمام الشافعي</h3>
                         <div className="flex items-center justify-center gap-6 text-muted-foreground font-black text-[10px] uppercase tracking-widest">
-                            <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> 06.66.55.44.33</span>
-                            <span>•</span>
-                            <span>حي بوخضرة - عنابة</span>
+                            <span>حي تكسبت الغربية / الوادي</span>
                         </div>
                     </div>
                 </div>

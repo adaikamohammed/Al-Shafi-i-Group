@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { Textarea } from '@/components/ui/textarea';
+import { Save, Edit } from 'lucide-react';
 
 // Helper function to get color based on student's day data
 const getStudentDayColor = (dayData: any, viewType: 'attendance' | 'evaluation' = 'attendance') => {
@@ -191,7 +193,7 @@ const StudentStatWidget = ({ title, value, unit, icon, colorClass }: { title: st
 );
 
 function StudentHistoryContent() {
-    const { students, dailySessions, loading, shareStudentRecord } = useStudentContext();
+    const { students, allUsers, dailySessions, loading, shareStudentRecord, updateStudent } = useStudentContext();
     const { toast } = useToast();
     const searchParams = useSearchParams();
     const studentIdParam = searchParams.get('studentId');
@@ -200,6 +202,8 @@ function StudentHistoryContent() {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'year' | 'quarter' | 'month'>('year');
     const [viewType, setViewType] = useState<'attendance' | 'evaluation'>('attendance');
+    const [sheikhNotes, setSheikhNotes] = useState<string>('');
+    const [isSavingNotes, setIsSavingNotes] = useState(false);
 
     useEffect(() => {
         if (studentIdParam) {
@@ -210,6 +214,20 @@ function StudentHistoryContent() {
     const selectedStudent = useMemo(() =>
         (students || []).find(s => s.id === selectedStudentId)
         , [students, selectedStudentId]);
+
+    useEffect(() => {
+        if (selectedStudent) {
+            setSheikhNotes(selectedStudent.sheikhNotes || '');
+        } else {
+            setSheikhNotes('');
+        }
+    }, [selectedStudent]);
+
+    const sheikhName = useMemo(() => {
+        if (!selectedStudent || !allUsers) return null;
+        const sheikh = (allUsers || []).find(u => u.role === 'sheikh' && u.group === selectedStudent.groupName);
+        return sheikh?.displayName || null;
+    }, [selectedStudent, allUsers]);
 
     const currentYear = getYear(currentDate);
     const currentMonth = getMonth(currentDate);
@@ -378,7 +396,7 @@ function StudentHistoryContent() {
                                     </div>
                                     <div>
                                         <h3 className="text-2xl font-black font-headline text-primary">{selectedStudent?.fullName}</h3>
-                                        <p className="text-muted-foreground font-bold">{selectedStudent?.group || 'غير محدد'}</p>
+                                        <p className="text-muted-foreground font-bold">{selectedStudent?.groupName || 'غير محدد'}</p>
                                     </div>
                                     <div className="flex flex-wrap justify-center items-center gap-2">
                                         {selectedStudent?.dailyMemorizationAmount && (
@@ -393,7 +411,11 @@ function StudentHistoryContent() {
                                             onClick={async () => {
                                                 try {
                                                     const historySnapshot = {
-                                                        student: selectedStudent,
+                                                        student: {
+                                                            ...selectedStudent,
+                                                            sheikhName: sheikhName || 'غير محدد',
+                                                            sheikhNotes: sheikhNotes
+                                                        },
                                                         studentData: studentData,
                                                         stats: stats,
                                                         generatedAt: new Date().toISOString()
@@ -419,21 +441,59 @@ function StudentHistoryContent() {
                                             نسخ رابط الولي
                                         </Button>
                                     </div>
-                                    <div className="pt-4 border-t border-dashed space-y-3">
-                                        <div className="flex justify-between items-center bg-red-50/50 p-3 rounded-xl border border-red-100/50">
-                                            <span className="text-red-700 font-bold text-sm flex items-center gap-2">
-                                                <ShieldAlert className="h-4 w-4" />
-                                                التعهدات النشطة:
-                                            </span>
-                                            <span className="font-black text-xl text-red-600">
-                                                {(selectedStudent?.covenants || []).filter(c => c.status === 'نشط' && c.card !== 'بدون').length}
-                                            </span>
-                                        </div>
-                                    </div>
                                 </CardContent>
                             </Card>
 
                             <div className="lg:col-span-3 space-y-6">
+                                <Card className="shadow-lg border-primary/10 rounded-2xl p-6">
+                                    <div className="space-y-4 text-right">
+                                        <div className="flex items-center justify-between">
+                                            <Badge variant="outline" className="text-[10px] font-black border-primary/20">ملاحظات موجهة لولي الأمر</Badge>
+                                            <label className="text-sm font-black font-headline text-primary flex items-center gap-2">
+                                                <Edit className="h-4 w-4" />
+                                                ملاحظة الشيخ
+                                            </label>
+                                        </div>
+                                        <Textarea
+                                            value={sheikhNotes}
+                                            onChange={(e) => setSheikhNotes(e.target.value)}
+                                            placeholder="اكتب هنا توجيهاتك لولي الأمر (ستظهر له في الرابط)..."
+                                            className="min-h-[120px] bg-muted/20 border-primary/5 focus:border-primary/20 rounded-2xl font-bold text-md resize-none"
+                                        />
+                                        <Button
+                                            variant="default"
+                                            size="lg"
+                                            className="w-full h-12 rounded-2xl gap-2 font-black shadow-lg bg-primary text-white hover:bg-primary/90 transition-all font-sans"
+                                            disabled={isSavingNotes}
+                                            onClick={async () => {
+                                                if (!selectedStudent) return;
+                                                setIsSavingNotes(true);
+                                                try {
+                                                    await updateStudent(selectedStudent.id, {
+                                                        sheikhNotes: sheikhNotes
+                                                    } as any, selectedStudent.ownerId);
+                                                    toast({
+                                                        title: "✅ تم الحفظ",
+                                                        description: "تم تحديث ملاحظة الشيخ للطالب بنجاح.",
+                                                    });
+                                                } catch (error) {
+                                                    console.error("Error saving notes:", error);
+                                                    toast({
+                                                        title: "❌ خطأ",
+                                                        description: "فشل في حفظ الملاحظة.",
+                                                        variant: "destructive"
+                                                    });
+                                                } finally {
+                                                    setIsSavingNotes(false);
+                                                }
+                                            }}
+                                        >
+                                            <Save className="h-5 w-5" />
+                                            {isSavingNotes ? 'جاري الحفظ...' : 'حفظ ونشر الملاحظة'}
+                                        </Button>
+                                    </div>
+                                </Card>
+
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <StudentStatWidget
                                         title="معدل الانضباط"
@@ -507,21 +567,21 @@ function StudentHistoryContent() {
                                     {/* View Mode Selectors */}
                                     <div className="flex items-center bg-background p-1.5 rounded-2xl shadow-sm border border-primary/10">
                                         <Button
-                                            variant={viewMode === 'year' ? 'primary' : 'ghost'}
+                                            variant={viewMode === 'year' ? 'default' : 'ghost'}
                                             onClick={() => setViewMode('year')}
                                             className={cn("h-10 px-6 rounded-xl font-bold transition-all", viewMode === 'year' ? "bg-primary text-primary-foreground shadow-md" : "")}
                                         >
                                             سنوي
                                         </Button>
                                         <Button
-                                            variant={viewMode === 'quarter' ? 'primary' : 'ghost'}
+                                            variant={viewMode === 'quarter' ? 'default' : 'ghost'}
                                             onClick={() => setViewMode('quarter')}
                                             className={cn("h-10 px-6 rounded-xl font-bold transition-all", viewMode === 'quarter' ? "bg-primary text-primary-foreground shadow-md" : "")}
                                         >
                                             فصلي
                                         </Button>
                                         <Button
-                                            variant={viewMode === 'month' ? 'primary' : 'ghost'}
+                                            variant={viewMode === 'month' ? 'default' : 'ghost'}
                                             onClick={() => setViewMode('month')}
                                             className={cn("h-10 px-6 rounded-xl font-bold transition-all", viewMode === 'month' ? "bg-primary text-primary-foreground shadow-md" : "")}
                                         >
@@ -720,7 +780,8 @@ function StudentHistoryContent() {
                         <h3 className="text-3xl font-black font-headline text-muted-foreground/60 tracking-tight">الرجاء اختيار طالب لعرض سجله التفصيلي</h3>
                         <p className="mt-4 text-muted-foreground/40 font-bold">بوابة رصد الأداء المتكاملة - مجموعة الإمام الشافعي</p>
                     </div>
-                )}
+                )
+                }
             </div>
         </TooltipProvider>
     );

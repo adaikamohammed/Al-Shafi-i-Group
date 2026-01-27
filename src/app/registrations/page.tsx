@@ -42,7 +42,8 @@ import {
     Lock,
     ChevronsUpDown,
     Check,
-    X
+    X,
+    ArrowRightLeft
 } from 'lucide-react';
 import { format, getYear, setYear, startOfYear, differenceInYears, isValid, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -79,7 +80,9 @@ const SHEIKHS_LIST = [
 ];
 
 
+
 const statusColors: Record<PreRegistrationStatus, string> = {
+    "تم الإتصال": "bg-purple-100 dark:bg-purple-900/20",
     "تم الإنضمام": "bg-green-100 dark:bg-green-900/20",
     "مرفوض": "bg-red-100 dark:bg-red-900/20",
     "مؤجل": "bg-yellow-100 dark:bg-yellow-900/20",
@@ -88,6 +91,7 @@ const statusColors: Record<PreRegistrationStatus, string> = {
 };
 
 const statusHeaderColors: Record<PreRegistrationStatus, string> = {
+    "تم الإتصال": "bg-purple-500",
     "تم الإنضمام": "bg-green-500",
     "مرفوض": "bg-red-500",
     "مؤجل": "bg-yellow-500",
@@ -97,6 +101,7 @@ const statusHeaderColors: Record<PreRegistrationStatus, string> = {
 
 
 const statusBadgeColors: Record<PreRegistrationStatus, string> = {
+    "تم الإتصال": "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800",
     "تم الإنضمام": "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800",
     "مرفوض": "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800",
     "مؤجل": "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-800",
@@ -237,59 +242,53 @@ const StudentProfileCard = ({ student, onEdit, isLocked, onStatusChange }: { stu
                 </div>
             </div>
             <DialogFooter className="flex-col gap-3 border-t p-4 md:p-6">
-                {/* WhatsApp Message Section */}
-                <div className="w-full space-y-2">
-                    <Label className="text-xs md:text-sm font-semibold">رسالة واتساب جاهزة للإرسال:</Label>
-                    <div className="flex gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            className="flex-1 text-xs md:text-sm"
-                            onClick={copyWhatsAppMessage}
-                        >
-                            <svg className="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                            نسخ الرسالة
-                        </Button>
-                        <Button
-                            type="button"
-                            className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs md:text-sm"
-                            onClick={sendWhatsAppMessage}
-                        >
-                            <svg viewBox="0 0 24 24" className="ml-2 h-4 w-4 fill-current">
-                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                            </svg>
-                            إرسال عبر واتساب
-                        </Button>
-                    </div>
-                </div>
-                
-                <Separator />
-                
-                {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row gap-2 w-full">
-                    {student.status === 'مرشح' && onStatusChange && (
-                        <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex flex-col-reverse sm:flex-row gap-2 w-full justify-between items-center sm:items-stretch">
+                    {/* Left Side: Actions */}
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <Button variant="secondary" className="flex-1 sm:flex-none text-xs md:text-sm" onClick={onEdit} disabled={isLocked}>تعديل البيانات</Button>
+
+                        {student.status === 'مرشح' && onStatusChange && (
+                            <>
+                                <Button
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex-1 sm:flex-none text-xs md:text-sm"
+                                    onClick={() => onStatusChange(student.id, 'تم الإنضمام')}
+                                >
+                                    <Check className="ml-2 h-4 w-4" />
+                                    قبول
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    className="flex-1 sm:flex-none text-xs md:text-sm"
+                                    onClick={() => onStatusChange(student.id, 'مرفوض')}
+                                >
+                                    <X className="ml-2 h-4 w-4" />
+                                    رفض
+                                </Button>
+                            </>
+                        )}
+
+                        {student.status === 'تم الإنضمام' && onStatusChange && (
                             <Button
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex-1 sm:flex-none text-xs md:text-sm"
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold flex-1 sm:flex-none text-xs md:text-sm"
                                 onClick={() => onStatusChange(student.id, 'تم الإنضمام')}
                             >
-                                <Check className="ml-2 h-4 w-4" />
-                                تم الانضمام
+                                <ArrowRightLeft className="ml-2 h-4 w-4" />
+                                نقل للفوج
                             </Button>
-                            <Button
-                                variant="destructive"
-                                className="font-bold flex-1 sm:flex-none text-xs md:text-sm"
-                                onClick={() => onStatusChange(student.id, 'مرفوض')}
-                            >
-                                <X className="ml-2 h-4 w-4" />
-                                مرفوض
+                        )}
+                    </div>
+
+                    {/* Right Side: Communication */}
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <div className="flex gap-1 w-full sm:w-auto bg-muted/50 p-1 rounded-md">
+                            <Button variant="ghost" size="sm" className="flex-1 sm:flex-none text-xs" onClick={copyWhatsAppMessage}>
+                                <FileEdit className="ml-1 h-3 w-3" /> النسخ
+                            </Button>
+                            <Separator orientation="vertical" className="h-6" />
+                            <Button variant="ghost" size="sm" className="flex-1 sm:flex-none text-xs text-green-600 hover:text-green-700 hover:bg-green-50" onClick={sendWhatsAppMessage}>
+                                <Phone className="ml-1 h-3 w-3" /> واتساب
                             </Button>
                         </div>
-                    )}
-                    <div className="flex gap-2 w-full sm:w-auto sm:mr-auto">
-                        <Button variant="secondary" className="flex-1 sm:flex-none text-xs md:text-sm" onClick={onEdit} disabled={isLocked}>تعديل البيانات</Button>
                     </div>
                 </div>
             </DialogFooter>
@@ -454,6 +453,7 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
                             <SelectTrigger id="status"><SelectValue /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="مرشح">مرشح</SelectItem>
+                                <SelectItem value="تم الإتصال">تم الإتصال</SelectItem>
                                 <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
                                 <SelectItem value="مرفوض">مرفوض</SelectItem>
                                 <SelectItem value="مؤجل">مؤجل</SelectItem>
@@ -552,6 +552,7 @@ const BulkEditModal = ({ open, onOpenChange, selectedCount, onSave }: { open: bo
                                 <SelectTrigger id="status-select"><SelectValue placeholder="اختر الحالة الجديدة" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="مرشح">مرشح</SelectItem>
+                                    <SelectItem value="تم الإتصال">تم الإتصال</SelectItem>
                                     <SelectItem value="مرفوض">مرفوض</SelectItem>
                                     <SelectItem value="مؤجل">مؤجل</SelectItem>
                                 </SelectContent>
@@ -815,6 +816,114 @@ export default function PreRegistrationPage() {
         setFormOpen(true);
     }
 
+    // --- Sheikh Selection Logic & Student Transfer ---
+    const [isJoinDialogOpen, setJoinDialogOpen] = useState(false);
+    const [registrationToJoin, setRegistrationToJoin] = useState<PreRegistration | null>(null);
+    const [selectedSheikhId, setSelectedSheikhId] = useState<string>("");
+
+    const handleStatusChange = (id: string, newStatus: PreRegistrationStatus) => {
+        // Robust check for "Joined" status (handling potential Hamza differences)
+        if (newStatus === 'تم الإنضمام' || newStatus === 'تم الانضمام' as any) {
+            const reg = preRegistrations.find(r => r.id === id);
+            if (reg) {
+                setRegistrationToJoin(reg);
+                setJoinDialogOpen(true);
+            }
+        } else {
+            const reg = preRegistrations.find(r => r.id === id);
+            updatePreRegistration(id, { status: newStatus, fullName: reg?.fullName || 'الطالب' }, true);
+
+            // Only update local state if we aren't relying on the context update to reflect immediately
+            // (Though context update usually triggers re-render)
+            if (selectedStudent && selectedStudent.id === id) {
+                setSelectedStudent(prev => prev ? { ...prev, status: newStatus } : null);
+            }
+        }
+    };
+
+    const handleConfirmJoin = async () => {
+        if (!registrationToJoin || !selectedSheikhId) return;
+
+        let selectedSheikh: AppUser | typeof SHEIKHS_LIST[0] | undefined = allUsers.find(u => u.uid === selectedSheikhId);
+
+        if (!selectedSheikh) {
+            selectedSheikh = SHEIKHS_LIST.find(s => s.id.toString() === selectedSheikhId);
+        }
+
+        if (!selectedSheikh) {
+            toast({ title: "❌ خطأ", description: "الشيخ المختار غير موجود", variant: "destructive" });
+            return;
+        }
+
+        let targetOwnerId = "";
+        let targetGroupName = "";
+
+        if ('uid' in selectedSheikh && selectedSheikh.uid) {
+            targetOwnerId = selectedSheikh.uid;
+            targetGroupName = selectedSheikh.group || "فوج غير محدد";
+        } else if ('email' in selectedSheikh) {
+            targetGroupName = selectedSheikh.group;
+            const realUser = allUsers.find(u => u.email === selectedSheikh.email);
+            if (realUser) { targetOwnerId = realUser.uid; }
+            else {
+                toast({ title: "خطأ", description: `لم يتم العثور على حساب المستخدم لهذا الفوج (${(selectedSheikh as any).email})`, variant: "destructive" });
+                return;
+            }
+        }
+
+        try {
+            // 1. Create Data
+            const newStudentData = {
+                fullName: registrationToJoin.fullName,
+                birthDate: registrationToJoin.birthDate,
+                educationalLevel: registrationToJoin.educationalLevel || "غير محدد",
+                photoURL: registrationToJoin.photoURL,
+                gender: registrationToJoin.gender,
+                guardianName: registrationToJoin.guardianName,
+                phone1: registrationToJoin.phone1,
+                phone2: registrationToJoin.phone2,
+                address: registrationToJoin.address,
+                notes: registrationToJoin.notes,
+                status: 'نشط',
+                groupName: targetGroupName,
+                ownerId: targetOwnerId, // Vital for assigning to specific sheikh
+                pageNumber: registrationToJoin.pageNumber || '',
+                registrationDate: new Date().toISOString(),
+                memorizedSurahs: [],
+                memorizedSurahsCount: 0,
+                completedHizbsCount: 0,
+                dailyMemorizationAmount: "غير محدد",
+                joiningDate: new Date().toISOString(),
+            };
+
+            // 2. Add to StudentContext
+            // Note: We use 'any' to bypass strict type check on addStudent if it misses ownerId in signature, 
+            // but internally it should handle it if using firebase push spread.
+            await addStudent(newStudentData as any, null);
+
+            // 3. Update Registration Status
+            await updatePreRegistration(registrationToJoin.id, { status: 'تم الإنضمام' });
+
+            // 4. Cleanup
+            setJoinDialogOpen(false);
+            setRegistrationToJoin(null);
+            setSelectedSheikhId("");
+
+            if (selectedStudent && selectedStudent.id === registrationToJoin.id) {
+                setSelectedStudent(prev => prev ? { ...prev, status: 'تم الإنضمام' } : null);
+            }
+
+            toast({
+                title: "✅ تم النقل بنجاح",
+                description: `تم نقل الطالب ${registrationToJoin.fullName} إلى ${targetGroupName}`
+            });
+
+        } catch (error) {
+            console.error("Error transferring student:", error);
+            toast({ title: "❌ خطأ", description: "حدث خطأ أثناء نقل الطالب", variant: "destructive" });
+        }
+    };
+
     const handleInitiateBulkDelete = () => {
         if (undoTimeoutRef.current) {
             clearTimeout(undoTimeoutRef.current);
@@ -891,7 +1000,7 @@ export default function PreRegistrationPage() {
     }
     const currentAccess = accessLevelConfig[accessLevel];
 
-    const statusOptions: PreRegistrationStatus[] = ["مرشح", "تم الإنضمام", "مرفوض", "مؤجل", "إنضم لمدرسة أخرى"];
+    const statusOptions: PreRegistrationStatus[] = ["مرشح", "تم الإتصال", "تم الإنضمام", "مرفوض", "مؤجل", "إنضم لمدرسة أخرى"];
 
     return (
         <div className="space-y-6">
@@ -905,6 +1014,39 @@ export default function PreRegistrationPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <Dialog open={isJoinDialogOpen} onOpenChange={setJoinDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>نقل الطالب إلى فوج</DialogTitle>
+                        <DialogDescription>
+                            يرجى اختيار الشيخ الذي سينضم إليه الطالب <strong>{registrationToJoin?.fullName}</strong>.
+                            سيتم نقل بيانات الطالب تلقائيًا إلى حساب الشيخ المختار.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="py-4">
+                        <Label className="mb-2 block">اختر الفوج / الشيخ:</Label>
+                        <Select dir="rtl" value={selectedSheikhId} onValueChange={setSelectedSheikhId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="اختر الشيخ..." />
+                            </SelectTrigger>
+                            <SelectContent className="z-[9999] max-h-[200px] overflow-y-auto bg-white dark:bg-slate-900 border shadow-lg">
+                                {SHEIKHS_LIST.map(sheikh => (
+                                    <SelectItem key={sheikh.id} value={sheikh.id.toString()} className="text-right cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">
+                                        {sheikh.group}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setJoinDialogOpen(false)}>إلغاء</Button>
+                        <Button onClick={handleConfirmJoin} disabled={!selectedSheikhId}>تأكيد ونقل الطالب</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={isAccessModalOpen} onOpenChange={setIsAccessModalOpen} className="no-print">
                 <DialogContent>

@@ -36,6 +36,7 @@ import { PORTAL_THEMES } from '@/lib/themes';
 const navItems = [
   { href: '/', label: 'إدارة الطلبة', icon: Users, color: 'text-blue-400', glow: 'group-hover:shadow-blue-500/20' },
   { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus, color: 'text-emerald-400', glow: 'group-hover:shadow-emerald-500/20' },
+  { href: '/admin/entry-permit', label: 'إذن دخول', icon: FileText, color: 'text-blue-500', glow: 'group-hover:shadow-blue-500/20' },
   { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList, color: 'text-sky-400', glow: 'group-hover:shadow-sky-500/20' },
   { href: '/stats', label: 'المتابعة الأسبوعية', icon: Calendar, color: 'text-indigo-400', glow: 'group-hover:shadow-indigo-500/20' },
 
@@ -66,8 +67,14 @@ export default function HomePage() {
   const { students, dailySessions, loading } = useStudentContext();
 
   const filteredNavItems = useMemo(() => {
-    return navItems.filter(item => canAccessPage(item.href, role));
-  }, [role]);
+    return navItems.filter(item => {
+      // Special restriction for registrations and entry-permit: ONLY admin00 can see it
+      if ((item.href === '/registrations' || item.href === '/admin/entry-permit') && user?.email !== 'admin00@gmail.com') {
+        return false;
+      }
+      return canAccessPage(item.href, role);
+    });
+  }, [role, user?.email]);
 
   const currentThemeId = user?.portalTheme || 'midnight';
   const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
@@ -299,8 +306,9 @@ export default function HomePage() {
         </div>
 
         {/* Footer */}
-        <div className="py-12 text-center opacity-20 hover:opacity-100 transition-opacity duration-1000">
-          <p className="text-xs font-bold tracking-[0.5em] uppercase">المدرسة القرآنية للإمام الشافعي • تصميم وبناء Antigravity ✨</p>
+        <div className="py-12 text-center opacity-60 hover:opacity-100 transition-opacity duration-500 space-y-1">
+          <p className="text-sm font-bold tracking-wider">المدرسة القرآنية للإمام الشافعي</p>
+          <p className="text-xs font-medium">حي تكسبت الغربية / الوادي</p>
         </div>
       </div>
     </div>

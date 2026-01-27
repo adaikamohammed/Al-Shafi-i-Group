@@ -52,11 +52,16 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     return NAV_GROUPS.map(group => ({
       ...group,
       items: group.items.filter(item => {
+        // Special restriction for registrations and entry-permit page: ONLY admin00 can see it
+        if ((item.href === '/registrations' || item.href === '/admin/entry-permit') && user?.email !== 'admin00@gmail.com') {
+          return false;
+        }
+
         // Use the permissions system to check access
         return canAccessPage(item.href, role);
       })
     })).filter(group => group.items.length > 0);
-  }, [role]);
+  }, [role, user?.email]);
 
   const filteredBottomNavItems = useMemo(() => {
     return BOTTOM_NAV_ITEMS.filter(item => canAccessPage(item.href, role));
