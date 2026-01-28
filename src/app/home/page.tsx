@@ -43,7 +43,6 @@ const navItems = [
   { href: '/yearly-performance', label: 'رادار الأداء السنوي', icon: BarChart3, color: 'text-purple-400', glow: 'group-hover:shadow-purple-500/20' },
   { href: '/comparison', label: 'ساحة المقارنة', icon: Swords, color: 'text-rose-400', glow: 'group-hover:shadow-rose-500/20' },
   { href: '/dues', label: 'المستحقات المالية', icon: DollarSign, color: 'text-amber-400', glow: 'group-hover:shadow-amber-500/20' },
-  { href: '/management/monitoring', label: 'نظام المراقبة', icon: BarChart3, color: 'text-emerald-500', glow: 'group-hover:shadow-emerald-500/20' },
   { href: '/reports/daily', label: 'التقرير اليومي', icon: Edit, color: 'text-pink-400', glow: 'group-hover:shadow-pink-500/20' },
 
   { href: '/reports/student', label: 'تقرير الطالب', icon: FileText, color: 'text-orange-400', glow: 'group-hover:shadow-orange-500/20' },

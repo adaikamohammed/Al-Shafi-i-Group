@@ -14,6 +14,16 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
     PieChart, Pie, Cell, Legend
 } from 'recharts';
+import {
+    startOfWeek, endOfWeek,
+    startOfMonth, endOfMonth,
+    startOfQuarter, endOfQuarter,
+    startOfYear, endOfYear,
+    isWithinInterval, parseISO
+} from 'date-fns';
+import { MonitoringRadar } from './MonitoringRadar';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CalendarDays, CalendarRange, CalendarCheck, History, Info, Zap } from 'lucide-react';
 
 interface StatCardProps {
     title: string;
@@ -54,9 +64,75 @@ const StatCard = ({ title, value, icon: Icon, color, description, theme }: StatC
 );
 
 export const ManagementDashboard = () => {
-    const { students, preRegistrations, allUsers, loading, generateDemoData } = useStudentContext();
+    const { students, preRegistrations, allUsers, dailySessions, loading, generateDemoData } = useStudentContext();
     const { user } = useAuth();
     const [selectedGroup, setSelectedGroup] = React.useState<string>('all');
+    const [timeframe, setTimeframe] = React.useState<string>('weekly');
+
+    const aggregatedData = useMemo(() => {
+        if (!dailySessions) return [];
+
+        let start: Date, end: Date;
+        const now = new Date();
+
+        switch (timeframe) {
+            case 'monthly':
+                start = startOfMonth(now); end = endOfMonth(now); break;
+            case 'seasonal':
+                start = startOfQuarter(now); end = endOfQuarter(now); break;
+            case 'yearly':
+                start = startOfYear(now); end = endOfYear(now); break;
+            case 'weekly':
+            default:
+                start = startOfWeek(now, { weekStartsOn: 6 });
+                end = endOfWeek(now, { weekStartsOn: 6 }); break;
+        }
+
+        const uniqueGroups = Array.from(new Set(allUsers.filter(u => u.role === 'sheikh' && u.group).map(u => u.group)));
+
+        return uniqueGroups.map(groupName => {
+            let totalSessions = 0;
+            let totalAttendance = 0;
+            let totalRecords = 0;
+            let totalReview = 0;
+            let totalEvaluationPoints = 0;
+            let totalBehaviorPoints = 0;
+
+            Object.entries(dailySessions).forEach(([date, sessionsOnDay]) => {
+                const sessionDate = parseISO(date);
+                if (isWithinInterval(sessionDate, { start, end })) {
+                    Object.values(sessionsOnDay).forEach((session: any) => {
+                        const sheikh = allUsers.find(u => u.uid === session.ownerId);
+                        if (sheikh?.group === groupName) {
+                            totalSessions++;
+                            (session.records || []).forEach(record => {
+                                totalRecords++;
+                                if (record.attendance === 'حاضر' || record.attendance === 'متأخر') totalAttendance++;
+                                if (record.review) totalReview++;
+                                const evalMap: Record<string, number> = { 'ممتاز': 100, 'جيد جداً': 80, 'جيد': 60, 'متوسط': 40, 'ضعيف': 20 };
+                                totalEvaluationPoints += evalMap[record.memorization || ''] || 0;
+                                const behavMap: Record<string, number> = { 'هادئ': 100, 'متوسط': 60, 'غير منضبط': 20 };
+                                totalBehaviorPoints += behavMap[record.behavior || ''] || 0;
+                            });
+                        }
+                    });
+                }
+            });
+
+            const countRecords = totalRecords || 1;
+            return {
+                groupName,
+                attendanceRate: Math.round((totalAttendance / countRecords) * 100),
+                reviewRate: Math.round((totalReview / countRecords) * 100),
+                evaluationScore: Math.round(totalEvaluationPoints / countRecords),
+                behaviorScore: Math.round(totalBehaviorPoints / countRecords)
+            };
+        }).sort((a, b) => {
+            const groupA = parseInt((a.groupName || '').replace(/[^0-9]/g, '')) || 999;
+            const groupB = parseInt((b.groupName || '').replace(/[^0-9]/g, '')) || 999;
+            return groupA - groupB;
+        });
+    }, [dailySessions, allUsers, timeframe]);
 
     React.useEffect(() => {
         const handleGenerate = () => generateDemoData(); // using the existing function name but new logic
@@ -131,25 +207,116 @@ export const ManagementDashboard = () => {
     return (
         <div className="w-full max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header & Filter */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="space-y-1">
                     <h2 className="text-3xl font-headline font-bold">لوحة القيادة</h2>
-                    <p className="text-muted-foreground opacity-60">نظرة شاملة على أداء المدرسة</p>
+                    <p className="text-muted-foreground opacity-60 flex items-center gap-2">
+                        <Info className="h-4 w-4" />
+                        نظرة شاملة ومراقبة حية لأداء المدرسة
+                    </p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <Button
-                        variant="outline"
-                        onClick={() => {
-                            if (window.confirm('هل أنت متأكد من توليد بيانات تجريبية؟ سيتم إضافة مشايخ وطلاب وهميين.')) {
-                                window.dispatchEvent(new CustomEvent('GENERATE_DEMO_DATA'));
-                            }
-                        }}
-                        className="gap-2 border-dashed border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-600"
-                    >
-                        <Shield className="h-4 w-4" />
-                        تهيئة النظام
-                    </Button>
-                    <GroupSelector value={selectedGroup} onChange={setSelectedGroup} />
+                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto">
+                    <Tabs value={timeframe} onValueChange={setTimeframe} className="w-full md:w-auto">
+                        <TabsList className={cn(
+                            "p-1 h-auto grid grid-cols-4 gap-1 rounded-xl border",
+                            theme.isLight ? "bg-slate-50 border-slate-200" : "bg-white/5 border-white/10"
+                        )}>
+                            <TabsTrigger value="weekly" className="rounded-lg py-2 text-xs data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
+                                <CalendarDays className="ml-1 h-3 w-3" /> أسبوعي
+                            </TabsTrigger>
+                            <TabsTrigger value="monthly" className="rounded-lg py-2 text-xs data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
+                                <CalendarRange className="ml-1 h-3 w-3" /> شهري
+                            </TabsTrigger>
+                            <TabsTrigger value="seasonal" className="rounded-lg py-2 text-xs data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
+                                <CalendarCheck className="ml-1 h-3 w-3" /> فصلي
+                            </TabsTrigger>
+                            <TabsTrigger value="yearly" className="rounded-lg py-2 text-xs data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
+                                <History className="ml-1 h-3 w-3" /> سنوي
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+
+                    <div className="flex items-center gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                if (window.confirm('هل أنت متأكد من توليد بيانات تجريبية؟ سيتم إضافة مشايخ وطلاب وهميين.')) {
+                                    window.dispatchEvent(new CustomEvent('GENERATE_DEMO_DATA'));
+                                }
+                            }}
+                            className={cn(
+                                "gap-2 border-dashed h-10 rounded-xl",
+                                theme.isLight ? "border-amber-500/50 hover:bg-amber-50/50" : "border-amber-500/30 hover:bg-amber-500/10"
+                            )}
+                        >
+                            <Shield className="h-4 w-4" />
+                            تهيئة
+                        </Button>
+                        <GroupSelector value={selectedGroup} onChange={setSelectedGroup} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Monitoring Radar Section - Added from Monitoring page */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2">
+                    <MonitoringRadar data={aggregatedData} selectedGroup={selectedGroup} />
+                </div>
+                <div className="space-y-6">
+                    <Card className={cn(
+                        "border-none shadow-xl h-full",
+                        theme.isLight ? "bg-white text-slate-800" : "bg-white/5 text-white"
+                    )}>
+                        <CardHeader>
+                            <CardTitle className="text-lg font-headline font-bold flex items-center gap-2">
+                                <Zap className="h-5 w-5 text-amber-400" />
+                                ملخص الأداء {timeframe === 'weekly' ? 'الأسبوعي' : timeframe === 'monthly' ? 'الشهري' : timeframe === 'seasonal' ? 'الفصلي' : 'السنوي'}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {selectedGroup === 'all' ? (
+                                <div className="space-y-4">
+                                    <p className="text-sm opacity-60">يعرض الرادار متوسط أداء كافة الأفواج. يمكنك اختيار فوج محدد للحصول على تفاصيل دقيقة.</p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10">
+                                            <p className="text-xs opacity-60">إجمالي الأفواج</p>
+                                            <p className="text-2xl font-black font-headline text-primary">{aggregatedData.length}</p>
+                                        </div>
+                                        <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
+                                            <p className="text-xs opacity-60">متوسط الحضور</p>
+                                            <p className="text-2xl font-black font-headline text-emerald-400">
+                                                {aggregatedData.length > 0 ? Math.round(aggregatedData.reduce((acc, curr) => acc + curr.attendanceRate, 0) / aggregatedData.length) : 0}%
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {aggregatedData.find(g => g.groupName === selectedGroup) ? (
+                                        <>
+                                            <p className="text-sm font-bold">تحليل {selectedGroup}:</p>
+                                            <ul className="space-y-3">
+                                                <li className="flex justify-between items-center text-sm">
+                                                    <span className="opacity-60">نسبة الحفظ:</span>
+                                                    <span className="font-bold">{aggregatedData.find(g => g.groupName === selectedGroup)?.evaluationScore}%</span>
+                                                </li>
+                                                <li className="flex justify-between items-center text-sm">
+                                                    <span className="opacity-60">وتيرة المراجعة:</span>
+                                                    <span className="font-bold">{aggregatedData.find(g => g.groupName === selectedGroup)?.reviewRate}%</span>
+                                                </li>
+                                                <li className="flex justify-between items-center text-sm">
+                                                    <span className="opacity-60">مستوى الانضباط:</span>
+                                                    <span className="font-bold">{aggregatedData.find(g => g.groupName === selectedGroup)?.behaviorScore}%</span>
+                                                </li>
+                                            </ul>
+                                        </>
+                                    ) : (
+                                        <p className="text-sm opacity-40">لا توجد بيانات لهذا الفوج في الفترة المختارة</p>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
 

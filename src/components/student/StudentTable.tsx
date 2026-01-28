@@ -180,7 +180,7 @@ export const StudentTable = React.memo(({
                                             <Badge variant="outline" className="border-primary/30 text-primary font-bold">{student.subscriptionTier}</Badge>
                                         </TableCell>
                                         <TableCell className="hidden md:table-cell text-center font-bold text-lg text-primary">{student.memorizedSurahsCount || 0}</TableCell>
-                                        <TableCell className="text-center">
+                                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                                             <StudentActions student={student} onStatusChange={onStatusChange} onEdit={() => onEdit(student)} isSuperAdmin={isSuperAdmin} />
                                         </TableCell>
                                     </TableRow>

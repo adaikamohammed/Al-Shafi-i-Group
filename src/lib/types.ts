@@ -22,6 +22,14 @@ export interface ExpulsionRecord {
   reason: string;
 }
 
+export interface TransferRecord {
+  date: string; // ISO String
+  fromSheikhId: string;
+  fromGroupName: string;
+  toSheikhId: string;
+  toGroupName: string;
+  reason: string;
+}
 
 export interface Student {
   id: string;
@@ -49,6 +57,7 @@ export interface Student {
   expulsionDate?: string | null;
   expulsionReason?: string | null;
   expulsionHistory?: ExpulsionRecord[];
+  transferHistory?: TransferRecord[];
 }
 
 export type AttendanceStatus = "حاضر" | "غياب" | "غائب" | "متأخر" | "تعويض" | "";

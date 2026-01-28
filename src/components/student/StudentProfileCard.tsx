@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, memo } from 'react';
-import { Award, GraduationCap, Shield, BookOpen, FolderKanban, User as UserIcon, Phone, Archive, CheckCircle, XCircle, UserX, Loader2, ArrowRight, BarChart3, PieChart as PieChartIcon, TrendingUp } from 'lucide-react';
+import { Award, GraduationCap, Shield, BookOpen, FolderKanban, User as UserIcon, Phone, Archive, CheckCircle, XCircle, UserX, Loader2, ArrowRight, BarChart3, PieChart as PieChartIcon, TrendingUp, ArrowRightLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -32,7 +32,13 @@ interface StudentProfileCardProps {
 }
 
 export const StudentProfileCard = memo(({ student, user, rankingData, medalHistory, onEdit, onViewStats }: StudentProfileCardProps) => {
+    const { allUsers } = useStudentContext();
     const [showStats, setShowStats] = useState(false);
+
+    const supervisorName = useMemo(() => {
+        const supervisor = allUsers.find(u => u.uid === student.ownerId);
+        return supervisor?.displayName || 'غير محدد';
+    }, [allUsers, student.ownerId]);
 
     const { rank, commitmentBalance, stats } = useMemo(() => {
         const studentRankData = rankingData.find((r: any) => r.id === student.id);
@@ -85,6 +91,16 @@ export const StudentProfileCard = memo(({ student, user, rankingData, medalHisto
                     item: e
                 });
             } catch (e) { console.error("Invalid expulsion date", (e as Error).message) }
+        });
+
+        (student.transferHistory || []).forEach(t => {
+            try {
+                items.push({
+                    date: parseISO(t.date),
+                    type: 'transfer',
+                    item: t
+                });
+            } catch (e) { console.error("Invalid transfer date", (e as Error).message) }
         });
 
         return items.sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -241,7 +257,7 @@ export const StudentProfileCard = memo(({ student, user, rankingData, medalHisto
                             <Badge variant={statusVariant[student.status] || "secondary"} className="px-3 py-1 font-bold shadow-sm">{student.status}</Badge>
                             <div className="flex items-center gap-2 text-muted-foreground font-body">
                                 <UserIcon className="h-4 w-4" />
-                                <span className="text-sm">بإشراف: {user?.displayName}</span>
+                                <span className="text-sm">بإشراف: {supervisorName}</span>
                             </div>
                         </div>
                     </div>
@@ -384,19 +400,22 @@ export const StudentProfileCard = memo(({ student, user, rankingData, medalHisto
 
                                             const typeColors: any = {
                                                 'covenant': 'bg-primary/10 text-primary border-primary/20',
-                                                'expulsion': 'bg-red-100 text-red-700 border-red-200'
+                                                'expulsion': 'bg-red-100 text-red-700 border-red-200',
+                                                'transfer': 'bg-blue-100 text-blue-700 border-blue-200'
                                             };
 
                                             return (
                                                 <div key={index} className="relative animate-in-up" style={{ animationDelay: `${index * 50}ms` }}>
                                                     <div className={cn(
-                                                        "absolute right-[-26px] top-1 h-4 w-4 rounded-full ring-4 ring-background z-10",
-                                                        isCovenant ? 'bg-primary' : 'bg-red-600'
-                                                    )} />
+                                                        "absolute right-[-26px] top-1 h-4 w-4 rounded-full ring-4 ring-background z-10 flex items-center justify-center",
+                                                        isCovenant ? 'bg-primary' : timelineItem.type === 'transfer' ? 'bg-blue-600' : 'bg-red-600'
+                                                    )}>
+                                                        {timelineItem.type === 'transfer' && <ArrowRightLeft className="h-2 w-2 text-white" />}
+                                                    </div>
                                                     <div className="flex flex-col gap-2">
                                                         <div className="flex items-center justify-between">
                                                             <Badge variant="outline" className={cn("text-[10px] font-bold", typeColors[timelineItem.type])}>
-                                                                {isCovenant ? item.type : "قرار طرد جاد"}
+                                                                {isCovenant ? item.type : timelineItem.type === 'transfer' ? 'نقل طالب' : "قرار طرد جاد"}
                                                             </Badge>
                                                             <span className="text-[11px] text-muted-foreground font-body">{dateStr}</span>
                                                         </div>
@@ -404,9 +423,17 @@ export const StudentProfileCard = memo(({ student, user, rankingData, medalHisto
                                                             "p-3 rounded-lg border-r-4 font-body shadow-sm",
                                                             isCovenant && item.card === 'بطاقة صفراء' ? 'bg-yellow-50/50 border-yellow-400' :
                                                                 isCovenant && item.card === 'بطاقة حمراء' ? 'bg-red-50/50 border-red-500' :
-                                                                    'bg-muted/30 border-muted'
+                                                                    timelineItem.type === 'transfer' ? 'bg-blue-50/30 border-blue-400' :
+                                                                        'bg-muted/30 border-muted'
                                                         )}>
-                                                            <p className="text-sm font-medium">{isCovenant ? item.text : item.reason}</p>
+                                                            {timelineItem.type === 'transfer' ? (
+                                                                <div className="space-y-1">
+                                                                    <p className="text-sm font-medium">تم نقله من <span className="font-bold">{item.fromGroupName}</span> إلى <span className="font-bold">{item.toGroupName}</span></p>
+                                                                    <p className="text-xs text-muted-foreground">السبب: {item.reason}</p>
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-sm font-medium">{isCovenant ? item.text : item.reason}</p>
+                                                            )}
                                                             {isCovenant && (
                                                                 <div className="mt-2 text-[10px] font-bold flex items-center gap-1 opacity-70">
                                                                     {item.status === 'تم الوفاء بها' ? <CheckCircle className="h-3 w-3 text-green-600" /> : <Loader2 className="h-3 w-3 animate-spin text-blue-600" />}

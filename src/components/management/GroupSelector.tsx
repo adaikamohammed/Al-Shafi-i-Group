@@ -31,12 +31,20 @@ export function GroupSelector({ value, onChange, className }: GroupSelectorProps
     const sheikhs = useMemo(() => {
         const uniqueGroups = new Map();
 
-        allUsers.forEach(u => {
-            if (u.role === 'sheikh' && u.group) {
-                // If duplicates exist, prefer the one that is NOT isDemo if possible, or just take the last one
-                // normalizing key to ensure "فوج 1" matches "فوج 1"
-                if (!uniqueGroups.has(u.group)) {
-                    uniqueGroups.set(u.group, u);
+        // Sort users to prefer UIDs containing 'admin' when selecting a representative for a group
+        const sortedUsers = [...allUsers].sort((a, b) => {
+            const aIsAdmin = a.uid.toLowerCase().includes('admin');
+            const bIsAdmin = b.uid.toLowerCase().includes('admin');
+            if (aIsAdmin && !bIsAdmin) return -1;
+            if (!aIsAdmin && bIsAdmin) return 1;
+            return 0;
+        });
+
+        sortedUsers.forEach(u => {
+            if (u.group) {
+                const groupKey = u.group.trim();
+                if (!uniqueGroups.has(groupKey)) {
+                    uniqueGroups.set(groupKey, u);
                 }
             }
         });
@@ -68,7 +76,7 @@ export function GroupSelector({ value, onChange, className }: GroupSelectorProps
                         🏛️ كل المدرسة (عرض شامل)
                     </SelectItem>
                     {sheikhs.map((sheikh) => (
-                        <SelectItem key={sheikh.group} value={sheikh.group || ''} className="cursor-pointer">
+                        <SelectItem key={sheikh.uid} value={sheikh.uid} className="cursor-pointer">
                             <span className="flex items-center gap-2">
                                 <span className={cn("inline-block w-2 h-2 rounded-full", theme.isLight ? "bg-slate-400" : "bg-white/40")} />
                                 <span>{sheikh.group || 'فوج غير محدد'}</span>

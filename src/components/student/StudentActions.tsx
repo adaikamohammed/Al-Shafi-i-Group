@@ -7,6 +7,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Student, StudentStatus } from '@/lib/types';
 import { ExpulsionDialog } from './ExpulsionDialog';
+import { TransferDialog } from './TransferDialog';
+import { ArrowRightLeft } from 'lucide-react';
 
 interface StudentActionsProps {
     student: Student;
@@ -17,6 +19,7 @@ interface StudentActionsProps {
 
 export const StudentActions = ({ student, onStatusChange, onEdit, isSuperAdmin }: StudentActionsProps) => {
     const [isExpelDialogOpen, setExpelDialogOpen] = useState(false);
+    const [isTransferDialogOpen, setTransferDialogOpen] = useState(false);
 
     const handleExpulsion = (reason: string, notes: string) => {
         const fullReason = `${reason}: ${notes}`;
@@ -72,6 +75,10 @@ export const StudentActions = ({ student, onStatusChange, onEdit, isSuperAdmin }
                                         <UserX className="ml-2 h-4 w-4" />
                                         طرد
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTransferDialogOpen(true) }}>
+                                        <ArrowRightLeft className="ml-2 h-4 w-4" />
+                                        نقل إلى فوج آخر
+                                    </DropdownMenuItem>
                                 </>
                             ) : (
                                 <DropdownMenuItem onSelect={handleReactivate}>
@@ -84,6 +91,7 @@ export const StudentActions = ({ student, onStatusChange, onEdit, isSuperAdmin }
                 </DropdownMenuContent>
             </DropdownMenu>
             <ExpulsionDialog student={student} open={isExpelDialogOpen} onOpenChange={setExpelDialogOpen} onConfirm={handleExpulsion} />
+            <TransferDialog student={student} open={isTransferDialogOpen} onOpenChange={setTransferDialogOpen} />
         </>
     );
 };

@@ -97,6 +97,7 @@ interface StudentContextType {
   saveAdminLog: (log: Omit<AdminLog, 'id' | 'timestamp'>) => Promise<void>;
   deleteAdminLog: (log: AdminLog) => Promise<void>;
   getNextTicketNumber: () => Promise<number>;
+  transferStudent: (studentId: string, currentOwnerId: string, targetSheikhId: string, reason: string) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -219,7 +220,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           if (userData.dailySessions) {
             for (const date in userData.dailySessions) {
               if (!allSessions[date]) allSessions[date] = {};
-              Object.assign(allSessions[date], userData.dailySessions[date]);
+              // Inject ownerId into each session during merge for management view
+              Object.entries(userData.dailySessions[date]).forEach(([sessionId, session]: [string, any]) => {
+                allSessions[date][sessionId] = { ...session, ownerId: uid };
+              });
             }
           }
           if (userData.dailyReports) {
@@ -1180,6 +1184,89 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const transferStudent = async (studentId: string, currentOwnerId: string, targetSheikhId: string, reason: string): Promise<void> => {
+    if (!authContextUser) return;
+
+    try {
+      const student = students.find(s => s.id === studentId);
+      const targetSheikh = allUsers.find(u => u.uid === targetSheikhId);
+
+      if (!student || !targetSheikh) {
+        throw new Error('الطالب أو الشيخ المستهدف غير موجود');
+      }
+
+      const fromGroupName = student.groupName || 'غير محدد';
+      const toGroupName = targetSheikh.group || 'فوج غير محدد';
+
+      const transferRecord = {
+        date: new Date().toISOString(),
+        fromSheikhId: currentOwnerId,
+        fromGroupName: fromGroupName,
+        toSheikhId: targetSheikhId,
+        toGroupName: toGroupName,
+        reason: reason
+      };
+
+      const updatedTransferHistory = [...(student.transferHistory || []), transferRecord];
+
+      // Prepare updates for atomic move
+      const updates: any = {};
+
+      // 1. Remove from current path
+      updates[`users/${currentOwnerId}/students/${studentId}`] = null;
+
+      // 2. Add to target path
+      const sanitizedStudent = sanitizeData({
+        ...student,
+        ownerId: targetSheikhId,
+        groupName: toGroupName,
+        transferHistory: updatedTransferHistory,
+        updatedAt: new Date()
+      });
+
+      updates[`users/${targetSheikhId}/students/${studentId}`] = {
+        ...sanitizedStudent,
+        birthDate: sanitizedStudent.birthDate ? sanitizedStudent.birthDate.toISOString() : null,
+        registrationDate: sanitizedStudent.registrationDate.toISOString(),
+        updatedAt: sanitizedStudent.updatedAt.toISOString(),
+      };
+
+      // 3. Move Surah Progress if exists
+      if (surahProgress[studentId]) {
+        updates[`users/${currentOwnerId}/surahProgress/${studentId}`] = null;
+        updates[`users/${targetSheikhId}/surahProgress/${studentId}`] = surahProgress[studentId];
+      }
+
+      await update(ref(db), updates);
+
+      toast({
+        title: "✅ تم نقل الطالب",
+        description: `تم نقل ${student.fullName} من ${fromGroupName} إلى ${toGroupName} بنجاح.`,
+      });
+
+      // Log action
+      logActivity(
+        'UPDATE_STUDENT',
+        authContextUser.uid,
+        `تم نقل طالب: ${student.fullName} من ${fromGroupName} إلى ${toGroupName}. السبب: ${reason}`,
+        studentId,
+        student.fullName,
+        authContextUser.displayName || 'Unknown',
+        toGroupName,
+        targetSheikhId
+      );
+
+    } catch (error: any) {
+      console.error("Transfer error:", error);
+      toast({
+        title: "❌ خطأ في النقل",
+        description: error.message || "حدث خطأ أثناء محاولة نقل الطالب.",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   return (
     <StudentContext.Provider value={{
       students,
@@ -1221,6 +1308,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       saveAdminLog,
       deleteAdminLog,
       getNextTicketNumber,
+      transferStudent
     }}>
       {children}
     </StudentContext.Provider>

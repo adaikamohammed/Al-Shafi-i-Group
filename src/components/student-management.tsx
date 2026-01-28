@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, Search, Filter, Download, Trash2, Loader2, Users, UserCheck, UserMinus, Star, X } from 'lucide-react';
+import { PlusCircle, Search, Filter, Download, Trash2, Loader2, Users, UserCheck, UserMinus, Star, X, ArrowRightLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
@@ -146,6 +146,18 @@ export default function StudentManagement() {
         return list;
     }, [students, user, isSuperAdmin, isManagement, selectedGroup]);
 
+    const transferredOutCount = useMemo(() => {
+        const currentGroupUid = (isSuperAdmin || isManagement) ? selectedGroup : user?.uid;
+        if (currentGroupUid === 'all') {
+            // Count all unique students who have been transferred at least once
+            return (students ?? []).filter(s => (s.transferHistory?.length || 0) > 0).length;
+        }
+        // Count students who were transferred FROM this specific group
+        return (students ?? []).filter(s =>
+            s.transferHistory?.some(h => h.fromSheikhId === currentGroupUid)
+        ).length;
+    }, [students, selectedGroup, user, isSuperAdmin, isManagement]);
+
     if (loading) {
         return <div className="flex items-center justify-center h-full"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
     }
@@ -175,7 +187,7 @@ export default function StudentManagement() {
                 <DailyInspiration />
 
                 {/* Global Dashboard Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <Card className="border-none bg-primary/10 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
                         <div className="absolute right-0 top-0 p-2 opacity-10 group-hover:scale-110 transition-transform"><Users className="h-16 w-16" /></div>
                         <CardContent className="p-4 relative">
@@ -202,6 +214,13 @@ export default function StudentManagement() {
                         <CardContent className="p-4 relative">
                             <p className="text-xs text-red-600 font-body font-bold">المطرودون</p>
                             <h3 className="text-3xl font-bold font-headline mt-1 text-red-700">{allStudents.filter(s => s.status === 'مطرود').length}</h3>
+                        </CardContent>
+                    </Card>
+                    <Card className="border-none bg-blue-50 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
+                        <div className="absolute right-0 top-0 p-2 opacity-10 group-hover:scale-110 transition-transform"><ArrowRightLeft className="h-16 w-16" /></div>
+                        <CardContent className="p-4 relative">
+                            <p className="text-xs text-blue-600 font-body font-bold">الطلاب المنتقلون</p>
+                            <h3 className="text-3xl font-bold font-headline mt-1 text-blue-700">{transferredOutCount}</h3>
                         </CardContent>
                     </Card>
                 </div>
