@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { ref, onValue, off } from 'firebase/database';
+import { ref, onValue, off, type DataSnapshot } from 'firebase/database';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,57 +35,71 @@ import { ClipboardList } from 'lucide-react';
 
 // --- Copied Components & Helpers from student-history ---
 
-const getStudentDayColor = (dayData: any, viewType: 'attendance' | 'evaluation' = 'attendance') => {
+const getStudentDayColor = (dayData: any, viewType: 'attendance' | 'evaluation' | 'behavior' = 'attendance') => {
     if (!dayData) return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
     if (dayData.isHoliday) return 'bg-blue-400 border-blue-500';
-    if (dayData.isSheikhAbsentNoSub) return 'bg-red-400 border-red-500';
+    if (dayData.isSheikhAbsentNoSub) return 'bg-rose-400 border-rose-500';
     if (dayData.isSheikhAbsentWithSub) return 'bg-purple-400 border-purple-500';
 
+    const records = dayData.records || [];
+    if (records.length === 0) return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
+
+    const hasMultiple = records.length > 1;
+
     if (viewType === 'attendance') {
-        switch (dayData.attendance) {
-            case 'حاضر': return 'bg-emerald-500 border-emerald-600';
-            case 'متأخر': return 'bg-amber-400 border-amber-500';
-            case 'غائب': return 'bg-red-500 border-red-600';
-            default: return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
-        }
-    } else {
-        const evalValue = dayData.memorization;
-        if (!evalValue) return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
-        if (evalValue.includes('ممتاز')) return 'bg-emerald-700 border-emerald-800';
-        if (evalValue.includes('جيد جدا')) return 'bg-emerald-500 border-emerald-600';
-        if (evalValue.includes('جيد')) return 'bg-amber-400 border-amber-500';
-        if (evalValue.includes('مقبول')) return 'bg-orange-400 border-orange-500';
-        if (evalValue.includes('ضعيف')) return 'bg-red-500 border-red-600';
+        const statuses = records.map((r: any) => r.attendance);
+        if (statuses.includes('حاضر')) return hasMultiple ? 'bg-emerald-700 border-emerald-800 shadow-inner' : 'bg-emerald-500 border-emerald-600';
+        if (statuses.includes('متأخر')) return hasMultiple ? 'bg-amber-500 border-amber-600 shadow-inner' : 'bg-amber-400 border-amber-500';
+        if (statuses.includes('غياب') || statuses.includes('غائب')) return hasMultiple ? 'bg-red-700 border-red-800 shadow-inner' : 'bg-red-500 border-red-600';
+        return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
+    } else if (viewType === 'evaluation') {
+        const evals = records.map((r: any) => r.memorization).filter(Boolean);
+        if (evals.length === 0) return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
+        if (evals.some((e: string) => e.includes('ممتاز'))) return hasMultiple ? 'bg-emerald-900 border-emerald-950' : 'bg-emerald-700 border-emerald-800';
+        if (evals.some((e: string) => e.includes('جيد جدا'))) return hasMultiple ? 'bg-emerald-700 border-emerald-800' : 'bg-emerald-500 border-emerald-600';
+        if (evals.some((e: string) => e.includes('جيد'))) return hasMultiple ? 'bg-amber-600 border-amber-700' : 'bg-amber-400 border-amber-500';
+        if (evals.some((e: string) => e.includes('مقبول'))) return hasMultiple ? 'bg-orange-600 border-orange-700' : 'bg-orange-400 border-orange-500';
+        if (evals.some((e: string) => e.includes('ضعيف'))) return hasMultiple ? 'bg-red-700 border-red-800' : 'bg-red-500 border-red-600';
         return 'bg-emerald-400 border-emerald-500';
+    } else {
+        const behaviors = records.map((r: any) => r.behavior).filter(Boolean);
+        if (behaviors.length === 0) return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
+        if (behaviors.includes('مشاغب')) return hasMultiple ? 'bg-red-700 border-red-800' : 'bg-red-500 border-red-600';
+        if (behaviors.includes('مقبول') || behaviors.includes('عادي')) return hasMultiple ? 'bg-blue-600 border-blue-700' : 'bg-blue-400 border-blue-500';
+        if (behaviors.includes('هادئ')) return hasMultiple ? 'bg-emerald-700 border-emerald-800' : 'bg-emerald-500 border-emerald-600';
+        return 'bg-gray-300 border-gray-400';
     }
 };
 
 const StudentDayTooltip = ({ day, dayData }: { day: Date, dayData: any }) => {
     const formattedDate = format(day, 'd MMMM yyyy', { locale: ar });
-    if (!dayData) return <p className="font-bold">{formattedDate}<br />لا توجد بيانات</p>;
+    if (!dayData) return <p className="font-bold text-center">{formattedDate}<br />لا توجد بيانات</p>;
 
     return (
-        <div className="space-y-1 text-right min-w-[150px]">
-            <p className="font-bold border-b pb-1 mb-1">{formattedDate}</p>
-            {dayData.isHoliday ? (
-                <p className="text-blue-600 font-bold">يوم عطلة</p>
-            ) : dayData.isSheikhAbsentNoSub ? (
-                <p className="text-red-600 font-bold">غياب الشيخ (بدون بديل)</p>
-            ) : dayData.isSheikhAbsentWithSub ? (
-                <p className="text-purple-600 font-bold">غياب الشيخ (مع بديل)</p>
-            ) : (
-                <>
-                    <p className="text-xs"><span className="font-bold">الحضور:</span> {dayData.attendance || 'غير مسجل'}</p>
-                    {dayData.memorization && <p className="text-xs"><span className="font-bold">التقييم:</span> {dayData.memorization}</p>}
-                    {dayData.behavior && <p className="text-xs"><span className="font-bold">السلوك:</span> {dayData.behavior}</p>}
-                    {dayData.notes && <p className="text-xs text-muted-foreground mt-1 border-t pt-1 italic">"{dayData.notes}"</p>}
-                </>
+        <div className="space-y-2 text-right min-w-[180px] p-1">
+            <p className="font-black border-b pb-1.5 mb-2 text-center text-primary">{formattedDate}</p>
+            {dayData.isHoliday && <p className="text-blue-600 font-black flex items-center gap-2 justify-end">يوم عطلة <span className="w-2 h-2 rounded-full bg-blue-500"></span></p>}
+            {dayData.isSheikhAbsentNoSub && <p className="text-rose-600 font-black flex items-center gap-2 justify-end">غياب الشيخ (بدون بديل) <span className="w-2 h-2 rounded-full bg-rose-500"></span></p>}
+            {dayData.isSheikhAbsentWithSub && <p className="text-purple-600 font-black flex items-center gap-2 justify-end">غياب الشيخ (مع بديل) <span className="w-2 h-2 rounded-full bg-purple-500"></span></p>}
+
+            {(dayData.records || []).map((record: any, idx: number) => (
+                <div key={idx} className={cn("mt-2 p-2 rounded-lg bg-muted/30 border border-muted", (dayData.records.length > 1) && "border-r-4 border-r-primary")}>
+                    {dayData.records.length > 1 && <p className="text-[10px] font-black text-primary mb-1 underline">حصة رقم {record.sessionNumber || idx + 1}</p>}
+                    <p className="text-xs flex justify-between gap-4"><span className="opacity-60">الحضور:</span> <span className="font-black">{record.attendance || 'غير مسجل'}</span></p>
+                    {record.memorization && <p className="text-xs flex justify-between gap-4"><span className="opacity-60">التقييم:</span> <span className="font-black">{record.memorization}</span></p>}
+                    {record.behavior && <p className="text-xs flex justify-between gap-4"><span className="opacity-60">السلوك:</span> <span className="font-black">{record.behavior}</span></p>}
+                    {record.notes && <p className="text-[10px] text-muted-foreground mt-1 border-t pt-1 italic select-none">"{record.notes}"</p>}
+                </div>
+            ))}
+
+            {(!dayData.isHoliday && !dayData.isSheikhAbsentNoSub && (!dayData.records || dayData.records.length === 0)) && (
+                <p className="text-xs text-muted-foreground italic text-center">لم يتم تسجيل بيانات لهذا اليوم</p>
             )}
         </div>
     );
 };
 
-const StudentYearView = ({ year, data, onDayClick, viewType }: { year: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' }) => {
+const StudentYearView = ({ year, data, onDayClick, viewType }: { year: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' | 'behavior' }) => {
     const yearStart = startOfYear(new Date(year, 0, 1));
     const daysInYear = getYear(yearStart) % 4 === 0 && (getYear(yearStart) % 100 !== 0 || getYear(yearStart) % 400 === 0) ? 366 : 365;
     const days = Array.from({ length: daysInYear }, (_, i) => addDays(yearStart, i));
@@ -112,7 +126,7 @@ const StudentYearView = ({ year, data, onDayClick, viewType }: { year: number, d
     );
 };
 
-const StudentQuarterView = ({ year, quarter, data, onDayClick, viewType }: { year: number, quarter: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' }) => {
+const StudentQuarterView = ({ year, quarter, data, onDayClick, viewType }: { year: number, quarter: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' | 'behavior' }) => {
     const startMonthIndex = (quarter - 1) * 3;
     const months = [startMonthIndex, startMonthIndex + 1, startMonthIndex + 2];
 
@@ -154,7 +168,7 @@ const StudentQuarterView = ({ year, quarter, data, onDayClick, viewType }: { yea
     );
 };
 
-const StudentMonthView = ({ year, month, data, onDayClick, viewType }: { year: number, month: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' }) => {
+const StudentMonthView = ({ year, month, data, onDayClick, viewType }: { year: number, month: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' | 'behavior' }) => {
     const monthStart = startOfMonth(new Date(year, month));
     const daysInMonth = getDaysInMonth(monthStart);
     const firstDay = getDay(monthStart);
@@ -210,7 +224,7 @@ export default function PublicStudentRecordPage() {
     const [loading, setLoading] = useState(true);
     const [snapshot, setSnapshot] = useState<any>(null);
     const [viewMode, setViewMode] = useState<'year' | 'quarter' | 'month'>('year');
-    const [viewType, setViewType] = useState<'attendance' | 'evaluation'>('attendance');
+    const [viewType, setViewType] = useState<'attendance' | 'evaluation' | 'behavior'>('attendance');
     const [currentDate, setCurrentDate] = useState(new Date());
     const [adminFilterDate, setAdminFilterDate] = useState<string>(''); // For filtering admin logs
 
@@ -218,7 +232,7 @@ export default function PublicStudentRecordPage() {
         if (!studentId) return;
 
         const reportRef = ref(db, `public_student_reports/${studentId}`);
-        const listener = onValue(reportRef, (snap) => {
+        const listener = onValue(reportRef, (snap: DataSnapshot) => {
             if (snap.exists()) {
                 setSnapshot(snap.val());
             } else {
@@ -254,7 +268,7 @@ export default function PublicStudentRecordPage() {
     };
 
     const { stats: periodStats } = useMemo(() => {
-        if (!studentData) return { stats: { attendanceRate: 0, totalPresent: 0, totalAbsent: 0, totalLate: 0, avgEval: '---' }, displayStats: snapshot?.stats };
+        if (!studentData) return { stats: { attendanceRate: 0, totalPresent: 0, totalAbsent: 0, totalLate: 0, avgEval: '---', sheikhAbsenceNoSub: 0, sheikhAbsenceWithSub: 0 }, displayStats: snapshot?.stats };
 
         let startDate: Date;
         let endDate: Date;
@@ -283,15 +297,20 @@ export default function PublicStudentRecordPage() {
             })
             .map(dateStr => studentData[dateStr]);
 
-        const relevantDays = filteredDays.filter((d: any) => !d.isHoliday && !d.isSheikhAbsentNoSub && (d.attendance));
-        const presentDays = relevantDays.filter((d: any) => d.attendance === 'حاضر').length;
-        const lateDays = relevantDays.filter((d: any) => d.attendance === 'متأخر').length;
-        const absentDays = relevantDays.filter((d: any) => d.attendance === 'غائب').length;
+        const allRecords = filteredDays.flatMap(d => d.records || []);
 
-        const totalWorkDays = presentDays + lateDays + absentDays;
-        const rate = totalWorkDays > 0 ? ((presentDays + lateDays) / totalWorkDays) * 100 : 0;
+        const presentCount = allRecords.filter((r: any) => r.attendance === 'حاضر').length;
+        const lateCount = allRecords.filter((r: any) => r.attendance === 'متأخر').length;
+        const absentCount = allRecords.filter((r: any) => r.attendance === 'غياب' || r.attendance === 'غائب').length;
 
-        const evals = relevantDays.filter(d => d.memorization).map(d => d.memorization);
+        const sheikhAbsenceNoSub = filteredDays.filter(d => d.isSheikhAbsentNoSub).length;
+        const sheikhAbsenceWithSub = filteredDays.filter(d => d.isSheikhAbsentWithSub).length;
+
+        const totalWorkSessions = presentCount + lateCount + absentCount;
+        const rate = totalWorkSessions > 0 ? ((presentCount + lateCount) / totalWorkSessions) * 100 : 0;
+
+        // Eval stats
+        const evals = allRecords.filter((r: any) => r.memorization).map((r: any) => r.memorization);
         let dominantEval = '---';
         if (evals.length > 0) {
             const counts: any = {};
@@ -301,10 +320,12 @@ export default function PublicStudentRecordPage() {
 
         const calculatedStats = {
             attendanceRate: rate.toFixed(0),
-            totalPresent: presentDays,
-            totalAbsent: absentDays,
-            totalLate: lateDays,
-            avgEval: dominantEval
+            totalPresent: presentCount,
+            totalAbsent: absentCount,
+            totalLate: lateCount,
+            avgEval: dominantEval,
+            sheikhAbsenceNoSub,
+            sheikhAbsenceWithSub
         };
 
         return {
@@ -433,30 +454,7 @@ export default function PublicStudentRecordPage() {
                         </Card>
                     )}
 
-                    {/* Stats Overview */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <StatWidget
-                            title="معدل الانضباط العام"
-                            value={snapshot?.stats?.attendanceRate || '0'}
-                            unit="%"
-                            icon={<CheckCircle className="h-7 w-7 text-emerald-600" />}
-                            colorClass="bg-emerald-50"
-                        />
-                        <StatWidget
-                            title="التقييم السائد"
-                            value={snapshot?.stats?.avgEval || '---'}
-                            unit=""
-                            icon={<Award className="h-7 w-7 text-amber-600" />}
-                            colorClass="bg-amber-50"
-                        />
-                        <StatWidget
-                            title="إجمالي أيام الغياب"
-                            value={snapshot?.stats?.totalAbsent || '0'}
-                            unit="يوم"
-                            icon={<AlertCircle className="h-7 w-7 text-red-600" />}
-                            colorClass="bg-red-50"
-                        />
-                    </div>
+
 
                     {/* Radar Content */}
                     <Card className="shadow-2xl border-none rounded-[3rem] overflow-hidden bg-white/80 backdrop-blur-xl">
@@ -475,12 +473,15 @@ export default function PublicStudentRecordPage() {
                                     <Button variant={viewMode === 'quarter' ? 'default' : 'ghost'} onClick={() => setViewMode('quarter')} className={cn("h-9 px-6 rounded-2xl font-black text-xs", viewMode === 'quarter' ? "bg-primary text-white" : "")}>فصلي</Button>
                                     <Button variant={viewMode === 'month' ? 'default' : 'ghost'} onClick={() => setViewMode('month')} className={cn("h-9 px-6 rounded-2xl font-black text-xs", viewMode === 'month' ? "bg-primary text-white" : "")}>شهري</Button>
                                 </div>
-                                <div className="flex items-center bg-muted/50 p-1.5 rounded-[1.5rem] border border-dotted border-primary/30">
+                                <div className="flex flex-wrap items-center justify-center gap-2 bg-muted/50 p-1.5 rounded-[1.5rem] border border-dotted border-primary/30">
                                     <Button variant={viewType === 'attendance' ? 'secondary' : 'ghost'} onClick={() => setViewType('attendance')} className={cn("h-8 px-4 rounded-xl flex items-center gap-2 font-black text-[10px]", viewType === 'attendance' ? "bg-emerald-500 text-white" : "")}>
                                         <Calendar className="h-3 w-3" /> الحضور
                                     </Button>
                                     <Button variant={viewType === 'evaluation' ? 'secondary' : 'ghost'} onClick={() => setViewType('evaluation')} className={cn("h-8 px-4 rounded-xl flex items-center gap-2 font-black text-[10px]", viewType === 'evaluation' ? "bg-blue-600 text-white" : "")}>
                                         <Award className="h-3 w-3" /> التقييم
+                                    </Button>
+                                    <Button variant={viewType === 'behavior' ? 'secondary' : 'ghost'} onClick={() => setViewType('behavior')} className={cn("h-8 px-4 rounded-xl flex items-center gap-2 font-black text-[10px]", viewType === 'behavior' ? "bg-amber-500 text-white" : "")}>
+                                        <TrendingUp className="h-3 w-3" /> السلوك
                                     </Button>
                                 </div>
                             </div>
@@ -492,20 +493,35 @@ export default function PublicStudentRecordPage() {
                                     <h4 className="font-black text-xl mb-1">{statsTitle}</h4>
                                     <p className="text-xs text-muted-foreground font-bold">ملخص الإنجاز في الفترة المحددة</p>
                                 </div>
-                                <div className="flex items-center justify-center gap-8 flex-wrap">
+                                <div className="flex items-center justify-center gap-x-8 gap-y-4 flex-wrap">
                                     <div className="text-center">
                                         <span className="block text-2xl font-black text-emerald-600">{periodStats.totalPresent}</span>
                                         <span className="text-[10px] font-black opacity-50 uppercase">حضور</span>
                                     </div>
-                                    <div className="w-px h-8 bg-muted border-dotted border-l" />
+                                    <div className="w-px h-8 bg-muted border-dotted border-l hidden sm:block" />
                                     <div className="text-center">
-                                        <span className="block text-2xl font-black text-amber-600">{periodStats.totalLate}</span>
+                                        <span className="block text-2xl font-black text-amber-600">{periodStats.avgEval}</span>
+                                        <span className="text-[10px] font-black opacity-50 uppercase">التقييم</span>
+                                    </div>
+                                    <div className="w-px h-8 bg-muted border-dotted border-l hidden sm:block" />
+                                    <div className="text-center">
+                                        <span className="block text-2xl font-black text-blue-600">{periodStats.totalLate}</span>
                                         <span className="text-[10px] font-black opacity-50 uppercase">تأخر</span>
                                     </div>
-                                    <div className="w-px h-8 bg-muted border-dotted border-l" />
+                                    <div className="w-px h-8 bg-muted border-dotted border-l hidden sm:block" />
                                     <div className="text-center">
                                         <span className="block text-2xl font-black text-red-600">{periodStats.totalAbsent}</span>
                                         <span className="text-[10px] font-black opacity-50 uppercase">غياب</span>
+                                    </div>
+                                    <div className="w-px h-8 bg-muted border-dotted border-l hidden sm:block" />
+                                    <div className="text-center">
+                                        <span className="block text-2xl font-black text-rose-600">{Number(periodStats.sheikhAbsenceNoSub) + Number(periodStats.sheikhAbsenceWithSub)}</span>
+                                        <span className="text-[10px] font-black opacity-50 uppercase">غياب الشيخ</span>
+                                    </div>
+                                    <div className="w-px h-8 bg-muted border-dotted border-l hidden sm:block" />
+                                    <div className="text-center">
+                                        <span className="block text-2xl font-black text-primary">{periodStats.attendanceRate}%</span>
+                                        <span className="text-[10px] font-black opacity-50 uppercase">نسبة الحضور</span>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 bg-white p-1 rounded-2xl shadow-sm border">
@@ -525,10 +541,11 @@ export default function PublicStudentRecordPage() {
                                 {viewType === 'attendance' ? (
                                     <>
                                         <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-emerald-500 shadow-sm"></div> حاضر</span>
+                                        <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-emerald-700 shadow-sm shadow-inner"></div> حصتان (حضور)</span>
                                         <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-amber-400 shadow-sm"></div> متأخر</span>
                                         <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-red-500 shadow-sm"></div> غائب</span>
                                     </>
-                                ) : (
+                                ) : viewType === 'evaluation' ? (
                                     <>
                                         <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-emerald-700 shadow-sm"></div> ممتاز</span>
                                         <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-emerald-500 shadow-sm"></div> جيد جداً</span>
@@ -536,10 +553,17 @@ export default function PublicStudentRecordPage() {
                                         <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-orange-400 shadow-sm"></div> مقبول</span>
                                         <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-red-500 shadow-sm"></div> ضعيف</span>
                                     </>
+                                ) : (
+                                    <>
+                                        <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-emerald-500 shadow-sm"></div> هادئ</span>
+                                        <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-blue-400 shadow-sm"></div> مقبول</span>
+                                        <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-red-500 shadow-sm"></div> مشاغب</span>
+                                    </>
                                 )}
                                 <div className="h-4 w-px bg-muted mx-2 border-l" />
                                 <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-blue-400 shadow-sm"></div> عطلة</span>
-                                <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-purple-400 shadow-sm"></div> غياب الشيخ</span>
+                                <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-purple-400 shadow-sm"></div> غياب الشيخ (بديل)</span>
+                                <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-rose-400 shadow-sm"></div> غياب الشيخ (بدون)</span>
                                 <span className="flex items-center gap-2 font-black text-[10px]"><div className="w-3 h-3 rounded bg-gray-100 shadow-sm"></div> لم يسجل</span>
                             </div>
                         </CardContent>
@@ -583,20 +607,25 @@ export default function PublicStudentRecordPage() {
                                                             )}
                                                         </div>
                                                         {!d.isHoliday && (
-                                                            <div className="grid grid-cols-2 gap-4 mt-2">
-                                                                <div className="bg-muted/30 p-4 rounded-2xl border border-dotted border-primary/20">
-                                                                    <span className="text-[10px] text-muted-foreground font-black block mb-1 uppercase opacity-60">التقييم القرآني</span>
-                                                                    <span className="font-black text-sm text-primary">{d.memorization || '---'}</span>
-                                                                </div>
-                                                                <div className="bg-muted/30 p-4 rounded-2xl border border-dotted border-primary/20">
-                                                                    <span className="text-[10px] text-muted-foreground font-black block mb-1 uppercase opacity-60">سلوك الحصة</span>
-                                                                    <span className="font-black text-sm">{d.behavior || '---'}</span>
-                                                                </div>
-                                                                {d.notes && (
-                                                                    <div className="col-span-2 bg-primary/5 p-4 rounded-2xl border-r-4 border-primary/20 italic text-sm text-foreground/80 leading-relaxed">
-                                                                        "{d.notes}"
+                                                            <div className="space-y-4 mt-2">
+                                                                {(d.records || [d]).map((record: any, idx: number) => (
+                                                                    <div key={idx} className={cn("grid grid-cols-2 gap-4 p-4 rounded-2xl border border-dotted border-primary/20 bg-muted/10", (d.records?.length > 1) && "border-r-4 border-r-primary")}>
+                                                                        {d.records?.length > 1 && <div className="col-span-2 text-[10px] font-black text-primary underline mb-1">الحصة رقم {record.sessionNumber || idx + 1}</div>}
+                                                                        <div>
+                                                                            <span className="text-[10px] text-muted-foreground font-black block mb-1 uppercase opacity-60">التقييم القرآني</span>
+                                                                            <span className="font-black text-sm text-primary">{record.memorization || '---'}</span>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span className="text-[10px] text-muted-foreground font-black block mb-1 uppercase opacity-60">سلوك الحصة</span>
+                                                                            <span className="font-black text-sm">{record.behavior || '---'}</span>
+                                                                        </div>
+                                                                        {record.notes && (
+                                                                            <div className="col-span-2 bg-primary/5 p-3 rounded-xl italic text-xs text-foreground/80 leading-relaxed border-r-2 border-primary/20">
+                                                                                "{record.notes}"
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                )}
+                                                                ))}
                                                             </div>
                                                         )}
                                                     </div>

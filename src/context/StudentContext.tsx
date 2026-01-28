@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry, AdminLog } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry, AdminLog, ActivityLog } from '@/lib/types';
 import { isWithinInterval, parseISO, isValid, isAfter, subDays } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -68,6 +68,7 @@ interface StudentContextType {
   settings: AppSettings;
   hallOfFame: HallOfFameData | null;
   adminLogs: AdminLog[];
+  activityLogs: ActivityLog[];
   loading: boolean;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string }) => Promise<void>;
   updateStudent: (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => Promise<void>;
@@ -112,6 +113,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [surahProgress, setSurahProgress] = useState<Record<string, SurahMastery>>({});
   const [payments, setPayments] = useState<Payment[]>([]);
   const [adminLogs, setAdminLogs] = useState<AdminLog[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
 
@@ -132,35 +134,22 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setPreRegistrations([]);
       setAllUsers([]);
       setAdminLogs([]);
+      setActivityLogs([]);
       return;
     }
 
     setLoading(true);
-
-    let dataRef: DatabaseReference;
-    let preRegsRef: DatabaseReference;
-    let dataListener: () => void;
-    let preRegsListener: () => void;
-
-    // Only fetch allUsers list for management/super_admin or if specifically needed
+    let dataRef: DatabaseReference | null = null;
+    let preRegsRef: DatabaseReference | null = null;
+    let dataListener: (() => void) | null = null;
+    let preRegsListener: (() => void) | null = null;
     let allUsersRef: DatabaseReference | null = null;
     let allUsersListener: (() => void) | null = null;
+    let globalLogsRef: DatabaseReference | null = null;
+    let globalLogsListener: (() => void) | null = null;
 
-    if (isSuperAdmin || isManagement) {
-      console.log(`[StudentContext] Setting up allUsers listener for role: ${role}`);
-      allUsersRef = ref(db, 'users');
-      allUsersListener = onValue(allUsersRef, (snapshot) => {
-        const usersData = snapshot.val();
-        const usersArray = usersData ? Object.entries(usersData).map(([uid, data]: [string, any]) => ({
-          uid,
-          ...data.profile
-        })) : [];
-        setAllUsers(usersArray);
-      }, (error) => {
-        console.error(`Firebase read failed for allUsers (role: ${role}): ${error.message}`);
-      });
-    }
-
+    let accumulatedUserLogs: Record<string, ActivityLog> = {};
+    let accumulatedGlobalLogs: Record<string, ActivityLog> = {};
 
     const processStudentData = (studentData: any, uid: string, groupName?: string): Student => ({
       ...studentData,
@@ -179,31 +168,33 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       birthDate: preReg.birthDate && isValid(parseISO(preReg.birthDate)) ? parseISO(preReg.birthDate) : preReg.birthDate,
     });
 
-    // Only fetch pre_registrations for management/super_admin
     if (isSuperAdmin || isManagement) {
-      preRegsRef = ref(db, 'pre_registrations');
-      preRegsListener = onValue(preRegsRef, (snapshot) => {
-        const data = snapshot.val();
-        const preRegsArray: PreRegistration[] = data ? Object.entries(data).map(([id, r]) => processPreRegData({ id, ...(r as any) })) : [];
-        setPreRegistrations(preRegsArray);
-      }, (error) => {
-        if (error.message.includes('permission_denied')) {
-          console.warn(`[StudentContext] Permission denied for ${role} on /pre_registrations.`);
-        } else {
-          console.error(`Firebase read failed for pre_registrations: ${error.message}`);
-        }
-      });
-    }
+      const mergeAndSetLogs = () => {
+        const merged = { ...accumulatedUserLogs, ...accumulatedGlobalLogs };
+        const logsArray = Object.values(merged).sort((a, b) => {
+          const timeA = typeof a.timestamp === 'number' ? a.timestamp : 0;
+          const timeB = typeof b.timestamp === 'number' ? b.timestamp : 0;
+          return timeB - timeA;
+        });
+        setActivityLogs(logsArray);
+      };
 
+      // 1. All Users Listener (main data source for management)
+      allUsersRef = ref(db, 'users');
+      allUsersListener = onValue(allUsersRef, (snapshot) => {
+        const usersData = snapshot.val();
+        const usersArray = usersData ? Object.entries(usersData).map(([uid, data]: [string, any]) => ({
+          uid,
+          ...data.profile
+        })) : [];
+        setAllUsers(usersArray);
 
-    if (isSuperAdmin || isManagement) {
-      dataRef = ref(db, 'users');
-      dataListener = onValue(dataRef, (snapshot) => {
-        if (!snapshot.exists()) {
+        if (!usersData) {
           setLoading(false);
           return;
         }
-        const allUsersData = snapshot.val();
+
+        // Aggregate data from all users
         let allStudents: Student[] = [];
         let allSessions: Record<string, Record<string, DailySession>> = {};
         let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
@@ -212,15 +203,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         let allAdminLogs: AdminLog[] = [];
         let finalSettings: AppSettings = DEFAULT_SETTINGS;
 
-        if (allUsersData[authContextUser.uid]?.settings) {
-          finalSettings = {
-            ...DEFAULT_SETTINGS,
-            ...allUsersData[authContextUser.uid].settings
-          }
+        if (usersData[authContextUser.uid]?.settings) {
+          finalSettings = { ...DEFAULT_SETTINGS, ...usersData[authContextUser.uid].settings };
         }
 
-        for (const uid in allUsersData) {
-          const userData = allUsersData[uid];
+        accumulatedUserLogs = {};
+        for (const uid in usersData) {
+          const userData = usersData[uid];
           if (userData.students) {
             const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) =>
               processStudentData({ ...s, id }, uid, userData.profile?.group)
@@ -243,7 +232,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             const userLogs = Object.entries(userData.admin_logs).map(([id, l]) => ({ id, ...(l as Omit<AdminLog, 'id'>) }));
             allAdminLogs.push(...userLogs);
           }
+          if (userData.activity_logs) {
+            Object.entries(userData.activity_logs).forEach(([id, l]) => {
+              accumulatedUserLogs[id] = { id, ...(l as any) };
+            });
+          }
         }
+
         setStudents(allStudents);
         setDailySessions(allSessions);
         setDailyReports(allReports);
@@ -251,17 +246,34 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setPayments(allPayments);
         setAdminLogs(allAdminLogs);
         setSettingsState(finalSettings);
+        mergeAndSetLogs();
         setLoading(false);
       }, (error) => {
-        if (error.message.includes('permission_denied')) {
-          console.warn(`[StudentContext] Permission denied for ${role} on /users. Falling back to personal data.`);
-        } else {
-          console.error(`Firebase read failed for ${role}: ${error.message}`);
-        }
+        console.error(`Firebase read failed for management: ${error.message}`);
         setLoading(false);
       });
 
+      // 2. Pre-registrations
+      preRegsRef = ref(db, 'pre_registrations');
+      preRegsListener = onValue(preRegsRef, (snapshot) => {
+        const data = snapshot.val();
+        const preRegsArray: PreRegistration[] = data ? Object.entries(data).map(([id, r]) => processPreRegData({ id, ...(r as any) })) : [];
+        setPreRegistrations(preRegsArray);
+      });
+
+      // 3. Global Activity Logs
+      globalLogsRef = ref(db, 'activity_logs');
+      globalLogsListener = onValue(globalLogsRef, (snapshot) => {
+        if (snapshot.exists()) {
+          accumulatedGlobalLogs = {};
+          Object.entries(snapshot.val()).forEach(([id, l]) => {
+            accumulatedGlobalLogs[id] = { id, ...(l as any) };
+          });
+          mergeAndSetLogs();
+        }
+      });
     } else {
+      // Sheikh (Personal) View
       dataRef = ref(db, `users/${authContextUser.uid}`);
       dataListener = onValue(dataRef, (snapshot) => {
         if (!snapshot.exists()) {
@@ -287,18 +299,20 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setSurahProgress(data.surahProgress || {});
         setPayments(paymentsArray);
         setAdminLogs(adminLogsArray);
+        setActivityLogs(data.activity_logs ? Object.entries(data.activity_logs).map(([id, l]) => ({ id, ...(l as any) })) : []);
         setSettingsState(userSettings);
         setLoading(false);
       }, (error) => {
-        console.error(`Firebase read failed for user ${authContextUser.uid}: ${error.message}`);
+        console.error(`Firebase read failed for user: ${error.message}`);
         setLoading(false);
       });
     }
 
     return () => {
-      if (dataRef && dataListener) off(dataRef, 'value', dataListener);
-      if (preRegsRef && preRegsListener) off(preRegsRef, 'value', preRegsListener);
       if (allUsersRef && allUsersListener) off(allUsersRef, 'value', allUsersListener);
+      if (preRegsRef && preRegsListener) off(preRegsRef, 'value', preRegsListener);
+      if (globalLogsRef && globalLogsListener) off(globalLogsRef, 'value', globalLogsListener);
+      if (dataRef && dataListener) off(dataRef, 'value', dataListener);
     };
   }, [authContextUser, authLoading, isSuperAdmin, isManagement]);
 
@@ -1163,16 +1177,45 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <StudentContext.Provider value={{
-      students, preRegistrations, allUsers, dailySessions, dailyReports, loading, surahProgress, payments, settings, hallOfFame,
-      addStudent, updateStudent, deleteStudent, deleteAllStudents, deleteMultipleStudents,
-      addDailySession, deleteDailySession, getSessionsForDay, getSessionById, getRecordsForDateRange,
-      importStudents, importPreRegistrations, updatePreRegistration, bulkUpdatePreRegistrations, deleteAllPreRegistrations, deleteMultiplePreRegistrations,
-      saveDailyReport, deleteDailyReport, toggleSurahStatus, addPayment, updatePaymentStatus, saveSettings, generateDemoData,
+      students,
+      preRegistrations,
+      allUsers,
+      dailySessions,
+      dailyReports,
+      surahProgress,
+      payments,
+      settings,
+      hallOfFame,
+      adminLogs,
+      activityLogs,
+      loading,
+      addStudent,
+      updateStudent,
+      deleteStudent,
+      deleteAllStudents,
+      deleteMultipleStudents,
+      addDailySession,
+      deleteDailySession,
+      getSessionsForDay,
+      getSessionById,
+      getRecordsForDateRange,
+      importStudents,
+      importPreRegistrations,
+      updatePreRegistration,
+      bulkUpdatePreRegistrations,
+      deleteAllPreRegistrations,
+      deleteMultiplePreRegistrations,
+      saveDailyReport,
+      deleteDailyReport,
+      toggleSurahStatus,
+      addPayment,
+      updatePaymentStatus,
+      saveSettings,
+      generateDemoData,
       shareStudentRecord,
       saveAdminLog,
       deleteAdminLog,
       getNextTicketNumber,
-      adminLogs,
     }}>
       {children}
     </StudentContext.Provider>

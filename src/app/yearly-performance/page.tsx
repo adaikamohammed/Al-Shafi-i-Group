@@ -5,7 +5,11 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, ArrowLeft, ArrowRight, Calendar, CheckCircle, TrendingUp, Users, CalendarX } from 'lucide-react';
+import {
+    Loader2, ArrowLeft, ArrowRight, Calendar, CheckCircle, TrendingUp, Users, CalendarX,
+    BookOpen, PlusCircle, Activity, Coffee, UserX, UserCheck, Star, Zap, Target,
+    ChevronLeft, ChevronRight
+} from 'lucide-react';
 import { format, getYear, getDay, startOfYear, addDays, parseISO, getMonth, getDaysInMonth, startOfMonth, endOfMonth, getQuarter, setYear, setMonth, addMonths, subMonths, endOfYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -73,7 +77,7 @@ const YearView = ({ year, data, onDayClick }: { year: number, data: any, onDayCl
                 return (
                     <Tooltip key={dateString}>
                         <TooltipTrigger asChild>
-                            <div className={cn("w-4 h-4 rounded", colorClass)} onClick={() => onDayClick(day)} />
+                            <div className={cn("w-4 h-4 rounded cursor-pointer transition-all hover:scale-125", colorClass)} onClick={() => onDayClick(day)} />
                         </TooltipTrigger>
                         <TooltipContent><DayTooltipContent day={day} dayData={dayData} /></TooltipContent>
                     </Tooltip>
@@ -109,7 +113,7 @@ const QuarterView = ({ year, quarter, data, onDayClick }: { year: number, quarte
                                 return (
                                     <Tooltip key={dateString}>
                                         <TooltipTrigger asChild>
-                                            <div className={cn("w-8 h-8 rounded-md", colorClass)} onClick={() => onDayClick(day)} />
+                                            <div className={cn("w-8 h-8 rounded-md cursor-pointer transition-all hover:scale-110", colorClass)} onClick={() => onDayClick(day)} />
                                         </TooltipTrigger>
                                         <TooltipContent><DayTooltipContent day={day} dayData={dayData} /></TooltipContent>
                                     </Tooltip>
@@ -145,7 +149,7 @@ const MonthView = ({ year, month, data, onDayClick }: { year: number, month: num
         dayCells.push(
             <Tooltip key={dateString}>
                 <TooltipTrigger asChild>
-                    <div className={cn("w-full h-20 rounded-lg p-2 border-2 text-right flex flex-col justify-between cursor-pointer", colorClass)} onClick={() => onDayClick(day)}>
+                    <div className={cn("w-full h-20 rounded-lg p-2 border-2 text-right flex flex-col justify-between cursor-pointer transition-all hover:border-primary/50", colorClass)} onClick={() => onDayClick(day)}>
                         <span className="font-bold text-lg">{i}</span>
                     </div>
                 </TooltipTrigger>
@@ -155,7 +159,7 @@ const MonthView = ({ year, month, data, onDayClick }: { year: number, month: num
     }
 
     return (
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 gap-2 text-right" dir="rtl">
             {weekdays.map(day => <div key={day} className="text-center font-semibold text-muted-foreground pb-2">{day}</div>)}
             {dayCells}
         </div>
@@ -163,15 +167,42 @@ const MonthView = ({ year, month, data, onDayClick }: { year: number, month: num
 };
 
 
-const StatWidget = ({ title, value, unit, icon }: { title: string, value: string | number, unit: string, icon: React.ReactNode }) => (
-    <div className="flex items-center p-4 bg-muted rounded-lg">
-        <div className="mr-4">{icon}</div>
-        <div>
-            <p className="text-sm text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold">{value} <span className="text-sm font-normal">{unit}</span></p>
+const StatWidget = ({ title, value, unit, icon, description, variant = "default" }: { title: string, value: string | number, unit: string, icon: React.ReactNode, description?: string, variant?: 'default' | 'emerald' | 'blue' | 'indigo' | 'orange' | 'red' | 'purple' }) => {
+    const variants = {
+        default: "bg-muted/50 border-muted-foreground/10",
+        emerald: "bg-emerald-50 border-emerald-100 text-emerald-900",
+        blue: "bg-blue-50 border-blue-100 text-blue-900",
+        indigo: "bg-indigo-50 border-indigo-100 text-indigo-900",
+        orange: "bg-orange-50 border-orange-100 text-orange-900",
+        red: "bg-red-50 border-red-100 text-red-900",
+        purple: "bg-purple-50 border-purple-100 text-purple-900",
+    };
+
+    const iconColors = {
+        default: "text-muted-foreground",
+        emerald: "text-emerald-500",
+        blue: "text-blue-500",
+        indigo: "text-indigo-500",
+        orange: "text-orange-500",
+        red: "text-red-500",
+        purple: "text-purple-500",
+    };
+
+    return (
+        <div className={cn("flex flex-col p-4 rounded-xl border shadow-sm transition-all hover:shadow-md", variants[variant])}>
+            <div className="flex items-center justify-between mb-2">
+                <div className={cn("p-2 rounded-lg bg-background/50", iconColors[variant])}>{icon}</div>
+                <div className="text-left font-bold text-2xl">
+                    {value} <span className="text-[10px] uppercase font-normal text-muted-foreground">{unit}</span>
+                </div>
+            </div>
+            <div className="text-right">
+                <p className="text-xs font-bold opacity-80">{title}</p>
+                {description && <p className="text-[10px] opacity-60 mt-0.5">{description}</p>}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 export default function YearlyPerformancePage() {
     const { students, dailySessions, loading } = useStudentContext();
@@ -229,10 +260,23 @@ export default function YearlyPerformancePage() {
     }, [dailySessions, students, currentYear]);
 
     const { periodStats, statsTitle } = useMemo(() => {
-        if (!dailySessions || !students) return { periodStats: { commitmentRate: 0, extraSessions: 0, netWorkDays: 0, sheikhAbsenceDays: 0 }, statsTitle: '' };
+        const emptyStats = {
+            attendanceRate: "0",
+            accomplishmentRate: "0",
+            basicSessions: 0,
+            extraSessions: 0,
+            activitySessions: 0,
+            holidays: 0,
+            sheikhAbsenceNoSub: 0,
+            sheikhAbsenceWithSub: 0,
+            netWorkDays: 0,
+            totalWorkSessions: 0
+        };
+
+        if (!dailySessions || !students) return { periodStats: emptyStats, statsTitle: '' };
 
         const activeStudentsCount = students.filter(s => s.status === 'نشط').length;
-        if (activeStudentsCount === 0) return { periodStats: { commitmentRate: 0, extraSessions: 0, netWorkDays: 0, sheikhAbsenceDays: 0 }, statsTitle: '' };
+        if (activeStudentsCount === 0) return { periodStats: emptyStats, statsTitle: '' };
 
         let startDate: Date;
         let endDate: Date;
@@ -262,11 +306,16 @@ export default function YearlyPerformancePage() {
         }
 
         const stats = {
+            basicSessions: 0,
             extraSessions: 0,
+            activitySessions: 0,
+            holidays: 0,
+            sheikhAbsenceNoSub: 0,
+            sheikhAbsenceWithSub: 0,
             workDays: new Set<string>(),
             totalAttendance: 0,
             totalPossibleAttendance: 0,
-            sheikhAbsenceDays: 0,
+            totalWorkSessions: 0,
         };
 
         Object.keys(dailySessions).forEach(dateString => {
@@ -274,26 +323,32 @@ export default function YearlyPerformancePage() {
                 const sessionDate = parseISO(dateString);
                 if (sessionDate >= startDate && sessionDate <= endDate) {
                     const sessionsOnDay = Object.values(dailySessions[dateString]);
-                    const isHoliday = sessionsOnDay.some(s => s.sessionType === 'يوم عطلة');
-                    const isSheikhAbsentNoSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
 
-                    if (isSheikhAbsentNoSub) {
-                        stats.sheikhAbsenceDays++;
-                    }
+                    // إحصائيات عامة لليوم
+                    if (sessionsOnDay.some(s => s.sessionType === 'يوم عطلة')) stats.holidays++;
+                    if (sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher)) stats.sheikhAbsenceNoSub++;
+                    if (sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && s.substituteTeacher)) stats.sheikhAbsenceWithSub++;
 
-                    if (!isHoliday && !isSheikhAbsentNoSub) {
-                        const workSessions = sessionsOnDay.filter(s => s.sessionType !== 'يوم عطلة' && !(s.sessionType === 'غياب الشيخ' && !s.substituteTeacher));
-                        if (workSessions.length > 0) {
-                            stats.workDays.add(dateString);
-                            workSessions.forEach(session => {
-                                if (session.sessionType === 'حصة تعويضية') {
-                                    stats.extraSessions++;
-                                }
-                                const attendanceCount = (session.records || []).filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
-                                stats.totalAttendance += attendanceCount;
-                                stats.totalPossibleAttendance += activeStudentsCount;
-                            });
-                        }
+                    const workSessions = sessionsOnDay.filter(s =>
+                        s.sessionType !== 'يوم عطلة' &&
+                        !(s.sessionType === 'غياب الشيخ' && !s.substituteTeacher)
+                    );
+
+                    if (workSessions.length > 0) {
+                        stats.workDays.add(dateString);
+                        workSessions.forEach(session => {
+                            stats.totalWorkSessions++;
+
+                            // تصنيف الحصة
+                            if (session.sessionType === 'حصة أساسية') stats.basicSessions++;
+                            else if (session.sessionType === 'حصة إضافية' || session.sessionType === 'حصة تعويضية') stats.extraSessions++;
+                            else if (session.sessionType === 'حصة أنشطة') stats.activitySessions++;
+
+                            // حساب الحضور
+                            const attendanceCount = (session.records || []).filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
+                            stats.totalAttendance += attendanceCount;
+                            stats.totalPossibleAttendance += activeStudentsCount;
+                        });
                     }
                 }
             } catch (e) {
@@ -301,16 +356,28 @@ export default function YearlyPerformancePage() {
             }
         });
 
-        const commitmentRate = stats.totalPossibleAttendance > 0 ? (stats.totalAttendance / stats.totalPossibleAttendance) * 100 : 0;
+        const attendanceRate = stats.totalPossibleAttendance > 0 ? (stats.totalAttendance / stats.totalPossibleAttendance) * 100 : 0;
 
-        const finalStats = {
-            commitmentRate: commitmentRate.toFixed(0),
-            extraSessions: stats.extraSessions,
-            netWorkDays: stats.workDays.size,
-            sheikhAbsenceDays: stats.sheikhAbsenceDays,
+        // حساب معدل الإنجاز (افتراض أن الأسبوع فيه 5 أيام عمل، أي 20 يوم في الشهر)
+        const daysInPeriod = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1;
+        const estimatedTargetSessions = Math.max(stats.workDays.size, Math.floor((daysInPeriod / 7) * 5));
+        const accomplishmentRate = estimatedTargetSessions > 0 ? (stats.totalWorkSessions / estimatedTargetSessions) * 100 : 0;
+
+        return {
+            periodStats: {
+                attendanceRate: attendanceRate.toFixed(0),
+                accomplishmentRate: accomplishmentRate.toFixed(0),
+                basicSessions: stats.basicSessions,
+                extraSessions: stats.extraSessions,
+                activitySessions: stats.activitySessions,
+                holidays: stats.holidays,
+                sheikhAbsenceNoSub: stats.sheikhAbsenceNoSub,
+                sheikhAbsenceWithSub: stats.sheikhAbsenceWithSub,
+                netWorkDays: stats.workDays.size,
+                totalWorkSessions: stats.totalWorkSessions
+            },
+            statsTitle: title
         };
-
-        return { periodStats: finalStats, statsTitle: title };
 
     }, [dailySessions, students, viewMode, currentDate]);
 
@@ -345,90 +412,128 @@ export default function YearlyPerformancePage() {
     return (
         <TooltipProvider>
             <div className="space-y-6 w-full">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-3xl font-headline font-bold">رادار الأداء السنوي</CardTitle>
-                        <CardDescription>نظرة شاملة على التزام وأداء الفوج على مدار العام. كل مربع يمثل يوماً.</CardDescription>
+                <Card className="border-none shadow-none bg-transparent">
+                    <CardHeader className="px-0">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="text-right">
+                                <CardTitle className="text-3xl font-headline font-bold text-primary">رادار الأداء السنوي</CardTitle>
+                                <CardDescription className="text-base">نظرة شاملة على التزام وأداء الفوج وجدول الحصص.</CardDescription>
+                            </div>
+                            <div className="flex items-center gap-3 bg-muted/50 p-1.5 rounded-2xl border">
+                                <Button variant={viewMode === 'year' ? 'secondary' : 'ghost'} onClick={() => setViewMode('year')} className="h-9 px-5 rounded-xl font-bold">سنوي</Button>
+                                <Button variant={viewMode === 'quarter' ? 'secondary' : 'ghost'} onClick={() => setViewMode('quarter')} className="h-9 px-5 rounded-xl font-bold">فصلي</Button>
+                                <Button variant={viewMode === 'month' ? 'secondary' : 'ghost'} onClick={() => setViewMode('month')} className="h-9 px-5 rounded-xl font-bold">شهري</Button>
+                            </div>
+                        </div>
                     </CardHeader>
                 </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <Card className="lg:col-span-2">
+                    <Card className="lg:col-span-2 overflow-hidden border-muted/60">
                         <CardContent className="pt-6">
-                            <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
-                                <div className="flex items-center gap-2">
-                                    <Button variant="outline" size="icon" onClick={() => handleDateNavigation('prev')}><ArrowRight className="h-4 w-4" /></Button>
-                                    <span className="font-semibold text-lg w-32 text-center">{viewTitle}</span>
-                                    <Button variant="outline" size="icon" onClick={() => handleDateNavigation('next')}><ArrowLeft className="h-4 w-4" /></Button>
+                            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+                                <div className="flex items-center gap-4 order-2 md:order-1">
+                                    <Button variant="outline" size="icon" className="rounded-full" onClick={() => handleDateNavigation('prev')}><ChevronRight className="h-5 w-5" /></Button>
+                                    <span className="font-bold text-xl min-w-[140px] text-center text-primary">{viewTitle}</span>
+                                    <Button variant="outline" size="icon" className="rounded-full" onClick={() => handleDateNavigation('next')}><ChevronLeft className="h-5 w-5" /></Button>
                                 </div>
 
-                                <div className="flex-1 flex justify-center">
+                                <div className="flex-1 flex justify-center order-1 md:order-2">
                                     {viewMode === 'quarter' && (
-                                        <div className="flex items-center space-x-1 rounded-lg bg-muted p-1">
-                                            <Button variant={currentQuarter === 1 ? 'secondary' : 'ghost'} onClick={() => handleSetQuarter(1)} className="h-8 px-2 text-xs">الربع 1</Button>
-                                            <Button variant={currentQuarter === 2 ? 'secondary' : 'ghost'} onClick={() => handleSetQuarter(2)} className="h-8 px-2 text-xs">الربع 2</Button>
-                                            <Button variant={currentQuarter === 3 ? 'secondary' : 'ghost'} onClick={() => handleSetQuarter(3)} className="h-8 px-2 text-xs">الربع 3</Button>
-                                            <Button variant={currentQuarter === 4 ? 'secondary' : 'ghost'} onClick={() => handleSetQuarter(4)} className="h-8 px-2 text-xs">الربع 4</Button>
+                                        <div className="flex items-center gap-1 rounded-xl bg-muted/40 p-1 border">
+                                            {[1, 2, 3, 4].map(q => (
+                                                <Button key={q} variant={currentQuarter === q ? 'secondary' : 'ghost'} onClick={() => handleSetQuarter(q)} className="h-8 px-4 text-xs font-bold rounded-lg transition-all">الربع {q}</Button>
+                                            ))}
                                         </div>
                                     )}
                                 </div>
-
-                                <div className="flex items-center space-x-1 rounded-lg bg-muted p-1">
-                                    <Button variant={viewMode === 'year' ? 'secondary' : 'ghost'} onClick={() => setViewMode('year')} className="h-8 px-3">سنوي</Button>
-                                    <Button variant={viewMode === 'quarter' ? 'secondary' : 'ghost'} onClick={() => setViewMode('quarter')} className="h-8 px-3">فصلي</Button>
-                                    <Button variant={viewMode === 'month' ? 'secondary' : 'ghost'} onClick={() => setViewMode('month')} className="h-8 px-3">شهري</Button>
-                                </div>
                             </div>
 
-                            {viewMode === 'year' && <YearView year={currentYear} data={yearlyData} onDayClick={(date) => { setCurrentDate(date); setViewMode('month'); }} />}
-                            {viewMode === 'quarter' && <QuarterView year={currentYear} quarter={currentQuarter} data={yearlyData} onDayClick={(date) => { setCurrentDate(date); setViewMode('month'); }} />}
-                            {viewMode === 'month' && <MonthView year={currentYear} month={currentMonth} data={yearlyData} onDayClick={(date) => console.log(date)} />}
+                            <div className="relative">
+                                {viewMode === 'year' && <YearView year={currentYear} data={yearlyData} onDayClick={(date) => { setCurrentDate(date); setViewMode('month'); }} />}
+                                {viewMode === 'quarter' && <QuarterView year={currentYear} quarter={currentQuarter} data={yearlyData} onDayClick={(date) => { setCurrentDate(date); setViewMode('month'); }} />}
+                                {viewMode === 'month' && <MonthView year={currentYear} month={currentMonth} data={yearlyData} onDayClick={(date) => console.log(date)} />}
+                            </div>
 
-                            <div className="mt-6 flex flex-wrap justify-center gap-4 text-sm">
-                                <span className="flex items-center gap-2">جهد أقل</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-400 border border-emerald-500"></div></span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-600 border border-emerald-700"></div></span>
-                                <span className="flex items-center gap-2">جهد أعلى</span>
-                                <span className="flex items-center gap-2 font-semibold ml-4">|</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-400 border border-red-500"></div>غياب</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-purple-400 border border-purple-500"></div>غياب (ببديل)</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-blue-400 border border-blue-500"></div>عطلة</span>
-                                <span className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-gray-100 dark:bg-gray-800"></div>يوم فارغ</span>
+                            <div className="mt-8 pt-6 border-t flex flex-wrap justify-center gap-x-6 gap-y-3 text-[11px] font-bold text-muted-foreground">
+                                <div className="flex items-center gap-2"><div className="w-3.5 h-3.5 rounded bg-emerald-400 border border-emerald-500"></div> جهد معتدل</div>
+                                <div className="flex items-center gap-2"><div className="w-3.5 h-3.5 rounded bg-emerald-600 border border-emerald-700"></div> جهد مكثف</div>
+                                <div className="flex items-center gap-4 px-2 opacity-30">|</div>
+                                <div className="flex items-center gap-2"><div className="w-3.5 h-3.5 rounded bg-red-400 border border-red-500"></div> غياب الشيخ</div>
+                                <div className="flex items-center gap-2"><div className="w-3.5 h-3.5 rounded bg-purple-400 border border-purple-500"></div> غياب (ببديل)</div>
+                                <div className="flex items-center gap-2"><div className="w-3.5 h-3.5 rounded bg-blue-400 border border-blue-500"></div> عطلة رسمية</div>
                             </div>
                         </CardContent>
                     </Card>
 
                     <div className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{statsTitle}</CardTitle>
-                                <CardDescription>ملخص أداء الفوج للفترة المحددة</CardDescription>
+                        <Card className="border-primary/10 shadow-lg shadow-primary/5">
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-lg font-bold">{statsTitle}</CardTitle>
+                                    <Target className="h-5 w-5 text-primary opacity-50" />
+                                </div>
+                                <CardDescription>تحليل دقيق لأداء الفترة المختارة</CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-4">
-                                <StatWidget
-                                    title="معدل الالتزام"
-                                    value={periodStats.commitmentRate}
-                                    unit="%"
-                                    icon={<CheckCircle className="h-8 w-8 text-green-500" />}
-                                />
-                                <StatWidget
-                                    title="صافي أيام العمل"
-                                    value={periodStats.netWorkDays}
-                                    unit="يوم"
-                                    icon={<Calendar className="h-8 w-8 text-blue-500" />}
-                                />
-                                <StatWidget
-                                    title="حصص إضافية وتعويضية"
-                                    value={periodStats.extraSessions}
-                                    unit="حصة"
-                                    icon={<TrendingUp className="h-8 w-8 text-indigo-500" />}
-                                />
-                                <StatWidget
-                                    title="غيابات الشيخ"
-                                    value={periodStats.sheikhAbsenceDays}
-                                    unit="يوم"
-                                    icon={<CalendarX className="h-8 w-8 text-red-500" />}
-                                />
+                            <CardContent className="space-y-6 pt-4">
+                                {/* Main KPIs */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <StatWidget
+                                        title="معدل الحضور"
+                                        value={periodStats.attendanceRate}
+                                        unit="%"
+                                        variant="emerald"
+                                        description="حضور الطلبة"
+                                        icon={<Users className="h-5 w-5" />}
+                                    />
+                                    <StatWidget
+                                        title="مستوى الإنجاز"
+                                        value={periodStats.accomplishmentRate}
+                                        unit="%"
+                                        variant="orange"
+                                        description="جهد الشيخ"
+                                        icon={<Star className="h-5 w-5" />}
+                                    />
+                                </div>
+
+                                <div className="space-y-3">
+                                    <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mr-1">تفاصيل الحصص المنعقدة</h4>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        <StatWidget
+                                            title="الحصص الأساسية"
+                                            value={periodStats.basicSessions}
+                                            unit="حصة"
+                                            variant="blue"
+                                            icon={<BookOpen className="h-4 w-4" />}
+                                        />
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <StatWidget
+                                                title="إضافية / تعويضية"
+                                                value={periodStats.extraSessions}
+                                                unit="حصة"
+                                                variant="indigo"
+                                                icon={<PlusCircle className="h-4 w-4" />}
+                                            />
+                                            <StatWidget
+                                                title="حصص الأنشطة"
+                                                value={periodStats.activitySessions}
+                                                unit="حصة"
+                                                variant="emerald"
+                                                icon={<Activity className="h-4 w-4" />}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 pt-2">
+                                    <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mr-1">الإجازات والغيابات</h4>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <StatWidget title="عطل رسمية" value={periodStats.holidays} unit="يوم" variant="default" icon={<Coffee className="h-4 w-4" />} />
+                                        <StatWidget title="صافي العمل" value={periodStats.netWorkDays} unit="يوم" variant="default" icon={<Calendar className="h-4 w-4" />} />
+                                        <StatWidget title="غياب (لا بديل)" value={periodStats.sheikhAbsenceNoSub} unit="يوم" variant="red" icon={<UserX className="h-4 w-4" />} />
+                                        <StatWidget title="غياب (ببديل)" value={periodStats.sheikhAbsenceWithSub} unit="يوم" variant="purple" icon={<UserCheck className="h-4 w-4" />} />
+                                    </div>
+                                </div>
                             </CardContent>
                         </Card>
                     </div>

@@ -105,9 +105,16 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                     </div>
 
                     {/* Session Infos */}
-                    <div className="space-y-1">
+                    <div className="space-y-1 relative z-10">
                         {sessions.map((session, idx) => (
-                            <div key={idx} className="flex items-center text-[10px] font-bold text-muted-foreground bg-white/50 rounded-md px-1 py-0.5 truncate">
+                            <div
+                                key={idx}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDayClick(day, session.sessionNumber as 1 | 2);
+                                }}
+                                className="flex items-center text-[10px] font-bold text-muted-foreground bg-white/50 hover:bg-white/80 border border-transparent hover:border-primary/20 rounded-md px-1 py-0.5 truncate transition-colors"
+                            >
                                 {session.sessionType === 'حصة أساسية' ? `حصة ${session.sessionNumber}` : session.sessionType}
                             </div>
                         ))}
@@ -135,14 +142,8 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                                             <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={(e) => onDeleteSession(e, session.id)}>
                                                 <Trash2 className="ml-2 h-3 w-3" /> حذف
                                             </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
                                         </React.Fragment>
                                     ))}
-                                    {sessions.some(s => s.sessionNumber === 1) && !sessions.some(s => s.sessionNumber === 2) && (
-                                        <DropdownMenuItem onClick={() => onDayClick(day, 2)}>
-                                            <Copy className="ml-2 h-3 w-3" /> إضافة حصة إضافية
-                                        </DropdownMenuItem>
-                                    )}
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>

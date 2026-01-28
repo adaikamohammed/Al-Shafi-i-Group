@@ -88,7 +88,7 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                                 size="sm"
                                                 variant={record.attendance === 'حاضر' ? 'default' : 'outline'}
                                                 className={cn("flex-1 text-[10px] md:text-xs font-bold px-1", record.attendance === 'حاضر' && "bg-emerald-600 hover:bg-emerald-700")}
-                                                onClick={() => onUpdateRecord(student.id, 'attendance', 'حاضر')}
+                                                onClick={() => onUpdateRecord(student.id, 'attendance', record.attendance === 'حاضر' ? '' : 'حاضر')}
                                             >
                                                 <Check className="h-3 w-3 ml-1" /> حاضر
                                             </Button>
@@ -97,7 +97,7 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                                 size="sm"
                                                 variant={record.attendance === 'متأخر' ? 'default' : 'outline'}
                                                 className={cn("flex-1 text-[10px] md:text-xs font-bold px-1", record.attendance === 'متأخر' && "bg-amber-500 hover:bg-amber-600")}
-                                                onClick={() => onUpdateRecord(student.id, 'attendance', 'متأخر')}
+                                                onClick={() => onUpdateRecord(student.id, 'attendance', record.attendance === 'متأخر' ? '' : 'متأخر')}
                                             >
                                                 <Clock className="h-3 w-3 ml-1" /> متأخر
                                             </Button>
@@ -106,7 +106,7 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                                 size="sm"
                                                 variant={record.attendance === 'غياب' ? 'destructive' : 'outline'}
                                                 className="flex-1 text-[10px] md:text-xs font-bold px-1"
-                                                onClick={() => onUpdateRecord(student.id, 'attendance', 'غياب')}
+                                                onClick={() => onUpdateRecord(student.id, 'attendance', record.attendance === 'غياب' ? '' : 'غياب')}
                                             >
                                                 <X className="h-3 w-3 ml-1" /> غائب
                                             </Button>

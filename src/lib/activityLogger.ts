@@ -1,4 +1,4 @@
-import { ref, push, serverTimestamp, get } from 'firebase/database';
+import { ref, push, serverTimestamp, get, update } from 'firebase/database';
 import { db } from './firebase';
 import { toast } from '@/hooks/use-toast';
 
@@ -39,7 +39,9 @@ export const logActivity = async (
         const targetOwnerId = ownerId || actorId;
         if (!targetOwnerId) return;
 
-        const logsRef = ref(db, `users/${targetOwnerId}/activity_logs`);
+        // Generate a new key for the activity
+        const newLogId = push(ref(db, 'activity_logs')).key;
+        if (!newLogId) return;
 
         // Sanitize data to ensure no undefined values
         const safeLog: LogEntry = {
@@ -53,9 +55,16 @@ export const logActivity = async (
             groupName: groupName || ''
         };
 
-        console.log(`[ActivityLogger] Pushing log to users/${targetOwnerId}/activity_logs:`, safeLog);
+        const updates: any = {};
+        // 1. Log to the common global path (visible to Management)
+        updates[`activity_logs/${newLogId}`] = safeLog;
 
-        await push(logsRef, safeLog);
+        // 2. Log to the user's private path (visible to the specific Sheikh)
+        updates[`users/${targetOwnerId}/activity_logs/${newLogId}`] = safeLog;
+
+        console.log(`[ActivityLogger] Atomic log aggregation to global and user path:`, updates);
+
+        await update(ref(db), updates);
     } catch (error: any) {
         console.error('Error logging activity:', error);
         if (error.code === 'PERMISSION_DENIED' || error.message?.includes('permission_denied')) {

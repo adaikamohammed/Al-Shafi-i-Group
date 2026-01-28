@@ -19,7 +19,8 @@ import { GroupSelector } from '@/components/management/GroupSelector';
 const getAttendanceColor = (status?: string) => {
     switch (status) {
         case "حاضر": return "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800";
-        case "غائب": return "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900";
+        case "غائب":
+        case "غياب": return "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900";
         case "متأخر": return "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800";
         case "تعويض": return "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800";
         case "عطلة": return "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800";
@@ -307,7 +308,7 @@ export default function WeeklyFollowUpPage() {
                             <h4 className="font-semibold mb-2">الحضور (لون الخلفية)</h4>
                             <ul className="space-y-1 text-sm">
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-emerald-100 border border-emerald-200"></div> حاضر</li>
-                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-red-50 border border-red-200"></div> غائب</li>
+                                <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-red-100 border border-red-200"></div> غائب / غياب</li>
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-amber-50 border border-amber-200"></div> متأخر</li>
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-indigo-50 border border-indigo-200"></div> تعويض</li>
                                 <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-blue-50 border border-blue-200"></div> يوم عطلة</li>

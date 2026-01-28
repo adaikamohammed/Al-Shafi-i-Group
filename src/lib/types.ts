@@ -1,4 +1,4 @@
-
+import { ActivityAction } from "./activityLogger";
 
 export type StudentStatus = "نشط" | "مطرود" | "محذوف";
 export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "أكثر";
@@ -51,7 +51,7 @@ export interface Student {
   expulsionHistory?: ExpulsionRecord[];
 }
 
-export type AttendanceStatus = "حاضر" | "غياب" | "متأخر" | "تعويض" | "";
+export type AttendanceStatus = "حاضر" | "غياب" | "غائب" | "متأخر" | "تعويض" | "";
 export type PerformanceLevel = "ممتاز" | "جيد جدا" | "جيد جداً" | "جيد" | "متوسط" | "مقبول" | "ضعيف" | "لم يحفظ" | "لا يوجد" | "";
 export type BehaviorLevel = "هادئ" | "متوسط" | "مقبول" | "غير منضبط" | "مشاغب" | "";
 export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة" | "حصة تعويضية" | "غياب الشيخ" | "حصة إضافية";
@@ -99,8 +99,6 @@ export interface DailyReport {
   isPinned: boolean;
   priority?: 'normal' | 'urgent' | 'important';
   hasNewReply?: boolean;
-  audioURL?: string;
-  imageURL?: string;
 }
 
 
@@ -292,4 +290,16 @@ export interface AdminLog {
   groupName: string;
   details: any; // Flexible depending on type
   timestamp: string; // ISO string for record creation
+}
+
+export interface ActivityLog {
+  id: string;
+  action: ActivityAction;
+  actorId: string;
+  actorName: string;
+  targetId?: string;
+  targetName?: string;
+  details?: string;
+  timestamp: any;
+  groupName?: string;
 }

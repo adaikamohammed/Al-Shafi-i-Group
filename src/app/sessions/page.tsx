@@ -10,6 +10,7 @@ import { ar } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
 import { surahs } from '@/lib/surahs';
+import { SessionType } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -18,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, FileText, UserCheck, AlertTriangle, Trophy, Download, Trash2, Copy, MoreVertical, Dot, ChevronRight, ChevronLeft, BookOpen } from 'lucide-react';
+import { Loader2, Save, FileText, UserCheck, AlertTriangle, Trophy, Download, Trash2, Copy, MoreVertical, Dot, ChevronRight, ChevronLeft, BookOpen, Plus, Calendar as CalendarIcon } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ProtectedPage } from '@/components/ui/ProtectedPage';
@@ -58,25 +59,42 @@ export default function DailySessionsPage() {
 
   // State
   const [currentDate, setCurrentDate] = useState(new Date());
-  const handleDayClick = (day: number, sessionNumber: 1 | 2 = 1) => {
+  const [isAddExtraDialogOpen, setIsAddExtraDialogOpen] = useState(false);
+  const [extraSessionDate, setExtraSessionDate] = useState('');
+  const [extraSessionType, setExtraSessionType] = useState<SessionType>('حصة أساسية');
+  const [extraSessionNumber, setExtraSessionNumber] = useState<1 | 2>(1);
+  const [sessionChoiceData, setSessionChoiceData] = useState<{ day: number, dateStr: string, sessions: any[] } | null>(null);
+  const handleDayClick = (day: number, sessionNumber?: 1 | 2) => {
     const newSelectedDay = new Date(getYear(currentDate), getMonth(currentDate), day);
     const dateStr = format(newSelectedDay, 'yyyy-MM-dd');
     const daySessions = getSessionsForDay(dateStr);
 
-    // Validation: Cannot open Session 2 if Session 1 is explicitly missing
-    if (sessionNumber === 2) {
-      const session1 = daySessions.find(s => s.sessionNumber === 1);
-      if (!session1) {
-        toast({
-          title: "تنبيه",
-          description: "يجب تسجيل الحصة الأولى (الأساسية) قبل فتح الحصة الثانية (الإضافية).",
-          variant: "destructive",
-        });
-        return;
+    // إذا تم تحديد رقم الحصة مسبقاً (عبر النقر المباشر على ماركة الحصة)
+    if (sessionNumber) {
+      // التحقق من وجود الحصة الأولى قبل فتح الحصة الثانية
+      if (sessionNumber === 2) {
+        const session1 = daySessions.find(s => s.sessionNumber === 1);
+        if (!session1) {
+          toast({
+            title: "تنبيه",
+            description: "يجب تسجيل الحصة الأولى (الأساسية) قبل فتح الحصة الثانية (الإضافية).",
+            variant: "destructive",
+          });
+          return;
+        }
       }
+      router.push(`/sessions/register?date=${dateStr}&session=${sessionNumber}`);
+      return;
     }
 
-    router.push(`/sessions/register?date=${dateStr}&session=${sessionNumber}`);
+    // إذا لم يتم تحديد رقم الحصة (النقر على الخلية نفسها)
+    // نتحقق من عدد الحصص الموجودة
+    if (daySessions.length > 1) {
+      setSessionChoiceData({ day, dateStr, sessions: daySessions });
+    } else {
+      // حصة واحدة أو لا توجد حصص -> نفتح الحصة 1 افتراضياً
+      router.push(`/sessions/register?date=${dateStr}&session=1`);
+    }
   };
 
   const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
@@ -84,6 +102,43 @@ export default function DailySessionsPage() {
     deleteDailySession(sessionId);
     toast({ title: "تم الحذف", description: `تم حذف بيانات الحصة بنجاح.` });
   }
+
+  const handleAddExtraSession = () => {
+    if (!extraSessionDate) {
+      toast({ title: "خطأ", description: "يرجى اختيار التاريخ", variant: "destructive" });
+      return;
+    }
+
+    const daySessions = getSessionsForDay(extraSessionDate);
+
+    // التحقق من وجود الحصة الأولى إذا كان المستخدم يريد إضافة الحصة الثانية
+    if (extraSessionNumber === 2) {
+      const session1 = daySessions.find(s => s.sessionNumber === 1);
+      if (!session1) {
+        toast({
+          title: "تنبيه",
+          description: "يجب تسجيل الحصة الأولى (الأساسية) قبل إضافة الحصة الثانية (الإضافية).",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    // التحقق من عدم وجود الحصة المطلوبة مسبقاً
+    const existingSession = daySessions.find(s => s.sessionNumber === extraSessionNumber);
+    if (existingSession) {
+      toast({
+        title: "تنبيه",
+        description: `الحصة رقم ${extraSessionNumber} موجودة بالفعل في هذا اليوم.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // الانتقال إلى صفحة تسجيل الحصة
+    router.push(`/sessions/register?date=${extraSessionDate}&session=${extraSessionNumber}`);
+    setIsAddExtraDialogOpen(false);
+  };
 
   const handleExportSession = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation(); // Prevent navigation
@@ -209,6 +264,143 @@ export default function DailySessionsPage() {
           onDeleteSession={handleDeleteSession}
           onExportSession={handleExportSession}
         />
+
+        {/* Session Choice Dialog */}
+        <Dialog open={!!sessionChoiceData} onOpenChange={() => setSessionChoiceData(null)}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-headline">اختر الحصة</DialogTitle>
+              <DialogDescription className="font-body">
+                هذا اليوم يحتوي على أكثر من حصة مسجلة. اختر الحصة التي تريد تعديلها:
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 gap-3 py-4">
+              {sessionChoiceData?.sessions.sort((a, b) => a.sessionNumber - b.sessionNumber).map((session) => (
+                <Button
+                  key={session.id}
+                  variant="outline"
+                  className="h-16 rounded-xl flex items-center justify-between px-6 hover:bg-emerald-50 hover:border-emerald-200 transition-all group"
+                  onClick={() => {
+                    router.push(`/sessions/register?date=${sessionChoiceData.dateStr}&session=${session.sessionNumber}`);
+                    setSessionChoiceData(null);
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-100 rounded-lg text-emerald-700 group-hover:scale-110 transition-transform">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-lg">حصة {session.sessionNumber === 1 ? 'أساسية' : 'إضافية'}</div>
+                      <div className="text-xs text-muted-foreground">{session.sessionType}</div>
+                    </div>
+                  </div>
+                  <ChevronLeft className="h-5 w-5 text-muted-foreground group-hover:translate-x-[-4px] transition-transform" />
+                </Button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Floating Action Button */}
+        {!isSuperAdmin && (
+          <Button
+            onClick={() => setIsAddExtraDialogOpen(true)}
+            className="fixed bottom-8 left-8 h-16 w-16 rounded-full shadow-2xl z-50 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 transition-all duration-300 hover:scale-110"
+            size="icon"
+          >
+            <Plus className="h-8 w-8" />
+          </Button>
+        )}
+
+        {/* Add Extra Session Dialog */}
+        <Dialog open={isAddExtraDialogOpen} onOpenChange={setIsAddExtraDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-headline">إضافة حصة إضافية</DialogTitle>
+              <DialogDescription className="font-body">
+                اختر التاريخ ونوع الحصة ورقم الحصة لإضافة حصة جديدة للفوج.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 py-4">
+              {/* Date Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="extra-date" className="text-base font-semibold flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  التاريخ
+                </Label>
+                <Input
+                  id="extra-date"
+                  type="date"
+                  value={extraSessionDate}
+                  onChange={(e) => setExtraSessionDate(e.target.value)}
+                  className="text-right"
+                />
+              </div>
+
+              {/* Session Type Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="extra-type" className="text-base font-semibold">نوع الحصة</Label>
+                <Select value={extraSessionType} onValueChange={(value) => setExtraSessionType(value as SessionType)}>
+                  <SelectTrigger id="extra-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="حصة أساسية">حصة أساسية</SelectItem>
+                    <SelectItem value="حصة أنشطة">حصة أنشطة</SelectItem>
+                    <SelectItem value="حصة إضافية">حصة إضافية</SelectItem>
+                    <SelectItem value="غياب الشيخ">غياب الشيخ</SelectItem>
+                    <SelectItem value="يوم عطلة">يوم عطلة</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Session Number Selection */}
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">رقم الحصة</Label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="sessionNumber"
+                      value={1}
+                      checked={extraSessionNumber === 1}
+                      onChange={() => setExtraSessionNumber(1)}
+                      className="w-4 h-4"
+                    />
+                    <span className="font-body">الحصة الأولى</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="sessionNumber"
+                      value={2}
+                      checked={extraSessionNumber === 2}
+                      onChange={() => setExtraSessionNumber(2)}
+                      className="w-4 h-4"
+                    />
+                    <span className="font-body">الحصة الثانية (إضافية)</span>
+                  </label>
+                </div>
+                {extraSessionNumber === 2 && (
+                  <p className="text-sm text-muted-foreground mt-2 mr-6 font-body">
+                    💡 ملاحظة: يجب أن تكون الحصة الأولى مسجلة في هذا اليوم قبل إضافة الحصة الثانية.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddExtraDialogOpen(false)}>
+                إلغاء
+              </Button>
+              <Button onClick={handleAddExtraSession} className="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600">
+                <Plus className="ml-2 h-4 w-4" />
+                إضافة الحصة
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </ProtectedPage>
   );

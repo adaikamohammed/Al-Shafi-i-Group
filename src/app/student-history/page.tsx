@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, ArrowLeft, ArrowRight, Calendar, CheckCircle, TrendingUp, User, ShieldAlert, Info, AlertCircle, Bookmark, Award, LayoutDashboard, Link } from 'lucide-react';
+import { Loader2, ArrowLeft, ArrowRight, Calendar, CheckCircle, TrendingUp, User, ShieldAlert, Info, AlertCircle, Bookmark, Award, LayoutDashboard, Link, UserX, Users as UsersIcon } from 'lucide-react';
 import { format, getYear, getDay, startOfYear, addDays, parseISO, getMonth, getDaysInMonth, startOfMonth, endOfMonth, getQuarter, setYear, setMonth, addMonths, subMonths, endOfYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -19,30 +19,42 @@ import { Save, Edit, ClipboardList, Trash2 } from 'lucide-react';
 import { ReceiptDesign } from '@/components/admin/ReceiptDesign';
 
 // Helper function to get color based on student's day data
-const getStudentDayColor = (dayData: any, viewType: 'attendance' | 'evaluation' = 'attendance') => {
+const getStudentDayColor = (dayData: any, viewType: 'attendance' | 'evaluation' | 'behavior' = 'attendance') => {
     if (!dayData) return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
     if (dayData.isHoliday) return 'bg-blue-400 border-blue-500';
-    if (dayData.isSheikhAbsentNoSub) return 'bg-red-400 border-red-500';
+    if (dayData.isSheikhAbsentNoSub) return 'bg-rose-400 border-rose-500';
     if (dayData.isSheikhAbsentWithSub) return 'bg-purple-400 border-purple-500';
 
-    if (viewType === 'attendance') {
-        switch (dayData.attendance) {
-            case 'حاضر': return 'bg-emerald-500 border-emerald-600';
-            case 'متأخر': return 'bg-amber-400 border-amber-500';
-            case 'غائب': return 'bg-red-500 border-red-600';
-            default: return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
-        }
-    } else {
-        // Evaluation based colors
-        const evalValue = dayData.memorization;
-        if (!evalValue) return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
+    const records = dayData.records || [];
+    if (records.length === 0) return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
 
-        if (evalValue.includes('ممتاز')) return 'bg-emerald-700 border-emerald-800';
-        if (evalValue.includes('جيد جدا')) return 'bg-emerald-500 border-emerald-600';
-        if (evalValue.includes('جيد')) return 'bg-amber-400 border-amber-500';
-        if (evalValue.includes('مقبول')) return 'bg-orange-400 border-orange-500';
-        if (evalValue.includes('ضعيف')) return 'bg-red-500 border-red-600';
-        return 'bg-emerald-400 border-emerald-500'; // Default for other evaluations
+    const hasMultiple = records.length > 1;
+
+    if (viewType === 'attendance') {
+        const statuses = records.map((r: any) => r.attendance);
+        if (statuses.includes('حاضر')) return hasMultiple ? 'bg-emerald-700 border-emerald-800 shadow-inner' : 'bg-emerald-500 border-emerald-600';
+        if (statuses.includes('متأخر')) return hasMultiple ? 'bg-amber-500 border-amber-600 shadow-inner' : 'bg-amber-400 border-amber-500';
+        if (statuses.includes('غياب') || statuses.includes('غائب')) return hasMultiple ? 'bg-red-700 border-red-800 shadow-inner' : 'bg-red-500 border-red-600';
+        return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
+    } else if (viewType === 'evaluation') {
+        const evals = records.map((r: any) => r.memorization).filter(Boolean);
+        if (evals.length === 0) return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
+
+        if (evals.some((e: string) => e.includes('ممتاز'))) return hasMultiple ? 'bg-emerald-900 border-emerald-950' : 'bg-emerald-700 border-emerald-800';
+        if (evals.some((e: string) => e.includes('جيد جدا'))) return hasMultiple ? 'bg-emerald-700 border-emerald-800' : 'bg-emerald-500 border-emerald-600';
+        if (evals.some((e: string) => e.includes('جيد'))) return hasMultiple ? 'bg-amber-600 border-amber-700' : 'bg-amber-400 border-amber-500';
+        if (evals.some((e: string) => e.includes('مقبول'))) return hasMultiple ? 'bg-orange-600 border-orange-700' : 'bg-orange-400 border-orange-500';
+        if (evals.some((e: string) => e.includes('ضعيف'))) return hasMultiple ? 'bg-red-700 border-red-800' : 'bg-red-500 border-red-600';
+        return 'bg-emerald-400 border-emerald-500';
+    } else {
+        // Behavior view
+        const behaviors = records.map((r: any) => r.behavior).filter(Boolean);
+        if (behaviors.length === 0) return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
+
+        if (behaviors.includes('مشاغب')) return hasMultiple ? 'bg-red-700 border-red-800' : 'bg-red-500 border-red-600';
+        if (behaviors.includes('مقبول') || behaviors.includes('عادي')) return hasMultiple ? 'bg-blue-600 border-blue-700' : 'bg-blue-400 border-blue-500';
+        if (behaviors.includes('هادئ')) return hasMultiple ? 'bg-emerald-700 border-emerald-800' : 'bg-emerald-500 border-emerald-600';
+        return 'bg-gray-300 border-gray-400';
     }
 };
 
@@ -50,32 +62,35 @@ const StudentDayTooltip = ({ day, dayData }: { day: Date, dayData: any }) => {
     const formattedDate = format(day, 'd MMMM yyyy', { locale: ar });
 
     if (!dayData) {
-        return <p className="font-bold">{formattedDate}<br />لا توجد بيانات</p>;
+        return <p className="font-bold text-center">{formattedDate}<br />لا توجد بيانات</p>;
     }
 
     return (
-        <div className="space-y-1 text-right min-w-[150px]">
-            <p className="font-bold border-b pb-1 mb-1">{formattedDate}</p>
-            {dayData.isHoliday ? (
-                <p className="text-blue-600 font-bold">يوم عطلة</p>
-            ) : dayData.isSheikhAbsentNoSub ? (
-                <p className="text-red-600 font-bold">غياب الشيخ (بدون بديل)</p>
-            ) : dayData.isSheikhAbsentWithSub ? (
-                <p className="text-purple-600 font-bold">غياب الشيخ (مع بديل)</p>
-            ) : (
-                <>
-                    <p className="text-xs"><span className="font-bold">الحضور:</span> {dayData.attendance || 'غير مسجل'}</p>
-                    {dayData.memorization && <p className="text-xs"><span className="font-bold">التقييم:</span> {dayData.memorization}</p>}
-                    {dayData.behavior && <p className="text-xs"><span className="font-bold">السلوك:</span> {dayData.behavior}</p>}
-                    {dayData.notes && <p className="text-xs text-muted-foreground mt-1 border-t pt-1 italic">"{dayData.notes}"</p>}
-                </>
+        <div className="space-y-2 text-right min-w-[180px] p-1">
+            <p className="font-black border-b pb-1.5 mb-2 text-center text-primary">{formattedDate}</p>
+            {dayData.isHoliday && <p className="text-blue-600 font-black flex items-center gap-2 justify-end">يوم عطلة <span className="w-2 h-2 rounded-full bg-blue-500"></span></p>}
+            {dayData.isSheikhAbsentNoSub && <p className="text-rose-600 font-black flex items-center gap-2 justify-end">غياب الشيخ (بدون بديل) <span className="w-2 h-2 rounded-full bg-rose-500"></span></p>}
+            {dayData.isSheikhAbsentWithSub && <p className="text-purple-600 font-black flex items-center gap-2 justify-end">غياب الشيخ (مع بديل) <span className="w-2 h-2 rounded-full bg-purple-500"></span></p>}
+
+            {(dayData.records || []).map((record: any, idx: number) => (
+                <div key={idx} className={cn("mt-2 p-2 rounded-lg bg-muted/30 border border-muted", (dayData.records.length > 1) && "border-r-4 border-r-primary")}>
+                    {dayData.records.length > 1 && <p className="text-[10px] font-black text-primary mb-1 underline">حصة رقم {record.sessionNumber || idx + 1}</p>}
+                    <p className="text-xs flex justify-between gap-4"><span className="opacity-60">الحضور:</span> <span className="font-black">{record.attendance || 'غير مسجل'}</span></p>
+                    {record.memorization && <p className="text-xs flex justify-between gap-4"><span className="opacity-60">التقييم:</span> <span className="font-black">{record.memorization}</span></p>}
+                    {record.behavior && <p className="text-xs flex justify-between gap-4"><span className="opacity-60">السلوك:</span> <span className="font-black">{record.behavior}</span></p>}
+                    {record.notes && <p className="text-[10px] text-muted-foreground mt-1 border-t pt-1 italic select-none">"{record.notes}"</p>}
+                </div>
+            ))}
+
+            {(!dayData.isHoliday && !dayData.isSheikhAbsentNoSub && (!dayData.records || dayData.records.length === 0)) && (
+                <p className="text-xs text-muted-foreground italic text-center">لم يتم تسجيل بيانات لهذا اليوم</p>
             )}
         </div>
     );
 };
 
 // Components adapted for student view
-const StudentYearView = ({ year, data, onDayClick, viewType }: { year: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' }) => {
+const StudentYearView = ({ year, data, onDayClick, viewType }: { year: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' | 'behavior' }) => {
     const yearStart = startOfYear(new Date(year, 0, 1));
     const daysInYear = getYear(yearStart) % 4 === 0 && (getYear(yearStart) % 100 !== 0 || getYear(yearStart) % 400 === 0) ? 366 : 365;
     const days = Array.from({ length: daysInYear }, (_, i) => addDays(yearStart, i));
@@ -103,7 +118,7 @@ const StudentYearView = ({ year, data, onDayClick, viewType }: { year: number, d
     );
 };
 
-const StudentQuarterView = ({ year, quarter, data, onDayClick, viewType }: { year: number, quarter: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' }) => {
+const StudentQuarterView = ({ year, quarter, data, onDayClick, viewType }: { year: number, quarter: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' | 'behavior' }) => {
     const startMonthIndex = (quarter - 1) * 3;
     const months = [startMonthIndex, startMonthIndex + 1, startMonthIndex + 2];
 
@@ -145,7 +160,7 @@ const StudentQuarterView = ({ year, quarter, data, onDayClick, viewType }: { yea
     );
 };
 
-const StudentMonthView = ({ year, month, data, onDayClick, viewType }: { year: number, month: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' }) => {
+const StudentMonthView = ({ year, month, data, onDayClick, viewType }: { year: number, month: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' | 'behavior' }) => {
     const monthStart = startOfMonth(new Date(year, month));
     const daysInMonth = getDaysInMonth(monthStart);
     const firstDay = getDay(monthStart);
@@ -202,7 +217,7 @@ function StudentHistoryContent() {
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'year' | 'quarter' | 'month'>('year');
-    const [viewType, setViewType] = useState<'attendance' | 'evaluation'>('attendance');
+    const [viewType, setViewType] = useState<'attendance' | 'evaluation' | 'behavior'>('attendance');
     const [sheikhNotes, setSheikhNotes] = useState<string>('');
     const [isSavingNotes, setIsSavingNotes] = useState(false);
     const [adminFilterDate, setAdminFilterDate] = useState<string>(''); // For filtering admin logs
@@ -248,21 +263,27 @@ function StudentHistoryContent() {
             const isSheikhAbsentNoSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
             const isSheikhAbsentWithSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && s.substituteTeacher);
 
-            const studentRecord = sessionsOnDay
-                .flatMap(s => (s.records || []).map(r => ({ ...r, sessionType: s.sessionType, sessionNumber: s.sessionNumber })))
-                .find(r => r.studentId === selectedStudentId);
+            const studentRecords = sessionsOnDay
+                .map(s => {
+                    const record = (s.records || []).find(r => r.studentId === selectedStudentId);
+                    if (record) return { ...record, sessionType: s.sessionType, sessionNumber: s.sessionNumber || 1 };
+                    return null;
+                })
+                .filter(Boolean);
 
             data[dateString] = {
                 id: dateString,
                 isHoliday,
                 isSheikhAbsentNoSub,
                 isSheikhAbsentWithSub,
-                attendance: studentRecord?.attendance || null,
-                memorization: studentRecord?.memorization || null,
-                behavior: studentRecord?.behavior || null,
-                notes: studentRecord?.notes || null,
-                sessionType: studentRecord?.sessionType || null,
-                sessionNumber: studentRecord?.sessionNumber || null
+                records: studentRecords,
+                // Root values for compatibility (pick first)
+                attendance: studentRecords[0]?.attendance || null,
+                memorization: studentRecords[0]?.memorization || null,
+                behavior: studentRecords[0]?.behavior || null,
+                notes: studentRecords[0]?.notes || null,
+                sessionType: studentRecords[0]?.sessionType || null,
+                sessionNumber: studentRecords[0]?.sessionNumber || null
             };
         });
 
@@ -270,7 +291,7 @@ function StudentHistoryContent() {
     }, [dailySessions, selectedStudentId]);
 
     const { stats, statsTitle } = useMemo(() => {
-        if (!selectedStudentId || !studentData) return { stats: { attendanceRate: 0, totalPresent: 0, totalAbsent: 0, totalLate: 0, avgEval: '---' }, statsTitle: '' };
+        if (!selectedStudentId || !studentData) return { stats: { attendanceRate: 0, totalPresent: 0, totalAbsent: 0, totalLate: 0, avgEval: '---', sheikhAbsenceNoSub: 0, sheikhAbsenceWithSub: 0 }, statsTitle: '' };
 
         let startDate: Date;
         let endDate: Date;
@@ -303,16 +324,20 @@ function StudentHistoryContent() {
             })
             .map(dateStr => studentData[dateStr]);
 
-        const relevantDays = filteredDays.filter((d: any) => !d.isHoliday && !d.isSheikhAbsentNoSub && (d.attendance));
-        const presentDays = relevantDays.filter((d: any) => d.attendance === 'حاضر').length;
-        const lateDays = relevantDays.filter((d: any) => d.attendance === 'متأخر').length;
-        const absentDays = relevantDays.filter((d: any) => d.attendance === 'غائب').length;
+        const allRecords = filteredDays.flatMap(d => d.records || []);
 
-        const totalWorkDays = presentDays + lateDays + absentDays;
-        const rate = totalWorkDays > 0 ? ((presentDays + lateDays) / totalWorkDays) * 100 : 0;
+        const presentCount = allRecords.filter((r: any) => r.attendance === 'حاضر').length;
+        const lateCount = allRecords.filter((r: any) => r.attendance === 'متأخر').length;
+        const absentCount = allRecords.filter((r: any) => r.attendance === 'غياب' || r.attendance === 'غائب').length;
 
-        // Eval stats
-        const evals = relevantDays.filter(d => d.memorization).map(d => d.memorization);
+        const sheikhAbsenceNoSub = filteredDays.filter(d => d.isSheikhAbsentNoSub).length;
+        const sheikhAbsenceWithSub = filteredDays.filter(d => d.isSheikhAbsentWithSub).length;
+
+        const totalWorkSessions = presentCount + lateCount + absentCount;
+        const rate = totalWorkSessions > 0 ? ((presentCount + lateCount) / totalWorkSessions) * 100 : 0;
+
+        // Eval stats from all records
+        const evals = allRecords.filter((r: any) => r.memorization).map((r: any) => r.memorization);
         let dominantEval = '---';
         if (evals.length > 0) {
             const counts: any = {};
@@ -323,10 +348,12 @@ function StudentHistoryContent() {
         return {
             stats: {
                 attendanceRate: rate.toFixed(0),
-                totalPresent: presentDays,
-                totalAbsent: absentDays,
-                totalLate: lateDays,
-                avgEval: dominantEval
+                totalPresent: presentCount,
+                totalAbsent: absentCount,
+                totalLate: lateCount,
+                avgEval: dominantEval,
+                sheikhAbsenceNoSub,
+                sheikhAbsenceWithSub
             },
             statsTitle: title
         };
@@ -496,58 +523,69 @@ function StudentHistoryContent() {
                                     </div>
                                 </Card>
 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <StudentStatWidget
-                                        title="معدل الانضباط"
-                                        value={stats.attendanceRate}
-                                        unit="%"
-                                        icon={<CheckCircle className="h-7 w-7 text-emerald-600" />}
-                                        colorClass="bg-emerald-50"
-                                    />
-                                    <StudentStatWidget
-                                        title="التقييم السائد"
-                                        value={stats.avgEval}
-                                        unit=""
-                                        icon={<Award className="h-7 w-7 text-amber-600" />}
-                                        colorClass="bg-amber-50"
-                                    />
-                                    <StudentStatWidget
-                                        title="أيام غياب"
-                                        value={stats.totalAbsent}
-                                        unit="يوم"
-                                        icon={<AlertCircle className="h-7 w-7 text-red-600" />}
-                                        colorClass="bg-red-50"
-                                    />
-                                </div>
-
                                 <Card className="shadow-lg border-primary/10 rounded-2xl overflow-hidden">
                                     <CardHeader className="bg-muted/30 pb-4 flex flex-col md:flex-row items-center justify-between gap-4">
-                                        <div className="flex flex-col items-center md:items-start">
+                                        <div className="flex flex-col items-center md:items-start text-center md:text-right">
                                             <CardTitle className="font-headline text-xl font-black">{statsTitle}</CardTitle>
-                                            <CardDescription className="italic">ملخص إنجاز الطالب للفترة المختارة</CardDescription>
+                                            <CardDescription className="italic text-xs">ملخص إنجاز الطالب للفترة المختارة</CardDescription>
                                         </div>
                                         <div className="flex items-center gap-2 bg-background p-1.5 rounded-2xl shadow-inner border border-primary/10">
                                             <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9" onClick={() => handleDateNavigation('prev')}><ArrowRight className="h-4 w-4" /></Button>
-                                            <span className="font-black px-4 min-w-[120px] text-center">{format(currentDate, viewMode === 'year' ? 'yyyy' : viewMode === 'month' ? 'MMMM yyyy' : 'yyyy', { locale: ar })}</span>
+                                            <span className="font-black px-4 min-w-[120px] text-center text-sm">{format(currentDate, viewMode === 'year' ? 'yyyy' : viewMode === 'month' ? 'MMMM yyyy' : 'yyyy', { locale: ar })}</span>
                                             <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9" onClick={() => handleDateNavigation('next')}><ArrowLeft className="h-4 w-4" /></Button>
                                         </div>
                                     </CardHeader>
-                                    <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6">
-                                        <div className="text-center p-3 rounded-2xl bg-emerald-50/30 border border-emerald-100 flex flex-col justify-center">
-                                            <span className="text-xs text-muted-foreground font-bold mb-1">حضور</span>
-                                            <span className="text-2xl font-black text-emerald-700">{stats.totalPresent}</span>
-                                        </div>
-                                        <div className="text-center p-3 rounded-2xl bg-amber-50/30 border border-amber-100 flex flex-col justify-center">
-                                            <span className="text-xs text-muted-foreground font-bold mb-1">تأخر</span>
-                                            <span className="text-2xl font-black text-amber-700">{stats.totalLate}</span>
-                                        </div>
-                                        <div className="text-center p-3 rounded-2xl bg-red-50/30 border border-red-100 flex flex-col justify-center">
-                                            <span className="text-xs text-muted-foreground font-bold mb-1">غياب</span>
-                                            <span className="text-2xl font-black text-red-700">{stats.totalAbsent}</span>
-                                        </div>
-                                        <div className="text-center p-3 rounded-2xl bg-blue-50/30 border border-blue-100 flex flex-col justify-center">
-                                            <span className="text-xs text-muted-foreground font-bold mb-1">المعدل</span>
-                                            <span className="text-2xl font-black text-blue-700">{stats.attendanceRate}%</span>
+                                    <CardContent className="p-6">
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+                                            <StudentStatWidget
+                                                title="حضور"
+                                                value={stats.totalPresent}
+                                                unit="حصة"
+                                                icon={<CheckCircle className="h-5 w-5 text-emerald-600" />}
+                                                colorClass="bg-emerald-50"
+                                            />
+                                            <StudentStatWidget
+                                                title="التقييم"
+                                                value={stats.avgEval}
+                                                unit=""
+                                                icon={<Award className="h-5 w-5 text-amber-600" />}
+                                                colorClass="bg-amber-50"
+                                            />
+                                            <StudentStatWidget
+                                                title="تأخر"
+                                                value={stats.totalLate}
+                                                unit="حصة"
+                                                icon={<TrendingUp className="h-5 w-5 text-blue-600" />}
+                                                colorClass="bg-blue-50"
+                                            />
+                                            <StudentStatWidget
+                                                title="غياب"
+                                                value={stats.totalAbsent}
+                                                unit="حصة"
+                                                icon={<AlertCircle className="h-5 w-5 text-red-600" />}
+                                                colorClass="bg-red-50"
+                                            />
+                                            <StudentStatWidget
+                                                title="غياب الشيخ"
+                                                value={stats.sheikhAbsenceNoSub}
+                                                unit="بدون"
+                                                icon={<UserX className="h-5 w-5 text-rose-600" />}
+                                                colorClass="bg-rose-50"
+                                            />
+                                            <StudentStatWidget
+                                                title="غياب الشيخ"
+                                                value={stats.sheikhAbsenceWithSub}
+                                                unit="بديل"
+                                                icon={<UsersIcon className="h-5 w-5 text-purple-600" />}
+                                                colorClass="bg-purple-50"
+                                            />
+                                            <StudentStatWidget
+                                                title="الانضباط"
+                                                value={`${stats.attendanceRate}%`}
+                                                unit=""
+                                                icon={<ShieldAlert className="h-5 w-5 text-indigo-600" />}
+                                                colorClass="bg-indigo-50"
+                                            />
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -591,8 +629,8 @@ function StudentHistoryContent() {
                                         </Button>
                                     </div>
 
-                                    {/* View Type Toggle (Attendance vs Eval) */}
-                                    <div className="flex items-center bg-muted/50 p-1.5 rounded-2xl border border-dotted border-primary/30">
+                                    {/* View Type Toggle (Attendance vs Eval vs Behavior) */}
+                                    <div className="flex flex-wrap items-center bg-muted/50 p-1.5 rounded-2xl border border-dotted border-primary/30">
                                         <Button
                                             variant={viewType === 'attendance' ? 'secondary' : 'ghost'}
                                             onClick={() => setViewType('attendance')}
@@ -608,6 +646,14 @@ function StudentHistoryContent() {
                                         >
                                             <Award className="h-4 w-4" />
                                             التقييم
+                                        </Button>
+                                        <Button
+                                            variant={viewType === 'behavior' ? 'secondary' : 'ghost'}
+                                            onClick={() => setViewType('behavior')}
+                                            className={cn("h-9 px-4 rounded-xl flex items-center gap-2 font-bold", viewType === 'behavior' ? "bg-amber-500 text-white shadow-sm" : "")}
+                                        >
+                                            <TrendingUp className="h-4 w-4" />
+                                            السلوك
                                         </Button>
                                     </div>
                                 </div>
@@ -641,10 +687,11 @@ function StudentHistoryContent() {
                                         {viewType === 'attendance' ? (
                                             <>
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-emerald-500 border border-emerald-600"></div> حاضر</span>
+                                                <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-emerald-700 border border-emerald-800 shadow-inner"></div> حصتان (حضور)</span>
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-amber-400 border border-amber-500"></div> متأخر</span>
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-red-500 border border-red-600"></div> غائب</span>
                                             </>
-                                        ) : (
+                                        ) : viewType === 'evaluation' ? (
                                             <>
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-emerald-700 border border-emerald-800"></div> ممتاز</span>
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-emerald-500 border border-emerald-600"></div> جيد جداً</span>
@@ -652,10 +699,17 @@ function StudentHistoryContent() {
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-orange-400 border border-orange-500"></div> مقبول</span>
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-red-500 border border-red-600"></div> ضعيف</span>
                                             </>
+                                        ) : (
+                                            <>
+                                                <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-emerald-500 border border-emerald-600"></div> هادئ</span>
+                                                <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-blue-400 border border-blue-500"></div> مقبول</span>
+                                                <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-red-500 border border-red-600"></div> مشاغب</span>
+                                            </>
                                         )}
                                         <div className="h-4 w-px bg-muted mx-2" />
                                         <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-blue-400 border border-blue-500"></div> عطلة</span>
-                                        <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-purple-400 border border-purple-500"></div> غياب الشيخ</span>
+                                        <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-purple-400 border border-purple-500"></div> غياب الشيخ (بديل)</span>
+                                        <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-rose-400 border border-rose-500"></div> غياب الشيخ (بدون)</span>
                                         <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-gray-100 dark:bg-gray-800"></div> لم يسجل</span>
                                     </div>
                                 </div>

@@ -12,15 +12,14 @@ import { useAuth } from '@/context/AuthContext';
 import { format, parseISO, getMonth, getYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, MoreVertical, Edit, Trash2, Eye, CheckCircle, Pin, PinOff, Mic, Square, ImagePlus, FileAudio, X, Volume2 } from 'lucide-react';
+import { Loader2, Save, MoreVertical, Edit, Trash2, Eye, CheckCircle, Pin, PinOff } from 'lucide-react';
 import type { DailyReport } from '@/lib/types';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-import { storage } from '@/lib/firebase';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+
 
 const defaultCategories = ["اقتراح", "شكوى", "ملاحظة عامة", "شكر", "طلب", "إذن غياب", "طلب صيانة", "إنجاز استثنائي", "حالة طارئة"];
 
@@ -144,25 +143,7 @@ const ReportCard = ({ report, isSuperAdmin, isAdmin, onEdit, onDelete, onToggleP
             <CardContent className="p-4 pt-0">
                 <p className="mt-2 whitespace-pre-wrap border-t pt-2">{report.note}</p>
 
-                {report.imageURL && (
-                    <div className="mt-4 rounded-lg overflow-hidden border">
-                        <img
-                            src={report.imageURL}
-                            alt="Report detail"
-                            className="max-h-[300px] w-auto mx-auto object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => window.open(report.imageURL, '_blank')}
-                        />
-                    </div>
-                )}
 
-                {report.audioURL && (
-                    <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg flex items-center gap-3">
-                        <div className="bg-primary/10 p-2 rounded-full">
-                            <Volume2 className="h-4 w-4 text-primary" />
-                        </div>
-                        <audio controls src={report.audioURL} className="h-8 flex-1" />
-                    </div>
-                )}
 
                 {isAdmin && (report.status !== 'reviewed' || isEditingReply) && (
                     <div className="mt-4 pt-4 border-t border-dashed space-y-2">
@@ -211,85 +192,11 @@ export default function DailyReportPage() {
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
 
-    // Media states
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [isRecording, setIsRecording] = useState(false);
-    const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-    const [recordingTime, setRecordingTime] = useState(0);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const audioChunksRef = useRef<Blob[]>([]);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
 
     const isAdmin = isSuperAdmin || isManagement;
 
-    // Reset media when resetting form
-    const resetMedia = () => {
-        setImageFile(null);
-        setImagePreview(null);
-        setAudioBlob(null);
-        setIsRecording(false);
-        setRecordingTime(0);
-        if (timerRef.current) clearInterval(timerRef.current);
-    };
 
-    const startRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream);
-            mediaRecorderRef.current = mediaRecorder;
-            audioChunksRef.current = [];
-
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) audioChunksRef.current.push(event.data);
-            };
-
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-                setAudioBlob(audioBlob);
-                stream.getTracks().forEach(track => track.stop());
-            };
-
-            mediaRecorder.start();
-            setIsRecording(true);
-            setRecordingTime(0);
-            timerRef.current = setInterval(() => {
-                setRecordingTime((prev) => prev + 1);
-            }, 1000);
-        } catch (err) {
-            toast({
-                title: "خطأ في الميكروفون",
-                description: "يرجى التأكد من إعطاء صلاحية الوصول للميكروفون.",
-                variant: "destructive"
-            });
-        }
-    };
-
-    const stopRecording = () => {
-        if (mediaRecorderRef.current && isRecording) {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-            if (timerRef.current) clearInterval(timerRef.current);
-        }
-    };
-
-    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setImageFile(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
 
     const monthlyReports = useMemo(() => {
         return Object.values(dailyReports)
@@ -314,7 +221,7 @@ export default function DailyReportPage() {
     const unpinnedReports = useMemo(() => {
         if (filterStatus === 'all') return monthlyReports.filter(r => !r.isPinned);
         if (filterStatus === 'pinned') return [];
-        return monthlyReports.filter(r => !r.isPinned && (filterStatus === 'all' || r.status === filterStatus));
+        return monthlyReports.filter(r => !r.isPinned && (filterStatus === 'all' || (r.status as string) === filterStatus));
     }, [monthlyReports, filterStatus]);
 
     const resetForm = () => {
@@ -323,7 +230,6 @@ export default function DailyReportPage() {
         setPriority('normal');
         setEditingReport(null);
         setUploadStatus(null);
-        resetMedia();
     };
 
     const handleSaveReport = async () => {
@@ -331,8 +237,8 @@ export default function DailyReportPage() {
             toast({ title: "خطأ", description: "يجب تسجيل الدخول لحفظ التقارير.", variant: "destructive" });
             return;
         }
-        if (!note.trim() && !audioBlob && !imageFile) {
-            toast({ title: "خطأ", description: "لا يمكن حفظ تقرير فارغ تماماً. يرجى كتابة ملاحظة أو تسجيل صوت أو رفع صورة.", variant: "destructive" });
+        if (!note.trim()) {
+            toast({ title: "خطأ", description: "لا يمكن حفظ تقرير فارغ تماماً. يرجى كتابة ملاحظة.", variant: "destructive" });
             return;
         }
         setIsSaving(true);
@@ -340,47 +246,12 @@ export default function DailyReportPage() {
 
         try {
             const reportId = editingReport?.id || Date.now().toString();
-            let audioURL = editingReport?.audioURL;
-            let imageURL = editingReport?.imageURL;
-
-            const uploadTasks: Promise<any>[] = [];
-
-            // Parallel upload Audio if exists
-            if (audioBlob) {
-                const aRef = storageRef(storage, `reports/audio/${reportId}`);
-                uploadTasks.push(
-                    (async () => {
-                        setUploadStatus("جاري رفع الصوت...");
-                        await uploadBytes(aRef, audioBlob);
-                        audioURL = await getDownloadURL(aRef);
-                    })()
-                );
-            }
-
-            // Parallel upload Image if exists
-            if (imageFile) {
-                const iRef = storageRef(storage, `reports/images/${reportId}`);
-                uploadTasks.push(
-                    (async () => {
-                        setUploadStatus("جاري رفع الصورة...");
-                        await uploadBytes(iRef, imageFile);
-                        imageURL = await getDownloadURL(iRef);
-                    })()
-                );
-            }
-
-            if (uploadTasks.length > 0) {
-                setUploadStatus(uploadTasks.length === 2 ? "جاري رفع الملفات..." : "جاري رفع المرفق...");
-                await Promise.all(uploadTasks);
-            }
 
             setUploadStatus("جاري حفظ البيانات...");
             const reportData: Partial<DailyReport> = {
                 note: note,
                 category: category,
-                priority: priority,
-                audioURL,
-                imageURL
+                priority: priority
             };
 
             await saveDailyReport(reportData, reportId);
@@ -518,97 +389,7 @@ export default function DailyReportPage() {
                             />
                         </div>
 
-                        {/* Media Controls */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Voice Recording */}
-                            <div className="p-4 border rounded-xl bg-slate-50 dark:bg-slate-900/40 space-y-3">
-                                <Label className="flex items-center gap-2">
-                                    <Mic className="h-4 w-4 text-primary" />
-                                    تسجيل صوتي
-                                </Label>
-                                <div className="flex items-center gap-3">
-                                    {!audioBlob ? (
-                                        <Button
-                                            type="button"
-                                            variant={isRecording ? "destructive" : "outline"}
-                                            className={cn("rounded-full h-12 w-12 p-0 shadow-lg", isRecording && "animate-pulse")}
-                                            onClick={isRecording ? stopRecording : startRecording}
-                                        >
-                                            {isRecording ? <Square className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                                        </Button>
-                                    ) : (
-                                        <div className="flex items-center gap-2 flex-1 animate-in fade-in slide-in-from-right-1">
-                                            <div className="bg-primary/10 p-2 rounded-full">
-                                                <FileAudio className="h-5 w-5 text-primary" />
-                                            </div>
-                                            <audio controls src={URL.createObjectURL(audioBlob)} className="h-8 flex-1" />
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10"
-                                                onClick={() => setAudioBlob(null)}
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    )}
-                                    {isRecording && (
-                                        <span className="font-mono text-destructive font-bold animate-pulse text-lg">
-                                            {formatTime(recordingTime)}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
 
-                            {/* Image Upload */}
-                            <div className="p-4 border rounded-xl bg-slate-50 dark:bg-slate-900/40 space-y-3">
-                                <Label className="flex items-center gap-2">
-                                    <ImagePlus className="h-4 w-4 text-primary" />
-                                    إرفاق صورة
-                                </Label>
-                                <div className="flex items-center gap-3">
-                                    {!imagePreview ? (
-                                        <div className="relative">
-                                            <Input
-                                                type="file"
-                                                accept="image/*"
-                                                className="hidden"
-                                                id="image-upload"
-                                                onChange={handleImageSelect}
-                                            />
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                className="rounded-full h-12 w-12 p-0 border-dashed border-primary/40 hover:border-primary transition-colors shadow-sm"
-                                                onClick={() => document.getElementById('image-upload')?.click()}
-                                            >
-                                                <ImagePlus className="h-5 w-5" />
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <div className="relative group animate-in zoom-in-95">
-                                            <img
-                                                src={imagePreview}
-                                                alt="Preview"
-                                                className="h-14 w-14 rounded-lg object-cover border-2 border-primary shadow-md"
-                                            />
-                                            <Button
-                                                variant="destructive"
-                                                size="icon"
-                                                className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 border-2 border-white shadow-sm"
-                                                onClick={() => {
-                                                    setImageFile(null);
-                                                    setImagePreview(null);
-                                                }}
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    )}
-                                    <span className="text-xs text-muted-foreground bg-white/50 dark:bg-black/20 p-1 rounded px-2">أقصى حجم: 2MB</span>
-                                </div>
-                            </div>
-                        </div>
 
                         <div className="flex items-center gap-2 pt-2">
                             <Button onClick={handleSaveReport} disabled={isSaving} className="w-full md:w-auto h-12 px-10 font-black text-lg gap-2 shadow-xl hover:scale-105 transition-transform">

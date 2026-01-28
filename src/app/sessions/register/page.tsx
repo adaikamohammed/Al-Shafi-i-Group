@@ -671,7 +671,6 @@ function RegisterSessionContent() {
                             <SelectContent>
                                 <SelectItem value="حصة أساسية">حصة أساسية</SelectItem>
                                 <SelectItem value="حصة أنشطة">حصة أنشطة 🏃‍♂️</SelectItem>
-                                {sessionToOpen === 2 && <SelectItem value="حصة تعويضية">حصة تعويضية</SelectItem>}
                                 {sessionToOpen === 2 && <SelectItem value="حصة إضافية">حصة إضافية ➕</SelectItem>}
                                 <SelectItem value="يوم عطلة">يوم عطلة</SelectItem>
                                 <SelectItem value="غياب الشيخ">غياب الشيخ</SelectItem>
