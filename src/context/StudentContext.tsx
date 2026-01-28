@@ -216,7 +216,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             );
             allStudents.push(...userStudents);
           }
-          if (userData.dailySessions) Object.assign(allSessions, userData.dailySessions);
+          if (userData.dailySessions) {
+            for (const date in userData.dailySessions) {
+              if (!allSessions[date]) allSessions[date] = {};
+              Object.assign(allSessions[date], userData.dailySessions[date]);
+            }
+          }
           if (userData.dailyReports) {
             for (const date in userData.dailyReports) {
               if (!allReports[date]) allReports[date] = {};

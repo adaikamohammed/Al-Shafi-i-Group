@@ -3,9 +3,10 @@
 import React, { useState, useMemo } from 'react';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { MonitoringCharts } from '@/components/management/MonitoringCharts';
+import { MonitoringRadar } from '@/components/management/MonitoringRadar';
 import { AssistantReport } from '@/components/management/AssistantReport';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     Calendar, Shield, ArrowLeft, Loader2, Info,
     CalendarDays, CalendarRange, CalendarCheck, History
@@ -24,6 +25,7 @@ export default function MonitoringPage() {
     const { dailySessions, allUsers, loading, students } = useStudentContext();
     const { isManagement } = useAuth();
     const [timeframe, setTimeframe] = useState('weekly');
+    const [selectedGroup, setSelectedGroup] = useState('all');
 
     const aggregatedData = useMemo(() => {
         if (!dailySessions) return [];
@@ -133,12 +135,33 @@ export default function MonitoringPage() {
                     </p>
                 </div>
 
-                <Button asChild variant="ghost" className="rounded-xl hover:bg-white/10 text-white/70">
-                    <Link href="/home" className="flex items-center gap-2">
-                        <ArrowLeft className="h-4 w-4" />
-                        العودة للوحة التحكم
-                    </Link>
-                </Button>
+                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
+                    <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                        <SelectTrigger className="w-full md:w-48 bg-white/5 border-white/10 rounded-xl h-11 text-white">
+                            <SelectValue placeholder="اختر الفوج" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-white/10 text-white rounded-xl">
+                            <SelectItem value="all">جميع الأفواج</SelectItem>
+                            {Array.from(new Set(allUsers.filter(u => u.role === 'sheikh' && u.group).map(u => u.group)))
+                                .sort((a, b) => {
+                                    const numA = parseInt(a?.replace(/[^0-9]/g, '') || '0');
+                                    const numB = parseInt(b?.replace(/[^0-9]/g, '') || '0');
+                                    return numA - numB;
+                                })
+                                .map(group => (
+                                    <SelectItem key={group} value={group || ''}>{group}</SelectItem>
+                                ))
+                            }
+                        </SelectContent>
+                    </Select>
+
+                    <Button asChild variant="ghost" className="rounded-xl hover:bg-white/10 text-white/70">
+                        <Link href="/home" className="flex items-center gap-2">
+                            <ArrowLeft className="h-4 w-4" />
+                            العودة للوحة التحكم
+                        </Link>
+                    </Button>
+                </div>
             </div>
 
             {/* Timeframe Selectors */}
@@ -163,17 +186,38 @@ export default function MonitoringPage() {
 
             {/* Main Content Layout */}
             <div className="max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-                {/* 1. Comparison Charts */}
+
+                {/* 1. Global School Radar */}
                 <section className="space-y-6">
                     <div className="flex items-center gap-4">
                         <div className="h-px flex-1 bg-white/10" />
-                        <h2 className="text-xl font-headline font-bold text-white/80">المقارنات البصرية للأفواج</h2>
+                        <h2 className="text-2xl font-headline font-black text-emerald-400">رادار متوسط أداء المدرسة</h2>
                         <div className="h-px flex-1 bg-white/10" />
                     </div>
-                    <MonitoringCharts data={aggregatedData} />
+                    <MonitoringRadar data={aggregatedData} selectedGroup="all" />
                 </section>
 
-                {/* 2. Intelligent Report */}
+                {/* 2. Individual Group Radars Grid */}
+                <section className="space-y-8">
+                    <div className="flex items-center gap-4">
+                        <div className="h-px flex-1 bg-white/10" />
+                        <h2 className="text-xl font-headline font-bold text-white/80">رادار الأفواج التفصيلي</h2>
+                        <div className="h-px flex-1 bg-white/10" />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                        {aggregatedData.map((groupData) => (
+                            <div key={groupData.groupName} className="transform transition-all hover:scale-[1.03]">
+                                <MonitoringRadar
+                                    data={[groupData]}
+                                    selectedGroup={groupData.groupName}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* 3. Intelligent Report */}
                 <section className="space-y-6">
                     <div className="flex items-center gap-4">
                         <div className="h-px flex-1 bg-white/10" />
