@@ -69,6 +69,7 @@ export const NAV_GROUPS: NavGroup[] = [
             { href: '/management/monitoring', label: 'نظام المراقبة', icon: BarChart3, primary: true },
             { href: '/occasions', label: 'المناسبات الدينية', icon: MoonStar },
             { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus },
+            { href: '/meetings', label: 'الاجتماعات', icon: Calendar },
             { href: '/admin/admin-docs', label: 'الأوصال الإدارية', icon: ClipboardList },
             { href: '/data', label: 'إدارة البيانات', icon: ArrowRightLeft },
             { href: '/dues', label: 'المستحقات (فصلي)', icon: DollarSign },

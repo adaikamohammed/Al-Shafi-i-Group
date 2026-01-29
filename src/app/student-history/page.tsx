@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
+import { SearchableSelect, SearchableSelectOption } from '@/components/ui/SearchableSelect';
 import { Save, Edit, ClipboardList, Trash2 } from 'lucide-react';
 import { ReceiptDesign } from '@/components/admin/ReceiptDesign';
 
@@ -232,6 +233,9 @@ function StudentHistoryContent() {
         (students || []).find(s => s.id === selectedStudentId)
         , [students, selectedStudentId]);
 
+    const activeStudents = useMemo(() => (students || []).filter(s => s.status === 'نشط').sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
+    const studentOptions: SearchableSelectOption[] = useMemo(() => activeStudents.map(s => ({ value: s.id, label: s.fullName })), [activeStudents]);
+
     useEffect(() => {
         if (selectedStudent) {
             setSheikhNotes(selectedStudent.sheikhNotes || '');
@@ -397,16 +401,14 @@ function StudentHistoryContent() {
                         </div>
                         <div className="w-full lg:w-96 flex flex-col gap-2">
                             <label className="text-xs font-bold text-muted-foreground mr-1">ابحث باسم الطالب</label>
-                            <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                                <SelectTrigger className="bg-background/90 backdrop-blur-md border-primary/20 hover:border-primary transition-all shadow-sm h-12 text-lg font-bold rounded-2xl">
-                                    <SelectValue placeholder="اختر طالباً للعرض..." />
-                                </SelectTrigger>
-                                <SelectContent className="rounded-2xl shadow-xl border-primary/10">
-                                    {(students || []).filter(s => s.status === 'نشط').map(s => (
-                                        <SelectItem key={s.id} value={s.id} className="text-lg font-medium focus:bg-primary/10 rounded-xl">{s.fullName}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <SearchableSelect
+                                options={studentOptions}
+                                value={selectedStudentId}
+                                onValueChange={setSelectedStudentId}
+                                placeholder="اختر طالباً للعرض..."
+                                searchPlaceholder="ابحث باسم الطالب..."
+                                className="bg-background/90 backdrop-blur-md border-primary/20 hover:border-primary transition-all shadow-sm h-12 text-lg font-bold rounded-2xl"
+                            />
                         </div>
                     </CardHeader>
                 </Card>

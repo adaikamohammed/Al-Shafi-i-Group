@@ -14,6 +14,8 @@ import { format, getYear, getDay, startOfYear, addDays, parseISO, getMonth, getD
 import { ar } from 'date-fns/locale';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
+import { SearchableSelect, SearchableSelectOption } from '@/components/ui/SearchableSelect';
 
 
 // Helper function to get color based on day's data
@@ -205,9 +207,46 @@ const StatWidget = ({ title, value, unit, icon, description, variant = "default"
 };
 
 export default function YearlyPerformancePage() {
-    const { students, dailySessions, loading } = useStudentContext();
+    const { user: authUser, isSuperAdmin, isManagement } = useAuth();
+    const { students: allContextStudents, dailySessions: allContextSessions, allUsers, loading } = useStudentContext();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'year' | 'quarter' | 'month'>('year');
+    const [selectedSheikhId, setSelectedSheikhId] = useState<string>('all');
+
+    const isAdmin = isSuperAdmin || isManagement;
+
+    // Filter students and sessions based on selected sheikh
+    const students = useMemo(() => {
+        if (!isAdmin || selectedSheikhId === 'all') return allContextStudents;
+        return allContextStudents.filter(s => s.ownerId === selectedSheikhId);
+    }, [allContextStudents, isAdmin, selectedSheikhId]);
+
+    const dailySessions = useMemo(() => {
+        if (!isAdmin || selectedSheikhId === 'all') return allContextSessions;
+
+        const filtered: Record<string, Record<string, DailySession>> = {};
+        Object.entries(allContextSessions).forEach(([date, sessions]) => {
+            const sessionsForSheikh = Object.entries(sessions)
+                .filter(([_, session]) => session.ownerId === selectedSheikhId)
+                .reduce((acc, [id, s]) => ({ ...acc, [id]: s }), {});
+
+            if (Object.keys(sessionsForSheikh).length > 0) {
+                filtered[date] = sessionsForSheikh;
+            }
+        });
+        return filtered;
+    }, [allContextSessions, isAdmin, selectedSheikhId]);
+
+    const sheikhOptions: SearchableSelectOption[] = useMemo(() => {
+        const options: SearchableSelectOption[] = [{ value: 'all', label: 'كل الأفواج (عرض شامل)' }];
+        if (!allUsers) return options;
+
+        const sheikhs = allUsers.filter(u => u.role === 'sheikh' || u.role === 'management' || u.role === 'super_admin');
+        sheikhs.forEach(s => {
+            options.push({ value: s.uid, label: s.displayName || s.email || s.uid });
+        });
+        return options;
+    }, [allUsers]);
 
     const currentYear = getYear(currentDate);
 
@@ -419,10 +458,23 @@ export default function YearlyPerformancePage() {
                                 <CardTitle className="text-3xl font-headline font-bold text-primary">رادار الأداء السنوي</CardTitle>
                                 <CardDescription className="text-base">نظرة شاملة على التزام وأداء الفوج وجدول الحصص.</CardDescription>
                             </div>
-                            <div className="flex items-center gap-3 bg-muted/50 p-1.5 rounded-2xl border">
-                                <Button variant={viewMode === 'year' ? 'secondary' : 'ghost'} onClick={() => setViewMode('year')} className="h-9 px-5 rounded-xl font-bold">سنوي</Button>
-                                <Button variant={viewMode === 'quarter' ? 'secondary' : 'ghost'} onClick={() => setViewMode('quarter')} className="h-9 px-5 rounded-xl font-bold">فصلي</Button>
-                                <Button variant={viewMode === 'month' ? 'secondary' : 'ghost'} onClick={() => setViewMode('month')} className="h-9 px-5 rounded-xl font-bold">شهري</Button>
+                            <div className="flex flex-wrap items-center gap-3">
+                                {isAdmin && (
+                                    <div className="min-w-[200px]">
+                                        <SearchableSelect
+                                            options={sheikhOptions}
+                                            value={selectedSheikhId}
+                                            onValueChange={setSelectedSheikhId}
+                                            placeholder="اختر الشيخ/الفوج"
+                                            searchPlaceholder="ابحث عن شيخ..."
+                                        />
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-3 bg-muted/50 p-1.5 rounded-2xl border">
+                                    <Button variant={viewMode === 'year' ? 'secondary' : 'ghost'} onClick={() => setViewMode('year')} className="h-9 px-5 rounded-xl font-bold">سنوي</Button>
+                                    <Button variant={viewMode === 'quarter' ? 'secondary' : 'ghost'} onClick={() => setViewMode('quarter')} className="h-9 px-5 rounded-xl font-bold">فصلي</Button>
+                                    <Button variant={viewMode === 'month' ? 'secondary' : 'ghost'} onClick={() => setViewMode('month')} className="h-9 px-5 rounded-xl font-bold">شهري</Button>
+                                </div>
                             </div>
                         </div>
                     </CardHeader>

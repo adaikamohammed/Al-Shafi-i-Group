@@ -18,6 +18,7 @@ import { Loader2, Save, FileText, UserCheck, AlertTriangle, ArrowRight, Trash2, 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AttendanceList, AttendanceRecord } from '@/components/sessions/AttendanceList';
 import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
+import { SearchableSelect, SearchableSelectOption } from '@/components/ui/SearchableSelect';
 import { surahs } from '@/lib/surahs';
 import { db } from '@/lib/firebase';
 import { ref as dbRef, get } from 'firebase/database';
@@ -53,6 +54,8 @@ function RegisterSessionContent() {
     const [isDirty, setIsDirty] = useState(false);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const surahOptions: SearchableSelectOption[] = useMemo(() => surahs.map(s => ({ value: s.id.toString(), label: `${s.id}. ${s.name}` })), []);
 
     const activeStudents = useMemo(() =>
         (students ?? []).filter(s => {
@@ -726,16 +729,14 @@ function RegisterSessionContent() {
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                             <div className="space-y-1 col-span-1 md:col-span-2">
                                 <Label className="text-[11px] font-bold text-emerald-700">السورة</Label>
-                                <Select value={surahId.toString()} onValueChange={(val) => setSurahId(parseInt(val))} dir="rtl">
-                                    <SelectTrigger className="h-10 bg-white border-emerald-200 focus:ring-emerald-500">
-                                        <SelectValue placeholder="اختر السورة" />
-                                    </SelectTrigger>
-                                    <SelectContent className="max-h-[300px]">
-                                        {surahs.map(s => (
-                                            <SelectItem key={s.id} value={s.id.toString()}>{s.id}. {s.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <SearchableSelect
+                                    options={surahOptions}
+                                    value={surahId.toString()}
+                                    onValueChange={(val) => setSurahId(parseInt(val))}
+                                    placeholder="اختر السورة"
+                                    searchPlaceholder="ابحث عن سورة..."
+                                    className="h-10 bg-white border-emerald-200 focus:ring-emerald-500"
+                                />
                             </div>
                             <div className="flex gap-4">
                                 <div className="space-y-1 flex-1">

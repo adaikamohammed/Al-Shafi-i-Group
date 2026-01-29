@@ -257,7 +257,7 @@ export interface HallOfFameData {
 }
 
 
-export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "مرشح" | "تم الإتصال";
+export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "مرشح" | "تم الإتصال" | "مكرر";
 
 export interface PreRegistration {
   id: string;
@@ -306,6 +306,34 @@ export interface AdminLog {
   groupName: string;
   details: any; // Flexible depending on type
   timestamp: string; // ISO string for record creation
+}
+
+export interface MeetingTopic {
+  topic: string;
+  speaker: string;
+  solutions: string;
+}
+
+export interface MeetingSuggestion {
+  id: string;
+  authorName: string;
+  authorId: string;
+  text: string;
+  timestamp: string;
+}
+
+export interface Meeting {
+  id: string;
+  title: string;
+  date: string; // Detailed string: e.g. "الأربعاء 28 جانفي 2026 من العشاء إلى 21:30"
+  timestamp: string; // ISO string for sorting
+  attendance: Record<string, { name: string; status: 'present' | 'absent' | 'excused' }>;
+  foodProvided: boolean;
+  foodDetails?: string;
+  topics: MeetingTopic[];
+  suggestions: MeetingSuggestion[];
+  status: 'upcoming' | 'completed';
+  createdBy: string;
 }
 
 export interface ActivityLog {

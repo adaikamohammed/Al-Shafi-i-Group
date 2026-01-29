@@ -88,6 +88,7 @@ const statusColors: Record<PreRegistrationStatus, string> = {
     "مؤجل": "bg-yellow-100 dark:bg-yellow-900/20",
     "إنضم لمدرسة أخرى": "bg-blue-100 dark:bg-blue-900/20",
     "مرشح": "bg-orange-100 dark:bg-orange-900/20",
+    "مكرر": "bg-gray-100 dark:bg-gray-900/20",
 };
 
 const statusHeaderColors: Record<PreRegistrationStatus, string> = {
@@ -97,6 +98,7 @@ const statusHeaderColors: Record<PreRegistrationStatus, string> = {
     "مؤجل": "bg-yellow-500",
     "إنضم لمدرسة أخرى": "bg-blue-500",
     "مرشح": "bg-orange-500",
+    "مكرر": "bg-gray-500",
 };
 
 
@@ -107,6 +109,7 @@ const statusBadgeColors: Record<PreRegistrationStatus, string> = {
     "مؤجل": "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-800",
     "إنضم لمدرسة أخرى": "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800",
     "مرشح": "bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800",
+    "مكرر": "bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/40 dark:text-gray-300 dark:border-gray-800",
 };
 
 const educationalLevels = {
@@ -377,11 +380,12 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
         reader.readAsDataURL(file);
     };
 
-    const showReasonField = status === 'مرفوض' || status === 'مؤجل' || status === 'مرشح';
+    const showReasonField = status === 'مرفوض' || status === 'مؤجل' || status === 'مرشح' || status === 'مكرر';
     let reasonLabel = "ملاحظات";
     if (status === 'مرفوض') reasonLabel = "سبب الرفض";
     if (status === 'مؤجل') reasonLabel = "سبب التأجيل";
     if (status === 'مرشح') reasonLabel = "سبب الترشيح / تفاصيل إضافية";
+    if (status === 'مكرر') reasonLabel = "ملاحظات التكرار (مثال: مكرر مع الطالب فلان)";
 
     return (
         <form onSubmit={handleSubmit}>
@@ -458,6 +462,7 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
                                 <SelectItem value="مرفوض">مرفوض</SelectItem>
                                 <SelectItem value="مؤجل">مؤجل</SelectItem>
                                 <SelectItem value="إنضم لمدرسة أخرى">إنضم لمدرسة أخرى</SelectItem>
+                                <SelectItem value="مكرر">مكرر</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -555,6 +560,7 @@ const BulkEditModal = ({ open, onOpenChange, selectedCount, onSave }: { open: bo
                                     <SelectItem value="تم الإتصال">تم الإتصال</SelectItem>
                                     <SelectItem value="مرفوض">مرفوض</SelectItem>
                                     <SelectItem value="مؤجل">مؤجل</SelectItem>
+                                    <SelectItem value="مكرر">مكرر</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -1000,7 +1006,7 @@ export default function PreRegistrationPage() {
     }
     const currentAccess = accessLevelConfig[accessLevel];
 
-    const statusOptions: PreRegistrationStatus[] = ["مرشح", "تم الإتصال", "تم الإنضمام", "مرفوض", "مؤجل", "إنضم لمدرسة أخرى"];
+    const statusOptions: PreRegistrationStatus[] = ["مرشح", "تم الإتصال", "تم الإنضمام", "مرفوض", "مؤجل", "إنضم لمدرسة أخرى", "مكرر"];
 
     return (
         <div className="space-y-6">

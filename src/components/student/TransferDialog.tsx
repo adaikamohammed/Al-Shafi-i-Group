@@ -10,6 +10,7 @@ import { useStudentContext } from '@/context/StudentContext';
 import { Student } from '@/lib/types';
 import { AlertCircle, ArrowRightLeft, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { SearchableSelect, SearchableSelectOption } from '@/components/ui/SearchableSelect';
 
 interface TransferDialogProps {
     student: Student;
@@ -23,7 +24,7 @@ export const TransferDialog = ({ student, open, onOpenChange }: TransferDialogPr
     const [reason, setReason] = useState<string>('');
     const [isTransferring, setIsTransferring] = useState(false);
 
-    const availableSheikhs = useMemo(() => {
+    const sheikhOptions: SearchableSelectOption[] = useMemo(() => {
         const uniqueGroups = new Map();
 
         allUsers.forEach(u => {
@@ -31,7 +32,6 @@ export const TransferDialog = ({ student, open, onOpenChange }: TransferDialogPr
                 const groupKey = u.group.trim();
                 const existing = uniqueGroups.get(groupKey);
 
-                // Priority logic: Prefer accounts with 'admin' in their UID as they are often the primary accounts
                 const isNewAdmin = u.uid.toLowerCase().includes('admin');
                 const isExistingAdmin = existing?.uid.toLowerCase().includes('admin');
 
@@ -46,7 +46,11 @@ export const TransferDialog = ({ student, open, onOpenChange }: TransferDialogPr
                 const groupA = parseInt((a.group || '').replace(/[^0-9]/g, '')) || 999;
                 const groupB = parseInt((b.group || '').replace(/[^0-9]/g, '')) || 999;
                 return groupA - groupB;
-            });
+            })
+            .map(s => ({
+                value: s.uid,
+                label: `${s.group || 'بدون فوج'} - ${s.displayName || s.email}`
+            }));
     }, [allUsers, student.ownerId]);
 
     const handleTransfer = async () => {
@@ -87,18 +91,13 @@ export const TransferDialog = ({ student, open, onOpenChange }: TransferDialogPr
 
                     <div className="space-y-2">
                         <Label htmlFor="targetSheikh" className="font-bold">اختر الفوج / الشيخ المستهدف</Label>
-                        <Select value={targetSheikhId} onValueChange={setTargetSheikhId}>
-                            <SelectTrigger id="targetSheikh">
-                                <SelectValue placeholder="اختر الشيخ المستهدف" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {availableSheikhs.map((sheikh) => (
-                                    <SelectItem key={sheikh.uid} value={sheikh.uid}>
-                                        {sheikh.group || 'بدون فوج'} - {sheikh.displayName}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <SearchableSelect
+                            options={sheikhOptions}
+                            value={targetSheikhId}
+                            onValueChange={setTargetSheikhId}
+                            placeholder="اختر الشيخ المستهدف"
+                            searchPlaceholder="ابحث باسم الشيخ أو الفوج..."
+                        />
                     </div>
 
                     <div className="space-y-2">

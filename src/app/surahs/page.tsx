@@ -12,6 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { surahs as allSurahs } from '@/lib/surahs';
 import { cn } from '@/lib/utils';
 import { Loader2, AlertTriangle, CheckCircle, Award, Check } from 'lucide-react';
+import { SearchableSelect, SearchableSelectOption } from '@/components/ui/SearchableSelect';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +29,7 @@ export default function SurahProgressPage() {
     const [selectedGroupForDetails, setSelectedGroupForDetails] = useState<string | null>(null);
 
     const studentsToShow = useMemo(() => (students ?? []).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
+    const studentOptions: SearchableSelectOption[] = useMemo(() => studentsToShow.map(s => ({ value: s.id, label: s.fullName })), [studentsToShow]);
 
     const selectedStudent = useMemo(() => {
         return studentsToShow.find(s => s.id === selectedStudentId);
@@ -207,18 +209,13 @@ export default function SurahProgressPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
                             <div className="flex flex-col gap-4">
                                 <div className="max-w-md">
-                                    <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="اختر طالبًا..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {studentsToShow.map(student => (
-                                                <SelectItem key={student.id} value={student.id}>
-                                                    {student.fullName}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <SearchableSelect
+                                        options={studentOptions}
+                                        value={selectedStudentId}
+                                        onValueChange={setSelectedStudentId}
+                                        placeholder="اختر طالبًا..."
+                                        searchPlaceholder="ابحث عن طالب..."
+                                    />
                                 </div>
 
                                 {isAdmin5 && lastSessionProgress && (

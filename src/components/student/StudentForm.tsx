@@ -20,8 +20,10 @@ import { Student, Covenant, CovenantType, CovenantStatus, CovenantCard } from '@
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { SearchableSelect, SearchableSelectOption } from '@/components/ui/SearchableSelect';
 
 const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
+const educationalLevelOptions: SearchableSelectOption[] = educationalLevels.map(level => ({ value: level, label: level }));
 
 interface StudentFormProps {
     student?: Student;
@@ -52,6 +54,20 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
     const [photoPreview, setPhotoPreview] = useState<string | null>(student?.photoURL || null);
     const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [educationalLevel, setEducationalLevel] = useState<string>(student?.educationalLevel || "");
+    const [groupName, setGroupName] = useState<string>(student?.groupName || user?.group || "");
+
+    const groupOptions: SearchableSelectOption[] = [
+        { value: "فوج الشيخ زياد درويش", label: "فوج الشيخ زياد درويش" },
+        { value: "فوج الشيخ عبد الحميد", label: "فوج الشيخ عبد الحميد" },
+        { value: "فوج الشيخ فؤاد بن عمر", label: "فوج الشيخ فؤاد بن عمر" },
+        { value: "فوج الشيخ أحمد بن عمر", label: "فوج الشيخ أحمد بن عمر" },
+        { value: "فوج الشيخ إبراهيم مراد", label: "فوج الشيخ إبراهيم مراد" },
+        { value: "فوج الشيخ سفيان نصيرة", label: "فوج الشيخ سفيان نصيرة" },
+        { value: "فوج الشيخ محمد منصور", label: "فوج الشيخ محمد منصور" },
+        { value: "فوج الشيخ عبد الحق نصيرة", label: "فوج الشيخ عبد الحق نصيرة" },
+        { value: "فوج الشيخ صهيب نصيب", label: "فوج الشيخ صهيب نصيب" },
+    ];
 
     useEffect(() => {
         if (birthDate) {
@@ -227,12 +243,14 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="educationalLevel" className="font-headline font-bold">المستوى الدراسي</Label>
-                            <Select dir="rtl" name="educationalLevel" defaultValue={student?.educationalLevel}>
-                                <SelectTrigger id="educationalLevel" className="font-body shadow-sm"><SelectValue placeholder="اختر المستوى" /></SelectTrigger>
-                                <SelectContent className="font-body max-h-[300px]">
-                                    {educationalLevels.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
+                            <SearchableSelect
+                                name="educationalLevel"
+                                options={educationalLevelOptions}
+                                value={educationalLevel}
+                                onValueChange={setEducationalLevel}
+                                placeholder="اختر المستوى"
+                                searchPlaceholder="ابحث عن مستوى..."
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="pageNumber" className="font-headline font-bold">رقم الهوية / الصفحة</Label>
@@ -241,20 +259,14 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
                         {isSuperAdmin && (
                             <div className="space-y-2">
                                 <Label htmlFor="groupName" className="font-headline font-bold text-accent">تخصيص الفوج (سوبر أدمن)</Label>
-                                <Select dir="rtl" name="groupName" defaultValue={student?.groupName || user?.group}>
-                                    <SelectTrigger id="groupName" className="font-body border-accent/30 shadow-sm"><SelectValue placeholder="اختر الفوج" /></SelectTrigger>
-                                    <SelectContent className="font-body">
-                                        <SelectItem value="فوج الشيخ زياد درويش">فوج الشيخ زياد درويش</SelectItem>
-                                        <SelectItem value="فوج الشيخ عبد الحميد">فوج الشيخ عبد الحميد</SelectItem>
-                                        <SelectItem value="فوج الشيخ فؤاد بن عمر">فوج الشيخ فؤاد بن عمر</SelectItem>
-                                        <SelectItem value="فوج الشيخ أحمد بن عمر">فوج الشيخ أحمد بن عمر</SelectItem>
-                                        <SelectItem value="فوج الشيخ إبراهيم مراد">فوج الشيخ إبراهيم مراد</SelectItem>
-                                        <SelectItem value="فوج الشيخ سفيان نصيرة">فوج الشيخ سفيان نصيرة</SelectItem>
-                                        <SelectItem value="فوج الشيخ محمد منصور">فوج الشيخ محمد منصور</SelectItem>
-                                        <SelectItem value="فوج الشيخ عبد الحق نصيرة">فوج الشيخ عبد الحق نصيرة</SelectItem>
-                                        <SelectItem value="فوج الشيخ صهيب نصيب">فوج الشيخ صهيب نصيب</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <SearchableSelect
+                                    name="groupName"
+                                    options={groupOptions}
+                                    value={groupName}
+                                    onValueChange={setGroupName}
+                                    placeholder="اختر الفوج"
+                                    searchPlaceholder="ابحث عن فوج..."
+                                />
                             </div>
                         )}
                     </div>

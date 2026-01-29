@@ -14,8 +14,8 @@ export const RegistrationsStats = ({ registrations }: RegistrationsStatsProps) =
     const pending = registrations.filter(r => r.status === 'مؤجل' || r.status === 'مرشح').length;
     // Accepted: 'تم الإنضمام'
     const accepted = registrations.filter(r => r.status === 'تم الإنضمام').length;
-    // Rejected: 'مرفوض' + 'إنضم لمدرسة أخرى'
-    const rejected = registrations.filter(r => r.status === 'مرفوض' || r.status === 'إنضم لمدرسة أخرى').length;
+    // Rejected: 'مرفوض' + 'إنضم لمدرسة أخرى' + 'مكرر'
+    const rejected = registrations.filter(r => r.status === 'مرفوض' || r.status === 'إنضم لمدرسة أخرى' || r.status === 'مكرر').length;
 
     // Group by educational level
     const levelCounts = registrations.reduce((acc, curr) => {

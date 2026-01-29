@@ -119,12 +119,20 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🔄 StudentContext useEffect triggered');
+    console.log('Auth loading:', authLoading);
+    console.log('User:', authContextUser?.email);
+    console.log('Role:', role);
+    console.log('isSuperAdmin:', isSuperAdmin);
+    console.log('isManagement:', isManagement);
+
     if (authLoading) {
       setLoading(true);
       return;
     }
 
     if (!authContextUser) {
+      console.log('❌ No authenticated user - resetting data');
       setLoading(false);
       setStudents([]);
       setDailySessions({});
@@ -139,6 +147,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    console.log('✅ User authenticated, setting up listeners...');
     setLoading(true);
     let dataRef: DatabaseReference | null = null;
     let preRegsRef: DatabaseReference | null = null;
@@ -170,6 +179,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     });
 
     if (isSuperAdmin || isManagement) {
+      console.log('👑 Management/SuperAdmin mode activated');
       const mergeAndSetLogs = () => {
         const merged = { ...accumulatedUserLogs, ...accumulatedGlobalLogs };
         const logsArray = Object.values(merged).sort((a, b) => {
@@ -197,6 +207,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
         // If management/admin, aggregate data from all users
         if (isSuperAdmin || isManagement) {
+          console.log('🔍 Management/Admin view - Aggregating data from all users');
+          console.log('Total users found:', Object.keys(usersData).length);
+
           let allStudents: Student[] = [];
           let allSessions: Record<string, Record<string, DailySession>> = {};
           let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
@@ -212,13 +225,20 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           accumulatedUserLogs = {};
           for (const uid in usersData) {
             const userData = usersData[uid];
-            // ... (rest of the aggregation logic stays same, just ensuring usersArray is set first)
+
+            // Log each user's data
             if (userData.students) {
+              const studentCount = Object.keys(userData.students).length;
+              console.log(`📚 User ${userData.profile?.displayName || uid}: ${studentCount} students`);
+
               const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) =>
                 processStudentData({ ...s, id }, uid, userData.profile?.group)
               );
               allStudents.push(...userStudents);
+            } else {
+              console.log(`📭 User ${userData.profile?.displayName || uid}: No students`);
             }
+
             if (userData.dailySessions) {
               for (const date in userData.dailySessions) {
                 if (!allSessions[date]) allSessions[date] = {};
@@ -249,6 +269,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             }
           }
 
+          console.log('✅ Total students aggregated:', allStudents.length);
+          console.log('✅ Total sessions aggregated:', Object.keys(allSessions).length);
+
           setStudents(allStudents);
           setDailySessions(allSessions);
           setDailyReports(allReports);
@@ -261,6 +284,19 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         }
       }, (error) => {
         console.error(`Firebase read failed for user list: ${error.message}`);
+        console.error('Error code:', error.code);
+        console.error('Full error:', error);
+
+        // Check if it's a permission error
+        if (error.code === 'PERMISSION_DENIED') {
+          console.warn('⚠️ PERMISSION DENIED - Database rules may not be updated correctly');
+          toast({
+            title: "خطأ في الصلاحيات",
+            description: "يرجى التحقق من قواعد Firebase Database في Console.",
+            variant: "destructive"
+          });
+        }
+
         if (isSuperAdmin || isManagement) setLoading(false);
       });
 

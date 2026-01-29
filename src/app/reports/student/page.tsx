@@ -12,6 +12,8 @@ import { Loader2, AlertTriangle, FileDown, MessageCircle, Send } from 'lucide-re
 import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, startOfYear, endOfYear, setMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { useSearchParams } from 'next/navigation';
+import { SearchableSelect, SearchableSelectOption } from '@/components/ui/SearchableSelect';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import dynamic from 'next/dynamic';
@@ -28,7 +30,9 @@ export default function StudentReportPage() {
     const { students, dailySessions, surahProgress, loading } = useStudentContext();
     const { user } = useAuth();
     const { toast } = useToast();
-    
+    const searchParams = useSearchParams();
+    const studentIdParam = searchParams.get('id');
+
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
     const [reportPeriod, setReportPeriod] = useState<'month' | 'season' | 'year'>('month');
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
@@ -40,20 +44,23 @@ export default function StudentReportPage() {
     const [messageContent, setMessageContent] = useState('');
 
     const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط').sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
+    const studentOptions: SearchableSelectOption[] = useMemo(() => activeStudents.map(s => ({ value: s.id, label: s.fullName })), [activeStudents]);
     const selectedStudent = useMemo(() => activeStudents.find(s => s.id === selectedStudentId), [activeStudents, selectedStudentId]);
 
-     useEffect(() => {
-        if(activeStudents.length > 0 && !selectedStudentId) {
+    useEffect(() => {
+        if (studentIdParam) {
+            setSelectedStudentId(studentIdParam);
+        } else if (activeStudents.length > 0 && !selectedStudentId) {
             setSelectedStudentId(activeStudents[0].id);
         }
-    }, [activeStudents, selectedStudentId]);
-    
+    }, [activeStudents, selectedStudentId, studentIdParam]);
+
     const reportData = useMemo(() => {
         if (!selectedStudentId) return null;
-        
+
         const student = (students ?? []).find(s => s.id === selectedStudentId);
         if (!student) return null;
-        
+
         let startDate: Date;
         let endDate: Date;
         let reportTitle = '';
@@ -83,7 +90,7 @@ export default function StudentReportPage() {
         }
 
         const sessionsInRange = Object.values(dailySessions ?? {}).flatMap(day => Object.values(day)).filter(session => {
-            if(!session.date) return false;
+            if (!session.date) return false;
             const sessionDate = parseISO(session.date);
             return sessionDate >= startDate && sessionDate <= endDate;
         });
@@ -95,8 +102,8 @@ export default function StudentReportPage() {
             if (session.sessionType === 'يوم عطلة') {
                 stats.holidays++;
             } else {
-                 const record = (session.records ?? []).find(r => r.studentId === selectedStudentId);
-                 if (record) {
+                const record = (session.records ?? []).find(r => r.studentId === selectedStudentId);
+                if (record) {
                     totalSessionsHeld++;
                     switch (record.attendance) {
                         case 'حاضر': stats.present++; break;
@@ -104,20 +111,20 @@ export default function StudentReportPage() {
                         case 'تعويض': stats.makeup++; break;
                         case 'غائب': stats.absent++; break;
                     }
-                    if(record.attendance !== 'غائب' && session.sessionType === 'حصة تعويضية') {
+                    if (record.attendance !== 'غائب' && session.sessionType === 'حصة تعويضية') {
                         stats.compensationBalance++;
                     }
-                    if(record.behavior) {
+                    if (record.behavior) {
                         stats.totalBehavior++;
-                        switch(record.behavior){
+                        switch (record.behavior) {
                             case 'هادئ': stats.calm++; break;
                             case 'متوسط': stats.mediumBehavior++; break;
                             case 'غير منضبط': stats.undisciplined++; break;
                         }
                     }
-                    if(record.memorization) {
+                    if (record.memorization) {
                         stats.totalEvaluations++;
-                         switch(record.memorization){
+                        switch (record.memorization) {
                             case 'ممتاز': stats.excellent++; break;
                             case 'جيد': stats.good++; break;
                             case 'متوسط': stats.average++; break;
@@ -133,7 +140,7 @@ export default function StudentReportPage() {
 
         const attendanceScore = totalSessionsHeld > 0 ? ((stats.present + stats.late) / totalSessionsHeld) * 10 : 0;
         const disciplineScore = stats.totalBehavior > 0 ? ((stats.calm * 2 + stats.mediumBehavior * 1) / (stats.totalBehavior * 2)) * 10 : 0;
-        
+
         const studentMastery = surahProgress[selectedStudentId] || {};
         const masteredCount = Object.values(studentMastery).filter(s => s.status === 2).length;
         const memorizationScore = masteredCount > 0 ? (masteredCount / 114) * 10 : 0;
@@ -147,16 +154,16 @@ export default function StudentReportPage() {
             { subject: 'المراجعة', score: parseFloat(reviewScore.toFixed(1)), fullMark: 10 },
             { subject: 'التجويد', score: tajweedScore, fullMark: 10 },
         ];
-        
+
         let autoNote = '';
         const studentProgressData = surahProgress[selectedStudentId] || {};
         const memorizedCount = Object.values(studentProgressData).filter(s => s.status === 1).length;
-        if(masteredCount > 0 && memorizedCount > masteredCount) {
-             autoNote = 'الطالب يحفظ جيداً ولكن يحتاج لتركيز أكبر على مراجعة وتثبيت المحفوظ القديم.';
+        if (masteredCount > 0 && memorizedCount > masteredCount) {
+            autoNote = 'الطالب يحفظ جيداً ولكن يحتاج لتركيز أكبر على مراجعة وتثبيت المحفوظ القديم.';
         } else {
             const minScoreItem = radarData.reduce((min, item) => item.score < min.score ? item : min, radarData[0]);
             if (minScoreItem.score < 5) {
-                switch(minScoreItem.subject) {
+                switch (minScoreItem.subject) {
                     case 'الحفظ': autoNote = 'نوصي بتكثيف المراجعة والتركيز على تثبيت السور المحفوظة للوصول لمرحلة الإتقان.'; break;
                     case 'الحضور': autoNote = 'نوصي بالتركيز على تحسين جانب الحضور والالتزام بمواعيد الحصص.'; break;
                     case 'السلوك': autoNote = 'نوصي بالعمل على تحسين السلوك والانضباط داخل الحلقة.'; break;
@@ -199,7 +206,7 @@ export default function StudentReportPage() {
 
         switch (messageTemplate) {
             case 'report':
-                 generatedMessage = `السلام عليكم ورحمة الله وبركاته. السيد ولي أمر الطالب: ${studentName}. تحية طيبة وبعد، نرسل لكم تقرير أداء الطالب لشهر ${monthName}. نرجو منكم مراجعة التقرير بعناية وإرفاقه مطبوعاً مع التوقيع في موعد أقصاه ثلاثة أيام من تاريخه. شاكرين لكم حسن تعاونكم وحرصكم.`;
+                generatedMessage = `السلام عليكم ورحمة الله وبركاته. السيد ولي أمر الطالب: ${studentName}. تحية طيبة وبعد، نرسل لكم تقرير أداء الطالب لشهر ${monthName}. نرجو منكم مراجعة التقرير بعناية وإرفاقه مطبوعاً مع التوقيع في موعد أقصاه ثلاثة أيام من تاريخه. شاكرين لكم حسن تعاونكم وحرصكم.`;
                 break;
             case 'tahdidi':
                 generatedMessage = messageBase + `نلاحظ تكرار غياب ابنكم، وعليه نرجو منكم الحضور للمدرسة للتوقيع على تعهد بالالتزام لضمان استمراره.`;
@@ -214,7 +221,7 @@ export default function StudentReportPage() {
                 generatedMessage = messageBase + `نبارك لكم التميز الباهر لابنكم في حصص القرآن مؤخراً. استمروا في دعمه وتشجيعه.`;
                 break;
             case 'inqitaa':
-                 generatedMessage = messageBase + `إشعار انقطاع: نحيطكم علماً بأن ابنكم قد تغيب لأكثر من 3 حصص متتالية دون عذر. نرجو منكم التواصل مع الإدارة بشكل عاجل.`;
+                generatedMessage = messageBase + `إشعار انقطاع: نحيطكم علماً بأن ابنكم قد تغيب لأكثر من 3 حصص متتالية دون عذر. نرجو منكم التواصل مع الإدارة بشكل عاجل.`;
                 break;
         }
         setMessageContent(generatedMessage);
@@ -251,7 +258,7 @@ export default function StudentReportPage() {
     if (loading) {
         return <div className="flex items-center justify-center h-full"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
     }
-    
+
     if (activeStudents.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
@@ -264,23 +271,23 @@ export default function StudentReportPage() {
 
     return (
         <div className="space-y-6">
-             <Card className="print:hidden">
+            <Card className="print:hidden">
                 <CardHeader>
                     <CardTitle>إنشاء تقرير أداء الطالب</CardTitle>
                     <CardDescription>اختر الطالب والفترة، أضف ملاحظاتك، ثم قم بحفظ التقرير أو إرساله.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                     <div className="flex flex-col md:flex-row gap-2">
-                         <Select dir="rtl" value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                            <SelectTrigger className="w-full md:w-[200px]"><SelectValue placeholder="اختر طالبًا" /></SelectTrigger>
-                            <SelectContent>
-                                {activeStudents.map(student => (
-                                    <SelectItem key={student.id} value={student.id}>{student.fullName}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        
-                         <Select dir="rtl" value={reportPeriod} onValueChange={(value: 'month' | 'season' | 'year') => setReportPeriod(value)}>
+                    <div className="flex flex-col md:flex-row gap-2">
+                        <SearchableSelect
+                            options={studentOptions}
+                            value={selectedStudentId}
+                            onValueChange={setSelectedStudentId}
+                            placeholder="اختر طالبًا"
+                            searchPlaceholder="ابحث عن طالب..."
+                            className="w-full md:w-[300px]"
+                        />
+
+                        <Select dir="rtl" value={reportPeriod} onValueChange={(value: 'month' | 'season' | 'year') => setReportPeriod(value)}>
                             <SelectTrigger className="w-full md:w-[150px]"><SelectValue placeholder="نوع التقرير" /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="month">تقرير شهري</SelectItem>
@@ -290,17 +297,17 @@ export default function StudentReportPage() {
                         </Select>
 
                         {reportPeriod === 'month' && (
-                           <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
+                            <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
                                 <SelectTrigger className="w-full md:w-[150px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
                                 <SelectContent>
-                                    {Array.from({length: 12}, (_, i) => (
+                                    {Array.from({ length: 12 }, (_, i) => (
                                         <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', { locale: ar })}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         )}
                         {reportPeriod === 'season' && (
-                             <Select dir="rtl" value={selectedSeason.toString()} onValueChange={(val) => setSelectedSeason(parseInt(val))}>
+                            <Select dir="rtl" value={selectedSeason.toString()} onValueChange={(val) => setSelectedSeason(parseInt(val))}>
                                 <SelectTrigger className="w-full md:w-[220px]"><SelectValue placeholder="الموسم" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="1">الموسم 1 (جانفي - مارس)</SelectItem>
@@ -311,10 +318,10 @@ export default function StudentReportPage() {
                             </Select>
                         )}
 
-                         <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
+                        <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
                             <SelectTrigger className="w-full md:w-[120px]"><SelectValue placeholder="السنة" /></SelectTrigger>
                             <SelectContent>
-                                 {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
                                     <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
                                 ))}
                             </SelectContent>
@@ -322,12 +329,12 @@ export default function StudentReportPage() {
                     </div>
 
                     <div className="space-y-3">
-                       <Label htmlFor="tajweed-slider">تقييم التجويد: {tajweedScore}/10</Label>
-                       <Slider id="tajweed-slider" defaultValue={[tajweedScore]} max={10} step={1} onValueChange={(val) => setTajweedScore(val[0])} />
+                        <Label htmlFor="tajweed-slider">تقييم التجويد: {tajweedScore}/10</Label>
+                        <Slider id="tajweed-slider" defaultValue={[tajweedScore]} max={10} step={1} onValueChange={(val) => setTajweedScore(val[0])} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="teacher-note">ملاحظات الشيخ الختامية للتقرير</Label>
-                        <Textarea 
+                        <Textarea
                             id="teacher-note"
                             placeholder="هذه الملاحظات ستظهر في التقرير المطبوع فقط..."
                             value={teacherNote}
@@ -344,18 +351,18 @@ export default function StudentReportPage() {
                     </div>
                 </CardContent>
             </Card>
-            
-             <Card className="print:hidden">
+
+            <Card className="print:hidden">
                 <CardHeader>
-                  <CardTitle>قناة التواصل مع ولي الأمر</CardTitle>
-                  <CardDescription>
-                    اختر قالب رسالة جاهز، أو قم بتعديل النص يدويًا قبل إرساله عبر واتساب.
-                  </CardDescription>
+                    <CardTitle>قناة التواصل مع ولي الأمر</CardTitle>
+                    <CardDescription>
+                        اختر قالب رسالة جاهز، أو قم بتعديل النص يدويًا قبل إرساله عبر واتساب.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="message-template">اختر قالب الرسالة</Label>
-                         <Select dir="rtl" value={messageTemplate} onValueChange={(value: MessageTemplate) => setMessageTemplate(value)}>
+                        <Select dir="rtl" value={messageTemplate} onValueChange={(value: MessageTemplate) => setMessageTemplate(value)}>
                             <SelectTrigger id="message-template" className={cn(
                                 messageTemplate === 'tahdidi' || messageTemplate === 'tanbih' || messageTemplate === 'inqitaa' ? 'ring-2 ring-destructive' : '',
                                 messageTemplate === 'tashjee' ? 'ring-2 ring-green-500' : ''
@@ -374,7 +381,7 @@ export default function StudentReportPage() {
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="whatsapp-message">محتوى الرسالة (قابل للتعديل)</Label>
-                         <Textarea
+                        <Textarea
                             id="whatsapp-message"
                             value={messageContent}
                             onChange={(e) => setMessageContent(e.target.value)}
@@ -390,7 +397,7 @@ export default function StudentReportPage() {
             </Card>
 
             {reportData && (
-                <ReportDisplay 
+                <ReportDisplay
                     reportData={reportData}
                     user={user}
                     teacherNote={teacherNote}
@@ -400,4 +407,4 @@ export default function StudentReportPage() {
     );
 }
 
-    
+

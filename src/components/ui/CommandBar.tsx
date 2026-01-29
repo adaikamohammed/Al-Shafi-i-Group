@@ -51,11 +51,11 @@ export function CommandBar({ students, isOpen, onOpenChange, router }: CommandBa
         <CommandEmpty>لم يتم العثور على نتائج.</CommandEmpty>
 
         <CommandGroup heading="الطلبة">
-          {(students ?? []).filter(s => s.status === 'نشط').slice(0, 5).map((student) => (
+          {(students ?? []).filter(s => s.status === 'نشط').map((student) => (
             <CommandItem
               key={student.id}
               value={student.fullName}
-              onSelect={() => handleSelect(() => router.push(`/reports/student`))}
+              onSelect={() => handleSelect(() => router.push(`/reports/student?id=${student.id}`))}
               className="flex justify-between items-center"
             >
               <div className="flex items-center">
