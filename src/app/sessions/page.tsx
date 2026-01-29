@@ -19,7 +19,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, FileText, UserCheck, AlertTriangle, Trophy, Download, Trash2, Copy, MoreVertical, Dot, ChevronRight, ChevronLeft, BookOpen, Plus, Calendar as CalendarIcon, AlertCircle, Sparkles } from 'lucide-react';
+import {
+  Loader2,
+  Save,
+  FileText,
+  UserCheck,
+  AlertTriangle,
+  Trophy,
+  Download,
+  Trash2,
+  Copy,
+  MoreVertical,
+  Dot,
+  ChevronRight,
+  ChevronLeft,
+  BookOpen,
+  Plus,
+  Calendar as CalendarIcon,
+  AlertCircle,
+  Sparkles
+} from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ProtectedPage } from '@/components/ui/ProtectedPage';
@@ -101,9 +120,9 @@ export default function DailySessionsPage() {
     }
   };
 
-  const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
+  const handleDeleteSession = (e: React.MouseEvent, sessionId: string, date: string) => {
     e.stopPropagation();
-    deleteDailySession(sessionId);
+    deleteDailySession(sessionId, date);
     toast({ title: "تم الحذف", description: `تم حذف بيانات الحصة بنجاح.` });
   }
 

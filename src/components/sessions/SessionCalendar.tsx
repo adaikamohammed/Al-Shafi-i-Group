@@ -5,6 +5,7 @@ import { format, getYear, getMonth, getDaysInMonth, getDay, startOfMonth, isSame
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, ChevronRight, Dot, MoreVertical, Copy, Download, Trash2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
@@ -14,7 +15,7 @@ interface SessionCalendarProps {
     onDayClick: (day: number, sessionNumber?: 1 | 2) => void;
     getSessionsForDay: (dateString: string) => any[];
     isSuperAdmin: boolean;
-    onDeleteSession: (e: React.MouseEvent, sessionId: string) => void;
+    onDeleteSession: (e: React.MouseEvent, sessionId: string, date: string) => void;
     onExportSession: (e: React.MouseEvent, sessionId: string) => void;
 }
 
@@ -129,19 +130,29 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                                         <MoreVertical className="h-3 w-3" />
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-40 font-body">
-                                    {sessions.map((session) => (
-                                        <React.Fragment key={session.id}>
-                                            <DropdownMenuItem onClick={() => onDayClick(day, session.sessionNumber as 1 | 2)}>
-                                                <Copy className="ml-2 h-3 w-3" /> تعديل H{session.sessionNumber}
+                                <DropdownMenuContent align="end" className="w-52 font-body p-2 space-y-1">
+                                    <div className="px-2 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 rounded-lg mb-1">
+                                        إدارة حصص اليوم
+                                    </div>
+                                    {sessions.map((session, sIdx) => (
+                                        <React.Fragment key={session.id || sIdx}>
+                                            <div className="px-2 py-1 text-[10px] text-muted-foreground flex items-center justify-between">
+                                                <span> {session.sessionType || `حصة ${session.sessionNumber}`}</span>
+                                                <Badge variant="outline" className="text-[9px] h-4 px-1">{String(session.id).slice(-4)}</Badge>
+                                            </div>
+                                            <DropdownMenuItem onClick={() => onDayClick(day, session.sessionNumber as 1 | 2)} className="rounded-lg">
+                                                <Copy className="ml-2 h-3.5 w-3.5" /> تعديل البيانات
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={(e) => onExportSession(e, session.id)}>
-                                                <Download className="ml-2 h-3 w-3" /> تصدير Excel
+                                            <DropdownMenuItem onClick={(e) => onExportSession(e, session.id)} className="rounded-lg">
+                                                <Download className="ml-2 h-3.5 w-3.5" /> تصدير الملف
                                             </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={(e) => onDeleteSession(e, session.id)}>
-                                                <Trash2 className="ml-2 h-3 w-3" /> حذف
+                                            <DropdownMenuItem
+                                                className="text-red-600 focus:text-red-700 focus:bg-red-50 rounded-lg font-bold"
+                                                onClick={(e) => onDeleteSession(e, session.id, formattedDate)}
+                                            >
+                                                <Trash2 className="ml-2 h-3.5 w-3.5" /> حذف الحصة نهائياً
                                             </DropdownMenuItem>
+                                            {sIdx < sessions.length - 1 && <DropdownMenuSeparator className="my-1 bg-emerald-100/50" />}
                                         </React.Fragment>
                                     ))}
                                 </DropdownMenuContent>

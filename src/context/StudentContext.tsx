@@ -77,7 +77,7 @@ interface StudentContextType {
   deleteAllStudents: () => void;
   deleteMultipleStudents: (studentsToDelete: { id: string, ownerId: string }[]) => void;
   addDailySession: (session: DailySession) => Promise<void>;
-  deleteDailySession: (sessionId: string) => void;
+  deleteDailySession: (sessionId: string, date?: string) => void;
   getSessionsForDay: (date: string) => DailySession[];
   getSessionById: (sessionId: string) => DailySession | undefined;
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession[]>;
@@ -866,11 +866,15 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const deleteDailySession = (sessionId: string) => {
-    if (!authContextUser || isSuperAdmin) return;
-    const date = sessionId.substring(0, 10);
-    const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${date}/${sessionId}`);
-    const sessionToDelete = dailySessions[date]?.[sessionId];
+  const deleteDailySession = (sessionId: string, date?: string) => {
+    if (!authContextUser || isSuperAdmin || !sessionId) return;
+
+    // استخدام التاريخ الممرر أو استخراجه من الـ ID كخيار احتياطي
+    const targetDate = date || sessionId.substring(0, 10);
+
+    const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${targetDate}/${sessionId}`);
+    const sessionToDelete = dailySessions[targetDate]?.[sessionId];
+
     remove(sessionRef).then(() => {
       if (sessionToDelete) {
         logActivity(
@@ -889,7 +893,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
   const getSessionsForDay = (date: string): DailySession[] => {
     const sessionsForDate = (dailySessions ?? {})[date];
-    return sessionsForDate ? Object.values(sessionsForDate) : [];
+    if (!sessionsForDate) return [];
+
+    // Ensure id is present in each session object
+    return Object.entries(sessionsForDate).map(([id, session]) => ({
+      ...session,
+      id: session.id || id
+    }));
   }
 
   const getSessionById = (sessionId: string): DailySession | undefined => {
