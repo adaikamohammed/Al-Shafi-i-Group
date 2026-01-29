@@ -26,19 +26,57 @@ export const useFCM = () => {
             setPermission(permissionResult);
 
             if (permissionResult === 'granted') {
+                // Ensure service worker is registered and active
+                if (!('serviceWorker' in navigator)) {
+                    console.error("Service Worker not supported.");
+                    toast({
+                        title: "خطأ",
+                        description: "المتصفح لا يدعم الإشعارات.",
+                        variant: "destructive"
+                    });
+                    return;
+                }
+
+                // Register service worker if not already registered
+                let registration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+                if (!registration) {
+                    registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                    console.log('Firebase Messaging SW registered:', registration);
+                }
+
+                // Wait for service worker to be active
+                if (registration.installing) {
+                    await new Promise((resolve) => {
+                        registration!.installing!.addEventListener('statechange', (e) => {
+                            if ((e.target as ServiceWorker).state === 'activated') {
+                                resolve(true);
+                            }
+                        });
+                    });
+                } else if (registration.waiting) {
+                    await new Promise((resolve) => {
+                        registration!.waiting!.addEventListener('statechange', (e) => {
+                            if ((e.target as ServiceWorker).state === 'activated') {
+                                resolve(true);
+                            }
+                        });
+                    });
+                }
+
                 const msg = await messaging;
                 if (!msg) {
                     console.error("Messaging not supported.");
                     return;
                 }
 
-                // Try retrieving token without explicit VAPID key first (relying on implicit config)
+                // Try retrieving token with the service worker registration
                 try {
-                    const currentToken = await getToken(msg);
+                    const currentToken = await getToken(msg, {
+                        serviceWorkerRegistration: registration
+                    });
                     if (currentToken) {
                         setToken(currentToken);
                         // Save token to user profile
-                        const userRef = ref(db, `users/${user.uid}/fcmTokens`);
                         await update(ref(db, `users/${user.uid}`), {
                             fcmTokens: arrayUnion(currentToken)
                         });
@@ -53,8 +91,6 @@ export const useFCM = () => {
                     }
                 } catch (err) {
                     console.error('An error occurred while retrieving token. ', err);
-                    // If the error is related to missing VAPID key, checking console might be needed.
-                    // But usually modern firebase config handles it if "Web Push Certificate" is generated in console.
                     toast({
                         title: "خطأ في الإعداد",
                         description: "يرجى التأكد من إعداد Web Push Certificate في لوحة تحكم فايربيس.",

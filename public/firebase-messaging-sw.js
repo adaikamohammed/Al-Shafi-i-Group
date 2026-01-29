@@ -4,12 +4,13 @@ importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compa
 // Initialize the Firebase app in the service worker by passing in the
 // messagingSenderId.
 firebase.initializeApp({
-    apiKey: "PLACEHOLDER_API_KEY", // Will be replaced or these scripts need to check context
-    authDomain: "al-shafi-i-group.firebaseapp.com",
-    projectId: "al-shafi-i-group",
-    storageBucket: "al-shafi-i-group.firebasestorage.app",
-    messagingSenderId: "530591742388",
-    appId: "1:530591742388:web:7f85820465548074696013",
+    apiKey: "AIzaSyCVZOpgoz76g5AQDnPyRTzPB6UoT2YYKL8",
+    authDomain: "al-shafi-i-quran-school.web.app",
+    projectId: "al-shafi-i-quran-school",
+    storageBucket: "al-shafi-i-quran-school.appspot.com",
+    messagingSenderId: "833438544513",
+    appId: "1:833438544513:web:e141646e143dc4ac851380",
+    databaseURL: "https://al-shafi-i-quran-school-default-rtdb.firebaseio.com"
 });
 
 // Retrieve an instance of Firebase Messaging so that it can handle background
