@@ -33,6 +33,16 @@
                     }
                 }
             }
+        },
+        "public_student_reports": {
+            "$studentId": {
+                ".read": true,
+                ".write": "auth != null"
+            }
+        },
+        "site_updates": {
+            ".read": "auth != null",
+            ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')"
         }
     }
 }

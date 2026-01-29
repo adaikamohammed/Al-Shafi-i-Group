@@ -19,7 +19,9 @@ import {
     Home,
     UserCog,
     MoonStar,
-    Activity
+    Activity,
+    MessageSquare,
+    Sparkles
 } from 'lucide-react';
 
 export interface NavItem {
@@ -52,6 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
             { href: '/logs', label: 'سجل النشاطات', icon: Activity },
             { href: '/yearly-performance', label: 'الأداء السنوي', icon: BarChart3 },
             { href: '/reports/student', label: 'تقارير الطلاب', icon: FileText },
+            { href: '/parent-communication', label: 'قناة التواصل', icon: MessageSquare },
         ]
     },
     {
@@ -71,6 +74,7 @@ export const NAV_GROUPS: NavGroup[] = [
             { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus },
             { href: '/meetings', label: 'الاجتماعات', icon: Calendar },
             { href: '/admin/admin-docs', label: 'الأوصال الإدارية', icon: ClipboardList },
+            { href: '/updates', label: 'تحديثات الموقع', icon: Sparkles },
             { href: '/data', label: 'إدارة البيانات', icon: ArrowRightLeft },
             { href: '/dues', label: 'المستحقات (فصلي)', icon: DollarSign },
             { href: '/guide', label: 'دليل المستخدم', icon: HelpCircle },
@@ -81,5 +85,6 @@ export const NAV_GROUPS: NavGroup[] = [
 export const BOTTOM_NAV_ITEMS = [
     { href: '/home', label: 'البوابة الرئيسية', icon: Home },
     { href: '/profile', label: 'الملف الشخصي', icon: UserCog },
+    { href: '/updates', label: 'التحديثات', icon: Sparkles },
     { href: '/settings', label: 'الإعدادات', icon: Settings },
 ];

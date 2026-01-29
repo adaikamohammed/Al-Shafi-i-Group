@@ -348,3 +348,15 @@ export interface ActivityLog {
   timestamp: any;
   groupName?: string;
 }
+export type SiteUpdateType = "ميزة جديدة" | "تحسين" | "إصلاح خطأ" | "تنبيه غداري" | "أخرى";
+
+export interface SiteUpdate {
+  id: string;
+  title: string;
+  description: string;
+  date: string; // ISO string
+  type: SiteUpdateType;
+  authorId: string;
+  authorName: string;
+  version?: string;
+}

@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, FileText, UserCheck, AlertTriangle, Trophy, Download, Trash2, Copy, MoreVertical, Dot, ChevronRight, ChevronLeft, BookOpen, Plus, Calendar as CalendarIcon } from 'lucide-react';
+import { Loader2, Save, FileText, UserCheck, AlertTriangle, Trophy, Download, Trash2, Copy, MoreVertical, Dot, ChevronRight, ChevronLeft, BookOpen, Plus, Calendar as CalendarIcon, AlertCircle, Sparkles } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ProtectedPage } from '@/components/ui/ProtectedPage';
@@ -89,10 +89,14 @@ export default function DailySessionsPage() {
 
     // إذا لم يتم تحديد رقم الحصة (النقر على الخلية نفسها)
     // نتحقق من عدد الحصص الموجودة
-    if (daySessions.length > 1) {
+    if (daySessions.length >= 2) {
       setSessionChoiceData({ day, dateStr, sessions: daySessions });
+    } else if (daySessions.length === 1) {
+      // إذا كانت الحصة 1 موجودة، نفتح الحصة 2
+      const nextSession = daySessions[0].sessionNumber === 1 ? 2 : 1;
+      router.push(`/sessions/register?date=${dateStr}&session=${nextSession}`);
     } else {
-      // حصة واحدة أو لا توجد حصص -> نفتح الحصة 1 افتراضياً
+      // لا توجد حصص -> نفتح الحصة 1 افتراضياً
       router.push(`/sessions/register?date=${dateStr}&session=1`);
     }
   };
@@ -111,32 +115,32 @@ export default function DailySessionsPage() {
 
     const daySessions = getSessionsForDay(extraSessionDate);
 
-    // التحقق من وجود الحصة الأولى إذا كان المستخدم يريد إضافة الحصة الثانية
-    if (extraSessionNumber === 2) {
-      const session1 = daySessions.find(s => s.sessionNumber === 1);
-      if (!session1) {
-        toast({
-          title: "تنبيه",
-          description: "يجب تسجيل الحصة الأولى (الأساسية) قبل إضافة الحصة الثانية (الإضافية).",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
-    // التحقق من عدم وجود الحصة المطلوبة مسبقاً
-    const existingSession = daySessions.find(s => s.sessionNumber === extraSessionNumber);
-    if (existingSession) {
+    // التحقق من عدد الحصص
+    if (daySessions.length >= 2) {
       toast({
         title: "تنبيه",
-        description: `الحصة رقم ${extraSessionNumber} موجودة بالفعل في هذا اليوم.`,
+        description: "لا يمكن إضافة أكثر من حصتين في اليوم الواحد.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // تحديد رقم الحصة المفقودة تلقائياً
+    const existingSession1 = daySessions.find(s => s.sessionNumber === 1);
+    const sessionNumToOpen = existingSession1 ? 2 : 1;
+
+    // التحقق من وجود الحصة الأولى إذا كان المستخدم يريد إضافة الحصة الثانية
+    if (sessionNumToOpen === 2 && !existingSession1) {
+      toast({
+        title: "تنبيه",
+        description: "يجب تسجيل الحصة الأولى (الأساسية) قبل إضافة الحصة الثانية (الإضافية).",
         variant: "destructive",
       });
       return;
     }
 
     // الانتقال إلى صفحة تسجيل الحصة
-    router.push(`/sessions/register?date=${extraSessionDate}&session=${extraSessionNumber}`);
+    router.push(`/sessions/register?date=${extraSessionDate}&session=${sessionNumToOpen}`);
     setIsAddExtraDialogOpen(false);
   };
 
@@ -355,38 +359,15 @@ export default function DailySessionsPage() {
                 </Select>
               </div>
 
-              {/* Session Number Selection */}
-              <div className="space-y-2">
-                <Label className="text-base font-semibold">رقم الحصة</Label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="sessionNumber"
-                      value={1}
-                      checked={extraSessionNumber === 1}
-                      onChange={() => setExtraSessionNumber(1)}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-body">الحصة الأولى</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="sessionNumber"
-                      value={2}
-                      checked={extraSessionNumber === 2}
-                      onChange={() => setExtraSessionNumber(2)}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-body">الحصة الثانية (إضافية)</span>
-                  </label>
-                </div>
-                {extraSessionNumber === 2 && (
-                  <p className="text-sm text-muted-foreground mt-2 mr-6 font-body">
-                    💡 ملاحظة: يجب أن تكون الحصة الأولى مسجلة في هذا اليوم قبل إضافة الحصة الثانية.
+              {/* Session Number Auto Selection Info */}
+              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-emerald-600 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold text-emerald-900 text-sm">التحديد التلقائي لرقم الحصة</p>
+                  <p className="text-xs text-emerald-700 leading-relaxed font-body">
+                    سيقوم النظام تلقائياً بفتح "الحصة الثانية" إذا كانت الحصة الأساسية مسجلة مسبقاً، أو "الحصة الأولى" إذا لم يتم تسجيل أي حصة بعد.
                   </p>
-                )}
+                </div>
               </div>
             </div>
 
