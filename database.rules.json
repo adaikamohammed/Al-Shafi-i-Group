@@ -1,0 +1,57 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('profile').child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('profile').child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')",
+        
+        "profile": {
+          ".validate": "newData.hasChildren(['displayName', 'email'])"
+        },
+        
+        "students": {
+          "$studentId": {
+            ".validate": "newData.hasChildren(['fullName', 'registrationDate'])"
+          }
+        },
+        
+        "dailySessions": {
+          "$date": {
+            "$sessionId": {
+              ".validate": "newData.hasChildren(['id', 'date', 'sessionType'])"
+            }
+          }
+        },
+        
+        "fcmTokens": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid"
+        }
+      }
+    },
+    
+    "pre_registrations": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('profile').child('email').val() === 'admin00@gmail.com')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('profile').child('email').val() === 'admin00@gmail.com')",
+      
+      "$regId": {
+        ".validate": "newData.hasChildren(['fullName'])"
+      }
+    },
+    
+    "activity_logs": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')",
+      ".write": "auth != null"
+    },
+    
+    "shared_records": {
+      "$recordId": {
+        ".read": true,
+        ".write": "auth != null"
+      }
+    }
+  }
+}

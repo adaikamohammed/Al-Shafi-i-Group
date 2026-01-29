@@ -76,10 +76,17 @@ export const useFCM = () => {
                     });
                     if (currentToken) {
                         setToken(currentToken);
-                        // Save token to user profile
-                        await update(ref(db, `users/${user.uid}`), {
-                            fcmTokens: arrayUnion(currentToken)
-                        });
+
+                        // Save token to user profile (with error handling)
+                        try {
+                            await update(ref(db, `users/${user.uid}`), {
+                                fcmTokens: arrayUnion(currentToken)
+                            });
+                        } catch (dbError: any) {
+                            console.error('Failed to save FCM token to database:', dbError);
+                            // Don't show error to user - token is still valid locally
+                            // This might happen if database rules are not properly configured
+                        }
 
                         toast({
                             title: "تم تفعيل الإشعارات",
@@ -89,13 +96,23 @@ export const useFCM = () => {
                     } else {
                         console.log('No registration token available. Request permission to generate one.');
                     }
-                } catch (err) {
+                } catch (err: any) {
                     console.error('An error occurred while retrieving token. ', err);
-                    toast({
-                        title: "خطأ في الإعداد",
-                        description: "يرجى التأكد من إعداد Web Push Certificate في لوحة تحكم فايربيس.",
-                        variant: "destructive"
-                    });
+
+                    // Check if it's a permission error
+                    if (err?.code === 'messaging/permission-blocked' || err?.message?.includes('permission')) {
+                        toast({
+                            title: "خطأ في الصلاحيات",
+                            description: "يرجى التحقق من إعدادات الإشعارات في المتصفح.",
+                            variant: "destructive"
+                        });
+                    } else {
+                        toast({
+                            title: "خطأ في الإعداد",
+                            description: "يرجى التأكد من إعداد Web Push Certificate في لوحة تحكم فايربيس.",
+                            variant: "destructive"
+                        });
+                    }
                 }
             }
         } catch (error) {

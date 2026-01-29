@@ -315,6 +315,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
       }, (error) => {
         console.error(`Firebase read failed for user: ${error.message}`);
+
+        // Check if it's a permission error
+        if (error.code === 'PERMISSION_DENIED') {
+          console.warn('Permission denied - user may need to re-authenticate or database rules need updating');
+          toast({
+            title: "خطأ في الصلاحيات",
+            description: "يرجى تسجيل الخروج والدخول مرة أخرى.",
+            variant: "destructive"
+          });
+        }
+
         setLoading(false);
       });
     }
