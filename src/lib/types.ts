@@ -312,6 +312,7 @@ export interface MeetingTopic {
   topic: string;
   speaker: string;
   solutions: string;
+  isFeatured?: boolean;
 }
 
 export interface MeetingSuggestion {
