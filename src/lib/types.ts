@@ -356,6 +356,8 @@ export interface SiteUpdate {
   description: string;
   date: string; // ISO string
   type: SiteUpdateType;
+  status: 'published' | 'upcoming';
+  dueDate?: string; // For upcoming updates
   authorId: string;
   authorName: string;
   version?: string;

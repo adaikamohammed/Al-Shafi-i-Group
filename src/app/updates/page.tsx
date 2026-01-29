@@ -22,7 +22,11 @@ import {
     Zap,
     Bug,
     Info,
-    MoreHorizontal
+    MoreHorizontal,
+    Clock,
+    Timer,
+    History,
+    Hourglass
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -32,8 +36,91 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProtectedPage } from '@/components/ui/ProtectedPage';
 import { cn } from '@/lib/utils';
+
+const UpdateCard = ({ update, isEditor, openEditDialog, handleDelete, getTypeIcon, getTypeColor, isUpcoming }: any) => (
+    <Card className={cn(
+        "group border-none shadow-sm hover:shadow-md transition-all duration-300 rounded-[1.5rem] overflow-hidden bg-white/50 backdrop-blur-sm border",
+        isUpcoming ? "border-amber-100/50" : "border-emerald-50"
+    )}>
+        <div className="flex flex-col md:flex-row-reverse">
+            {/* Date Column */}
+            <div className={cn(
+                "md:w-48 p-6 flex flex-col items-center justify-center border-r text-center gap-1 transition-colors",
+                isUpcoming ? "bg-amber-50/30 border-amber-50 group-hover:bg-amber-50/50" : "bg-emerald-50/30 border-emerald-50 group-hover:bg-emerald-50/50"
+            )}>
+                {isUpcoming ? (
+                    <>
+                        <Hourglass className="h-8 w-8 text-amber-500 mb-2 animate-pulse" />
+                        <span className="text-xs font-body text-amber-600 font-bold">تاريخ الاستحقاق</span>
+                        <span className="text-lg font-headline font-black text-amber-700">
+                            {update.dueDate ? format(new Date(update.dueDate), 'dd MMMM', { locale: ar }) : 'قريباً'}
+                        </span>
+                    </>
+                ) : (
+                    <>
+                        <span className="text-3xl font-headline font-black text-emerald-700">
+                            {format(new Date(update.date), 'dd')}
+                        </span>
+                        <span className="text-sm font-body text-emerald-600 font-bold">
+                            {format(new Date(update.date), 'MMMM yyyy', { locale: ar })}
+                        </span>
+                    </>
+                )}
+                <Badge variant="outline" className={cn("mt-2 font-mono text-[10px] bg-white", isUpcoming ? "text-amber-800 border-amber-200" : "text-emerald-800 border-emerald-200")}>
+                    {update.version || (isUpcoming ? 'Planned' : 'v1.0')}
+                </Badge>
+            </div>
+
+            {/* Content Column */}
+            <CardHeader className="flex-1 p-6 text-right">
+                <div className="flex justify-between items-start gap-4">
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className={cn("px-3 py-1 rounded-full flex items-center gap-2 border shadow-none", getTypeColor(update.type))}>
+                                {getTypeIcon(update.type)}
+                                <span className="font-headline font-bold text-xs">{update.type}</span>
+                            </Badge>
+                            {isUpcoming && <Badge className="bg-amber-500 text-white border-transparent text-[10px]">قيد التنفيذ</Badge>}
+                        </div>
+                        <CardTitle className="text-2xl font-headline font-bold text-gray-800 leading-tight">
+                            {update.title}
+                        </CardTitle>
+                    </div>
+
+                    {isEditor && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(update)} className="h-9 w-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl">
+                                <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(update.id)} className="h-9 w-9 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl">
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    )}
+                </div>
+                <CardContent className="p-0 mt-4">
+                    <p className="text-gray-600 font-body leading-relaxed whitespace-pre-wrap">
+                        {update.description}
+                    </p>
+                </CardContent>
+                <CardFooter className="p-0 mt-6 flex items-center justify-start gap-3 text-[11px] text-muted-foreground font-body bg-gray-50/50 px-4 py-2 rounded-xl border border-gray-100/50 w-fit ml-auto translate-y-2">
+                    <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        <span>{isUpcoming ? 'تاريخ الإضافة:' : 'نُشر في:'} {format(new Date(update.date), 'p', { locale: ar })}</span>
+                    </div>
+                    <div className="w-1 h-1 bg-gray-300 rounded-full" />
+                    <div className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        <span>بواسطة: {update.authorName}</span>
+                    </div>
+                </CardFooter>
+            </CardHeader>
+        </div>
+    </Card>
+);
 
 export default function SiteUpdatesPage() {
     const { user, isManagement, isSuperAdmin } = useAuth();
@@ -46,6 +133,8 @@ export default function SiteUpdatesPage() {
         title: '',
         description: '',
         type: 'ميزة جديدة',
+        status: 'published',
+        dueDate: '',
         version: ''
     });
 
@@ -102,7 +191,7 @@ export default function SiteUpdatesPage() {
             }
             setIsDialogOpen(false);
             setEditingUpdate(null);
-            setFormData({ title: '', description: '', type: 'ميزة جديدة', version: '' });
+            setFormData({ title: '', description: '', type: 'ميزة جديدة', status: 'published', dueDate: '', version: '' });
         } catch (error) {
             console.error("Error saving update:", error);
             toast({ title: "خطأ", description: "فشل حفظ التحديث.", variant: "destructive" });
@@ -127,6 +216,8 @@ export default function SiteUpdatesPage() {
             title: update.title,
             description: update.description,
             type: update.type,
+            status: update.status || 'published',
+            dueDate: update.dueDate || '',
             version: update.version || ''
         });
         setIsDialogOpen(true);
@@ -182,87 +273,76 @@ export default function SiteUpdatesPage() {
                     <div className="absolute bottom-[-20%] left-[-10%] w-48 h-48 bg-white/10 rounded-full blur-2xl" />
                 </div>
 
-                {loading ? (
-                    <div className="flex flex-col items-center justify-center py-24 space-y-4">
-                        <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
-                        <p className="text-muted-foreground font-body">جاري تحميل السجل...</p>
-                    </div>
-                ) : updates.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-24 text-center space-y-6 bg-card border-2 border-dashed rounded-[2rem]">
-                        <div className="p-6 bg-emerald-50 rounded-full">
-                            <Info className="h-12 w-12 text-emerald-400" />
-                        </div>
-                        <div className="space-y-2">
-                            <h3 className="text-xl font-headline font-bold">لا توجد تحديثات مسجلة</h3>
-                            <p className="text-muted-foreground font-body max-w-sm">سجل التحديثات فارغ حالياً. سيقوم فريق الإدارة بنشر التحديثات هنا فور توفرها.</p>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 gap-6">
-                        {updates.map((update, index) => (
-                            <Card key={update.id} className="group border-none shadow-sm hover:shadow-md transition-all duration-300 rounded-[1.5rem] overflow-hidden bg-white/50 backdrop-blur-sm border border-emerald-50">
-                                <div className="flex flex-col md:flex-row">
-                                    {/* Date Column */}
-                                    <div className="md:w-48 bg-emerald-50/30 p-6 flex flex-col items-center justify-center border-l border-emerald-50 text-center gap-1 group-hover:bg-emerald-50/50 transition-colors">
-                                        <span className="text-3xl font-headline font-black text-emerald-700">
-                                            {format(new Date(update.date), 'dd')}
-                                        </span>
-                                        <span className="text-sm font-body text-emerald-600 font-bold">
-                                            {format(new Date(update.date), 'MMMM yyyy', { locale: ar })}
-                                        </span>
-                                        <Badge variant="outline" className="mt-2 font-mono text-[10px] bg-white text-emerald-800 border-emerald-200">
-                                            {update.version || 'v1.0'}
-                                        </Badge>
-                                    </div>
+                <Tabs defaultValue="published" className="w-full">
+                    <TabsList className="bg-emerald-50/50 p-1 rounded-2xl h-14 w-full md:w-fit grid grid-cols-2 gap-2 mb-8">
+                        <TabsTrigger value="published" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm font-bold h-12 px-8 flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4" />
+                            التحديثات المنشورة
+                        </TabsTrigger>
+                        <TabsTrigger value="upcoming" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-sm font-bold h-12 px-8 flex items-center gap-2">
+                            <Timer className="h-4 w-4" />
+                            التعديلات القادمة
+                        </TabsTrigger>
+                    </TabsList>
 
-                                    {/* Content Column */}
-                                    <CardHeader className="flex-1 p-6">
-                                        <div className="flex justify-between items-start gap-4">
-                                            <div className="space-y-2 text-right">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <Badge className={cn("px-3 py-1 rounded-full flex items-center gap-2 border shadow-none", getTypeColor(update.type))}>
-                                                        {getTypeIcon(update.type)}
-                                                        <span className="font-headline font-bold text-xs">{update.type}</span>
-                                                    </Badge>
-                                                </div>
-                                                <CardTitle className="text-2xl font-headline font-bold text-gray-800 leading-tight">
-                                                    {update.title}
-                                                </CardTitle>
-                                            </div>
+                    <TabsContent value="published">
+                        {loading ? (
+                            <div className="flex flex-col items-center justify-center py-24 space-y-4">
+                                <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
+                                <p className="text-muted-foreground font-body">جاري تحميل السجل...</p>
+                            </div>
+                        ) : updates.filter(u => u.status === 'published' || !u.status).length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-center space-y-6 bg-card border border-dashed rounded-[2rem]">
+                                <div className="p-4 bg-emerald-50 rounded-full text-emerald-400"><Info className="h-8 w-8" /></div>
+                                <h3 className="text-lg font-headline font-bold">لا توجد تحديثات منشورة بعد</h3>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 gap-6">
+                                {updates.filter(u => u.status === 'published' || !u.status).map((update) => (
+                                    <UpdateCard
+                                        key={update.id}
+                                        update={update}
+                                        isEditor={isEditor}
+                                        openEditDialog={openEditDialog}
+                                        handleDelete={handleDelete}
+                                        getTypeIcon={getTypeIcon}
+                                        getTypeColor={getTypeColor}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </TabsContent>
 
-                                            {isEditor && (
-                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(update)} className="h-9 w-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl">
-                                                        <Edit2 className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(update.id)} className="h-9 w-9 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl">
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <CardContent className="p-0 mt-4">
-                                            <p className="text-gray-600 font-body leading-relaxed whitespace-pre-wrap text-right">
-                                                {update.description}
-                                            </p>
-                                        </CardContent>
-                                        <CardFooter className="p-0 mt-6 flex items-center justify-end gap-3 text-[11px] text-muted-foreground font-body bg-gray-50/50 px-4 py-2 rounded-xl border border-gray-100/50 w-fit mr-auto">
-                                            <div className="flex items-center gap-1">
-                                                <Calendar className="h-3 w-3" />
-                                                <span>نُشر في {format(new Date(update.date), 'p', { locale: ar })}</span>
-                                            </div>
-                                            <div className="w-1 h-1 bg-gray-300 rounded-full" />
-                                            <div className="flex items-center gap-1">
-                                                <User className="h-3 w-3" />
-                                                <span>بواسطة: {update.authorName}</span>
-                                            </div>
-                                        </CardFooter>
-                                    </CardHeader>
+                    <TabsContent value="upcoming">
+                        {updates.filter(u => u.status === 'upcoming').length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-24 text-center space-y-6 bg-amber-50/20 border-2 border-dashed border-amber-100 rounded-[2rem]">
+                                <div className="p-6 bg-white rounded-full">
+                                    <Hourglass className="h-10 w-10 text-amber-300 animate-pulse" />
                                 </div>
-                            </Card>
-                        ))}
-                    </div>
-                )}
+                                <div className="space-y-2">
+                                    <h3 className="text-xl font-headline font-bold text-amber-900">لا توجد تعديلات قادمة</h3>
+                                    <p className="text-amber-600/70 font-body max-w-sm mx-auto">ترقبوا المزيد من الميزات المذهلة التي نعمل عليها حالياً لجعل تجربتكم أفضل.</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 gap-6">
+                                {updates.filter(u => u.status === 'upcoming')
+                                    .map((update) => (
+                                        <UpdateCard
+                                            key={update.id}
+                                            update={update}
+                                            isEditor={isEditor}
+                                            openEditDialog={openEditDialog}
+                                            handleDelete={handleDelete}
+                                            getTypeIcon={getTypeIcon}
+                                            getTypeColor={getTypeColor}
+                                            isUpcoming
+                                        />
+                                    ))}
+                            </div>
+                        )}
+                    </TabsContent>
+                </Tabs>
 
                 {/* Create/Edit Dialog */}
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -299,6 +379,33 @@ export default function SiteUpdatesPage() {
                                         dir="ltr"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="status" className="font-bold">حالة التحديث</Label>
+                                    <Select value={formData.status} onValueChange={(val) => setFormData({ ...formData, status: val as 'published' | 'upcoming', dueDate: val === 'published' ? '' : formData.dueDate })}>
+                                        <SelectTrigger id="status" className="h-12 rounded-xl text-right">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="published">منشور الآن ✅</SelectItem>
+                                            <SelectItem value="upcoming">تعديل قادم 🕒</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {formData.status === 'upcoming' && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="dueDate" className="font-bold text-amber-700">تاريخ الاستحقاق (Deadline)</Label>
+                                        <Input
+                                            id="dueDate"
+                                            type="date"
+                                            value={formData.dueDate}
+                                            onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                                            className="h-12 rounded-xl text-right border-amber-200 focus:ring-amber-500"
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-2">
