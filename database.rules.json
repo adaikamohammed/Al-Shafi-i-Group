@@ -22,6 +22,17 @@
                 ".read": true,
                 ".write": "auth != null"
             }
+        },
+        "meetings": {
+            ".read": "auth != null",
+            "$meetingId": {
+                ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')",
+                "suggestions": {
+                    "$suggestionId": {
+                        ".write": "auth != null"
+                    }
+                }
+            }
         }
     }
 }

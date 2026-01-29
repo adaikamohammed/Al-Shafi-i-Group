@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry, AdminLog, ActivityLog } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry, AdminLog, ActivityLog, Meeting, MeetingSuggestion } from '@/lib/types';
 import { isWithinInterval, parseISO, isValid, isAfter, subDays } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -69,6 +69,7 @@ interface StudentContextType {
   hallOfFame: HallOfFameData | null;
   adminLogs: AdminLog[];
   activityLogs: ActivityLog[];
+  meetings: Meeting[];
   loading: boolean;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string }) => Promise<void>;
   updateStudent: (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => Promise<void>;
@@ -98,6 +99,10 @@ interface StudentContextType {
   deleteAdminLog: (log: AdminLog) => Promise<void>;
   getNextTicketNumber: () => Promise<number>;
   transferStudent: (studentId: string, currentOwnerId: string, targetSheikhId: string, reason: string) => Promise<void>;
+  saveMeeting: (meetingData: Partial<Meeting>, meetingIdToUpdate?: string) => Promise<void>;
+  deleteMeeting: (meetingId: string) => Promise<void>;
+  addMeetingSuggestion: (meetingId: string, suggestion: Omit<MeetingSuggestion, 'id' | 'timestamp'>) => Promise<void>;
+  deleteMeetingSuggestion: (meetingId: string, suggestionId: string) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -115,6 +120,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [adminLogs, setAdminLogs] = useState<AdminLog[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
 
@@ -144,6 +150,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setAllUsers([]);
       setAdminLogs([]);
       setActivityLogs([]);
+      setMeetings([]);
       return;
     }
 
@@ -157,6 +164,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     let allUsersListener: (() => void) | null = null;
     let globalLogsRef: DatabaseReference | null = null;
     let globalLogsListener: (() => void) | null = null;
+    let meetingsRef: DatabaseReference | null = null;
+    let meetingsListener: (() => void) | null = null;
 
     let accumulatedUserLogs: Record<string, ActivityLog> = {};
     let accumulatedGlobalLogs: Record<string, ActivityLog> = {};
@@ -366,11 +375,26 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       });
     }
 
+    // Common Listeners for all authenticated users
+    meetingsRef = ref(db, 'meetings');
+    meetingsListener = onValue(meetingsRef, (snapshot) => {
+      const data = snapshot.val();
+      const meetingsArray = data ? Object.entries(data).map(([id, m]: [string, any]) => ({
+        id,
+        ...m,
+        attendance: m.attendance || {},
+        topics: m.topics || [],
+        suggestions: m.suggestions ? Object.entries(m.suggestions).map(([sid, s]: [string, any]) => ({ id: sid, ...s })) : []
+      })) : [];
+      setMeetings(meetingsArray);
+    });
+
     return () => {
       if (allUsersRef && allUsersListener) off(allUsersRef, 'value', allUsersListener);
       if (preRegsRef && preRegsListener) off(preRegsRef, 'value', preRegsListener);
       if (globalLogsRef && globalLogsListener) off(globalLogsRef, 'value', globalLogsListener);
       if (dataRef && dataListener) off(dataRef, 'value', dataListener);
+      if (meetingsRef && meetingsListener) off(meetingsRef, 'value', meetingsListener);
     };
   }, [authContextUser, authLoading, isSuperAdmin, isManagement]);
 
@@ -1432,7 +1456,44 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       saveAdminLog,
       deleteAdminLog,
       getNextTicketNumber,
-      transferStudent
+      transferStudent,
+      saveMeeting: async (meetingData, meetingId) => {
+        if (!authContextUser || (!isSuperAdmin && !isManagement)) return;
+        const id = meetingId || uuidv4();
+        const meetingRef = ref(db, `meetings/${id}`);
+        const dataToSave = {
+          ...meetingData,
+          id,
+          timestamp: meetingData.timestamp || new Date().toISOString(),
+          createdBy: meetingData.createdBy || authContextUser.uid,
+          status: meetingData.status || 'upcoming'
+        };
+        await update(meetingRef, dataToSave);
+        toast({ title: '✅ تم حفظ الاجتماع' });
+      },
+      deleteMeeting: async (meetingId) => {
+        if (!authContextUser || (!isSuperAdmin && !isManagement)) return;
+        const meetingRef = ref(db, `meetings/${meetingId}`);
+        await remove(meetingRef);
+        toast({ title: '🗑️ تم حذف الاجتماع' });
+      },
+      addMeetingSuggestion: async (meetingId, suggestion) => {
+        if (!authContextUser) return;
+        const id = uuidv4();
+        const suggestionRef = ref(db, `meetings/${meetingId}/suggestions/${id}`);
+        await set(suggestionRef, {
+          ...suggestion,
+          timestamp: new Date().toISOString()
+        });
+        toast({ title: '✅ تم إرسال المقترح' });
+      },
+      deleteMeetingSuggestion: async (meetingId, suggestionId) => {
+        if (!authContextUser || (!isSuperAdmin && !isManagement)) return;
+        const suggestionRef = ref(db, `meetings/${meetingId}/suggestions/${suggestionId}`);
+        await remove(suggestionRef);
+        toast({ title: '🗑️ تم حذف المقترح' });
+      },
+      meetings
     }}>
       {children}
     </StudentContext.Provider>

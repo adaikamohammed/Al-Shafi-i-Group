@@ -335,12 +335,50 @@ export default function DailyReportPage() {
         }
     }
 
+    const { meetings, addMeetingSuggestion } = useStudentContext();
+    const [meetingSuggestion, setMeetingSuggestion] = useState("");
+    const upcomingMeeting = useMemo(() => meetings.find(m => m.status === 'upcoming'), [meetings]);
+
     if (loading) {
         return <div className="flex items-center justify-center h-full"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
     }
 
     return (
         <div className="space-y-6">
+            {upcomingMeeting && !isSuperAdmin && (
+                <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent border-r-4 border-r-primary overflow-hidden shadow-lg animate-in slide-in-from-top-4 duration-500">
+                    <CardHeader className="py-4">
+                        <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                            <Calendar className="h-5 w-5" /> مقترحات الاجتماع القادم ({upcomingMeeting.date})
+                        </CardTitle>
+                        <CardDescription>ساهم في إثراء جدول أعمال الاجتماع القادم بمقترحاتك أو النقاط التي ترغب في طرحها.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="pb-4">
+                        <div className="flex gap-2">
+                            <Input
+                                placeholder="اكتب اقتراحك هنا..."
+                                value={meetingSuggestion}
+                                onChange={(e) => setMeetingSuggestion(e.target.value)}
+                                className="bg-white rounded-xl"
+                            />
+                            <Button
+                                onClick={async () => {
+                                    if (!meetingSuggestion.trim()) return;
+                                    await addMeetingSuggestion(upcomingMeeting.id, {
+                                        authorName: user?.displayName || 'Unknown',
+                                        authorId: user?.uid || '',
+                                        text: meetingSuggestion
+                                    });
+                                    setMeetingSuggestion("");
+                                }}
+                                className="rounded-xl gap-2 font-bold px-6"
+                            >
+                                <SendIcon className="h-4 w-4" /> إرسال المقترح
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
             {!isSuperAdmin && (
                 <Card>
                     <CardHeader>
@@ -528,4 +566,24 @@ export default function DailyReportPage() {
             </Card>
         </div>
     );
+}
+
+function SendIcon(props: any) {
+    return (
+        <svg
+            {...props}
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="m22 2-7 20-4-9-9-4Z" />
+            <path d="M22 2 11 13" />
+        </svg>
+    )
 }
