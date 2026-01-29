@@ -3,6 +3,7 @@ import './globals.css';
 import { AuthWrapper } from '@/components/ui/AuthWrapper';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { Toaster } from '@/components/ui/toaster';
+import { NotificationPrompter } from '@/components/NotificationPrompter';
 
 export const metadata: Metadata = {
   title: 'مدير مدرسة الشافعي',
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <ErrorBoundary>
           <AuthWrapper>
+            <NotificationPrompter />
             {children}
           </AuthWrapper>
         </ErrorBoundary>

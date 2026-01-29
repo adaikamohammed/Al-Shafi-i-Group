@@ -32,28 +32,35 @@ export const useFCM = () => {
                     return;
                 }
 
-                const currentToken = await getToken(msg, {
-                    vapidKey: 'BMYyQMLw-uJDVjwIeXF5M5kF2aD_4_3k2b8f8a1d5e3c1b_VAPID_Key_Placeholder' // Need valid VAPID pair, but for now we rely on default if none provided or set logic later
-                }).catch((err) => {
-                    // Often due to VAPID mismatch or config. We can try without VAPID if implicit.
-                    console.log('Error retrieving token with VAPID', err);
-                    // Note: getToken requires vapidKey usually for web push
-                    return null;
-                });
+                // Try retrieving token without explicit VAPID key first (relying on implicit config)
+                try {
+                    const currentToken = await getToken(msg);
+                    if (currentToken) {
+                        setToken(currentToken);
+                        // Save token to user profile
+                        const userRef = ref(db, `users/${user.uid}/fcmTokens`);
+                        await update(ref(db, `users/${user.uid}`), {
+                            fcmTokens: arrayUnion(currentToken)
+                        });
 
-                // Use a dummy VAPID for placeholder or remove if configured in project console
-                // Actually, best practice is to get VAPID from Firebase Console -> Project Settings -> Cloud Messaging -> Web Push certificates
-                // Since I don't have it, I'll try without VAPID first or assume implicit config.
-                // Re-attempt properly:
-
-                let finalToken = currentToken;
-                if (!finalToken) {
-                    finalToken = await getToken(msg, { vapidKey: "BOy35-a7F-a6b1c8d9e0f1..." }); // Placeholder
+                        toast({
+                            title: "تم تفعيل الإشعارات",
+                            description: "ستتلقى الآن تنبيهات من المدرسة.",
+                            className: "bg-green-600 text-white border-none"
+                        });
+                    } else {
+                        console.log('No registration token available. Request permission to generate one.');
+                    }
+                } catch (err) {
+                    console.error('An error occurred while retrieving token. ', err);
+                    // If the error is related to missing VAPID key, checking console might be needed.
+                    // But usually modern firebase config handles it if "Web Push Certificate" is generated in console.
+                    toast({
+                        title: "خطأ في الإعداد",
+                        description: "يرجى التأكد من إعداد Web Push Certificate في لوحة تحكم فايربيس.",
+                        variant: "destructive"
+                    });
                 }
-
-                // Correct implementation: User needs to provide VAPID key. 
-                // For now I'll create the hook structure and ask user to provide key or use a common pattern.
-
             }
         } catch (error) {
             console.error('Error requesting permission:', error);

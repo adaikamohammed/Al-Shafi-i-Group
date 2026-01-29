@@ -9,8 +9,9 @@ import {
   Swords, DollarSign, Edit, FileText, Award, BookCheck,
   Gavel, ArrowRightLeft, HelpCircle, UserCog, Settings,
   UserPlus, BarChart3, Shield, LayoutDashboard,
-  Check, TrendingUp, Star, MoonStar, Sparkles
+  Check, TrendingUp, Star, MoonStar, Sparkles, Bell, BellOff
 } from 'lucide-react';
+import { useFCM } from '@/hooks/useFCM';
 import Link from 'next/link';
 import { DailyChecklist } from '@/components/ui/DailyChecklist';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
@@ -62,6 +63,7 @@ export default function HomePage() {
   const { user, updateUserProfile, logout, isManagement, role } = useAuth();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const { permission, requestPermission } = useFCM();
 
   const { students, dailySessions, loading } = useStudentContext();
 
@@ -136,6 +138,24 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-4">
+            {permission === 'default' && (
+              <Button variant="outline" onClick={requestPermission} className="backdrop-blur-md rounded-xl h-11 shadow-lg border-amber-500/50 text-amber-600 hover:bg-amber-50">
+                <Bell className="ml-2 h-4 w-4" /> تفعيل التنبيهات
+              </Button>
+            )}
+            {permission === 'granted' && (
+              <div className={cn("hidden md:flex items-center gap-2 px-3 py-2 rounded-xl backdrop-blur-md border", theme.isLight ? "bg-green-50/50 border-green-200 text-green-700" : "bg-green-500/10 border-green-500/20 text-green-400")}>
+                <Bell className="h-4 w-4" />
+                <span className="text-xs font-bold">التنبيهات مفعلة</span>
+              </div>
+            )}
+            {permission === 'denied' && (
+              <div className={cn("hidden md:flex items-center gap-2 px-3 py-2 rounded-xl backdrop-blur-md border", theme.isLight ? "bg-red-50/50 border-red-200 text-red-700" : "bg-red-500/10 border-red-500/20 text-red-400")}>
+                <BellOff className="h-4 w-4" />
+                <span className="text-xs font-bold">التنبيهات محظورة</span>
+              </div>
+            )}
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
