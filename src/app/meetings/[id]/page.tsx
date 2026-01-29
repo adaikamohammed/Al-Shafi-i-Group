@@ -24,7 +24,8 @@ import {
     Smartphone,
     Share2,
     Calendar,
-    Crown
+    Crown,
+    Award
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 
