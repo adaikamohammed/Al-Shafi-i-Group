@@ -28,6 +28,7 @@ interface StudentTableProps {
     sortConfig: { key: keyof Student | 'pageNumber'; direction: 'ascending' | 'descending' };
     onRequestSort: (key: keyof Student | 'pageNumber') => void;
     isSuperAdmin?: boolean;
+    isManagement?: boolean;
     onStudentClick: (student: Student) => void;
     onStatusChange: (student: Student, status: StudentStatus, reason?: string) => void;
     onEdit: (student: Student) => void;
@@ -41,6 +42,7 @@ export const StudentTable = React.memo(({
     sortConfig,
     onRequestSort,
     isSuperAdmin,
+    isManagement,
     onStudentClick,
     onStatusChange,
     onEdit,
@@ -181,7 +183,7 @@ export const StudentTable = React.memo(({
                                         </TableCell>
                                         <TableCell className="hidden md:table-cell text-center font-bold text-lg text-primary">{student.memorizedSurahsCount || 0}</TableCell>
                                         <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                                            <StudentActions student={student} onStatusChange={onStatusChange} onEdit={() => onEdit(student)} isSuperAdmin={isSuperAdmin} />
+                                            <StudentActions student={student} onStatusChange={onStatusChange} onEdit={() => onEdit(student)} isSuperAdmin={isSuperAdmin} isManagement={isManagement} />
                                         </TableCell>
                                     </TableRow>
                                 )
@@ -242,12 +244,13 @@ export const StudentTable = React.memo(({
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex flex-col items-end gap-2 shrink-0">
+                                    <div className="flex flex-col items-end gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                                         <StudentActions
                                             student={student}
                                             onStatusChange={onStatusChange}
                                             onEdit={() => onEdit(student)}
                                             isSuperAdmin={isSuperAdmin}
+                                            isManagement={isManagement}
                                         />
                                         <div className="text-center bg-primary/5 rounded-lg px-2 py-1 border border-primary/10">
                                             <p className="text-[10px] text-muted-foreground">سور</p>

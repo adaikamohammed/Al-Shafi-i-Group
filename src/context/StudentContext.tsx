@@ -180,7 +180,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setActivityLogs(logsArray);
       };
 
-      // 1. All Users Listener (main data source for management)
+      // 1. All Users Listener (available to all for transfer dialog)
       allUsersRef = ref(db, 'users');
       allUsersListener = onValue(allUsersRef, (snapshot) => {
         const usersData = snapshot.val();
@@ -191,75 +191,77 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setAllUsers(usersArray);
 
         if (!usersData) {
-          setLoading(false);
+          if (isSuperAdmin || isManagement) setLoading(false);
           return;
         }
 
-        // Aggregate data from all users
-        let allStudents: Student[] = [];
-        let allSessions: Record<string, Record<string, DailySession>> = {};
-        let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
-        let allProgress: Record<string, SurahMastery> = {};
-        let allPayments: Payment[] = [];
-        let allAdminLogs: AdminLog[] = [];
-        let finalSettings: AppSettings = DEFAULT_SETTINGS;
+        // If management/admin, aggregate data from all users
+        if (isSuperAdmin || isManagement) {
+          let allStudents: Student[] = [];
+          let allSessions: Record<string, Record<string, DailySession>> = {};
+          let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
+          let allProgress: Record<string, SurahMastery> = {};
+          let allPayments: Payment[] = [];
+          let allAdminLogs: AdminLog[] = [];
+          let finalSettings: AppSettings = DEFAULT_SETTINGS;
 
-        if (usersData[authContextUser.uid]?.settings) {
-          finalSettings = { ...DEFAULT_SETTINGS, ...usersData[authContextUser.uid].settings };
-        }
-
-        accumulatedUserLogs = {};
-        for (const uid in usersData) {
-          const userData = usersData[uid];
-          if (userData.students) {
-            const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) =>
-              processStudentData({ ...s, id }, uid, userData.profile?.group)
-            );
-            allStudents.push(...userStudents);
+          if (usersData[authContextUser.uid]?.settings) {
+            finalSettings = { ...DEFAULT_SETTINGS, ...usersData[authContextUser.uid].settings };
           }
-          if (userData.dailySessions) {
-            for (const date in userData.dailySessions) {
-              if (!allSessions[date]) allSessions[date] = {};
-              // Inject ownerId into each session during merge for management view
-              Object.entries(userData.dailySessions[date]).forEach(([sessionId, session]: [string, any]) => {
-                allSessions[date][sessionId] = { ...session, ownerId: uid };
+
+          accumulatedUserLogs = {};
+          for (const uid in usersData) {
+            const userData = usersData[uid];
+            // ... (rest of the aggregation logic stays same, just ensuring usersArray is set first)
+            if (userData.students) {
+              const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) =>
+                processStudentData({ ...s, id }, uid, userData.profile?.group)
+              );
+              allStudents.push(...userStudents);
+            }
+            if (userData.dailySessions) {
+              for (const date in userData.dailySessions) {
+                if (!allSessions[date]) allSessions[date] = {};
+                Object.entries(userData.dailySessions[date]).forEach(([sessionId, session]: [string, any]) => {
+                  allSessions[date][sessionId] = { ...session, ownerId: uid };
+                });
+              }
+            }
+            if (userData.dailyReports) {
+              for (const date in userData.dailyReports) {
+                if (!allReports[date]) allReports[date] = {};
+                Object.assign(allReports[date], userData.dailyReports[date]);
+              }
+            }
+            if (userData.surahProgress) Object.assign(allProgress, userData.surahProgress);
+            if (userData.payments) {
+              const userPayments = Object.entries(userData.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) }));
+              allPayments.push(...userPayments);
+            }
+            if (userData.admin_logs) {
+              const userLogs = Object.entries(userData.admin_logs).map(([id, l]) => ({ id, ...(l as Omit<AdminLog, 'id'>) }));
+              allAdminLogs.push(...userLogs);
+            }
+            if (userData.activity_logs) {
+              Object.entries(userData.activity_logs).forEach(([id, l]) => {
+                accumulatedUserLogs[id] = { id, ...(l as any) };
               });
             }
           }
-          if (userData.dailyReports) {
-            for (const date in userData.dailyReports) {
-              if (!allReports[date]) allReports[date] = {};
-              Object.assign(allReports[date], userData.dailyReports[date]);
-            }
-          }
-          if (userData.surahProgress) Object.assign(allProgress, userData.surahProgress);
-          if (userData.payments) {
-            const userPayments = Object.entries(userData.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) }));
-            allPayments.push(...userPayments);
-          }
-          if (userData.admin_logs) {
-            const userLogs = Object.entries(userData.admin_logs).map(([id, l]) => ({ id, ...(l as Omit<AdminLog, 'id'>) }));
-            allAdminLogs.push(...userLogs);
-          }
-          if (userData.activity_logs) {
-            Object.entries(userData.activity_logs).forEach(([id, l]) => {
-              accumulatedUserLogs[id] = { id, ...(l as any) };
-            });
-          }
-        }
 
-        setStudents(allStudents);
-        setDailySessions(allSessions);
-        setDailyReports(allReports);
-        setSurahProgress(allProgress);
-        setPayments(allPayments);
-        setAdminLogs(allAdminLogs);
-        setSettingsState(finalSettings);
-        mergeAndSetLogs();
-        setLoading(false);
+          setStudents(allStudents);
+          setDailySessions(allSessions);
+          setDailyReports(allReports);
+          setSurahProgress(allProgress);
+          setPayments(allPayments);
+          setAdminLogs(allAdminLogs);
+          setSettingsState(finalSettings);
+          mergeAndSetLogs();
+          setLoading(false);
+        }
       }, (error) => {
-        console.error(`Firebase read failed for management: ${error.message}`);
-        setLoading(false);
+        console.error(`Firebase read failed for user list: ${error.message}`);
+        if (isSuperAdmin || isManagement) setLoading(false);
       });
 
       // 2. Pre-registrations
@@ -1197,12 +1199,16 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
       const fromGroupName = student.groupName || 'غير محدد';
       const toGroupName = targetSheikh.group || 'فوج غير محدد';
+      const fromSheikhName = allUsers.find(u => u.uid === currentOwnerId)?.displayName || 'غير معروف';
+      const toSheikhName = targetSheikh.displayName || 'غير معروف';
 
       const transferRecord = {
         date: new Date().toISOString(),
         fromSheikhId: currentOwnerId,
+        fromSheikhName: fromSheikhName,
         fromGroupName: fromGroupName,
         toSheikhId: targetSheikhId,
+        toSheikhName: toSheikhName,
         toGroupName: toGroupName,
         reason: reason
       };
@@ -1236,6 +1242,77 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         updates[`users/${currentOwnerId}/surahProgress/${studentId}`] = null;
         updates[`users/${targetSheikhId}/surahProgress/${studentId}`] = surahProgress[studentId];
       }
+
+      // 4. Move Historical Daily Sessions
+      Object.entries(dailySessions).forEach(([date, sessionsMap]) => {
+        Object.entries(sessionsMap).forEach(([sessionId, session]) => {
+          const records = session.records || [];
+          const recordIndex = records.findIndex(r => r.studentId === studentId);
+
+          if (recordIndex !== -1 && session.ownerId === currentOwnerId) {
+            const studentRecord = records[recordIndex];
+
+            // Remove record from old session
+            const updatedOldRecords = [...records];
+            updatedOldRecords.splice(recordIndex, 1);
+            updates[`users/${currentOwnerId}/dailySessions/${date}/${sessionId}/records`] = updatedOldRecords;
+
+            // Create a specific session entry for this student in the new owner's path
+            const transferSessionId = `tr_${studentId}_${sessionId}`;
+            updates[`users/${targetSheikhId}/dailySessions/${date}/${transferSessionId}`] = {
+              ...session,
+              id: transferSessionId,
+              records: [studentRecord],
+              isTransferred: true,
+              transferredFrom: currentOwnerId,
+              originalSessionId: sessionId,
+              transferReason: reason
+            };
+          }
+        });
+      });
+
+      // 5. Move Payment History
+      payments.filter(p => p.studentId === studentId).forEach(payment => {
+        updates[`users/${currentOwnerId}/payments/${payment.id}`] = null;
+        updates[`users/${targetSheikhId}/payments/${payment.id}`] = {
+          ...payment,
+          transferred: true,
+          transferredAt: new Date().toISOString()
+        };
+      });
+
+      // 6. Move Admin Logs (Receipts, Summons, etc.)
+      const studentAdminLogs = (adminLogs || []).filter(l => l.studentId === studentId);
+      studentAdminLogs.forEach(log => {
+        updates[`users/${currentOwnerId}/admin_logs/${log.id}`] = null;
+        updates[`users/${targetSheikhId}/admin_logs/${log.id}`] = {
+          ...log,
+          sheikhName: targetSheikh.displayName || log.sheikhName,
+          groupName: toGroupName,
+          details: {
+            ...(log.details || {}),
+            ownerId: targetSheikhId,
+            wasTransferred: true,
+            transferredFrom: currentOwnerId,
+            transferredAt: new Date().toISOString()
+          }
+        };
+      });
+
+      // 7. Move Daily Reports
+      Object.keys(dailyReports).forEach(date => {
+        Object.values(dailyReports[date]).forEach(report => {
+          if (report.note.includes(student.fullName) || (report as any).studentId === studentId) {
+            updates[`users/${currentOwnerId}/dailyReports/${date}/${report.id}`] = null;
+            updates[`users/${targetSheikhId}/dailyReports/${date}/${report.id}`] = {
+              ...report,
+              authorId: targetSheikhId,
+              isTransferred: true
+            };
+          }
+        });
+      });
 
       await update(ref(db), updates);
 

@@ -323,6 +323,7 @@ export default function StudentManagement() {
                             sortConfig={sortConfig}
                             onRequestSort={requestSort}
                             isSuperAdmin={isSuperAdmin}
+                            isManagement={isManagement}
                             onStudentClick={setSelectedStudent}
                             onStatusChange={handleStatusChange}
                             onEdit={(student) => { setSelectedStudent(student); setEditStudentDialogOpen(true); }}

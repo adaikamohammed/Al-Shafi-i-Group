@@ -15,9 +15,10 @@ interface StudentActionsProps {
     onStatusChange: (student: Student, status: StudentStatus, reason?: string) => void;
     onEdit: () => void;
     isSuperAdmin?: boolean;
+    isManagement?: boolean;
 }
 
-export const StudentActions = ({ student, onStatusChange, onEdit, isSuperAdmin }: StudentActionsProps) => {
+export const StudentActions = ({ student, onStatusChange, onEdit, isSuperAdmin, isManagement }: StudentActionsProps) => {
     const [isExpelDialogOpen, setExpelDialogOpen] = useState(false);
     const [isTransferDialogOpen, setTransferDialogOpen] = useState(false);
 
@@ -75,10 +76,17 @@ export const StudentActions = ({ student, onStatusChange, onEdit, isSuperAdmin }
                                         <UserX className="ml-2 h-4 w-4" />
                                         طرد
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTransferDialogOpen(true) }}>
-                                        <ArrowRightLeft className="ml-2 h-4 w-4" />
-                                        نقل إلى فوج آخر
-                                    </DropdownMenuItem>
+                                    {(isSuperAdmin || isManagement) ? (
+                                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setTransferDialogOpen(true) }}>
+                                            <ArrowRightLeft className="ml-2 h-4 w-4" />
+                                            نقل إلى فوج آخر
+                                        </DropdownMenuItem>
+                                    ) : (
+                                        <DropdownMenuItem disabled className="opacity-50 cursor-not-allowed">
+                                            <ArrowRightLeft className="ml-2 h-4 w-4" />
+                                            نقل الطالب (خاص بالإدارة)
+                                        </DropdownMenuItem>
+                                    )}
                                 </>
                             ) : (
                                 <DropdownMenuItem onSelect={handleReactivate}>

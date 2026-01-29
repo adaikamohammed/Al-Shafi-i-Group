@@ -5,6 +5,7 @@ import { getAuth } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
 import { getAnalytics, isSupported } from "firebase/analytics";
+import { getMessaging, isSupported as isMessagingSupported } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCVZOpgoz76g5AQDnPyRTzPB6UoT2YYKL8",
@@ -18,10 +19,11 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getDatabase(app); 
+const db = getDatabase(app);
 const storage = getStorage(app);
 
 // Initialize Analytics only in the browser and when supported
 const analytics = typeof window !== 'undefined' ? isSupported().then(yes => yes ? getAnalytics(app) : null) : Promise.resolve(null);
+const messaging = typeof window !== 'undefined' ? isMessagingSupported().then(yes => yes ? getMessaging(app) : null) : Promise.resolve(null);
 
-export { app, auth, db, storage, analytics };
+export { app, auth, db, storage, analytics, messaging };

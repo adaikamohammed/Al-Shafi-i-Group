@@ -25,8 +25,10 @@ export interface ExpulsionRecord {
 export interface TransferRecord {
   date: string; // ISO String
   fromSheikhId: string;
+  fromSheikhName?: string;
   fromGroupName: string;
   toSheikhId: string;
+  toSheikhName?: string;
   toGroupName: string;
   reason: string;
 }
@@ -93,6 +95,10 @@ export interface DailySession {
   fromVerse?: number;
   toVerse?: number;
   isReview?: boolean;
+  ownerId?: string; // ID of the sheikh who created the session
+  isTransferred?: boolean; // Flag for sessions moved between sheikhs
+  transferredFrom?: string;
+  transferReason?: string;
 }
 
 export interface DailyReport {
@@ -177,6 +183,7 @@ export interface AppUser {
   futurePlans?: string;
   educationTimeline?: EducationEvent[];
   portalTheme?: string;
+  fcmTokens?: string[];
 }
 
 export interface EducationEvent {

@@ -19,11 +19,14 @@ import {
     startOfMonth, endOfMonth,
     startOfQuarter, endOfQuarter,
     startOfYear, endOfYear,
-    isWithinInterval, parseISO
+    isWithinInterval, parseISO, format
 } from 'date-fns';
+import { ar } from 'date-fns/locale';
+import { useFCM } from '@/hooks/useFCM';
 import { MonitoringRadar } from './MonitoringRadar';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CalendarDays, CalendarRange, CalendarCheck, History, Info, Zap } from 'lucide-react';
+
+import { CalendarDays, CalendarRange, CalendarCheck, History, Info, Zap, Bell, BellOff } from 'lucide-react';
 
 interface StatCardProps {
     title: string;
@@ -68,6 +71,9 @@ export const ManagementDashboard = () => {
     const { user } = useAuth();
     const [selectedGroup, setSelectedGroup] = React.useState<string>('all');
     const [timeframe, setTimeframe] = React.useState<string>('weekly');
+
+    // FCM Integration
+    const { permission, requestPermission } = useFCM();
 
     const aggregatedData = useMemo(() => {
         if (!dailySessions) return [];
@@ -214,6 +220,29 @@ export const ManagementDashboard = () => {
                         <Info className="h-4 w-4" />
                         نظرة شاملة ومراقبة حية لأداء المدرسة
                     </p>
+                    <div className="flex items-center gap-2 mt-2">
+                        {permission === 'default' && (
+                            <Button variant="outline" size="sm" onClick={requestPermission} className="gap-2 h-7 text-xs">
+                                <Bell className="h-3 w-3" />
+                                تفعيل التنبيهات
+                            </Button>
+                        )}
+                        {permission === 'granted' && (
+                            <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100">
+                                <Bell className="h-3 w-3" />
+                                <span>التنبيهات مفعلة</span>
+                            </div>
+                        )}
+                        {permission === 'denied' && (
+                            <div className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-1 rounded-full border border-red-100">
+                                <BellOff className="h-3 w-3" />
+                                <span>التنبيهات محظورة</span>
+                            </div>
+                        )}
+                        <p className="text-xs text-muted-foreground mr-2">
+                            {format(new Date(), 'EEEE، d MMMM yyyy', { locale: ar })}
+                        </p>
+                    </div>
                 </div>
                 <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto">
                     <Tabs value={timeframe} onValueChange={setTimeframe} className="w-full md:w-auto">

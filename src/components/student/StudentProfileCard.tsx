@@ -428,7 +428,9 @@ export const StudentProfileCard = memo(({ student, user, rankingData, medalHisto
                                                         )}>
                                                             {timelineItem.type === 'transfer' ? (
                                                                 <div className="space-y-1">
-                                                                    <p className="text-sm font-medium">تم نقله من <span className="font-bold">{item.fromGroupName}</span> إلى <span className="font-bold">{item.toGroupName}</span></p>
+                                                                    <p className="text-sm font-medium">
+                                                                        تم نقله من <span className="font-bold text-primary">{item.fromSheikhName}</span> <span className="text-xs text-muted-foreground">({item.fromGroupName})</span> إلى <span className="font-bold text-primary">{item.toSheikhName}</span> <span className="text-xs text-muted-foreground">({item.toGroupName})</span>
+                                                                    </p>
                                                                     <p className="text-xs text-muted-foreground">السبب: {item.reason}</p>
                                                                 </div>
                                                             ) : (
