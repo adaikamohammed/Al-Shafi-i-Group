@@ -11,7 +11,10 @@ import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { surahs as allSurahs } from '@/lib/surahs';
 import { cn } from '@/lib/utils';
-import { Loader2, AlertTriangle, CheckCircle, Award, Check } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, Award, Check, Layers, Users, X, BookOpen, Trash2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/SearchableSelect';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -23,9 +26,14 @@ import { ManagementSurahsView } from '@/components/management/ManagementSurahsVi
 
 
 export default function SurahProgressPage() {
-    const { students, dailySessions, surahProgress, toggleSurahStatus, loading } = useStudentContext();
+    const { students, dailySessions, surahProgress, toggleSurahStatus, bulkUpdateSurahStatus, loading } = useStudentContext();
     const { isManagement, isSuperAdmin } = useAuth();
+    const { toast } = useToast();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+    const [isBulkMode, setIsBulkMode] = useState(false);
+    const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+    const [selectedSurahIds, setSelectedSurahIds] = useState<number[]>([]);
+    const [isApplying, setIsApplying] = useState(false);
     const [selectedGroupForDetails, setSelectedGroupForDetails] = useState<string | null>(null);
 
     const studentsToShow = useMemo(() => (students ?? []).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
@@ -140,8 +148,63 @@ export default function SurahProgressPage() {
 
 
     const handleSurahClick = (surahId: number) => {
+        if (isBulkMode) {
+            setSelectedSurahIds(prev =>
+                prev.includes(surahId)
+                    ? prev.filter(id => id !== surahId)
+                    : [...prev, surahId]
+            );
+            return;
+        }
         if (!selectedStudent) return;
         toggleSurahStatus(selectedStudent.id, surahId);
+    };
+
+    const handleApplyBulkStatus = async (status: 0 | 1 | 2) => {
+        if (selectedStudentIds.length === 0 || selectedSurahIds.length === 0) {
+            toast({
+                title: "تنبيه",
+                description: "يرجى اختيار طالب واحد على الأقل وسورة واحدة على الأقل.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        setIsApplying(true);
+        try {
+            await bulkUpdateSurahStatus(selectedStudentIds, selectedSurahIds, status);
+            setSelectedSurahIds([]);
+            toast({
+                title: "تم بنجاح",
+                description: `تم تحديث حالة ${selectedSurahIds.length} سورة لـ ${selectedStudentIds.length} طلاب.`
+            });
+        } catch (error) {
+            console.error("Bulk update error:", error);
+        } finally {
+            setIsApplying(false);
+        }
+    };
+
+    const selectJuz = (juzNumber: number) => {
+        // Juz definition (Surah ranges)
+        const juzSurahs: Record<number, number[]> = {
+            30: Array.from({ length: 114 - 78 + 1 }, (_, i) => 78 + i),
+            29: Array.from({ length: 77 - 67 + 1 }, (_, i) => 67 + i),
+            28: Array.from({ length: 66 - 58 + 1 }, (_, i) => 58 + i),
+            27: Array.from({ length: 57 - 51 + 1 }, (_, i) => 51 + i),
+            26: Array.from({ length: 50 - 46 + 1 }, (_, i) => 46 + i),
+            25: Array.from({ length: 45 - 42 + 1 }, (_, i) => 42 + i),
+            24: Array.from({ length: 41 - 39 + 1 }, (_, i) => 39 + i),
+            23: Array.from({ length: 38 - 36 + 1 }, (_, i) => 36 + i),
+        };
+
+        if (juzSurahs[juzNumber]) {
+            const surahsInJuz = juzSurahs[juzNumber];
+            setSelectedSurahIds(prev => {
+                const newSelection = new Set([...prev, ...surahsInJuz]);
+                return Array.from(newSelection);
+            });
+        }
     };
 
     const { user } = useAuth();
@@ -197,70 +260,188 @@ export default function SurahProgressPage() {
             <div className="space-y-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-3xl font-headline font-bold">متابعة الحفظ والإتقان</CardTitle>
-                        <CardDescription className="flex flex-wrap items-center gap-2 mt-2">
-                            <span>انقر على السورة لتغيير حالتها:</span>
-                            <Badge variant="secondary" className="bg-gray-200 text-gray-800 hover:bg-gray-200">غير محفوظة</Badge>
-                            <Badge variant="secondary" className="bg-green-200 text-green-800 hover:bg-green-200">محفوظة</Badge>
-                            <Badge variant="secondary" className="bg-green-600 text-white hover:bg-green-600">متقنة</Badge>
-                        </CardDescription>
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <CardTitle className="text-3xl font-headline font-bold">متابعة الحفظ والإتقان</CardTitle>
+                                <CardDescription className="flex flex-wrap items-center gap-2 mt-2">
+                                    <span>انقر على السورة لتغيير حالتها:</span>
+                                    <Badge variant="secondary" className="bg-gray-200 text-gray-800 hover:bg-gray-200">غير محفوظة</Badge>
+                                    <Badge variant="secondary" className="bg-green-200 text-green-800 hover:bg-green-200">محفوظة</Badge>
+                                    <Badge variant="secondary" className="bg-green-600 text-white hover:bg-green-600">متقنة</Badge>
+                                </CardDescription>
+                            </div>
+                            <Button
+                                variant={isBulkMode ? "destructive" : "default"}
+                                onClick={() => {
+                                    setIsBulkMode(!isBulkMode);
+                                    if (!isBulkMode) {
+                                        setSelectedStudentIds(selectedStudentId ? [selectedStudentId] : []);
+                                        setSelectedSurahIds([]);
+                                    }
+                                }}
+                                className="flex items-center gap-2"
+                            >
+                                {isBulkMode ? <X className="h-4 w-4" /> : <Layers className="h-4 w-4" />}
+                                {isBulkMode ? "إلغاء التحديث الجماعي" : "وضع التحديث الجماعي"}
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                             <div className="flex flex-col gap-4">
-                                <div className="max-w-md">
-                                    <SearchableSelect
-                                        options={studentOptions}
-                                        value={selectedStudentId}
-                                        onValueChange={setSelectedStudentId}
-                                        placeholder="اختر طالبًا..."
-                                        searchPlaceholder="ابحث عن طالب..."
-                                    />
-                                </div>
+                                {!isBulkMode ? (
+                                    <>
+                                        <div className="max-w-md">
+                                            <SearchableSelect
+                                                options={studentOptions}
+                                                value={selectedStudentId}
+                                                onValueChange={setSelectedStudentId}
+                                                placeholder="اختر طالبًا..."
+                                                searchPlaceholder="ابحث عن طالب..."
+                                            />
+                                        </div>
 
-                                {isAdmin5 && lastSessionProgress && (
-                                    <div className="bg-primary/5 p-3 rounded-xl border border-primary/10 animate-in fade-in slide-in-from-right-4 duration-500">
-                                        <div className="flex items-center gap-2 text-primary font-bold mb-1">
-                                            <Award className="h-4 w-4" />
-                                            <span className="text-sm font-headline">آخر ما تم تسجيله:</span>
+                                        {isAdmin5 && lastSessionProgress && (
+                                            <div className="bg-primary/5 p-3 rounded-xl border border-primary/10 animate-in fade-in slide-in-from-right-4 duration-500">
+                                                <div className="flex items-center gap-2 text-primary font-bold mb-1">
+                                                    <Award className="h-4 w-4" />
+                                                    <span className="text-sm font-headline">آخر ما تم تسجيله:</span>
+                                                </div>
+                                                <div className="text-sm font-body">
+                                                    سورة <span className="font-bold underlineDecoration-primary">{lastSessionProgress?.surahName}</span>
+                                                    {lastSessionProgress?.fromVerse && lastSessionProgress?.toVerse && (
+                                                        <> (من الآية <span className="font-bold">{lastSessionProgress?.fromVerse}</span> إلى <span className="font-bold">{lastSessionProgress?.toVerse}</span>)</>
+                                                    )}
+                                                    <span className="text-xs text-muted-foreground mr-2 opacity-70">
+                                                        - بتاريخ {lastSessionProgress?.date}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="font-bold flex items-center gap-2">
+                                                <Users className="h-4 w-4" />
+                                                تحديد الطلاب ({selectedStudentIds.length})
+                                            </h3>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setSelectedStudentIds(
+                                                    selectedStudentIds.length === studentsToShow.length
+                                                        ? []
+                                                        : studentsToShow.map(s => s.id)
+                                                )}
+                                            >
+                                                {selectedStudentIds.length === studentsToShow.length ? "إلغاء الكل" : "تحديد الكل"}
+                                            </Button>
                                         </div>
-                                        <div className="text-sm font-body">
-                                            سورة <span className="font-bold underlineDecoration-primary">{lastSessionProgress?.surahName}</span>
-                                            {lastSessionProgress?.fromVerse && lastSessionProgress?.toVerse && (
-                                                <> (من الآية <span className="font-bold">{lastSessionProgress?.fromVerse}</span> إلى <span className="font-bold">{lastSessionProgress?.toVerse}</span>)</>
-                                            )}
-                                            <span className="text-xs text-muted-foreground mr-2 opacity-70">
-                                                - بتاريخ {lastSessionProgress?.date}
-                                            </span>
-                                        </div>
+                                        <Card className="p-0 overflow-hidden border-primary/20">
+                                            <ScrollArea className="h-[200px] w-full p-4">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    {studentsToShow.map(student => (
+                                                        <div key={student.id} className="flex items-center space-x-2 space-x-reverse">
+                                                            <Checkbox
+                                                                id={`student-${student.id}`}
+                                                                checked={selectedStudentIds.includes(student.id)}
+                                                                onCheckedChange={(checked) => {
+                                                                    setSelectedStudentIds(prev =>
+                                                                        checked
+                                                                            ? [...prev, student.id]
+                                                                            : prev.filter(id => id !== student.id)
+                                                                    );
+                                                                }}
+                                                            />
+                                                            <label
+                                                                htmlFor={`student-${student.id}`}
+                                                                className="text-sm font-medium leading-none cursor-pointer select-none"
+                                                            >
+                                                                {student.fullName}
+                                                            </label>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </ScrollArea>
+                                        </Card>
                                     </div>
                                 )}
                             </div>
-                            {selectedStudent && (
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-sm font-medium">
-                                        <span>تقدم الطالب: {selectedStudent?.fullName}</span>
-                                        <span className="text-muted-foreground">{progressCounts.total} من {allSurahs.length} سورة</span>
+
+                            {!isBulkMode ? (
+                                selectedStudent && (
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-sm font-medium">
+                                            <span>تقدم الطالب: {selectedStudent?.fullName}</span>
+                                            <span className="text-muted-foreground">{progressCounts.total} من {allSurahs.length} سورة</span>
+                                        </div>
+                                        <Tooltip>
+                                            <TooltipTrigger className="w-full">
+                                                <div className="relative w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="absolute top-0 right-0 h-full bg-emerald-300 transition-all duration-500"
+                                                        style={{ width: `${progressPercentage.mastered + progressPercentage.memorized}%` }}
+                                                    />
+                                                    <div
+                                                        className="absolute top-0 right-0 h-full bg-emerald-700 transition-all duration-500"
+                                                        style={{ width: `${progressPercentage.mastered}%` }}
+                                                    />
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>المجموع: {progressCounts.total} ({((progressCounts.total / allSurahs.length) * 100).toFixed(1)}%)</p>
+                                                <p className="text-green-800">محفوظ: {progressCounts.memorized}</p>
+                                                <p className="text-green-600 font-bold">متقن: {progressCounts.mastered}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
                                     </div>
-                                    <Tooltip>
-                                        <TooltipTrigger className="w-full">
-                                            <div className="relative w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                <div
-                                                    className="absolute top-0 right-0 h-full bg-emerald-300 transition-all duration-500"
-                                                    style={{ width: `${progressPercentage.mastered + progressPercentage.memorized}%` }}
-                                                />
-                                                <div
-                                                    className="absolute top-0 right-0 h-full bg-emerald-700 transition-all duration-500"
-                                                    style={{ width: `${progressPercentage.mastered}%` }}
-                                                />
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p>المجموع: {progressCounts.total} ({((progressCounts.total / allSurahs.length) * 100).toFixed(1)}%)</p>
-                                            <p className="text-green-800">محفوظ: {progressCounts.memorized}</p>
-                                            <p className="text-green-600 font-bold">متقن: {progressCounts.mastered}</p>
-                                        </TooltipContent>
-                                    </Tooltip>
+                                )
+                            ) : (
+                                <div className="space-y-4">
+                                    <h3 className="font-bold flex items-center gap-2">
+                                        <BookOpen className="h-4 w-4" />
+                                        أدوات اختيار السور ({selectedSurahIds.length})
+                                    </h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button size="sm" variant="outline" onClick={() => selectJuz(30)}>جزء عم (30)</Button>
+                                        <Button size="sm" variant="outline" onClick={() => selectJuz(29)}>جزء تبارك (29)</Button>
+                                        <Button size="sm" variant="outline" onClick={() => selectJuz(28)}>جزء قد سمع (28)</Button>
+                                        <Button size="sm" variant="outline" onClick={() => selectJuz(27)}>جزء الذاريات (27)</Button>
+                                        <Button size="sm" variant="outline" onClick={() => selectJuz(26)}>جزء الاحقاف (26)</Button>
+                                        <Button size="sm" variant="outline" onClick={() => setSelectedSurahIds(allSurahs.map(s => s.id))}>تحديد المصحف كاملاً</Button>
+                                        <Button size="sm" variant="ghost" className="text-destructive h-[36px]" onClick={() => setSelectedSurahIds([])}>
+                                            <Trash2 className="h-4 w-4 ml-1" />
+                                            مسح الاختيار
+                                        </Button>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        يمكنك أيضاً تحديد السور يدوياً من "خريطة المصحف" أدناه.
+                                    </p>
+                                    <div className="flex gap-2 pt-2">
+                                        <Button
+                                            className="flex-1 bg-green-200 text-green-800 hover:bg-green-300 border-none"
+                                            onClick={() => handleApplyBulkStatus(1)}
+                                            disabled={isApplying || selectedStudentIds.length === 0 || selectedSurahIds.length === 0}
+                                        >
+                                            {isApplying ? <Loader2 className="h-4 w-4 animate-spin" /> : "ضبط كمحفوظ"}
+                                        </Button>
+                                        <Button
+                                            className="flex-1 bg-green-600 text-white hover:bg-green-700 border-none"
+                                            onClick={() => handleApplyBulkStatus(2)}
+                                            disabled={isApplying || selectedStudentIds.length === 0 || selectedSurahIds.length === 0}
+                                        >
+                                            {isApplying ? <Loader2 className="h-4 w-4 animate-spin" /> : "ضبط كمتقن"}
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1 border-destructive text-destructive hover:bg-destructive/10"
+                                            onClick={() => handleApplyBulkStatus(0)}
+                                            disabled={isApplying || selectedStudentIds.length === 0 || selectedSurahIds.length === 0}
+                                        >
+                                            {isApplying ? <Loader2 className="h-4 w-4 animate-spin" /> : "إلغاء الحفظ"}
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -360,10 +541,14 @@ export default function SurahProgressPage() {
                         <CardContent className="p-3 sm:p-6">
                             <div className="grid grid-cols-[repeat(auto-fill,minmax(75px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-1.5 sm:gap-3">
                                 {allSurahs.map(surah => {
-                                    const status = studentProgress[surah.id]?.status || 0;
+                                    const status = isBulkMode ? (selectedSurahIds.includes(surah.id) ? 1 : 0) : (studentProgress[surah.id]?.status || 0);
                                     let buttonClass = "bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200";
-                                    if (status === 1) buttonClass = "bg-green-200 hover:bg-green-300 text-green-800 dark:bg-green-800 dark:hover:bg-green-700 dark:text-green-100";
-                                    if (status === 2) buttonClass = "bg-green-600 hover:bg-green-700 text-white dark:bg-green-600 dark:hover:bg-green-500";
+                                    if (!isBulkMode) {
+                                        if (status === 1) buttonClass = "bg-green-200 hover:bg-green-300 text-green-800 dark:bg-green-800 dark:hover:bg-green-700 dark:text-green-100";
+                                        if (status === 2) buttonClass = "bg-green-600 hover:bg-green-700 text-white dark:bg-green-600 dark:hover:bg-green-500";
+                                    } else {
+                                        if (selectedSurahIds.includes(surah.id)) buttonClass = "bg-primary text-primary-foreground hover:bg-primary/90";
+                                    }
 
                                     return (
                                         <Tooltip key={surah.id}>
@@ -371,12 +556,18 @@ export default function SurahProgressPage() {
                                                 <Button
                                                     variant="outline"
                                                     onClick={() => handleSurahClick(surah.id)}
-                                                    disabled={!selectedStudentId || selectedStudent?.status === 'مطرود'}
-                                                    className={cn("h-auto justify-between transition-colors duration-300 px-1.5 py-1 sm:px-3 sm:py-2", buttonClass)}
+                                                    disabled={!isBulkMode && (!selectedStudentId || selectedStudent?.status === 'مطرود')}
+                                                    className={cn("h-auto justify-between transition-all duration-200 px-1.5 py-1 sm:px-3 sm:py-2", buttonClass, isBulkMode && selectedSurahIds.includes(surah.id) && "ring-2 ring-primary ring-offset-2 scale-105")}
                                                 >
                                                     <div className="flex items-center gap-1.5 overflow-hidden">
-                                                        {status === 1 && <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />}
-                                                        {status === 2 && <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />}
+                                                        {!isBulkMode ? (
+                                                            <>
+                                                                {status === 1 && <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />}
+                                                                {status === 2 && <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />}
+                                                            </>
+                                                        ) : (
+                                                            selectedSurahIds.includes(surah.id) && <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+                                                        )}
                                                         <span className="truncate text-[8px] xs:text-[9px] sm:text-xs font-medium">{surah.id}. {surah.name}</span>
                                                     </div>
                                                     <span className="text-[8px] sm:text-[10px] opacity-70 shrink-0 hidden xs:inline">{surah.verses}</span>
@@ -384,7 +575,7 @@ export default function SurahProgressPage() {
                                             </TooltipTrigger>
                                             <TooltipContent>
                                                 <p>
-                                                    {surah.name} - {status === 0 ? "غير محفوظة" : status === 1 ? "محفوظة" : "متقنة"}
+                                                    {surah.name} - {isBulkMode ? (selectedSurahIds.includes(surah.id) ? "منتقاة للتعديل" : "غير منتقاة") : (status === 0 ? "غير محفوظة" : status === 1 ? "محفوظة" : "متقنة")}
                                                 </p>
                                             </TooltipContent>
                                         </Tooltip>

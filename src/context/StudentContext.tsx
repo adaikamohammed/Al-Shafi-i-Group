@@ -90,6 +90,7 @@ interface StudentContextType {
   saveDailyReport: (reportData: Partial<DailyReport>, reportIdToUpdate?: string) => Promise<void>;
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
+  bulkUpdateSurahStatus: (studentIds: string[], surahIds: number[], targetStatus: 0 | 1 | 2) => Promise<void>;
   addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
   updatePaymentStatus: (paymentId: string, status: PaymentStatus, amount: number) => Promise<void>;
   saveSettings: (newSettings: AppSettings) => Promise<void>;
@@ -99,6 +100,7 @@ interface StudentContextType {
   deleteAdminLog: (log: AdminLog) => Promise<void>;
   getNextTicketNumber: () => Promise<number>;
   transferStudent: (studentId: string, currentOwnerId: string, targetSheikhId: string, reason: string) => Promise<void>;
+  bulkUpdateStudents: (updates: Record<string, Partial<Student>>) => Promise<void>;
   saveMeeting: (meetingData: Partial<Meeting>, meetingIdToUpdate?: string) => Promise<void>;
   deleteMeeting: (meetingId: string) => Promise<void>;
   addMeetingSuggestion: (meetingId: string, suggestion: Omit<MeetingSuggestion, 'id' | 'timestamp'>) => Promise<void>;
@@ -1048,6 +1050,73 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     updateStudent(studentId, { memorizedSurahsCount: memorizedCount }, studentOwnerId);
   }
 
+  const bulkUpdateSurahStatus = async (studentIds: string[], surahIds: number[], targetStatus: 0 | 1 | 2) => {
+    if (!authContextUser) return;
+
+    const updates: { [key: string]: any } = {};
+    const timestamp = new Date().toISOString();
+
+    studentIds.forEach(studentId => {
+      const student = students.find(s => s.id === studentId);
+      if (!student) return;
+
+      const studentOwnerId = student.ownerId;
+      if (!isSuperAdmin && !isManagement && authContextUser.uid !== studentOwnerId) return;
+
+      const studentProgressMap = { ...(surahProgress[studentId] || {}) };
+      let changed = false;
+
+      surahIds.forEach(surahId => {
+        const currentEntry = studentProgressMap[surahId] || { status: 0 };
+        const currentStatus = currentEntry.status;
+
+        if (currentStatus === targetStatus) return;
+        changed = true;
+
+        const newEntry: SurahMasteryEntry = { status: targetStatus };
+        if (targetStatus > 0 && currentStatus === 0) {
+          newEntry.completedAt = timestamp;
+        } else if (targetStatus > 0) {
+          newEntry.completedAt = currentEntry.completedAt || timestamp;
+        }
+
+        if (targetStatus === 0) {
+          updates[`users/${studentOwnerId}/surahProgress/${studentId}/${surahId}`] = null;
+          delete studentProgressMap[surahId];
+        } else {
+          updates[`users/${studentOwnerId}/surahProgress/${studentId}/${surahId}`] = newEntry;
+          studentProgressMap[surahId] = newEntry;
+        }
+      });
+
+      if (changed) {
+        const newMemorizedCount = Object.values(studentProgressMap).filter(entry => entry.status > 0).length;
+        updates[`users/${studentOwnerId}/students/${studentId}/memorizedSurahsCount`] = newMemorizedCount;
+        updates[`users/${studentOwnerId}/students/${studentId}/updatedAt`] = timestamp;
+
+        logActivity(
+          'UPDATE_SURAH_PROGRESS',
+          authContextUser.uid,
+          `تحديث جماعي للسور (${surahIds.length} سورة) إلى حالة: ${targetStatus === 0 ? 'غير محفوظة' : targetStatus === 1 ? 'محفوظة' : 'متقنة'}`,
+          studentId,
+          student.fullName,
+          authContextUser.displayName || 'Unknown',
+          student.groupName,
+          studentOwnerId
+        );
+      }
+    });
+
+    if (Object.keys(updates).length > 0) {
+      const dbRef = ref(db);
+      await update(dbRef, updates);
+      toast({
+        title: "✅ تم التحديث الجماعي",
+        description: `تم تحديث ${surahIds.length} سورة لـ ${studentIds.length} طلاب بنجاح.`,
+      });
+    }
+  };
+
   const addPayment = async (paymentData: Omit<Payment, 'id'>) => {
     if (!authContextUser) throw new Error("User not authenticated");
 
@@ -1425,6 +1494,49 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const bulkUpdateStudents = async (updates: Record<string, Partial<Student>>) => {
+    if (!authContextUser) return;
+    try {
+      const fbUpdates: Record<string, any> = {};
+      const timestamp = new Date().toISOString();
+
+      Object.entries(updates).forEach(([studentId, data]) => {
+        const student = students.find(s => s.id === studentId);
+        if (student) {
+          fbUpdates[`users/${student.ownerId}/students/${studentId}`] = {
+            ...student,
+            ...data,
+            updatedAt: timestamp
+          };
+
+          logActivity(
+            'UPDATE_STUDENT',
+            authContextUser.uid,
+            `تم تحديث بيانات الطالب: ${student.fullName} (تحديث جماعي)`,
+            studentId,
+            student.fullName,
+            authContextUser.displayName || 'Unknown',
+            student.groupName || 'Unknown',
+            student.ownerId
+          );
+        }
+      });
+
+      await update(ref(db), fbUpdates);
+      toast({
+        title: "✅ تم التحديث بنجاح",
+        description: `تم تحديث بيانات ${Object.keys(updates).length} طالب(ة).`,
+      });
+    } catch (error: any) {
+      console.error("Bulk update error:", error);
+      toast({
+        title: "❌ خطأ في التحديث",
+        description: error.message || "حدث خطأ أثناء محاولة تحديث البيانات.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <StudentContext.Provider value={{
       students,
@@ -1441,6 +1553,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       loading,
       addStudent,
       updateStudent,
+      bulkUpdateStudents,
       deleteStudent,
       deleteAllStudents,
       deleteMultipleStudents,
@@ -1458,6 +1571,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       saveDailyReport,
       deleteDailyReport,
       toggleSurahStatus,
+      bulkUpdateSurahStatus,
       addPayment,
       updatePaymentStatus,
       saveSettings,

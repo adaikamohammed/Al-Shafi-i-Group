@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, Search, Filter, Download, Trash2, Loader2, Users, UserCheck, UserMinus, Star, X, ArrowRightLeft } from 'lucide-react';
+import { PlusCircle, Search, Filter, Download, Trash2, Loader2, Users, UserCheck, UserMinus, Star, X, ArrowRightLeft, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
@@ -23,6 +23,7 @@ import { format } from 'date-fns';
 import { StudentTable } from './student/StudentTable';
 import { StudentForm } from './student/StudentForm';
 import { StudentProfileCard } from './student/StudentProfileCard';
+import { BulkStudentEditView } from './student/BulkStudentEditView';
 import { GroupSelector } from './management/GroupSelector';
 
 // Refactored Hooks
@@ -43,6 +44,7 @@ export default function StudentManagement() {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     const [selectedRows, setSelectedRows] = useState<string[]>([]);
     const [sortConfig, setSortConfig] = useState<{ key: keyof Student | 'pageNumber'; direction: 'ascending' | 'descending' }>({ key: 'fullName', direction: 'ascending' });
+    const [isBulkEdit, setIsBulkEdit] = useState(false);
 
     const { rankingData, getStudentMedalHistory } = useStudentStats(students, dailySessions, settings);
 
@@ -229,16 +231,28 @@ export default function StudentManagement() {
                     <h1 className="text-3xl font-headline font-bold">إدارة الطلبة</h1>
                     <div className="flex w-full sm:w-auto items-center gap-2">
                         {isManagement && <GroupSelector value={selectedGroup} onChange={setSelectedGroup} className="w-[200px]" />}
-                        {!isSuperAdmin && !isManagement && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
-                            <DialogTrigger asChild><Button className="w-full sm:w-auto"><PlusCircle className="ml-2 h-4 w-4" />إضافة طالب جديد</Button></DialogTrigger>
-                            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl">
-                                <DialogHeader className="p-6 pb-0">
-                                    <DialogTitle>إضافة طالب جديد</DialogTitle>
-                                    <DialogDescription>أدخل معلومات الطالب الجديد هنا لإضافته إلى النظام.</DialogDescription>
-                                </DialogHeader>
-                                <StudentForm addStudent={addStudent} onSuccess={() => setAddStudentDialogOpen(false)} onCancel={() => setAddStudentDialogOpen(false)} />
-                            </DialogContent>
-                        </Dialog>}
+                        <div className="flex gap-2 w-full sm:w-auto">
+                            <Button
+                                variant={isBulkEdit ? "destructive" : "outline"}
+                                onClick={() => setIsBulkEdit(!isBulkEdit)}
+                                className="flex-1 sm:flex-none font-bold whitespace-nowrap"
+                            >
+                                {isBulkEdit ? <X className="ml-2 h-4 w-4" /> : <Edit className="ml-2 h-4 w-4 text-primary" />}
+                                {isBulkEdit ? "إلغاء الوضع السريع" : "التعديل الجماعي للسجلات"}
+                            </Button>
+                            {!isBulkEdit && !isSuperAdmin && !isManagement && (
+                                <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
+                                    <DialogTrigger asChild><Button className="flex-1 sm:flex-none"><PlusCircle className="ml-2 h-4 w-4" />إضافة طالب</Button></DialogTrigger>
+                                    <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl">
+                                        <DialogHeader className="p-6 pb-0">
+                                            <DialogTitle>إضافة طالب جديد</DialogTitle>
+                                            <DialogDescription>أدخل معلومات الطالب الجديد هنا لإضافته إلى النظام.</DialogDescription>
+                                        </DialogHeader>
+                                        <StudentForm addStudent={addStudent} onSuccess={() => setAddStudentDialogOpen(false)} onCancel={() => setAddStudentDialogOpen(false)} />
+                                    </DialogContent>
+                                </Dialog>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -310,27 +324,34 @@ export default function StudentManagement() {
                     )}
                 </div>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>قائمة الطلبة ({filteredStudents.length})</CardTitle>
-                        <CardDescription>{isSuperAdmin ? 'عرض شامل لجميع الطلبة في كل الأفواج' : (user?.group || 'فوج غير محدد')}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <StudentTable
-                            students={filteredStudents}
-                            selectedRows={selectedRows}
-                            onSelectedRowsChange={setSelectedRows}
-                            sortConfig={sortConfig}
-                            onRequestSort={requestSort}
-                            isSuperAdmin={isSuperAdmin}
-                            isManagement={isManagement}
-                            onStudentClick={setSelectedStudent}
-                            onStatusChange={handleStatusChange}
-                            onEdit={(student) => { setSelectedStudent(student); setEditStudentDialogOpen(true); }}
-                            searchTerm={searchTerm}
-                        />
-                    </CardContent>
-                </Card>
+                {isBulkEdit ? (
+                    <BulkStudentEditView
+                        students={allStudents}
+                        onClose={() => setIsBulkEdit(false)}
+                    />
+                ) : (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>قائمة الطلبة ({filteredStudents.length})</CardTitle>
+                            <CardDescription>{isSuperAdmin ? 'عرض شامل لجميع الطلبة في كل الأفواج' : (user?.group || 'فوج غير محدد')}</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <StudentTable
+                                students={filteredStudents}
+                                selectedRows={selectedRows}
+                                onSelectedRowsChange={setSelectedRows}
+                                sortConfig={sortConfig}
+                                onRequestSort={requestSort}
+                                isSuperAdmin={isSuperAdmin}
+                                isManagement={isManagement}
+                                onStudentClick={setSelectedStudent}
+                                onStatusChange={handleStatusChange}
+                                onEdit={(student) => { setSelectedStudent(student); setEditStudentDialogOpen(true); }}
+                                searchTerm={searchTerm}
+                            />
+                        </CardContent>
+                    </Card>
+                )}
 
                 {selectedStudent && (
                     <Dialog open={!!selectedStudent && !isEditStudentDialogOpen} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}>
@@ -386,6 +407,6 @@ export default function StudentManagement() {
                     </div>
                 )}
             </div>
-        </TooltipProvider>
+        </TooltipProvider >
     );
 }
