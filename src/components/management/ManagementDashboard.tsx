@@ -3,17 +3,19 @@
 import React, { useMemo } from 'react';
 import { useStudentContext } from '@/context/StudentContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, UserCheck, Shield, UserPlus, TrendingUp, BarChart3, Award, Calendar } from 'lucide-react';
+import { Users, UserCheck, Shield, UserPlus, TrendingUp, BarChart3, Award, Calendar, ChevronRight, Activity, Target, PieChart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { PORTAL_THEMES } from '@/lib/themes';
 import { GroupSelector } from './GroupSelector';
-import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-    PieChart, Pie, Cell, Legend
-} from 'recharts';
+import dynamic from 'next/dynamic';
+
+const MonitoringRadar = dynamic(() => import('./MonitoringRadar').then(mod => mod.MonitoringRadar), { ssr: false });
+const InteractiveGrowthChart = dynamic(() => import('./ManagementCharts').then(mod => mod.InteractiveGrowthChart), { ssr: false });
+const LevelDistributionChart = dynamic(() => import('./ManagementCharts').then(mod => mod.LevelDistributionChart), { ssr: false });
+
 import {
     startOfWeek, endOfWeek,
     startOfMonth, endOfMonth,
@@ -23,7 +25,6 @@ import {
 } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useFCM } from '@/hooks/useFCM';
-import { MonitoringRadar } from './MonitoringRadar';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { CalendarDays, CalendarRange, CalendarCheck, History, Info, Zap, Bell, BellOff } from 'lucide-react';
@@ -33,38 +34,78 @@ interface StatCardProps {
     value: string | number;
     icon: any;
     color: string;
+    gradient: string;
     description?: string;
     theme: any;
 }
 
-const StatCard = ({ title, value, icon: Icon, color, description, theme }: StatCardProps) => (
-    <Card className={cn(
-        "relative overflow-hidden border-none shadow-xl transition-all duration-300 hover:scale-[1.02]",
-        theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
-    )}>
-        <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-                <div className={cn("p-3 rounded-2xl", color)}>
-                    <Icon className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-right">
-                    <p className="text-sm font-medium opacity-60 leading-tight">{title}</p>
-                    <h3 className="text-3xl font-black font-headline mt-1 tracking-tight">{value}</h3>
-                </div>
+const StatCard = ({ title, value, icon: Icon, color, gradient, description, theme }: StatCardProps) => (
+    <motion.div
+        whileHover={{ scale: 1.02, translateY: -5 }}
+        transition={{ type: "spring", stiffness: 300 }}
+    >
+        <Card className={cn(
+            "relative overflow-hidden border-none shadow-xl h-full",
+            theme.isLight ? "bg-white/80 backdrop-blur-md text-slate-900" : "bg-white/5 backdrop-blur-md text-white"
+        )}>
+            <div className={cn("absolute inset-0 opacity-10 bg-gradient-to-br", gradient)} />
+            <div className={cn("absolute -right-10 -bottom-10 opacity-5 rotate-12", color)}>
+                <Icon size={140} />
             </div>
-            {description && (
-                <div className="flex items-center gap-2 mt-2 opacity-60 text-xs font-body">
-                    <TrendingUp className="h-3 w-3" />
-                    <span>{description}</span>
+            <CardContent className="p-6 relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                    <div className={cn("p-3 rounded-2xl shadow-lg", color)}>
+                        <Icon className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="text-right">
+                        <p className="text-sm font-medium opacity-70 leading-tight">{title}</p>
+                        <h3 className="text-3xl font-black font-headline mt-1 tracking-tight">{value}</h3>
+                    </div>
                 </div>
-            )}
-            {/* Background decoration */}
-            <div className={cn("absolute -right-4 -bottom-4 opacity-10", color)}>
-                <Icon size={120} />
-            </div>
-        </CardContent>
-    </Card>
+                {description && (
+                    <div className="flex items-center gap-2 mt-2 py-1 px-2 rounded-lg bg-white/5 w-fit ml-auto">
+                        <TrendingUp className="h-3 w-3 text-emerald-500" />
+                        <span className="text-xs opacity-70">{description}</span>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    </motion.div>
 );
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        return (
+            <div className="bg-white/95 backdrop-blur-xl p-4 rounded-xl shadow-2xl border border-slate-100 text-right min-w-[200px]">
+                <div className="flex items-center gap-2 mb-2 border-b pb-2">
+                    <div className="p-1.5 bg-indigo-50 rounded-lg">
+                        <Shield className="h-4 w-4 text-indigo-600" />
+                    </div>
+                    <p className="font-bold text-slate-800">{data.name}</p>
+                </div>
+                <div className="space-y-2 text-sm">
+                    <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
+                        <span className="text-slate-500 flex items-center gap-1"><UserCheck className="h-3 w-3" /> الشيخ:</span>
+                        <span className="font-semibold text-slate-800 dir-rtl">{data.sheikhName}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-slate-500">إجمالي الطلبة:</span>
+                        <span className="font-bold text-slate-800">{data.students}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-slate-500">الطلبة النشطون:</span>
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-emerald-600">{data.active}</span>
+                            <span className="text-xs text-slate-400">({Math.round((data.active / data.students) * 100)}%)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
 
 export const ManagementDashboard = () => {
     const { students, preRegistrations, allUsers, dailySessions, loading, generateDemoData } = useStudentContext();
@@ -178,8 +219,10 @@ export const ManagementDashboard = () => {
 
             return {
                 name: groupName || 'غير محدد',
+                sheikhName: representativeSheikh?.displayName || 'غير محدد',
                 students: groupStudents.length,
-                active: groupStudents.filter(s => s.status === 'نشط').length
+                active: groupStudents.filter(s => s.status === 'نشط').length,
+                inactive: groupStudents.length - groupStudents.filter(s => s.status === 'نشط').length
             };
         })
             // Sort by Group Number (1-9)
@@ -208,10 +251,10 @@ export const ManagementDashboard = () => {
         };
     }, [students, preRegistrations, allUsers, selectedGroup]);
 
-    const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4'];
+    const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#6366f1'];
 
     return (
-        <div className="w-full max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="w-full max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
             {/* Header & Filter */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div className="space-y-1">
@@ -250,16 +293,16 @@ export const ManagementDashboard = () => {
                             "p-1 h-auto grid grid-cols-4 gap-1 rounded-xl border",
                             theme.isLight ? "bg-slate-50 border-slate-200" : "bg-white/5 border-white/10"
                         )}>
-                            <TabsTrigger value="weekly" className="rounded-lg py-2 text-xs data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
+                            <TabsTrigger value="weekly" className="rounded-lg py-2 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg">
                                 <CalendarDays className="ml-1 h-3 w-3" /> أسبوعي
                             </TabsTrigger>
-                            <TabsTrigger value="monthly" className="rounded-lg py-2 text-xs data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
+                            <TabsTrigger value="monthly" className="rounded-lg py-2 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg">
                                 <CalendarRange className="ml-1 h-3 w-3" /> شهري
                             </TabsTrigger>
-                            <TabsTrigger value="seasonal" className="rounded-lg py-2 text-xs data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
+                            <TabsTrigger value="seasonal" className="rounded-lg py-2 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg">
                                 <CalendarCheck className="ml-1 h-3 w-3" /> فصلي
                             </TabsTrigger>
-                            <TabsTrigger value="yearly" className="rounded-lg py-2 text-xs data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
+                            <TabsTrigger value="yearly" className="rounded-lg py-2 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg">
                                 <History className="ml-1 h-3 w-3" /> سنوي
                             </TabsTrigger>
                         </TabsList>
@@ -286,231 +329,143 @@ export const ManagementDashboard = () => {
                 </div>
             </div>
 
-            {/* Monitoring Radar Section - Added from Monitoring page */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                    <MonitoringRadar data={aggregatedData} selectedGroup={selectedGroup} />
-                </div>
-                <div className="space-y-6">
-                    <Card className={cn(
-                        "border-none shadow-xl h-full",
-                        theme.isLight ? "bg-white text-slate-800" : "bg-white/5 text-white"
-                    )}>
-                        <CardHeader>
-                            <CardTitle className="text-lg font-headline font-bold flex items-center gap-2">
-                                <Zap className="h-5 w-5 text-amber-400" />
-                                ملخص الأداء {timeframe === 'weekly' ? 'الأسبوعي' : timeframe === 'monthly' ? 'الشهري' : timeframe === 'seasonal' ? 'الفصلي' : 'السنوي'}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            {selectedGroup === 'all' ? (
-                                <div className="space-y-4">
-                                    <p className="text-sm opacity-60">يعرض الرادار متوسط أداء كافة الأفواج. يمكنك اختيار فوج محدد للحصول على تفاصيل دقيقة.</p>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10">
-                                            <p className="text-xs opacity-60">إجمالي الأفواج</p>
-                                            <p className="text-2xl font-black font-headline text-primary">{aggregatedData.length}</p>
-                                        </div>
-                                        <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
-                                            <p className="text-xs opacity-60">متوسط الحضور</p>
-                                            <p className="text-2xl font-black font-headline text-emerald-400">
-                                                {aggregatedData.length > 0 ? Math.round(aggregatedData.reduce((acc, curr) => acc + curr.attendanceRate, 0) / aggregatedData.length) : 0}%
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {aggregatedData.find(g => g.groupName === selectedGroup) ? (
-                                        <>
-                                            <p className="text-sm font-bold">تحليل {selectedGroup}:</p>
-                                            <ul className="space-y-3">
-                                                <li className="flex justify-between items-center text-sm">
-                                                    <span className="opacity-60">نسبة الحفظ:</span>
-                                                    <span className="font-bold">{aggregatedData.find(g => g.groupName === selectedGroup)?.evaluationScore}%</span>
-                                                </li>
-                                                <li className="flex justify-between items-center text-sm">
-                                                    <span className="opacity-60">وتيرة المراجعة:</span>
-                                                    <span className="font-bold">{aggregatedData.find(g => g.groupName === selectedGroup)?.reviewRate}%</span>
-                                                </li>
-                                                <li className="flex justify-between items-center text-sm">
-                                                    <span className="opacity-60">مستوى الانضباط:</span>
-                                                    <span className="font-bold">{aggregatedData.find(g => g.groupName === selectedGroup)?.behaviorScore}%</span>
-                                                </li>
-                                            </ul>
-                                        </>
-                                    ) : (
-                                        <p className="text-sm opacity-40">لا توجد بيانات لهذا الفوج في الفترة المختارة</p>
-                                    )}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-
-            {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    title="إجمالي الطلبة النشطين"
-                    value={stats.totalStudents}
-                    icon={Users}
-                    color="bg-blue-500"
-                    description="طالب مسجل حالياً"
-                    theme={theme}
-                />
-                <StatCard
-                    title="عدد المشايخ"
-                    value={stats.totalSheikhs}
-                    icon={UserCheck}
-                    color="bg-emerald-500"
-                    description="شيخ يدرس في المدرسة"
-                    theme={theme}
-                />
-                <StatCard
-                    title="تسجيلات مرشحة"
-                    value={stats.pendingRegs}
-                    icon={UserPlus}
-                    color="bg-amber-500"
-                    description="في انتظار المراجعة"
-                    theme={theme}
-                />
-                <StatCard
-                    title="معدل الحفظ العام"
-                    value={stats.completionRate}
-                    icon={TrendingUp}
-                    color="bg-purple-500"
-                    description="نسبة إتقان السور المقررة"
-                    theme={theme}
-                />
-            </div>
-
-            {/* Main Sections Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Groups Overview */}
+            {/* Smart Monitoring Section (Combined Chart + Table Concept) */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                {/* Main Interactive Chart */}
                 <Card className={cn(
-                    "lg:col-span-2 border-none shadow-2xl",
+                    "lg:col-span-3 border-none shadow-2xl overflow-hidden flex flex-col",
                     theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
                 )}>
-                    <CardHeader className="border-b border-white/5">
-                        <div className="flex items-center justify-between">
+                    <CardHeader className="pb-2 border-b border-gray-100 dark:border-white/10">
+                        <div className="flex justify-between items-center">
                             <div>
                                 <CardTitle className="text-2xl font-headline font-bold flex items-center gap-3">
-                                    <Shield className="text-primary h-6 w-6" />
-                                    مراقبة الأفواج
+                                    <Activity className="text-indigo-500 h-6 w-6" />
+                                    مراقبة نمو الأفواج
                                 </CardTitle>
-                                <CardDescription className="opacity-60">نظرة عامة على أداء المجموعات التعليمية</CardDescription>
+                                <CardDescription className="opacity-70 mt-1">
+                                    تحليل تفاعلي لتوزيع الطلبة ونشاطهم عبر المجموعات التعليمية
+                                </CardDescription>
                             </div>
-                            <Button variant="ghost" className="rounded-xl hover:bg-white/10" asChild>
-                                <a href="/management/groups">عرض كل الأفواج</a>
-                            </Button>
+                            <div className="flex gap-2 text-xs font-bold">
+                                <div className="flex items-center gap-1 bg-indigo-50 px-3 py-1 rounded-full text-indigo-700">
+                                    <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                                    <span>نشط</span>
+                                </div>
+                                <div className="flex items-center gap-1 bg-slate-50 px-3 py-1 rounded-full text-slate-600 text-xs">
+                                    <div className="w-2 h-2 rounded-full bg-slate-300" />
+                                    <span>خامل</span>
+                                </div>
+                            </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-right">
-                                <thead className={cn(
-                                    "text-xs uppercase tracking-wider opacity-60",
-                                    theme.isLight ? "bg-slate-50" : "bg-white/5"
-                                )}>
-                                    <tr>
-                                        <th className="px-6 py-4">الفوج</th>
-                                        <th className="px-6 py-4">الشيخ</th>
-                                        <th className="px-6 py-4 text-center">الطلبة</th>
-                                        <th className="px-6 py-4 text-center">النشطون</th>
-                                        <th className="px-6 py-4">الحالة</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/5">
-                                    {stats.groupComparisonData.map((group, idx) => (
-                                        <tr key={idx} className="hover:bg-white/5 transition-colors">
-                                            <td className="px-6 py-4 font-bold">{group.name}</td>
-                                            <td className="px-6 py-4 text-sm opacity-80 font-body">
-                                                {allUsers.find(u => u.group === group.name)?.displayName || 'غير محدد'}
-                                            </td>
-                                            <td className="px-6 py-4 text-center font-bold">{group.students}</td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-col items-center gap-1">
-                                                    <span className="text-xs font-bold font-body">{group.active}</span>
-                                                    <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-emerald-500 rounded-full"
-                                                            style={{ width: `${(group.active / (group.students || 1)) * 100}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">نشط</span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                    <CardContent className="flex-1 p-4 min-h-[400px]">
+                        <InteractiveGrowthChart data={stats.groupComparisonData} />
                     </CardContent>
                 </Card>
 
-                {/* Comparison Chart */}
-                {selectedGroup === 'all' ? (
+                {/* Radar & Summary - Compact Side Panel */}
+                <div className="flex flex-col gap-6 h-full">
+                    {/* Radar Chart */}
+                    <div className="bg-white dark:bg-white/5 rounded-xl shadow-xl overflow-hidden flex-1 min-h-[300px] relative">
+                        <div className="absolute top-4 right-4 z-10">
+                            <h3 className="font-bold text-sm bg-white/50 backdrop-blur px-2 py-1 rounded-lg">الأداء النوعي</h3>
+                        </div>
+                        <MonitoringRadar data={aggregatedData} selectedGroup={selectedGroup} />
+                    </div>
+
+                    {/* Quick KPI for selected Group or All */}
                     <Card className={cn(
-                        "border-none shadow-2xl overflow-hidden",
-                        theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
+                        "border-none shadow-xl flex-shrink-0",
+                        theme.isLight ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white" : "bg-gradient-to-br from-indigo-900 to-purple-900 text-white"
                     )}>
-                        <CardHeader>
-                            <CardTitle className="text-xl font-headline font-bold flex items-center gap-3">
-                                <BarChart3 className="text-primary h-5 w-5" />
-                                مقارنة أعداد الطلاب
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-base font-bold flex items-center justify-between">
+                                <span>{selectedGroup === 'all' ? 'متوسط الأداء العام' : selectedGroup}</span>
+                                <Target className="h-4 w-4 opacity-80" />
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="h-[300px] p-4">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={stats.groupComparisonData.slice(0, 5)}>
-                                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                                    <XAxis dataKey="name" hide />
-                                    <YAxis hide />
-                                    <RechartsTooltip
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                                    />
-                                    <Bar dataKey="students" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
+                        <CardContent className="space-y-4">
+                            <div className="flex justify-between items-end border-b border-white/20 pb-2">
+                                <span className="text-xs opacity-80">نسبة الحضور</span>
+                                <span className="text-2xl font-black font-headline">
+                                    {selectedGroup === 'all'
+                                        ? (aggregatedData.length > 0 ? Math.round(aggregatedData.reduce((acc, curr) => acc + curr.attendanceRate, 0) / aggregatedData.length) : 0)
+                                        : (aggregatedData.find(g => g.groupName === selectedGroup)?.attendanceRate || 0)
+                                    }%
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-end">
+                                <span className="text-xs opacity-80">التقييم العام</span>
+                                <span className="text-xl font-black font-headline text-amber-300">
+                                    {selectedGroup === 'all'
+                                        ? (aggregatedData.length > 0 ? Math.round(aggregatedData.reduce((acc, curr) => acc + curr.evaluationScore, 0) / aggregatedData.length) : 0)
+                                        : (aggregatedData.find(g => g.groupName === selectedGroup)?.evaluationScore || 0)
+                                    }
+                                    <span className="text-xs text-white/50 mr-1">/100</span>
+                                </span>
+                            </div>
                         </CardContent>
                     </Card>
-                ) : (
-                    <Card className={cn(
-                        "border-none shadow-2xl overflow-hidden",
-                        theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
-                    )}>
-                        <CardHeader>
-                            <CardTitle className="text-xl font-headline font-bold flex items-center gap-3">
-                                <BarChart3 className="text-primary h-5 w-5" />
-                                توزيع المستويات الدراسية
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="h-[300px] p-4">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={stats.levelDistributionData}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={80}
-                                        paddingAngle={5}
-                                        dataKey="value"
-                                    >
-                                        {stats.levelDistributionData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                        ))}
-                                    </Pie>
-                                    <RechartsTooltip />
-                                    <Legend />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-                )}
+                </div>
+            </div>
+
+            {/* Stats Overview Gradient Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard
+                    title="الطلبة النشطين"
+                    value={stats.totalStudents}
+                    icon={Users}
+                    color="bg-blue-500"
+                    gradient="from-blue-500 to-cyan-400"
+                    description="+12% نمو شهري"
+                    theme={theme}
+                />
+                <StatCard
+                    title="الكادر التعليمي"
+                    value={stats.totalSheikhs}
+                    icon={UserCheck}
+                    color="bg-emerald-500"
+                    gradient="from-emerald-500 to-teal-400"
+                    description="مشايخ وأساتذة"
+                    theme={theme}
+                />
+                <StatCard
+                    title="تسجيلات جديدة"
+                    value={stats.pendingRegs}
+                    icon={UserPlus}
+                    color="bg-amber-500"
+                    gradient="from-amber-500 to-orange-400"
+                    description="في انتظار الموافقة"
+                    theme={theme}
+                />
+                <StatCard
+                    title="معدل الإنجاز"
+                    value={stats.completionRate}
+                    icon={Award}
+                    color="bg-purple-500"
+                    gradient="from-purple-500 to-pink-400"
+                    description="جودة الحفظ والإتقان"
+                    theme={theme}
+                />
+            </div>
+
+            {/* Footer with Distribution Pie Chart */}
+            <div className="w-full">
+                <Card className={cn(
+                    "w-full border-none shadow-xl",
+                    theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
+                )}>
+                    <CardHeader>
+                        <CardTitle className="text-xl font-bold flex items-center gap-2">
+                            <PieChart className="text-primary h-6 w-6" />
+                            توزيع المستويات التعليمية
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-[400px] relative p-6">
+                        <LevelDistributionChart data={stats.levelDistributionData} />
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );

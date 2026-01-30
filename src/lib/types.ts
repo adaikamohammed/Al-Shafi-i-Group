@@ -184,6 +184,14 @@ export interface AppUser {
   educationTimeline?: EducationEvent[];
   portalTheme?: string;
   fcmTokens?: string[];
+  notificationEmail?: string;
+  emailPreferences?: {
+    weeklyReport?: boolean;
+    absenceAlerts?: boolean;
+    adminBroadcasts?: boolean;
+    financialUpdates?: boolean;
+    newStudents?: boolean;
+  };
 }
 
 export interface EducationEvent {

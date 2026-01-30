@@ -199,8 +199,8 @@ export default function DailyReportPage() {
 
 
     const monthlyReports = useMemo(() => {
-        return Object.values(dailyReports)
-            .flatMap(dayReports => Object.values(dayReports))
+        return Object.values(dailyReports || {})
+            .flatMap(dayReports => Object.values(dayReports || {}))
             .filter(report => {
                 if (!report || !report.date) return false;
                 try {

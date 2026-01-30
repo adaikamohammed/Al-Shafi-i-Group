@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle, Undo2, Download, Search, FileX, PlusCircle, MinusCircle, MoreHorizontal, Save } from 'lucide-react';
@@ -19,6 +20,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Payment, PaymentStatus, Student } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { GroupSelector } from '@/components/management/GroupSelector';
 
 
 type QuarterStatusFilter = 'all' | 'paid' | 'unpaid' | 'exempted';
@@ -31,7 +33,7 @@ const statusVariant: { [key in 'نشط' | 'مطرود']: "default" | "destructiv
 
 
 export default function DuesPage() {
-    const { students, payments, addPayment, updatePaymentStatus, loading, settings, saveSettings } = useStudentContext();
+    const { students, payments, addPayment, updatePaymentStatus, loading, settings, saveSettings, allUsers } = useStudentContext();
     const { isSuperAdmin, isManagement } = useAuth();
     const { toast } = useToast();
     const [currentYear, setCurrentYear] = useState(getYear(new Date()));
@@ -41,6 +43,9 @@ export default function DuesPage() {
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('نشط');
     const [isSaving, setIsSaving] = useState(false);
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+    const [selectedGroup, setSelectedGroup] = useState('all');
+    const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+    const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
     const [registrationFees, setRegistrationFees] = useState<Record<number, number>>({});
     const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -150,9 +155,22 @@ export default function DuesPage() {
                 if (quarterStatusFilter === 'exempted') quarterMatch = student.paymentStatus[q]?.status === 'exempted';
             }
 
-            return nameMatch && quarterMatch && statusMatch;
+            // Group Filter Logic
+            let groupMatch = true;
+            if (selectedGroup !== 'all' && (isSuperAdmin || isManagement)) {
+                // Find the group name associated with the selected sheikh UID
+                const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
+                if (selectedSheikh?.group) {
+                    groupMatch = student.groupName === selectedSheikh.group;
+                } else {
+                    // Fallback to strict owner matching if group name not found (unlikely)
+                    groupMatch = student.ownerId === selectedGroup;
+                }
+            }
+
+            return nameMatch && quarterMatch && statusMatch && groupMatch;
         });
-    }, [studentsWithDues, searchTerm, quarterFilter, quarterStatusFilter, statusFilter]);
+    }, [studentsWithDues, searchTerm, quarterFilter, quarterStatusFilter, statusFilter, selectedGroup, isSuperAdmin, isManagement, allUsers]);
 
     const totalsByQuarter = useMemo(() => {
         const quarterTotals: Record<number, { revenue: number, paidCount: number, exemptedCount: number }> = { 1: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 2: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 3: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 4: { revenue: 0, paidCount: 0, exemptedCount: 0 } };
@@ -183,6 +201,78 @@ export default function DuesPage() {
         return Object.values(totalsByQuarter).reduce((sum, q) => sum + q.revenue, 0);
     }, [totalsByQuarter]);
 
+    // --- Bulk Usage Handlers ---
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            setSelectedStudents(filteredStudents.map(s => s.id));
+        } else {
+            setSelectedStudents([]);
+        }
+    };
+
+    const handleSelectStudent = (studentId: string, checked: boolean) => {
+        if (checked) {
+            setSelectedStudents(prev => [...prev, studentId]);
+        } else {
+            setSelectedStudents(prev => prev.filter(id => id !== studentId));
+        }
+    };
+
+    const handleBulkPayment = async (quarter: number, status: PaymentStatus) => {
+        if (selectedStudents.length === 0) return;
+        if (!confirm(`هل أنت متأكد من تحديث حالة المستحقات لـ ${selectedStudents.length} طالب للفصل ${quarter}؟`)) return;
+
+        setIsBulkProcessing(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        try {
+            for (const studentId of selectedStudents) {
+                const student = students.find(s => s.id === studentId);
+                if (!student) continue;
+
+                const tier = student.subscriptionTier || 'فئة الأصاغر';
+                const amount = prices[tier] || 0;
+                const monthOfQuarter = (quarter - 1) * 3;
+                const paymentDate = new Date(currentYear, monthOfQuarter, 1);
+
+                const existingPayment = (payments ?? []).find(p => p.date && p.studentId === studentId && getQuarter(parseISO(p.date)) === quarter && getYear(parseISO(p.date)) === currentYear);
+
+                try {
+                    if (existingPayment) {
+                        if (existingPayment.status === status) continue;
+                        await updatePaymentStatus(existingPayment.id, status, status === 'paid' ? amount : 0);
+                    } else {
+                        await addPayment({
+                            studentId: studentId,
+                            amount: status === 'paid' ? amount : 0,
+                            date: paymentDate.toISOString(),
+                            status: status,
+                        });
+                    }
+                    successCount++;
+                } catch (e) {
+                    failCount++;
+                }
+            }
+
+            toast({
+                title: "تم التنفيذ",
+                description: `تم تحديث ${successCount} سجل بنجاح. ${failCount > 0 ? `فشل ${failCount}.` : ''}`,
+                variant: failCount > 0 ? "destructive" : "default"
+            });
+            setSelectedStudents([]);
+
+        } catch (error) {
+            toast({
+                title: "خطأ",
+                description: "حدث خطأ أثناء المعالجة الجماعية.",
+                variant: 'destructive'
+            });
+        } finally {
+            setIsBulkProcessing(false);
+        }
+    };
 
     const handlePaymentAction = React.useCallback(async (student: Student, quarter: number, status: PaymentStatus) => {
         if (isSuperAdmin) return; // Only super_admin is read-only
@@ -267,7 +357,7 @@ export default function DuesPage() {
     const quarterNames: Record<string, string> = { '1': 'فصل 1', '2': 'فصل 2', '3': 'فصل 3', '4': 'فصل 4' };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <h1 className="text-3xl font-headline font-bold">المستحقات المالية الفصلية</h1>
                 <div className="flex items-center gap-2">
@@ -286,6 +376,60 @@ export default function DuesPage() {
                 </div>
             </div>
 
+            {/* Bulk Actions Floating Bar */}
+            {selectedStudents.length > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/90 dark:bg-white/10 text-white backdrop-blur-md px-6 py-4 rounded-2xl shadow-2xl flex flex-col md:flex-row items-center gap-4 z-50 border border-white/20 animate-in slide-in-from-bottom-5 w-[90%] max-w-4xl justify-between">
+                    <div className="flex items-center gap-3 border-l border-white/20 pl-4 ml-2">
+                        <span className="font-bold text-lg whitespace-nowrap">{selectedStudents.length} طالب محدد</span>
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedStudents([])} className="text-white/70 hover:text-white h-auto p-0 hover:bg-transparent">إلغاء</Button>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 justify-end w-full">
+                        <span className="text-sm opacity-70 hidden md:inline ml-2">إجراء جماعي:</span>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="secondary" disabled={isBulkProcessing} className="bg-emerald-500 hover:bg-emerald-600 text-white border-0">
+                                    {isBulkProcessing ? <Loader2 className="animate-spin ml-2 h-4 w-4" /> : <CheckCircle className="ml-2 h-4 w-4" />}
+                                    تسجيل دافع
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                {[1, 2, 3, 4].map(q => (
+                                    <DropdownMenuItem key={q} onClick={() => handleBulkPayment(q, 'paid')}>فصل {q}</DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="bg-transparent text-white border-white/30 hover:bg-white/10" disabled={isBulkProcessing}>
+                                    <FileX className="ml-2 h-4 w-4 text-sky-400" />
+                                    تسجيل إعفاء
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                {[1, 2, 3, 4].map(q => (
+                                    <DropdownMenuItem key={q} onClick={() => handleBulkPayment(q, 'exempted')}>فصل {q}</DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="text-rose-300 hover:bg-rose-900/40 hover:text-rose-200" disabled={isBulkProcessing}>
+                                    <Undo2 className="ml-2 h-4 w-4" />
+                                    إلغاء الدفع
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                {[1, 2, 3, 4].map(q => (
+                                    <DropdownMenuItem key={q} onClick={() => handleBulkPayment(q, 'unpaid')} className="text-rose-600">فصل {q}</DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </div>
+            )}
+
             <Card>
                 <CardHeader>
                     <CardTitle>أدوات الفلترة والبحث</CardTitle>
@@ -300,9 +444,16 @@ export default function DuesPage() {
                             className="pl-9"
                         />
                     </div>
+                    {/* Group Selector */}
+                    {(isSuperAdmin || isManagement) && (
+                        <div className="min-w-[200px]">
+                            <GroupSelector value={selectedGroup} onChange={setSelectedGroup} />
+                        </div>
+                    )}
+
                     <div className="flex gap-2">
                         <Select dir="rtl" value={quarterFilter} onValueChange={setQuarterFilter}>
-                            <SelectTrigger className="w-1/2"><SelectValue placeholder="اختر الفصل" /></SelectTrigger>
+                            <SelectTrigger className="w-1/2"><SelectValue placeholder="اختر الفلتر" /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">كل الفصول</SelectItem>
                                 <SelectItem value="1">فصل 1</SelectItem>
@@ -330,7 +481,7 @@ export default function DuesPage() {
                 </CardContent>
             </Card>
 
-            <Card>
+            <Card className="mb-24">
                 <CardHeader>
                     <CardTitle>سجل الدفعات لسنة {currentYear}</CardTitle>
                     <CardDescription>
@@ -342,6 +493,13 @@ export default function DuesPage() {
                         <Table className="min-w-full">
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-[50px]">
+                                        <Checkbox
+                                            checked={filteredStudents.length > 0 && selectedStudents.length === filteredStudents.length}
+                                            onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                                            className="translate-y-[2px]"
+                                        />
+                                    </TableHead>
                                     <TableHead className="w-1/4">اسم الطالب</TableHead>
                                     {(isSuperAdmin || isManagement) && <TableHead>الفوج</TableHead>}
                                     <TableHead>الحالة</TableHead>
@@ -359,10 +517,12 @@ export default function DuesPage() {
                                         isManagement={isManagement}
                                         prices={prices}
                                         onPaymentAction={handlePaymentAction}
+                                        isSelected={selectedStudents.includes(student.id)}
+                                        onSelect={(checked) => handleSelectStudent(student.id, checked)}
                                     />
                                 )) : (
                                     <TableRow>
-                                        <TableCell colSpan={(isSuperAdmin || isManagement) ? 8 : 7} className="h-24 text-center">
+                                        <TableCell colSpan={(isSuperAdmin || isManagement) ? 9 : 8} className="h-24 text-center">
                                             لا يوجد طلبة مطابقون لخيارات البحث الحالية.
                                         </TableCell>
                                     </TableRow>
@@ -370,7 +530,7 @@ export default function DuesPage() {
                             </TableBody>
                             <TableFooter>
                                 <TableRow className="bg-muted/30">
-                                    <TableCell colSpan={(isSuperAdmin || isManagement) ? 4 : 3} className="font-semibold">حقوق التسجيل الإجمالية للفصل</TableCell>
+                                    <TableCell colSpan={(isSuperAdmin || isManagement) ? 5 : 4} className="font-semibold">حقوق التسجيل الإجمالية للفصل</TableCell>
                                     {[1, 2, 3, 4].map(q => (
                                         <TableCell key={`reg-fee-${q}`} className="text-center p-1">
                                             <Input
@@ -385,7 +545,7 @@ export default function DuesPage() {
                                     <TableCell></TableCell>
                                 </TableRow>
                                 <TableRow className="bg-amber-100 dark:bg-amber-800/20 font-bold text-base border-t-2 border-amber-300">
-                                    <TableCell colSpan={(isSuperAdmin || isManagement) ? 4 : 3}>الإجمالي النهائي للفصل</TableCell>
+                                    <TableCell colSpan={(isSuperAdmin || isManagement) ? 5 : 4}>الإجمالي النهائي للفصل</TableCell>
                                     {[1, 2, 3, 4].map(q => (
                                         <TableCell key={`total-footer-${q}`} className="text-center text-lg text-amber-800 dark:text-amber-200 transition-colors">
                                             {totalsByQuarter[q].revenue.toLocaleString()} د.ج
@@ -407,16 +567,23 @@ const PaymentRow = React.memo(({
     student,
     isSuperAdmin,
     prices,
-    onPaymentAction
+    onPaymentAction,
+    isSelected,
+    onSelect
 }: {
     student: any,
     isSuperAdmin: boolean,
     isManagement: boolean,
     prices: any,
-    onPaymentAction: (s: any, q: number, st: PaymentStatus) => void
+    onPaymentAction: (s: any, q: number, st: PaymentStatus) => void,
+    isSelected: boolean,
+    onSelect: (checked: boolean) => void
 }) => {
     return (
-        <TableRow className={cn(student.status === 'مطرود' && 'opacity-50 hover:opacity-70 transition-opacity')}>
+        <TableRow className={cn(student.status === 'مطرود' && 'opacity-50 hover:opacity-70 transition-opacity', isSelected && 'bg-blue-50 dark:bg-blue-900/10')}>
+            <TableCell>
+                <Checkbox checked={isSelected} onCheckedChange={(c) => onSelect(c as boolean)} className="translate-y-[2px]" />
+            </TableCell>
             <TableCell className="font-bold text-slate-700 dark:text-slate-200 py-4">{student.fullName}</TableCell>
             {isSuperAdmin && <TableCell><Badge variant="outline" className="font-medium">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
             <TableCell>
@@ -465,7 +632,7 @@ const PaymentRow = React.memo(({
                                             إضافة
                                         </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="center" className="w-48">
+                                    <DropdownMenuContent align="end" className="w-48">
                                         <DropdownMenuItem onSelect={() => onPaymentAction(student, q, 'paid')} className="cursor-pointer">
                                             <CheckCircle className="ml-2 h-4 w-4 text-emerald-500" />
                                             <span className="font-medium">تأكيد الدفع ({prices[student.subscriptionTier || 'فئة الأصاغر']} د.ج)</span>
@@ -499,7 +666,3 @@ const PaymentRow = React.memo(({
 });
 
 PaymentRow.displayName = 'PaymentRow';
-
-
-
-

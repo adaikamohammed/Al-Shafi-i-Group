@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -54,6 +55,14 @@ export default function ProfilePage() {
         joinDate: '',
         birthDate: '',
         quranCompletedDate: '',
+        notificationEmail: '',
+        emailPreferences: {
+            weeklyReport: true,
+            absenceAlerts: true,
+            adminBroadcasts: true,
+            financialUpdates: true,
+            newStudents: true
+        }
     });
 
     const [educationTimeline, setEducationTimeline] = useState<EducationEvent[]>([]);
@@ -138,6 +147,14 @@ export default function ProfilePage() {
                 joinDate: user.joinDate || '',
                 birthDate: user.birthDate || '',
                 quranCompletedDate: user.quranCompletedDate || '',
+                notificationEmail: user.notificationEmail || user.email || '',
+                emailPreferences: user.emailPreferences || {
+                    weeklyReport: true,
+                    absenceAlerts: true,
+                    adminBroadcasts: true,
+                    financialUpdates: true,
+                    newStudents: true
+                }
             });
             setEducationTimeline(user.educationTimeline || []);
             setAdminNotes(user.adminNotes || '');
@@ -218,6 +235,20 @@ export default function ProfilePage() {
             };
         };
         reader.readAsDataURL(file);
+    };
+
+    const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData(prev => ({ ...prev, notificationEmail: e.target.value }));
+    };
+
+    const handlePreferenceChange = (key: keyof typeof formData.emailPreferences, checked: boolean) => {
+        setFormData(prev => ({
+            ...prev,
+            emailPreferences: {
+                ...prev.emailPreferences,
+                [key]: checked
+            }
+        }));
     };
 
     const handleSaveChanges = async () => {
@@ -422,6 +453,53 @@ export default function ProfilePage() {
                                         <div className="space-y-2">
                                             <Label className="font-bold text-xs">الإجازات العلمية</Label>
                                             <Textarea className="rounded-xl bg-muted/20 min-h-[100px]" value={formData.certifications} onChange={(e) => handleInputChange(e, 'certifications')} placeholder="قائمة الإجازات..." />
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Email Notifications Card */}
+                                <Card className="rounded-[1.5rem] border-none shadow-sm overflow-hidden bg-white/50 backdrop-blur-sm">
+                                    <CardHeader>
+                                        <CardTitle className="text-xl font-headline flex items-center gap-2">
+                                            <Mail className="h-5 w-5 text-primary" />
+                                            إشعارات البريد الإلكتروني
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label className="font-bold text-xs">البريد الإلكتروني المفضل</Label>
+                                            <Input
+                                                className="rounded-xl border-muted bg-white/50"
+                                                value={formData.notificationEmail}
+                                                onChange={handleEmailChange}
+                                                placeholder="example@gmail.com"
+                                                dir="ltr"
+                                            />
+                                            <p className="text-[10px] text-muted-foreground">سنستخدم هذا البريد لإرسال التقارير والتنبيهات.</p>
+                                        </div>
+                                        <Separator />
+                                        <div className="space-y-3">
+                                            <Label className="font-bold text-xs block mb-2">تخصيص الإشعارات</Label>
+
+                                            <div className="flex items-center space-x-2 space-x-reverse">
+                                                <Checkbox id="pref-weekly" checked={formData.emailPreferences?.weeklyReport ?? true} onCheckedChange={(c) => handlePreferenceChange('weeklyReport', c as boolean)} />
+                                                <Label htmlFor="pref-weekly" className="text-sm cursor-pointer">التقرير الأسبوعي (الجمعة)</Label>
+                                            </div>
+
+                                            <div className="flex items-center space-x-2 space-x-reverse">
+                                                <Checkbox id="pref-absence" checked={formData.emailPreferences?.absenceAlerts ?? true} onCheckedChange={(c) => handlePreferenceChange('absenceAlerts', c as boolean)} />
+                                                <Label htmlFor="pref-absence" className="text-sm cursor-pointer">تنبيهات الغياب الفوري</Label>
+                                            </div>
+
+                                            <div className="flex items-center space-x-2 space-x-reverse">
+                                                <Checkbox id="pref-financial" checked={formData.emailPreferences?.financialUpdates ?? true} onCheckedChange={(c) => handlePreferenceChange('financialUpdates', c as boolean)} />
+                                                <Label htmlFor="pref-financial" className="text-sm cursor-pointer">نشرة المستحقات الشهرية</Label>
+                                            </div>
+
+                                            <div className="flex items-center space-x-2 space-x-reverse">
+                                                <Checkbox id="pref-admin" checked={formData.emailPreferences?.adminBroadcasts ?? true} onCheckedChange={(c) => handlePreferenceChange('adminBroadcasts', c as boolean)} />
+                                                <Label htmlFor="pref-admin" className="text-sm cursor-pointer">تعاميم الإدارة</Label>
+                                            </div>
                                         </div>
                                     </CardContent>
                                 </Card>
