@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { messaging } from '@/lib/firebase';
 import { getToken, onMessage } from 'firebase/messaging';
 import { useAuth } from '@/context/AuthContext';
-import { ref, update, arrayUnion, remove } from 'firebase/database';
+import { ref, update, get, remove } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 
@@ -79,9 +79,16 @@ export const useFCM = () => {
 
                         // Save token to user profile (with error handling)
                         try {
-                            await update(ref(db, `users/${user.uid}`), {
-                                fcmTokens: arrayUnion(currentToken)
-                            });
+                            const userRef = ref(db, `users/${user.uid}/profile`);
+                            const snapshot = await get(userRef);
+                            const profile = snapshot.val() || {};
+                            const currentTokens = profile.fcmTokens || [];
+
+                            if (!currentTokens.includes(currentToken)) {
+                                await update(userRef, {
+                                    fcmTokens: [...currentTokens, currentToken]
+                                });
+                            }
                         } catch (dbError: any) {
                             console.error('Failed to save FCM token to database:', dbError);
                             // Don't show error to user - token is still valid locally

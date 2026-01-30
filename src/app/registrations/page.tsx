@@ -76,7 +76,14 @@ const SHEIKHS_LIST = [
     { id: 6, name: "الشيخ سفيان نصيرة", email: "admin6@gmail.com", group: "فوج الشيخ سفيان نصيرة" },
     { id: 7, name: "الشيخ محمد منصور", email: "admin7@gmail.com", group: "فوج الشيخ محمد منصور" },
     { id: 8, name: "الشيخ عبد الحق نصيرة", email: "admin8@gmail.com", group: "فوج الشيخ عبد الحق نصيرة" },
-    { id: 9, name: "الشيخ صهيب نصيب", email: "admin9@gmail.com", group: "فوج الشيخ صهيب نصيب" }
+    { id: 9, name: "الشيخ صهيب نصيب", email: "admin9@gmail.com", group: "فوج الشيخ صهيب نصيب" },
+    { id: 10, name: "الأستاذة سعيدة", email: "admin10@gmail.com", group: "فوج 10" },
+    { id: 11, name: "الأستاذة سميرة", email: "admin11@gmail.com", group: "فوج 11" },
+    { id: 12, name: "الأستاذة رقية", email: "admin12@gmail.com", group: "فوج 12" },
+    { id: 13, name: "الأستاذة ثريا", email: "admin13@gmail.com", group: "فوج 13" },
+    { id: 14, name: "الأستاذة أميرة", email: "admin14@gmail.com", group: "فوج 14" },
+    { id: 15, name: "الأستاذة زينب", email: "admin15@gmail.com", group: "فوج 15" },
+    { id: 16, name: "الأستاذة جهاد", email: "admin16@gmail.com", group: "فوج 16" }
 ];
 
 

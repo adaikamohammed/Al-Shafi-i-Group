@@ -149,7 +149,9 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
 
                 <section className="avoid-break">
                     <Card className="bg-white shadow-none border border-gray-300">
-                        <CardHeader><CardTitle className="text-lg text-gray-800">ملاحظات وتوصيات الشيخ</CardTitle></CardHeader>
+                        <CardHeader><CardTitle className="text-lg text-gray-800">
+                            ملاحظات وتوصيات {(user?.displayName?.includes("الأستاذة") || user?.displayName?.includes("أستاذة")) ? "الأستاذة" : "الشيخ"}
+                        </CardTitle></CardHeader>
                         <CardContent className="min-h-[100px]">
                             {reportData.autoNote && <p className="whitespace-pre-wrap text-sm font-bold mb-2 p-2 bg-amber-100 text-amber-800 rounded-md">التوصية الآلية: {reportData.autoNote}</p>}
                             <p className="whitespace-pre-wrap text-sm">{teacherNote ? teacherNote : (reportData.autoNote ? '' : 'لا توجد ملاحظات إضافية.')}</p>
@@ -159,7 +161,7 @@ export function ReportDisplay({ reportData, user, teacherNote }: ReportDisplayPr
 
                 <footer className="pt-12 text-center text-xs text-gray-500">
                     <div className="flex justify-between items-end">
-                        <div className="w-1/3"><p>.........................</p><p className="font-semibold">توقيع الشيخ</p></div>
+                        <div className="w-1/3"><p>.........................</p><p className="font-semibold">توقيع {(user?.displayName?.includes("الأستاذة") || user?.displayName?.includes("أستاذة")) ? "الأستاذة" : "الشيخ"}</p></div>
                         <div className="w-1/3"><p>.........................</p><p className="font-semibold">توقيع ولي الأمر</p></div>
                         <div className="w-1/3"><p>.........................</p><p className="font-semibold">توقيع الإدارة</p></div>
                     </div>

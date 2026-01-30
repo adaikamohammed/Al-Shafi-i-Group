@@ -76,7 +76,7 @@ export const TransferDialog = ({ student, open, onOpenChange }: TransferDialogPr
                         نقل الطالب: {student.fullName}
                     </DialogTitle>
                     <DialogDescription>
-                        يمكنك نقل الطالب إلى فوج شيخ آخر. سيتم نقل كافة بيانات الطالب وسجلاته بشكل تلقائي.
+                        يمكنك نقل الطالب إلى فوج أستاذ(ة) أو شيخ آخر. سيتم نقل كافة بيانات الطالب وسجلاته بشكل تلقائي.
                     </DialogDescription>
                 </DialogHeader>
 

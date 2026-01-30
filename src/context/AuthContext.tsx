@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -30,6 +28,13 @@ const sheikhInitialData: { [email: string]: { name: string; group: string; role:
   "admin7@gmail.com": { name: "الشيخ محمد منصور", group: "فوج 7", role: "sheikh" },
   "admin8@gmail.com": { name: "الشيخ عبد الحق نصيرة", group: "فوج 8", role: "sheikh" },
   "admin9@gmail.com": { name: "الشيخ صهيب نصيب", group: "فوج 9", role: "sheikh" },
+  "admin10@gmail.com": { name: "الأستاذة سعيدة", group: "فوج 10", role: "sheikh" },
+  "admin11@gmail.com": { name: "الأستاذة سميرة", group: "فوج 11", role: "sheikh" },
+  "admin12@gmail.com": { name: "الأستاذة رقية", group: "فوج 12", role: "sheikh" },
+  "admin13@gmail.com": { name: "الأستاذة ثريا", group: "فوج 13", role: "sheikh" },
+  "admin14@gmail.com": { name: "الأستاذة أميرة", group: "فوج 14", role: "sheikh" },
+  "admin15@gmail.com": { name: "الأستاذة زينب", group: "فوج 15", role: "sheikh" },
+  "admin16@gmail.com": { name: "الأستاذة جهاد", group: "فوج 16", role: "sheikh" },
 };
 
 export interface UpdateProfileData extends Partial<AppUser> {
@@ -68,7 +73,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         let appUser: AppUser;
         if (snapshot.exists()) {
-          const profileData = snapshot.val();
+          let profileData = snapshot.val();
+
+          // Sync logic for accounts with default values
+          const email = currentUser.email || '';
+          if (sheikhInitialData[email] && (profileData.group === 'فوج غير محدد' || !profileData.group || profileData.displayName === 'مستخدم جديد')) {
+            const info = sheikhInitialData[email];
+            const updates = {
+              displayName: info.name,
+              group: info.group,
+              role: info.role
+            };
+            await update(ref(db, `users/${currentUser.uid}/profile`), updates);
+            profileData = { ...profileData, ...updates };
+            if (currentUser.displayName !== info.name) {
+              await updateProfile(currentUser, { displayName: info.name });
+            }
+          }
+
           appUser = {
             uid: currentUser.uid,
             email: currentUser.email,
@@ -204,9 +226,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (wasPhotoUploaded || wasBackgroundUploaded) {
+        const userName = profileData.displayName || user?.displayName || "";
+        const prefix = userName.includes("الأستاذة") ? "يا أستاذة" : "يا شيخ";
         toast({
           title: `✅ تم تحديث الصور`,
-          description: `تم تحديث ملفك بنجاح يا شيخ ${profileData.displayName || user?.displayName}.`,
+          description: `تم تحديث ملفك بنجاح ${prefix} ${userName}.`,
         });
       }
 

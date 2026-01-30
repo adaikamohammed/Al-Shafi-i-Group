@@ -12,7 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { format, parseISO, getMonth, getYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, MoreVertical, Edit, Trash2, Eye, CheckCircle, Pin, PinOff } from 'lucide-react';
+import { Loader2, Save, MoreVertical, Edit, Trash2, Eye, CheckCircle, Pin, PinOff, Calendar } from 'lucide-react';
 import type { DailyReport } from '@/lib/types';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';

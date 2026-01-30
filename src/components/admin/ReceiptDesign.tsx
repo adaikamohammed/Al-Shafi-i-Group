@@ -53,7 +53,7 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
                         <span className="receipt-field-value text-black">{studentName || '......'}</span>
                     </div>
                     <div className="receipt-field">
-                        <span className="receipt-field-label text-black text-[13px]">المجموعة / الشيخ</span>
+                        <span className="receipt-field-label text-black text-[13px]">المجموعة / الأستاذ(ة)</span>
                         <span className="receipt-field-value text-black">{sheikhName || '......'}</span>
                     </div>
                     <div className="receipt-field col-span-2">

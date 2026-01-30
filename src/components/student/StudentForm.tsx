@@ -67,6 +67,7 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
         { value: "فوج الشيخ محمد منصور", label: "فوج الشيخ محمد منصور" },
         { value: "فوج الشيخ عبد الحق نصيرة", label: "فوج الشيخ عبد الحق نصيرة" },
         { value: "فوج الشيخ صهيب نصيب", label: "فوج الشيخ صهيب نصيب" },
+        { value: "فوج الأستاذة سعيدة", label: "فوج الأستاذة سعيدة" },
     ];
 
     useEffect(() => {

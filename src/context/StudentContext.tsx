@@ -1178,6 +1178,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         { name: "الشيخ محمد منصور", group: "فوج 7", email: "admin7@gmail.com" },
         { name: "الشيخ عبد الحق نصيرة", group: "فوج 8", email: "admin8@gmail.com" },
         { name: "الشيخ صهيب نصيب", group: "فوج 9", email: "admin9@gmail.com" },
+        { name: "الأستاذة سعيدة", group: "فوج 10", email: "admin10@gmail.com" },
+        { name: "الأستاذة سميرة", group: "فوج 11", email: "admin11@gmail.com" },
+        { name: "الأستاذة رقية", group: "فوج 12", email: "admin12@gmail.com" },
+        { name: "الأستاذة ثريا", group: "فوج 13", email: "admin13@gmail.com" },
+        { name: "الأستاذة أميرة", group: "فوج 14", email: "admin14@gmail.com" },
+        { name: "الأستاذة زينب", group: "فوج 15", email: "admin15@gmail.com" },
+        { name: "الأستاذة جهاد", group: "فوج 16", email: "admin16@gmail.com" },
       ];
 
       const updates: any = {};
