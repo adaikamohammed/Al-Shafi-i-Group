@@ -21,7 +21,9 @@ import {
     MoonStar,
     Activity,
     MessageSquare,
-    Sparkles
+    Sparkles,
+    Mail,
+    Bell
 } from 'lucide-react';
 
 export interface NavItem {
@@ -55,6 +57,7 @@ export const NAV_GROUPS: NavGroup[] = [
             { href: '/yearly-performance', label: 'الأداء السنوي', icon: BarChart3 },
             { href: '/reports/student', label: 'تقارير الطلاب', icon: FileText },
             { href: '/parent-communication', label: 'قناة التواصل', icon: MessageSquare },
+            { href: '/notifications', label: 'مركز الإشعارات', icon: Bell },
         ]
     },
     {
@@ -70,6 +73,7 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'النافذة الإدارية',
         items: [
             { href: '/management/monitoring', label: 'نظام المراقبة', icon: BarChart3, primary: true },
+            { href: '/admin/notifications', label: 'الإشعارات البريدية', icon: Mail },
             { href: '/occasions', label: 'المناسبات الدينية', icon: MoonStar },
             { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus },
             { href: '/meetings', label: 'الاجتماعات', icon: Calendar },

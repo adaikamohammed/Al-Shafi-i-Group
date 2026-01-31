@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>التقرير الأسبوعي</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+            direction: rtl;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .greeting {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .section {
+            margin-bottom: 25px;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #059669;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #059669;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #f0fdf4;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #059669;
+            display: block;
+        }
+        .stat-label {
+            font-size: 13px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .student-list {
+            list-style: none;
+        }
+        .student-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #f9fafb;
+            border-radius: 6px;
+            border-right: 3px solid #10b981;
+        }
+        .alert-list {
+            list-style: none;
+        }
+        .alert-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #fef2f2;
+            border-radius: 6px;
+            border-right: 3px solid #ef4444;
+        }
+        .footer {
+            background: #f9fafb;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 13px;
+        }
+        .footer-logo {
+            color: #059669;
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 التقرير الأسبوعي</h1>
+            <p>{{dateRange}}</p>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                السلام عليكم ورحمة الله وبركاته<br>
+                الشيخ الفاضل/ {{sheikhName}}
+            </div>
+            
+            <p style="margin-bottom: 20px; color: #666;">
+                نتشرف بإرسال التقرير الأسبوعي لفوج <strong>{{groupName}}</strong>
+            </p>
+            
+            <div class="section">
+                <div class="section-title">📈 ملخص الأسبوع</div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-value">{{sessionCount}}</span>
+                        <span class="stat-label">عدد الحصص</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">{{attendanceRate}}%</span>
+                        <span class="stat-label">معدل الحضور</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">{{activeStudents}}</span>
+                        <span class="stat-label">الطلاب النشطون</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">{{averageVerses}}</span>
+                        <span class="stat-label">متوسط الحفظ (آية)</span>
+                    </div>
+                </div>
+            </div>
+            
+            {{#if topStudents.length}}
+            <div class="section">
+                <div class="section-title">⭐ الطلاب المتميزون</div>
+                <ul class="student-list">
+                    {{#each topStudents}}
+                    <li class="student-item">
+                        {{name}} - حضور {{attendance}}%، حفظ {{verses}} آية
+                    </li>
+                    {{/each}}
+                </ul>
+            </div>
+            {{/if}}
+            
+            {{#if needsAttention.length}}
+            <div class="section">
+                <div class="section-title">⚠️ يحتاجون متابعة</div>
+                <ul class="alert-list">
+                    {{#each needsAttention}}
+                    <li class="alert-item">
+                        {{name}} - {{reason}}
+                    </li>
+                    {{/each}}
+                </ul>
+            </div>
+            {{/if}}
+        </div>
+        
+        <div class="footer">
+            <div class="footer-logo">المدرسة القرآنية للإمام الشافعي</div>
+            <p>نسأل الله التوفيق والسداد</p>
+        </div>
+    </div>
+</body>
+</html>

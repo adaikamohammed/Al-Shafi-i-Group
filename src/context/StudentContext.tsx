@@ -3,12 +3,12 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry, AdminLog, ActivityLog, Meeting, MeetingSuggestion } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry, AdminLog, ActivityLog, Meeting, MeetingSuggestion, InternalNotification } from '@/lib/types';
 import { isWithinInterval, parseISO, isValid, isAfter, subDays } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { db, storage } from '@/lib/firebase';
-import { ref, set, onValue, off, remove, DatabaseReference, update, get } from 'firebase/database';
+import { ref, set, push, onValue, off, remove, DatabaseReference, update, get } from 'firebase/database';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
 import { sanitizeData } from '@/lib/utils';
@@ -103,8 +103,10 @@ interface StudentContextType {
   bulkUpdateStudents: (updates: Record<string, Partial<Student>>) => Promise<void>;
   saveMeeting: (meetingData: Partial<Meeting>, meetingIdToUpdate?: string) => Promise<void>;
   deleteMeeting: (meetingId: string) => Promise<void>;
-  addMeetingSuggestion: (meetingId: string, suggestion: Omit<MeetingSuggestion, 'id' | 'timestamp'>) => Promise<void>;
   deleteMeetingSuggestion: (meetingId: string, suggestionId: string) => Promise<void>;
+  internalNotifications: InternalNotification[];
+  addInternalNotification: (recipientId: string, title: string, message: string, type: InternalNotification['type'], metadata?: any) => Promise<void>;
+  markNotificationAsRead: (notificationId: string) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -123,6 +125,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [adminLogs, setAdminLogs] = useState<AdminLog[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [internalNotifications, setInternalNotifications] = useState<InternalNotification[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
 
@@ -153,6 +156,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setAdminLogs([]);
       setActivityLogs([]);
       setMeetings([]);
+      setInternalNotifications([]);
       return;
     }
 
@@ -168,6 +172,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     let globalLogsListener: (() => void) | null = null;
     let meetingsRef: DatabaseReference | null = null;
     let meetingsListener: (() => void) | null = null;
+    let notificationsRef: DatabaseReference | null = null;
+    let notificationsListener: (() => void) | null = null;
 
     let accumulatedUserLogs: Record<string, ActivityLog> = {};
     let accumulatedGlobalLogs: Record<string, ActivityLog> = {};
@@ -251,12 +257,20 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             }
 
             if (userData.dailySessions) {
+              const userSessionCount = Object.keys(userData.dailySessions).length;
+              console.log(`  📅 User ${userData.profile?.displayName || uid} has ${userSessionCount} date(s) with sessions`);
+
               for (const date in userData.dailySessions) {
                 if (!allSessions[date]) allSessions[date] = {};
+                const sessionsOnDate = Object.keys(userData.dailySessions[date]).length;
+                console.log(`    - ${date}: ${sessionsOnDate} session(s)`);
+
                 Object.entries(userData.dailySessions[date]).forEach(([sessionId, session]: [string, any]) => {
                   allSessions[date][sessionId] = { ...session, ownerId: uid };
                 });
               }
+            } else {
+              console.log(`  📅 User ${userData.profile?.displayName || uid} has NO sessions`);
             }
             if (userData.dailyReports) {
               for (const date in userData.dailyReports) {
@@ -282,6 +296,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
           console.log('✅ Total students aggregated:', allStudents.length);
           console.log('✅ Total sessions aggregated:', Object.keys(allSessions).length);
+
+          // 🔍 DIAGNOSTIC: Log session details for debugging
+          console.log('📊 Session Details by Date:');
+          Object.entries(allSessions).forEach(([date, sessions]) => {
+            const sessionCount = Object.keys(sessions).length;
+            const owners = [...new Set(Object.values(sessions).map((s: any) => s.ownerId))];
+            console.log(`  ${date}: ${sessionCount} session(s), owners: ${owners.join(', ')}`);
+          });
 
           setStudents(allStudents);
           setDailySessions(allSessions);
@@ -391,12 +413,24 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setMeetings(meetingsArray);
     });
 
+    // 6. Internal Notifications Listener
+    notificationsRef = ref(db, `users/${authContextUser.uid}/notifications`);
+    notificationsListener = onValue(notificationsRef, (snapshot) => {
+      const data = snapshot.val();
+      const notificationsArray = data ? Object.entries(data).map(([id, n]: [string, any]) => ({
+        id,
+        ...n
+      })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) : [];
+      setInternalNotifications(notificationsArray);
+    });
+
     return () => {
       if (allUsersRef && allUsersListener) off(allUsersRef, 'value', allUsersListener);
       if (preRegsRef && preRegsListener) off(preRegsRef, 'value', preRegsListener);
       if (globalLogsRef && globalLogsListener) off(globalLogsRef, 'value', globalLogsListener);
       if (dataRef && dataListener) off(dataRef, 'value', dataListener);
       if (meetingsRef && meetingsListener) off(meetingsRef, 'value', meetingsListener);
+      if (notificationsRef && notificationsListener) off(notificationsRef, 'value', notificationsListener);
     };
   }, [authContextUser, authLoading, isSuperAdmin, isManagement]);
 
@@ -1501,6 +1535,37 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const addInternalNotification = async (recipientId: string, title: string, message: string, type: InternalNotification['type'], metadata?: any) => {
+    if (!authContextUser) return;
+    try {
+      const notificationRef = ref(db, `users/${recipientId}/notifications`);
+      const newNotificationRef = push(notificationRef);
+      const notification: Omit<InternalNotification, 'id'> = {
+        title,
+        message,
+        type,
+        senderId: authContextUser.uid,
+        timestamp: new Date().toISOString(),
+        read: false,
+        metadata
+      };
+      await set(newNotificationRef, notification);
+    } catch (error) {
+      console.error("Error adding internal notification:", error);
+      throw error;
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    if (!authContextUser) return;
+    try {
+      const notificationRef = ref(db, `users/${authContextUser.uid}/notifications/${notificationId}`);
+      await update(notificationRef, { read: true });
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
+  };
+
   const bulkUpdateStudents = async (updates: Record<string, Partial<Student>>) => {
     if (!authContextUser) return;
     try {
@@ -1602,12 +1667,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         await update(meetingRef, dataToSave);
         toast({ title: '✅ تم حفظ الاجتماع' });
       },
-      deleteMeeting: async (meetingId) => {
-        if (!authContextUser || (!isSuperAdmin && !isManagement)) return;
-        const meetingRef = ref(db, `meetings/${meetingId}`);
-        await remove(meetingRef);
-        toast({ title: '🗑️ تم حذف الاجتماع' });
-      },
       addMeetingSuggestion: async (meetingId, suggestion) => {
         if (!authContextUser) return;
         const id = uuidv4();
@@ -1618,13 +1677,22 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         });
         toast({ title: '✅ تم إرسال المقترح' });
       },
+      deleteMeeting: async (meetingId) => {
+        if (!authContextUser || (!isSuperAdmin && !isManagement)) return;
+        const meetingRef = ref(db, `meetings/${meetingId}`);
+        await remove(meetingRef);
+        toast({ title: '🗑️ تم حذف الاجتماع' });
+      },
       deleteMeetingSuggestion: async (meetingId, suggestionId) => {
         if (!authContextUser || (!isSuperAdmin && !isManagement)) return;
         const suggestionRef = ref(db, `meetings/${meetingId}/suggestions/${suggestionId}`);
         await remove(suggestionRef);
         toast({ title: '🗑️ تم حذف المقترح' });
       },
-      meetings
+      meetings,
+      internalNotifications,
+      addInternalNotification,
+      markNotificationAsRead
     }}>
       {children}
     </StudentContext.Provider>

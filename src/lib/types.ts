@@ -203,6 +203,17 @@ export interface EducationEvent {
   notes?: string;
 }
 
+export interface InternalNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'weekly_report' | 'monthly_report' | 'absence_alert' | 'achievement_newsletter' | 'payment_reminder' | 'admin_broadcast';
+  senderId: string;
+  timestamp: string;
+  read: boolean;
+  metadata?: any;
+}
+
 export interface StudentStat extends Partial<SessionRecord> {
   date: string;
   sessionType: string;
@@ -369,4 +380,40 @@ export interface SiteUpdate {
   authorId: string;
   authorName: string;
   version?: string;
+}
+
+// ===== Email Notification System =====
+export type EmailNotificationStatus = 'pending' | 'reviewed' | 'scheduled' | 'sent' | 'failed';
+
+export type EmailNotificationType =
+  | 'weekly_report'
+  | 'monthly_report'
+  | 'absence_alert'
+  | 'achievement_newsletter'
+  | 'payment_reminder';
+
+export interface EmailNotification {
+  id: string;
+  type: EmailNotificationType;
+  recipientId: string; // Sheikh UID
+  recipientEmail: string;
+  recipientName: string;
+  subject: string;
+  body: string; // HTML content
+  status: EmailNotificationStatus;
+  scheduledFor?: string; // ISO date string
+  sentAt?: string;
+  createdAt: string;
+  createdBy: string; // Admin UID
+  lastModifiedAt?: string;
+  lastModifiedBy?: string;
+  errorMessage?: string;
+}
+
+export interface EmailPreferences {
+  weeklyReport: boolean;
+  monthlyReport: boolean;
+  absenceAlerts: boolean;
+  achievementNews: boolean;
+  paymentReminders: boolean;
 }
