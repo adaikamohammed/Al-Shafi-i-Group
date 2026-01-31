@@ -184,14 +184,6 @@ export interface AppUser {
   educationTimeline?: EducationEvent[];
   portalTheme?: string;
   fcmTokens?: string[];
-  notificationEmail?: string;
-  emailPreferences?: {
-    weeklyReport?: boolean;
-    absenceAlerts?: boolean;
-    adminBroadcasts?: boolean;
-    financialUpdates?: boolean;
-    newStudents?: boolean;
-  };
 }
 
 export interface EducationEvent {
@@ -382,38 +374,3 @@ export interface SiteUpdate {
   version?: string;
 }
 
-// ===== Email Notification System =====
-export type EmailNotificationStatus = 'pending' | 'reviewed' | 'scheduled' | 'sent' | 'failed';
-
-export type EmailNotificationType =
-  | 'weekly_report'
-  | 'monthly_report'
-  | 'absence_alert'
-  | 'achievement_newsletter'
-  | 'payment_reminder';
-
-export interface EmailNotification {
-  id: string;
-  type: EmailNotificationType;
-  recipientId: string; // Sheikh UID
-  recipientEmail: string;
-  recipientName: string;
-  subject: string;
-  body: string; // HTML content
-  status: EmailNotificationStatus;
-  scheduledFor?: string; // ISO date string
-  sentAt?: string;
-  createdAt: string;
-  createdBy: string; // Admin UID
-  lastModifiedAt?: string;
-  lastModifiedBy?: string;
-  errorMessage?: string;
-}
-
-export interface EmailPreferences {
-  weeklyReport: boolean;
-  monthlyReport: boolean;
-  absenceAlerts: boolean;
-  achievementNews: boolean;
-  paymentReminders: boolean;
-}
