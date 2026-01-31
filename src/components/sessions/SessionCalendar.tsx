@@ -114,7 +114,7 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                                     e.stopPropagation();
                                     onDayClick(day, session.sessionNumber as 1 | 2);
                                 }}
-                                className="flex items-center text-[10px] font-bold text-muted-foreground bg-white/50 hover:bg-white/80 border border-transparent hover:border-primary/20 rounded-md px-1 py-0.5 truncate transition-colors"
+                                className="flex items-center justify-center text-xs font-bold text-muted-foreground bg-white/60 hover:bg-white/90 border border-transparent hover:border-primary/30 rounded-lg px-2 py-1.5 truncate transition-all cursor-pointer shadow-sm hover:shadow-md"
                             >
                                 {session.sessionType === 'حصة أساسية' ? `حصة ${session.sessionNumber}` : session.sessionType}
                             </div>

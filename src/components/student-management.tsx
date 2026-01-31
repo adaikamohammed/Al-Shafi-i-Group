@@ -116,7 +116,12 @@ export default function StudentManagement() {
 
         // Management Filter
         if (isManagement && selectedGroup !== 'all') {
-            sortableStudents = sortableStudents.filter(s => s.ownerId === selectedGroup);
+            const selectedUser = allUsers.find(u => u.uid === selectedGroup);
+            if (selectedUser?.group) {
+                sortableStudents = sortableStudents.filter(s => s.groupName?.trim() === selectedUser.group?.trim());
+            } else {
+                sortableStudents = sortableStudents.filter(s => s.ownerId === selectedGroup);
+            }
         }
         sortableStudents = sortableStudents.filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
         if (statusFilter !== 'all') sortableStudents = sortableStudents.filter(s => s.status === statusFilter);
@@ -138,15 +143,20 @@ export default function StudentManagement() {
             return 0;
         });
         return sortableStudents;
-    }, [students, searchTerm, statusFilter, levelFilter, user, isSuperAdmin, isManagement, selectedGroup, sortConfig]);
+    }, [students, searchTerm, statusFilter, levelFilter, user, isSuperAdmin, isManagement, selectedGroup, sortConfig, allUsers]);
 
     const allStudents = useMemo(() => {
         let list = isSuperAdmin || isManagement ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
         if (isManagement && selectedGroup !== 'all') {
-            list = list.filter(s => s.ownerId === selectedGroup);
+            const selectedUser = allUsers.find(u => u.uid === selectedGroup);
+            if (selectedUser?.group) {
+                list = list.filter(s => s.groupName?.trim() === selectedUser.group?.trim());
+            } else {
+                list = list.filter(s => s.ownerId === selectedGroup);
+            }
         }
         return list;
-    }, [students, user, isSuperAdmin, isManagement, selectedGroup]);
+    }, [students, user, isSuperAdmin, isManagement, selectedGroup, allUsers]);
 
     const transferredOutCount = useMemo(() => {
         const currentGroupUid = (isSuperAdmin || isManagement) ? selectedGroup : user?.uid;

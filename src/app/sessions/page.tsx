@@ -111,9 +111,9 @@ export default function DailySessionsPage() {
     if (daySessions.length >= 2) {
       setSessionChoiceData({ day, dateStr, sessions: daySessions });
     } else if (daySessions.length === 1) {
-      // إذا كانت الحصة 1 موجودة، نفتح الحصة 2
-      const nextSession = daySessions[0].sessionNumber === 1 ? 2 : 1;
-      router.push(`/sessions/register?date=${dateStr}&session=${nextSession}`);
+      // إذا كانت هناك حصة واحدة فقط، نفتحها مباشرة
+      const existingSession = daySessions[0].sessionNumber;
+      router.push(`/sessions/register?date=${dateStr}&session=${existingSession}`);
     } else {
       // لا توجد حصص -> نفتح الحصة 1 افتراضياً
       router.push(`/sessions/register?date=${dateStr}&session=1`);

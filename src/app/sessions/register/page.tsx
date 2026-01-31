@@ -86,7 +86,15 @@ function RegisterSessionContent() {
             // ✅ قراءة مباشرة من Firebase (ليس من Context)
             const loadFromFirebase = async () => {
                 try {
-                    const sessionsRef = dbRef(db, `users/${user.uid}/dailySessions/${dateStr}`);
+                    // 🔍 First, detect session owner from context
+                    let sessionOwnerId = user.uid; // Default to current user
+                    const contextSessions = getSessionsForDay(dateStr);
+                    const existingContextSession = contextSessions.find((s: any) => s.sessionNumber == sessionToOpen);
+                    if (existingContextSession && existingContextSession.ownerId) {
+                        sessionOwnerId = existingContextSession.ownerId;
+                    }
+
+                    const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
                     const snapshot = await get(sessionsRef);
 
                     let existingSession = null;
@@ -292,7 +300,7 @@ function RegisterSessionContent() {
 
         if (!id) {
             const existingSessions = getSessionsForDay(dateStr);
-            const existingSession = existingSessions.find(s => s.sessionNumber === sessionToOpen);
+            const existingSession = existingSessions.find(s => s.sessionNumber == sessionToOpen);
             id = existingSession ? existingSession.id : `${dateStr}-s${sessionToOpen}`;
             setCurrentSessionId(id); // Lock it for future saves in this session
         }
@@ -300,7 +308,15 @@ function RegisterSessionContent() {
         // ✅ CRITICAL: قراءة البيانات القديمة من Firebase ودمجها مع الجديدة
         let existingRecords: any[] = [];
         try {
-            const sessionsRef = dbRef(db, `users/${user.uid}/dailySessions/${dateStr}`);
+            // 🔍 Detect session owner
+            let sessionOwnerId = user.uid;
+            const contextSessions = getSessionsForDay(dateStr);
+            const existingContextSession = contextSessions.find((s: any) => s.id === id);
+            if (existingContextSession && existingContextSession.ownerId) {
+                sessionOwnerId = existingContextSession.ownerId;
+            }
+
+            const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
             const snapshot = await get(sessionsRef);
             if (snapshot.exists()) {
                 const sessions = snapshot.val();
@@ -413,7 +429,16 @@ function RegisterSessionContent() {
         setIsRefreshing(true);
         try {
             const dateStr = format(selectedDay, 'yyyy-MM-dd');
-            const sessionsRef = dbRef(db, `users/${user.uid}/dailySessions/${dateStr}`);
+
+            // 🔍 Detect session owner from context
+            let sessionOwnerId = user.uid;
+            const contextSessions = getSessionsForDay(dateStr);
+            const existingContextSession = contextSessions.find((s: any) => s.sessionNumber == sessionToOpen);
+            if (existingContextSession && existingContextSession.ownerId) {
+                sessionOwnerId = existingContextSession.ownerId;
+            }
+
+            const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
             const snapshot = await get(sessionsRef);
 
             if (snapshot.exists()) {

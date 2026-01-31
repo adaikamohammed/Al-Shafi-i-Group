@@ -50,8 +50,8 @@ const getEvaluationSymbol = (evaluation?: PerformanceLevel | null) => {
 
 
 const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], student: Student, date: Date }) => {
-    const session1 = sessions?.find(s => s.sessionNumber === 1);
-    const session2 = sessions?.find(s => s.sessionNumber === 2);
+    const session1 = sessions?.find(s => s.sessionNumber == 1);
+    const session2 = sessions?.find(s => s.sessionNumber == 2);
 
     const record1 = session1?.records?.find(r => r.studentId === student.id);
     const record2 = session2?.records?.find(r => r.studentId === student.id);
@@ -135,7 +135,7 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
 };
 
 export default function WeeklyFollowUpPage() {
-    const { students, dailySessions, loading } = useStudentContext();
+    const { students, dailySessions, loading, allUsers } = useStudentContext();
     const { isManagement } = useAuth();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
     const [selectedGroup, setSelectedGroup] = useState<string>('all');
@@ -146,14 +146,19 @@ export default function WeeklyFollowUpPage() {
 
         // Management Group Filter
         if (isManagement && selectedGroup !== 'all') {
-            filtered = filtered.filter(s => s.ownerId === selectedGroup);
+            const selectedUser = allUsers.find(u => u.uid === selectedGroup);
+            if (selectedUser?.group) {
+                filtered = filtered.filter(s => s.groupName?.trim() === selectedUser.group?.trim());
+            } else {
+                filtered = filtered.filter(s => s.ownerId === selectedGroup);
+            }
         }
 
         if (selectedStudentId !== 'all') {
             return filtered.filter(s => s.id === selectedStudentId);
         }
         return filtered.sort((a, b) => a.fullName.localeCompare(b.fullName));
-    }, [students, selectedStudentId, selectedGroup, isManagement]);
+    }, [students, selectedStudentId, selectedGroup, isManagement, allUsers]);
 
     const weekDates = useMemo(() => {
         const start = startOfWeek(currentDate, { weekStartsOn: 6 }); // Saturday
