@@ -80,7 +80,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const isParentPortal = pathname.startsWith('/parent-portal') || pathname.startsWith('/record');
+    const isParentPortal = pathname.startsWith('/parent-portal') || pathname.startsWith('/record') || pathname === '/';
     if (!authLoading && !user && pathname !== '/login' && !isParentPortal) {
       router.push('/login');
     }
@@ -97,7 +97,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("keydown", down)
   }, [])
 
-  if (authLoading && !pathname.startsWith('/parent-portal') && !pathname.startsWith('/record')) {
+  if (authLoading && !pathname.startsWith('/parent-portal') && !pathname.startsWith('/record') && pathname !== '/') {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -105,7 +105,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if ((pathname.startsWith('/parent-portal') || pathname.startsWith('/record')) && !user) {
+  if ((pathname.startsWith('/parent-portal') || pathname.startsWith('/record') || pathname === '/') && !user) {
     return <div className="max-w-full mx-auto">{children}</div>;
   }
 
@@ -261,6 +261,16 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
       </SidebarFooter>
     </div>
   );
+
+  // Render simplified layout for public landing page if user is logged in or not (handled above if not logged in, but here if logged in on root)
+  // Actually, if user IS logged in and goes to '/', we might want to redirect them to '/dashboard' or show the public page with a "Go to Dashboard" button.
+  // For now, let's treat '/' as public page even for logged in users, OR redirect them.
+  // Let's redirect logged-in users from '/' to '/dashboard' inside a useEffect or just render public page.
+  // The user requirement implies '/' is public.
+
+  if (pathname === '/') {
+    return <div className="max-w-full mx-auto font-body">{children}</div>;
+  }
 
   return (
     <SidebarProvider defaultOpen={true}>
