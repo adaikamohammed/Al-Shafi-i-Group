@@ -585,28 +585,32 @@ export default function AdminDocsPage() {
             <style jsx global>{`
                 @media print {
                     @page { 
-                        size: 80mm auto portrait; 
+                        size: 80mm auto; 
                         margin: 0mm !important; 
                     }
                     body { 
                         margin: 0 !important; 
                         padding: 0 !important;
                         background: white !important;
-                    }
-                    body * { visibility: hidden; }
-                    #printable-receipt, #printable-receipt * { 
-                        visibility: visible; 
-                        font-weight: 800 !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
+                    body * { 
+                        visibility: hidden; 
+                        height: 0;
+                    }
+                    #printable-receipt, #printable-receipt * { 
+                        visibility: visible; 
+                        height: auto;
+                        font-weight: 800 !important;
+                    }
                     #printable-receipt {
-                        position: absolute;
+                        position: fixed;
                         left: 0;
                         top: 0;
-                        width: 100% !important;
-                        max-width: 80mm;
-                        padding: 1mm 2mm !important;
+                        width: 80mm !important;
+                        min-width: 80mm !important;
+                        padding: 0mm !important;
                         margin: 0 !important;
                         box-shadow: none !important;
                         border: none !important;
@@ -614,29 +618,30 @@ export default function AdminDocsPage() {
                         color: black !important;
                         z-index: 9999;
                         direction: rtl;
-                        /* Force a substantial zoom for better legibility on 80mm */
-                        zoom: 1.25; 
                     }
                     #printable-receipt h2 { 
-                        font-size: 24px !important;
-                        font-weight: 900 !important; 
+                        font-size: 22px !important;
+                        font-weight: 1000 !important; 
                         margin-bottom: 2mm !important;
+                        line-height: 1.1 !important;
                     }
                     #printable-receipt p, #printable-receipt span {
                         font-size: 14px !important;
-                        line-height: 1.2 !important;
+                        line-height: 1.3 !important;
                     }
                     .receipt-field-label {
-                        font-size: 11px !important;
-                        margin-bottom: 1mm !important;
+                        font-size: 12px !important;
+                        margin-bottom: 0.5mm !important;
+                        font-weight: 1000 !important;
                     }
                     .receipt-field-value {
                         font-size: 16px !important;
-                        font-weight: 950 !important;
+                        font-weight: 1000 !important;
                     }
                     .receipt-ticket-number {
-                        font-size: 14px !important;
-                        padding: 1mm 4mm !important;
+                        font-size: 15px !important;
+                        padding: 1.5mm 5mm !important;
+                        font-weight: 1000 !important;
                     }
                 }
             `}</style>
