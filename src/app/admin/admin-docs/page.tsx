@@ -584,31 +584,59 @@ export default function AdminDocsPage() {
             {/* Print Styles */}
             <style jsx global>{`
                 @media print {
+                    @page { 
+                        size: 80mm auto portrait; 
+                        margin: 0mm !important; 
+                    }
+                    body { 
+                        margin: 0 !important; 
+                        padding: 0 !important;
+                        background: white !important;
+                    }
                     body * { visibility: hidden; }
                     #printable-receipt, #printable-receipt * { 
                         visibility: visible; 
                         font-weight: 800 !important;
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
                     }
-                    #printable-receipt h2 { font-weight: 900 !important; }
                     #printable-receipt {
-                        position: fixed;
-                        right: 0;
+                        position: absolute;
+                        left: 0;
                         top: 0;
-                        width: 79mm;
-                        padding: 2mm 5mm;
-                        margin: 0;
-                        box-shadow: none;
-                        border: none;
+                        width: 100% !important;
+                        max-width: 80mm;
+                        padding: 1mm 2mm !important;
+                        margin: 0 !important;
+                        box-shadow: none !important;
+                        border: none !important;
                         background: white !important;
                         color: black !important;
                         z-index: 9999;
                         direction: rtl;
+                        /* Force a substantial zoom for better legibility on 80mm */
+                        zoom: 1.25; 
                     }
-                    @page { 
-                        size: 79mm auto portrait; 
-                        margin: 0mm; 
+                    #printable-receipt h2 { 
+                        font-size: 24px !important;
+                        font-weight: 900 !important; 
+                        margin-bottom: 2mm !important;
+                    }
+                    #printable-receipt p, #printable-receipt span {
+                        font-size: 14px !important;
+                        line-height: 1.2 !important;
+                    }
+                    .receipt-field-label {
+                        font-size: 11px !important;
+                        margin-bottom: 1mm !important;
+                    }
+                    .receipt-field-value {
+                        font-size: 16px !important;
+                        font-weight: 950 !important;
+                    }
+                    .receipt-ticket-number {
+                        font-size: 14px !important;
+                        padding: 1mm 4mm !important;
                     }
                 }
             `}</style>

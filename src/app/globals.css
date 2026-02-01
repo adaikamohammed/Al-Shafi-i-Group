@@ -174,7 +174,7 @@ body {
 
 @layer components {
   .receipt-container {
-    @apply w-[79mm] bg-white border-none px-[5mm] py-8 relative overflow-hidden ring-1 ring-black/5 shadow-none;
+    @apply w-[79mm] bg-white border-none px-[3mm] py-6 relative overflow-hidden ring-1 ring-black/5 shadow-none;
     font-family: var(--font-body);
     min-height: 400px;
     -webkit-print-color-adjust: exact;
@@ -186,38 +186,37 @@ body {
   }
 
   .receipt-header {
-    @apply flex flex-col items-center justify-center border-b-2 border-black/20 pb-4 mb-4 text-center;
+    @apply flex flex-col items-center justify-center border-b-2 border-black/20 pb-3 mb-4 text-center;
   }
 
   .receipt-title {
-    @apply text-2xl font-[900] text-black mb-1;
+    @apply text-2xl font-[950] text-black mb-1;
     font-family: var(--font-headline);
   }
 
   .receipt-ticket-number {
-    @apply mt-2 bg-black/5 text-black px-4 py-1.5 rounded-full text-sm font-[900] border border-black/20;
+    @apply mt-2 bg-black/5 text-black px-4 py-1.5 rounded-full text-sm font-[950] border border-black/20;
   }
 
   .receipt-body {
-    @apply space-y-5;
+    @apply space-y-4;
     width: 100%;
-    /* Should be 69mm due to container padding */
   }
 
   .receipt-field {
-    @apply flex flex-col gap-1.5;
+    @apply flex flex-col gap-1;
   }
 
   .receipt-field-label {
-    @apply text-[13px] text-black font-[900] uppercase opacity-70 tracking-tight;
+    @apply text-[13px] text-black font-[950] uppercase opacity-80 tracking-tight;
   }
 
   .receipt-field-value {
-    @apply text-lg font-[950] text-black leading-tight;
+    @apply text-xl font-[1000] text-black leading-tight;
   }
 
   .receipt-stats-grid {
-    @apply grid grid-cols-2 gap-4 bg-black/5 p-4 rounded-2xl border-2 border-dotted border-black/20;
+    @apply grid grid-cols-2 gap-3 bg-black/5 p-3 rounded-2xl border-2 border-dotted border-black/20;
   }
 
   .receipt-stat-item {
@@ -225,15 +224,15 @@ body {
   }
 
   .receipt-stat-label {
-    @apply text-[10px] text-black font-[900] mb-1.5;
+    @apply text-[11px] text-black font-[950] mb-1;
   }
 
   .receipt-stat-value {
-    @apply text-xl font-[950] text-black;
+    @apply text-2xl font-[1000] text-black;
   }
 
   .receipt-qr-section {
-    @apply flex items-end justify-between border-t-2 border-dotted border-black/20 pt-6 mt-6;
+    @apply flex items-end justify-between border-t-2 border-dotted border-black/20 pt-4 mt-6;
   }
 
   .receipt-qr-image {
@@ -241,7 +240,7 @@ body {
   }
 
   .receipt-footer {
-    @apply text-[11px] text-center font-[900] text-black/80 mt-6 pt-4 border-t border-black/10 leading-relaxed;
+    @apply text-[12px] text-center font-[950] text-black/90 mt-6 pt-4 border-t border-black/10 leading-relaxed;
   }
 }
 

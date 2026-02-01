@@ -38,7 +38,7 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
                         {type === 'payment' && 'وصل استلام مبلغ'}
                         {type === 'entry' && 'إذن دخول للحلقة'}
                     </h2>
-                    <p className="text-[12px] font-[950] text-black/80">المدرسة القرآنية للإمام الشافعي - حي تكسبت / الوادي</p>
+                    <p className="text-[14px] font-[950] text-black/80">المدرسة القرآنية للإمام الشافعي - حي تكسبت / الوادي</p>
                 </div>
                 <div className="receipt-ticket-number bg-black/5 text-black border-black/20">
                     {details?.ticketNumber || 'TKT-######'}
@@ -49,18 +49,18 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
                 {/* Student Info */}
                 <div className="grid grid-cols-2 gap-4 border-b border-black/10 pb-3">
                     <div className="receipt-field">
-                        <span className="receipt-field-label text-black text-[13px]">الطالب</span>
+                        <span className="receipt-field-label text-black text-[14px]">الطالب</span>
                         <span className="receipt-field-value text-black">{studentName || '......'}</span>
                     </div>
                     <div className="receipt-field">
-                        <span className="receipt-field-label text-black text-[13px]">المجموعة / الأستاذ(ة)</span>
+                        <span className="receipt-field-label text-black text-[14px]">المجموعة / الأستاذ(ة)</span>
                         <span className="receipt-field-value text-black">{sheikhName || '......'}</span>
                     </div>
                     <div className="receipt-field col-span-2">
-                        <span className="receipt-field-label text-black text-[13px]">ولي الأمر</span>
+                        <span className="receipt-field-label text-black text-[14px]">ولي الأمر</span>
                         <span className="receipt-field-value text-black">
                             {details?.guardianName || '......'}
-                            {details?.guardianPhone && <span className="text-[10px] opacity-70 mr-1" dir="ltr">({details.guardianPhone})</span>}
+                            {details?.guardianPhone && <span className="text-[12px] opacity-70 mr-1" dir="ltr">({details.guardianPhone})</span>}
                         </span>
                     </div>
                 </div>
@@ -70,7 +70,7 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
                     {type === 'summon' && (
                         <div className="space-y-4">
                             <div className="p-3 bg-black/5 rounded-xl border-r-4 border-black">
-                                <span className="receipt-field-label text-black text-[13px]">موعد الحضور المقرر</span>
+                                <span className="receipt-field-label text-black text-[14px]">موعد الحضور المقرر</span>
                                 <p className="text-sm font-black text-black">{details?.date || '......'}</p>
                             </div>
                             <div className="receipt-field">
