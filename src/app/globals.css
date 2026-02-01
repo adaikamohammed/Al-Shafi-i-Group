@@ -174,7 +174,7 @@ body {
 
 @layer components {
   .receipt-container {
-    @apply w-[80mm] bg-white border-none px-[3mm] py-6 relative overflow-hidden ring-1 ring-black/5 shadow-none;
+    @apply w-[79mm] bg-white border-none px-[5mm] py-6 relative overflow-hidden ring-1 ring-black/5 shadow-none;
     font-family: var(--font-body);
     min-height: 400px;
     -webkit-print-color-adjust: exact;
