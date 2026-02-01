@@ -565,8 +565,10 @@ const BulkEditModal = ({ open, onOpenChange, selectedCount, onSave }: { open: bo
                                 <SelectContent>
                                     <SelectItem value="مرشح">مرشح</SelectItem>
                                     <SelectItem value="تم الإتصال">تم الإتصال</SelectItem>
+                                    <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
                                     <SelectItem value="مرفوض">مرفوض</SelectItem>
                                     <SelectItem value="مؤجل">مؤجل</SelectItem>
+                                    <SelectItem value="إنضم لمدرسة أخرى">إنضم لمدرسة أخرى</SelectItem>
                                     <SelectItem value="مكرر">مكرر</SelectItem>
                                 </SelectContent>
                             </Select>

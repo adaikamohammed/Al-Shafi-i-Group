@@ -282,7 +282,8 @@ export default function WeeklyFollowUpPage() {
                                         </div>
                                         {weekDates.map(date => {
                                             const dateString = format(date, 'yyyy-MM-dd');
-                                            const sessions = dailySessions[dateString] ? Object.values(dailySessions[dateString]) : undefined;
+                                            const allSessionsForDay = dailySessions[dateString] ? Object.values(dailySessions[dateString]) : undefined;
+                                            const sessions = allSessionsForDay?.filter(s => !s.ownerId || s.ownerId === student.ownerId);
                                             return (
                                                 <DayCell key={date.toISOString()} sessions={sessions} student={student} date={date} />
                                             )

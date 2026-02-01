@@ -266,7 +266,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
                 console.log(`    - ${date}: ${sessionsOnDate} session(s)`);
 
                 Object.entries(userData.dailySessions[date]).forEach(([sessionId, session]: [string, any]) => {
-                  allSessions[date][sessionId] = { ...session, ownerId: uid };
+                  // Use a unique key to prevent collisions between different sheikhs' sessions
+                  const uniqueKey = `${uid}_${sessionId}`;
+                  allSessions[date][uniqueKey] = { ...session, ownerId: uid };
                 });
               }
             } else {
@@ -275,7 +277,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             if (userData.dailyReports) {
               for (const date in userData.dailyReports) {
                 if (!allReports[date]) allReports[date] = {};
-                Object.assign(allReports[date], userData.dailyReports[date]);
+                Object.entries(userData.dailyReports[date]).forEach(([reportId, report]: [string, any]) => {
+                  const uniqueKey = `${uid}_${reportId}`;
+                  allReports[date][uniqueKey] = { ...report, id: reportId, authorId: uid };
+                });
               }
             }
             if (userData.surahProgress) Object.assign(allProgress, userData.surahProgress);
@@ -620,13 +625,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       photoURL: photoURL
     };
     const studentRef = ref(db, `users/${ownerId}/students/${studentId}`);
-    const studentOp = set(studentRef, {
+    const studentOp = set(studentRef, sanitizeData({
       ...newStudent,
       birthDate: newStudent.birthDate ? newStudent.birthDate.toISOString() : null,
       registrationDate: newStudent.registrationDate.toISOString(),
       updatedAt: newStudent.updatedAt.toISOString(),
       covenants: newStudent.covenants || null // Use null for empty array
-    });
+    }));
 
     const surahProgressRef = ref(db, `users/${ownerId}/surahProgress/${studentId}`);
     const progressOp = set(surahProgressRef, {});
@@ -675,8 +680,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       finalData.status = 'مرشح';
     }
 
+    const sanitizedData = sanitizeData(finalData);
     const regRef = ref(db, `pre_registrations/${regId}`);
-    await update(regRef, finalData);
+    await update(regRef, sanitizedData);
 
     toast({
       title: isEditing ? '✅ تم التحديث' : '✅ تم التسجيل',
@@ -697,7 +703,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         requestedAt: updatedReg.requestedAt instanceof Date ? updatedReg.requestedAt.toISOString() : updatedReg.requestedAt,
       };
 
-      updates[`/pre_registrations/${id}`] = regToSave;
+      updates[`/pre_registrations/${id}`] = sanitizeData(regToSave);
     });
     const dbRef = ref(db);
     update(dbRef, updates);
@@ -712,11 +718,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const updates: { [key: string]: any } = {};
     newPreRegs.forEach(reg => {
       const regId = uuidv4();
-      updates[`/pre_registrations/${regId}`] = {
+      updates[`/pre_registrations/${regId}`] = sanitizeData({
         ...reg,
         requestedAt: reg.requestedAt instanceof Date ? reg.requestedAt.toISOString() : reg.requestedAt,
         birthDate: reg.birthDate instanceof Date ? reg.birthDate.toISOString() : reg.birthDate,
-      };
+      });
     });
     const dbRef = ref(db);
     update(dbRef, updates);
@@ -871,7 +877,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     try {
       // الحفظ في Firebase
       const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${session.date}/${session.id}`);
-      await set(sessionRef, session);
+      await set(sessionRef, sanitizeData(session));
 
       // تسجيل النشاط
       await logActivity(
@@ -1143,7 +1149,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     if (Object.keys(updates).length > 0) {
       const dbRef = ref(db);
-      await update(dbRef, updates);
+      await update(dbRef, sanitizeData(updates));
       toast({
         title: "✅ تم التحديث الجماعي",
         description: `تم تحديث ${surahIds.length} سورة لـ ${studentIds.length} طلاب بنجاح.`,
@@ -1505,7 +1511,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         });
       });
 
-      await update(ref(db), updates);
+      await update(ref(db), sanitizeData(updates));
 
       toast({
         title: "✅ تم نقل الطالب",
@@ -1575,11 +1581,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       Object.entries(updates).forEach(([studentId, data]) => {
         const student = students.find(s => s.id === studentId);
         if (student) {
-          fbUpdates[`users/${student.ownerId}/students/${studentId}`] = {
+          fbUpdates[`users/${student.ownerId}/students/${studentId}`] = sanitizeData({
             ...student,
             ...data,
             updatedAt: timestamp
-          };
+          });
 
           logActivity(
             'UPDATE_STUDENT',
@@ -1594,7 +1600,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         }
       });
 
-      await update(ref(db), fbUpdates);
+      await update(ref(db), sanitizeData(fbUpdates));
       toast({
         title: "✅ تم التحديث بنجاح",
         description: `تم تحديث بيانات ${Object.keys(updates).length} طالب(ة).`,
@@ -1664,7 +1670,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           createdBy: meetingData.createdBy || authContextUser.uid,
           status: meetingData.status || 'upcoming'
         };
-        await update(meetingRef, dataToSave);
+        await update(meetingRef, sanitizeData(dataToSave));
         toast({ title: '✅ تم حفظ الاجتماع' });
       },
       addMeetingSuggestion: async (meetingId, suggestion) => {
