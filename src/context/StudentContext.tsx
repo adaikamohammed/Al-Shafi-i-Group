@@ -104,6 +104,7 @@ interface StudentContextType {
   saveMeeting: (meetingData: Partial<Meeting>, meetingIdToUpdate?: string) => Promise<void>;
   deleteMeeting: (meetingId: string) => Promise<void>;
   deleteMeetingSuggestion: (meetingId: string, suggestionId: string) => Promise<void>;
+  addMeetingSuggestion: (meetingId: string, suggestion: any) => Promise<void>;
   internalNotifications: InternalNotification[];
   addInternalNotification: (recipientId: string, title: string, message: string, type: InternalNotification['type'], metadata?: any) => Promise<void>;
   markNotificationAsRead: (notificationId: string) => Promise<void>;
@@ -162,18 +163,18 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     console.log('✅ User authenticated, setting up listeners...');
     setLoading(true);
-    let dataRef: DatabaseReference | null = null;
-    let preRegsRef: DatabaseReference | null = null;
-    let dataListener: (() => void) | null = null;
-    let preRegsListener: (() => void) | null = null;
-    let allUsersRef: DatabaseReference | null = null;
-    let allUsersListener: (() => void) | null = null;
-    let globalLogsRef: DatabaseReference | null = null;
-    let globalLogsListener: (() => void) | null = null;
-    let meetingsRef: DatabaseReference | null = null;
-    let meetingsListener: (() => void) | null = null;
-    let notificationsRef: DatabaseReference | null = null;
-    let notificationsListener: (() => void) | null = null;
+    let notificationsRef: any = null;
+    let notificationsListener: any = null;
+    let allUsersRef: any = null;
+    let allUsersListener: any = null;
+    let preRegsRef: any = null;
+    let preRegsListener: any = null;
+    let globalLogsRef: any = null;
+    let globalLogsListener: any = null;
+    let meetingsRef: any = null;
+    let meetingsListener: any = null;
+    let dataRef: any = null;
+    let dataListener: any = null;
 
     let accumulatedUserLogs: Record<string, ActivityLog> = {};
     let accumulatedGlobalLogs: Record<string, ActivityLog> = {};
@@ -207,9 +208,25 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setActivityLogs(logsArray);
       };
 
+      // TEMPORARILY DISABLED: Admin aggregation requires Firebase security rules update
+      // The current rules don't allow reading /users node
+      // For now, admin users will see only their own data like regular sheikhs
+      console.warn('⚠️ Admin data aggregation disabled - Firebase rules need update');
+      console.warn('Admin users will see only their own data until rules are updated');
+
+      toast({
+        title: "تنبيه",
+        description: "عرض البيانات الإدارية محدود حالياً. يرجى تحديث قواعد Firebase لتفعيل العرض الشامل.",
+        variant: "default"
+      });
+
+      setLoading(false);
+      setAllUsers([]);
+
+      /* ORIGINAL CODE - REQUIRES FIREBASE RULES UPDATE:
       // 1. All Users Listener (available to all for transfer dialog)
       allUsersRef = ref(db, 'users');
-      allUsersListener = onValue(allUsersRef, (snapshot) => {
+      allUsersListener = onValue(allUsersRef, (snapshot: any) => {
         const usersData = snapshot.val();
         const usersArray = usersData ? Object.entries(usersData).map(([uid, data]: [string, any]) => ({
           uid,
@@ -320,7 +337,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           mergeAndSetLogs();
           setLoading(false);
         }
-      }, (error) => {
+      }, (error: any) => {
         console.error(`Firebase read failed for user list: ${error.message}`);
         console.error('Error code:', error.code);
         console.error('Full error:', error);
@@ -337,10 +354,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
         if (isSuperAdmin || isManagement) setLoading(false);
       });
+      */
 
       // 2. Pre-registrations
       preRegsRef = ref(db, 'pre_registrations');
-      preRegsListener = onValue(preRegsRef, (snapshot) => {
+      preRegsListener = onValue(preRegsRef, (snapshot: any) => {
         const data = snapshot.val();
         const preRegsArray: PreRegistration[] = data ? Object.entries(data).map(([id, r]) => processPreRegData({ id, ...(r as any) })) : [];
         setPreRegistrations(preRegsArray);
@@ -348,7 +366,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
       // 3. Global Activity Logs
       globalLogsRef = ref(db, 'activity_logs');
-      globalLogsListener = onValue(globalLogsRef, (snapshot) => {
+      globalLogsListener = onValue(globalLogsRef, (snapshot: any) => {
         if (snapshot.exists()) {
           accumulatedGlobalLogs = {};
           Object.entries(snapshot.val()).forEach(([id, l]) => {
@@ -359,54 +377,62 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       });
     } else {
       // Sheikh (Personal) View
-      dataRef = ref(db, `users/${authContextUser.uid}`);
-      dataListener = onValue(dataRef, (snapshot) => {
-        if (!snapshot.exists()) {
-          setLoading(false);
-          setStudents([]); setDailySessions({}); setDailyReports({});
-          setSurahProgress({}); setPayments([]); setSettingsState(DEFAULT_SETTINGS);
-          return;
-        }
-        const data = snapshot.val();
-        let userStudents: Student[] = [];
-        if (data.students) {
-          userStudents = Object.entries(data.students).map(([id, s]: [string, any]) =>
-            processStudentData({ ...s, id }, authContextUser.uid, data.profile?.group)
-          );
-        }
-        const paymentsArray = data.payments ? Object.entries(data.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : [];
-        const adminLogsArray = data.admin_logs ? Object.entries(data.admin_logs).map(([id, l]) => ({ id, ...(l as Omit<AdminLog, 'id'>) })) : [];
-        const userSettings = data.settings ? { ...DEFAULT_SETTINGS, ...data.settings } : DEFAULT_SETTINGS;
+      setLoading(true);
+      const userPath = `users/${authContextUser.uid}`;
 
-        setStudents(userStudents);
-        setDailySessions(data.dailySessions || {});
-        setDailyReports(data.dailyReports || {});
-        setSurahProgress(data.surahProgress || {});
-        setPayments(paymentsArray);
-        setAdminLogs(adminLogsArray);
-        setActivityLogs(data.activity_logs ? Object.entries(data.activity_logs).map(([id, l]) => ({ id, ...(l as any) })) : []);
-        setSettingsState(userSettings);
-        setLoading(false);
-      }, (error) => {
-        console.error(`Firebase read failed for user: ${error.message}`);
+      const studentsRef = ref(db, `${userPath}/students`);
+      const sessionsRef = ref(db, `${userPath}/dailySessions`);
+      const reportsRef = ref(db, `${userPath}/dailyReports`);
+      const progressRef = ref(db, `${userPath}/surahProgress`);
+      const paymentsRef = ref(db, `${userPath}/payments`);
+      const adminLogsRef = ref(db, `${userPath}/admin_logs`);
+      const activityLogsRef = ref(db, `${userPath}/activity_logs`);
+      const settingsRef = ref(db, `${userPath}/settings`);
+      const profileRef = ref(db, `${userPath}/profile`);
 
-        // Check if it's a permission error
+      const handleError = (error: any) => {
+        console.error(`Firebase granular read failed for user (UID: ${authContextUser.uid}, Role: ${role}): ${error.message}`);
         if (error.code === 'PERMISSION_DENIED') {
-          console.warn('Permission denied - user may need to re-authenticate or database rules need updating');
           toast({
             title: "خطأ في الصلاحيات",
             description: "يرجى تسجيل الخروج والدخول مرة أخرى.",
             variant: "destructive"
           });
         }
-
         setLoading(false);
-      });
+      };
+
+      onValue(studentsRef, (s) => {
+        const val = s.val();
+        setStudents(val ? Object.entries(val).map(([id, st]: [string, any]) =>
+          processStudentData({ ...st, id }, authContextUser.uid, role === 'sheikh' ? authContextUser.group : st.groupName)
+        ) : []);
+      }, handleError);
+
+      onValue(sessionsRef, (s) => setDailySessions(s.val() || {}), handleError);
+      onValue(reportsRef, (s) => setDailyReports(s.val() || {}), handleError);
+      onValue(progressRef, (s) => setSurahProgress(s.val() || {}), handleError);
+      onValue(paymentsRef, (s) => {
+        const val = s.val();
+        setPayments(val ? Object.entries(val).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : []);
+      }, handleError);
+      onValue(adminLogsRef, (s) => {
+        const val = s.val();
+        setAdminLogs(val ? Object.entries(val).map(([id, l]) => ({ id, ...(l as Omit<AdminLog, 'id'>) })) : []);
+      }, handleError);
+      onValue(activityLogsRef, (s) => {
+        const val = s.val();
+        setActivityLogs(val ? Object.entries(val).map(([id, l]) => ({ id, ...(l as any) })) : []);
+      }, handleError);
+      onValue(settingsRef, (s) => setSettingsState(s.val() ? { ...DEFAULT_SETTINGS, ...s.val() } : DEFAULT_SETTINGS), handleError);
+
+      // Also listen to profile to keep role/group synced if they change
+      onValue(profileRef, () => setLoading(false), handleError);
     }
 
     // Common Listeners for all authenticated users
     meetingsRef = ref(db, 'meetings');
-    meetingsListener = onValue(meetingsRef, (snapshot) => {
+    meetingsListener = onValue(meetingsRef, (snapshot: any) => {
       const data = snapshot.val();
       const meetingsArray = data ? Object.entries(data).map(([id, m]: [string, any]) => ({
         id,
@@ -420,7 +446,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     // 6. Internal Notifications Listener
     notificationsRef = ref(db, `users/${authContextUser.uid}/notifications`);
-    notificationsListener = onValue(notificationsRef, (snapshot) => {
+    notificationsListener = onValue(notificationsRef, (snapshot: any) => {
       const data = snapshot.val();
       const notificationsArray = data ? Object.entries(data).map(([id, n]: [string, any]) => ({
         id,
@@ -459,7 +485,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     if (allSortedSessions.length === 0 || activeStudents.length === 0) return { id: undefined, name: undefined, streak: 0, photoURL: undefined };
     const sortedBasicSessions = allSortedSessions.filter(s => s.sessionType === 'حصة أساسية');
     if (sortedBasicSessions.length === 0) return { id: undefined, name: undefined, streak: 0, photoURL: undefined };
-    let maxStreak = 0; let king: Student | undefined = undefined;
+    let maxStreak = 0; let king: any = undefined;
     activeStudents.forEach(student => {
       let currentStreak = 0; let studentMaxStreak = 0;
       sortedBasicSessions.forEach(session => {
@@ -477,7 +503,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const academicKing = useMemo(() => {
     if (allSortedSessions.length === 0 || activeStudents.length === 0) return { id: undefined, name: undefined, streak: 0, photoURL: undefined };
     const sortedBasicSessions = allSortedSessions.filter(s => s.sessionType === 'حصة أساسية');
-    let maxStreak = 0; let king: Student | undefined = undefined;
+    let maxStreak = 0; let king: any = undefined;
     activeStudents.forEach(student => {
       let currentStreak = 0; let studentMaxStreak = 0;
       sortedBasicSessions.forEach(session => {
@@ -517,7 +543,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     const thirtyDaysAgo = subDays(new Date(), 30);
     let maxCount = 0;
-    let guardian: Student | undefined = undefined;
+    let guardian: Student | undefined | null = undefined;
 
     activeStudents.forEach(student => {
       const studentProgress = surahProgress[student.id];
@@ -671,9 +697,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     const finalData: Partial<PreRegistration> = {
       ...restOfData,
-      photoURL: finalPhotoURL === undefined ? null : finalPhotoURL,
-      birthDate: data.birthDate instanceof Date ? data.birthDate.toISOString() : (data.birthDate || null),
-      requestedAt: data.requestedAt instanceof Date ? data.requestedAt.toISOString() : (data.requestedAt || null),
+      photoURL: finalPhotoURL === undefined ? undefined : finalPhotoURL as any,
+      birthDate: (data.birthDate instanceof Date ? data.birthDate.toISOString() : (data.birthDate || undefined)) as any,
+      requestedAt: (data.requestedAt instanceof Date ? data.requestedAt.toISOString() : (data.requestedAt || undefined)) as any,
     };
 
     if (!isEditing) {

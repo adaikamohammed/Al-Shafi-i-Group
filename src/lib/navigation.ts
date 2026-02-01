@@ -44,7 +44,7 @@ export const NAV_GROUPS: NavGroup[] = [
         items: [
             { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList, primary: true },
             { href: '/surahs', label: 'متابعة الحفظ', icon: BookCheck },
-            { href: '/', label: 'إدارة الطلبة', icon: Users },
+            { href: '/dashboard', label: 'إدارة الطلبة', icon: Users },
             { href: '/reports/daily', label: 'التقرير اليومي', icon: Edit },
         ]
     },

@@ -21,19 +21,48 @@ export default function LandingPage() {
                         <p className="text-gray-500 mb-12 max-w-2xl mx-auto">جانب من أنشطة وفعاليات المدرسة القرآنية، حيث نجمع بين التعليم والتربية والترفيه الهادف.</p>
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 h-96">
+                            {/* Main Image - Group Photo (wide) */}
                             <div className="md:col-span-2 row-span-2 rounded-3xl bg-gray-200 overflow-hidden relative group">
-                                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors" />
-                                {/* Placeholder */}
-                                <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold bg-white">صورة رئيسية</div>
+                                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors z-10" />
+                                <img
+                                    src="/gallery/group-photo.jpg"
+                                    alt="صورة جماعية لطلاب وأساتذة المدرسة"
+                                    className="w-full h-full object-cover"
+                                    style={{ objectPosition: 'center 35%' }}
+                                />
                             </div>
-                            <div className="rounded-3xl bg-gray-200 overflow-hidden relative">
-                                <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold bg-white">نشاط 1</div>
+
+                            {/* Activity 1 - Students at table */}
+                            <div className="rounded-3xl bg-gray-200 overflow-hidden relative group">
+                                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors z-10" />
+                                <img
+                                    src="/gallery/activity-5.jpg"
+                                    alt="طلاب على الطاولة"
+                                    className="w-full h-full object-cover"
+                                    style={{ objectPosition: 'center center' }}
+                                />
                             </div>
-                            <div className="rounded-3xl bg-gray-200 overflow-hidden relative">
-                                <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold bg-white">نشاط 2</div>
+
+                            {/* Activity 2 - Students with teacher */}
+                            <div className="rounded-3xl bg-gray-200 overflow-hidden relative group">
+                                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors z-10" />
+                                <img
+                                    src="/gallery/activity-6.jpg"
+                                    alt="طلاب مع الأستاذ"
+                                    className="w-full h-full object-cover"
+                                    style={{ objectPosition: 'center center' }}
+                                />
                             </div>
-                            <div className="md:col-span-2 rounded-3xl bg-gray-200 overflow-hidden relative">
-                                <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold bg-white">نشاط جماعي</div>
+
+                            {/* Wide Activity - Students entering */}
+                            <div className="md:col-span-2 rounded-3xl bg-gray-200 overflow-hidden relative group">
+                                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors z-10" />
+                                <img
+                                    src="/gallery/activity-1.jpg"
+                                    alt="طلاب المدرسة"
+                                    className="w-full h-full object-cover"
+                                    style={{ objectPosition: 'center center' }}
+                                />
                             </div>
                         </div>
                     </div>
@@ -43,7 +72,12 @@ export default function LandingPage() {
                 <section id="about" className="py-20">
                     <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
                         <div className="order-2 md:order-1 relative h-96 rounded-3xl overflow-hidden shadow-2xl skew-x-3 hover:skew-x-0 transition-transform duration-500">
-                            <div className="w-full h-full bg-primary/10 flex items-center justify-center font-bold text-primary">صورة عن المدرسة</div>
+                            <img
+                                src="/about-school.jpg"
+                                alt="طلاب المدرسة مع الشيخ"
+                                className="w-full h-full object-cover"
+                                style={{ objectPosition: 'center center' }}
+                            />
                         </div>
                         <div className="order-1 md:order-2 space-y-6">
                             <h2 className="text-4xl font-black text-gray-900 font-headline">عن المدرسة</h2>

@@ -74,29 +74,39 @@ export default function HeroSection() {
                 >
                     <div className="relative z-10 grid grid-cols-2 gap-4">
                         <div className="space-y-4 translate-y-12">
-                            <div className="h-64 w-full bg-gray-200 rounded-3xl overflow-hidden shadow-2xl skew-y-3 hover:skew-y-0 transition-all duration-500 cursor-pointer">
-                                {/* Placeholder for Student Image */}
-                                <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white/20">
-                                    <Image src="/uploaded_media_0_1769876321884.png" alt="Student 1" width={400} height={600} className="object-cover w-full h-full opacity-80 hover:scale-110 transition-transform duration-700" />
-                                </div>
+                            <div className="h-64 w-full bg-gray-200 rounded-3xl overflow-hidden shadow-2xl skew-y-3 hover:skew-y-0 transition-all duration-500 cursor-pointer relative">
+                                <Image
+                                    src="/gallery/activity-3.jpg"
+                                    alt="نشاط طلابي"
+                                    fill
+                                    className="object-cover hover:scale-110 transition-transform duration-700"
+                                />
                             </div>
-                            <div className="h-48 w-full bg-gray-100 rounded-3xl overflow-hidden shadow-lg -skew-y-3 hover:skew-y-0 transition-all duration-500">
-                                <div className="w-full h-full bg-primary/10 flex items-center justify-center">
-                                    <Image src="/uploaded_media_1_1769876321884.png" alt="Quran" width={400} height={600} className="object-cover w-full h-full opacity-80 hover:scale-110 transition-transform duration-700" />
-                                </div>
+                            <div className="h-48 w-full bg-gray-100 rounded-3xl overflow-hidden shadow-lg -skew-y-3 hover:skew-y-0 transition-all duration-500 relative">
+                                <Image
+                                    src="/gallery/activity-2.jpg"
+                                    alt="حلقة قرآنية"
+                                    fill
+                                    className="object-cover hover:scale-110 transition-transform duration-700"
+                                />
                             </div>
                         </div>
                         <div className="space-y-4">
-                            <div className="h-48 w-full bg-gray-100 rounded-3xl overflow-hidden shadow-lg skew-y-3 hover:skew-y-0 transition-all duration-500">
-                                <div className="w-full h-full bg-secondary/10 flex items-center justify-center">
-                                    <Image src="/uploaded_media_2_1769876321884.png" alt="Mosque" width={400} height={600} className="object-cover w-full h-full opacity-80 hover:scale-110 transition-transform duration-700" />
-                                </div>
+                            <div className="h-48 w-full bg-gray-100 rounded-3xl overflow-hidden shadow-lg skew-y-3 hover:skew-y-0 transition-all duration-500 relative">
+                                <Image
+                                    src="/gallery/activity-7.jpg"
+                                    alt="طلاب المدرسة"
+                                    fill
+                                    className="object-cover hover:scale-110 transition-transform duration-700"
+                                />
                             </div>
-                            <div className="h-64 w-full bg-gray-200 rounded-3xl overflow-hidden shadow-2xl -skew-y-3 hover:skew-y-0 transition-all duration-500 cursor-pointer">
-                                <div className="w-full h-full bg-gradient-to-bl from-emerald-500 to-primary flex items-center justify-center text-white/20">
-                                    {/* Using one of the user provided images if possible or a solid color with pattern */}
-                                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/islamic-pattern.png')] opacity-20"></div>
-                                </div>
+                            <div className="h-64 w-full bg-gray-200 rounded-3xl overflow-hidden shadow-2xl -skew-y-3 hover:skew-y-0 transition-all duration-500 cursor-pointer relative">
+                                <Image
+                                    src="/gallery/activity-8.jpg"
+                                    alt="نشاط جماعي"
+                                    fill
+                                    className="object-cover hover:scale-110 transition-transform duration-700"
+                                />
                             </div>
                         </div>
                     </div>

@@ -84,6 +84,11 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     if (!authLoading && !user && pathname !== '/login' && !isParentPortal) {
       router.push('/login');
     }
+
+    // Redirect authenticated users from public root to home
+    if (!authLoading && user && pathname === '/') {
+      router.push('/home');
+    }
   }, [user, authLoading, router, pathname]);
 
   useEffect(() => {
