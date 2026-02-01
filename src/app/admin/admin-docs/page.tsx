@@ -607,7 +607,7 @@ export default function AdminDocsPage() {
                         direction: rtl;
                     }
                     @page { 
-                        size: 79mm auto; 
+                        size: 79mm auto portrait; 
                         margin: 0mm; 
                     }
                 }

@@ -1562,6 +1562,14 @@ export default function PreRegistrationPage() {
                     </div>
                 )
             }
+            <style jsx global>{`
+                @media print {
+                    @page { 
+                        size: A4 landscape; 
+                        margin: 10mm; 
+                    }
+                }
+            `}</style>
         </div >
     );
 }
