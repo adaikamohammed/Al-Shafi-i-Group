@@ -17,10 +17,10 @@ import { Users, GraduationCap, School, BookOpen } from 'lucide-react';
  */
 
 const stats = [
-    { label: 'طالب وطالبة', value: '850', icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { label: 'حافظ للكتاب', value: '45', icon: GraduationCap, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { label: 'حلقة قرآنية', value: '22', icon: School, color: 'text-amber-500', bg: 'bg-amber-50' },
-    { label: 'معلم ومربي', value: '35', icon: BookOpen, color: 'text-purple-500', bg: 'bg-purple-50' },
+    { label: 'طالب وطالبة', value: '249', icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
+    { label: 'حافظ للكتاب', value: '10', icon: GraduationCap, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { label: 'حلقة قرآنية', value: '18', icon: School, color: 'text-amber-500', bg: 'bg-amber-50' },
+    { label: 'معلم ومربي', value: '18', icon: BookOpen, color: 'text-purple-500', bg: 'bg-purple-50' },
 ];
 
 export default function StatsSection() {

@@ -26,9 +26,9 @@ export default function HeroSection() {
                         الريادة في تعليم القرآن الكريم
                     </div>
 
-                    <h1 className="text-5xl lg:text-7xl font-black text-gray-900 leading-[1.2] font-headline">
-                        نغرس <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-600">القين</span> <br />
-                        ونبني <span className="text-secondary">الأجيال</span>
+                    <h1 className="text-4xl lg:text-6xl font-black text-gray-900 leading-[1.4] font-headline py-2">
+                        الشافــعي… <span className="text-secondary">قــرآنٌ يهــدي</span>، <br />
+                        <span className="text-primary">عــلمٌ يُنــير</span>، <span className="text-emerald-600">جــيلٌ يُبــنى</span>.
                     </h1>
 
                     <p className="text-xl text-gray-500 leading-relaxed max-w-lg mr-0 ml-auto bg-white/50 backdrop-blur-sm p-4 rounded-xl border border-white/50 shadow-sm">
@@ -49,17 +49,17 @@ export default function HeroSection() {
                     {/* Stats Preview */}
                     <div className="flex gap-8 pt-8 border-t border-gray-200/60">
                         <div>
-                            <p className="text-3xl font-black text-gray-900 font-headline">+800</p>
+                            <p className="text-3xl font-black text-gray-900 font-headline">249</p>
                             <p className="text-sm text-gray-500 font-bold">طالب وطالبة</p>
                         </div>
                         <div className="w-px h-12 bg-gray-200"></div>
                         <div>
-                            <p className="text-3xl font-black text-gray-900 font-headline">+50</p>
+                            <p className="text-3xl font-black text-gray-900 font-headline">10</p>
                             <p className="text-sm text-gray-500 font-bold">خاتم للكتاب</p>
                         </div>
                         <div className="w-px h-12 bg-gray-200"></div>
                         <div>
-                            <p className="text-3xl font-black text-gray-900 font-headline">20</p>
+                            <p className="text-3xl font-black text-gray-900 font-headline">18</p>
                             <p className="text-sm text-gray-500 font-bold">حلقة قرآنية</p>
                         </div>
                     </div>

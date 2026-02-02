@@ -68,7 +68,7 @@ export default function PublicFooter() {
                                 </div>
                                 <div className="space-y-1">
                                     <span className="block text-white font-bold text-sm">الهاتف</span>
-                                    <span className="block text-slate-400 text-sm" dir="ltr">+213 6 00 00 00 00</span>
+                                    <span className="block text-slate-400 text-sm" dir="ltr">+213 6 63 33 70 90</span>
                                 </div>
                             </li>
                             <li className="flex items-start gap-4">
@@ -77,24 +77,51 @@ export default function PublicFooter() {
                                 </div>
                                 <div className="space-y-1">
                                     <span className="block text-white font-bold text-sm">البريد الإلكتروني</span>
-                                    <span className="block text-slate-400 text-sm font-sans">contact@alshafii-school.com</span>
+                                    <span className="block text-slate-400 text-sm font-sans">alshafiischool39@gmail.com</span>
                                 </div>
                             </li>
                         </ul>
                     </div>
 
-                    {/* Newsletter */}
+                    {/* Newsletter (Now Contact Form) */}
                     <div className="space-y-6">
-                        <h3 className="text-lg font-bold font-headline">النشرة البريدية</h3>
-                        <p className="text-slate-400 text-sm">اشترك في قائمتنا البريدية ليصلك كل جديد</p>
-                        <form className="space-y-3">
+                        <h3 className="text-lg font-bold font-headline">تواصل معنا</h3>
+                        <p className="text-slate-400 text-sm">راسلنا مباشرة عبر البريد الإلكتروني</p>
+                        <form
+                            className="space-y-3"
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                const form = e.currentTarget;
+                                const name = (form.elements.namedItem('name') as HTMLInputElement).value;
+                                const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+                                const subject = (form.elements.namedItem('subject') as HTMLInputElement).value;
+                                const body = `الاسم: ${name}%0D%0Aالبريد: ${email}%0D%0A%0D%0Aالرسالة:%0D%0A`;
+                                window.location.href = `mailto:alshafiischool39@gmail.com?subject=${encodeURIComponent(subject)}&body=${body}`;
+                            }}
+                        >
                             <input
-                                type="email"
-                                placeholder="بريدك الإلكتروني"
-                                className="w-full h-12 rounded-xl bg-white/5 border border-white/10 px-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 transition-colors"
+                                name="name"
+                                type="text"
+                                required
+                                placeholder="اسمك الكريم"
+                                className="w-full h-10 rounded-xl bg-white/5 border border-white/10 px-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 transition-colors text-sm"
                             />
-                            <button className="w-full h-12 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold transition-colors">
-                                اشتراك
+                            <input
+                                name="email"
+                                type="email"
+                                required
+                                placeholder="بريدك الإلكتروني"
+                                className="w-full h-10 rounded-xl bg-white/5 border border-white/10 px-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 transition-colors text-sm"
+                            />
+                            <input
+                                name="subject"
+                                type="text"
+                                required
+                                placeholder="موضوع الرسالة"
+                                className="w-full h-10 rounded-xl bg-white/5 border border-white/10 px-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 transition-colors text-sm"
+                            />
+                            <button type="submit" className="w-full h-10 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold transition-colors text-sm">
+                                إرسال الرسالة
                             </button>
                         </form>
                     </div>

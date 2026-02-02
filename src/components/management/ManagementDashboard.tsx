@@ -109,9 +109,18 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export const ManagementDashboard = () => {
     const { students, preRegistrations, allUsers, dailySessions, loading, generateDemoData } = useStudentContext();
-    const { user } = useAuth();
+    const { user, isManagement, isSuperAdmin } = useAuth();
     const [selectedGroup, setSelectedGroup] = React.useState<string>('all');
     const [timeframe, setTimeframe] = React.useState<string>('weekly');
+
+    const isSheikh = user?.role === 'sheikh';
+
+    // Auto-select group for sheikhs
+    React.useEffect(() => {
+        if (isSheikh && user?.group) {
+            setSelectedGroup(user.group);
+        }
+    }, [isSheikh, user?.group]);
 
     // FCM Integration
     const { permission, requestPermission } = useFCM();
@@ -135,7 +144,11 @@ export const ManagementDashboard = () => {
                 end = endOfWeek(now, { weekStartsOn: 6 }); break;
         }
 
-        const uniqueGroups = Array.from(new Set(allUsers.filter(u => u.role === 'sheikh' && u.group).map(u => u.group)));
+        const sheikhUsers = allUsers.length > 0
+            ? allUsers.filter(u => u.role === 'sheikh' && u.group)
+            : (isSheikh && user ? [{ ...user }] : []);
+
+        const uniqueGroups = Array.from(new Set(sheikhUsers.map(u => u.group)));
 
         return uniqueGroups.map(groupName => {
             let totalSessions = 0;
@@ -149,7 +162,7 @@ export const ManagementDashboard = () => {
                 const sessionDate = parseISO(date);
                 if (isWithinInterval(sessionDate, { start, end })) {
                     Object.values(sessionsOnDay).forEach((session: any) => {
-                        const sheikh = allUsers.find(u => u.uid === session.ownerId);
+                        const sheikh = allUsers.find(u => u.uid === session.ownerId) || (isSheikh && session.ownerId === user?.uid ? user : null);
                         if (sheikh?.group === groupName) {
                             totalSessions++;
                             (session.records || []).forEach(record => {
@@ -208,7 +221,11 @@ export const ManagementDashboard = () => {
 
         // Group Comparison Data
         // 1. Get unique group names
-        const uniqueGroups = Array.from(new Set(allUsers.filter(u => u.role === 'sheikh' && u.group).map(u => u.group)));
+        const sheikhUsers = allUsers.length > 0
+            ? allUsers.filter(u => u.role === 'sheikh' && u.group)
+            : (isSheikh && user ? [{ ...user }] : []);
+
+        const uniqueGroups = Array.from(new Set(sheikhUsers.map(u => u.group)));
 
         const groupComparisonData = uniqueGroups.map(groupName => {
             // Find primary sheikh for display name (just pick one)
@@ -309,104 +326,128 @@ export const ManagementDashboard = () => {
                     </Tabs>
 
                     <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                if (window.confirm('هل أنت متأكد من توليد بيانات تجريبية؟ سيتم إضافة مشايخ وطلاب وهميين.')) {
-                                    window.dispatchEvent(new CustomEvent('GENERATE_DEMO_DATA'));
-                                }
-                            }}
-                            className={cn(
-                                "gap-2 border-dashed h-10 rounded-xl",
-                                theme.isLight ? "border-amber-500/50 hover:bg-amber-50/50" : "border-amber-500/30 hover:bg-amber-500/10"
-                            )}
-                        >
-                            <Shield className="h-4 w-4" />
-                            تهيئة
-                        </Button>
-                        <GroupSelector value={selectedGroup} onChange={setSelectedGroup} />
+                        {!isSheikh && (
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    if (window.confirm('هل أنت متأكد من توليد بيانات تجريبية؟ سيتم إضافة مشايخ وطلاب وهميين.')) {
+                                        window.dispatchEvent(new CustomEvent('GENERATE_DEMO_DATA'));
+                                    }
+                                }}
+                                className={cn(
+                                    "gap-2 border-dashed h-10 rounded-xl",
+                                    theme.isLight ? "border-amber-500/50 hover:bg-amber-50/50" : "border-amber-500/30 hover:bg-amber-500/10"
+                                )}
+                            >
+                                <Shield className="h-4 w-4" />
+                                تهيئة
+                            </Button>
+                        )}
+                        {!isSheikh && <GroupSelector value={selectedGroup} onChange={setSelectedGroup} />}
+                        {isSheikh && (
+                            <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-100 font-bold flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                {user?.group}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
             {/* Smart Monitoring Section (Combined Chart + Table Concept) */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                {/* Main Interactive Chart */}
-                <Card className={cn(
-                    "lg:col-span-3 border-none shadow-2xl overflow-hidden flex flex-col",
-                    theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
-                )}>
-                    <CardHeader className="pb-2 border-b border-gray-100 dark:border-white/10">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <CardTitle className="text-2xl font-headline font-bold flex items-center gap-3">
-                                    <Activity className="text-indigo-500 h-6 w-6" />
-                                    مراقبة نمو الأفواج
-                                </CardTitle>
-                                <CardDescription className="opacity-70 mt-1">
-                                    تحليل تفاعلي لتوزيع الطلبة ونشاطهم عبر المجموعات التعليمية
-                                </CardDescription>
-                            </div>
-                            <div className="flex gap-2 text-xs font-bold">
-                                <div className="flex items-center gap-1 bg-indigo-50 px-3 py-1 rounded-full text-indigo-700">
-                                    <div className="w-2 h-2 rounded-full bg-indigo-500" />
-                                    <span>نشط</span>
-                                </div>
-                                <div className="flex items-center gap-1 bg-slate-50 px-3 py-1 rounded-full text-slate-600 text-xs">
-                                    <div className="w-2 h-2 rounded-full bg-slate-300" />
-                                    <span>خامل</span>
-                                </div>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="flex-1 p-4 min-h-[400px]">
-                        <InteractiveGrowthChart data={stats.groupComparisonData} />
-                    </CardContent>
-                </Card>
-
-                {/* Radar & Summary - Compact Side Panel */}
-                <div className="flex flex-col gap-6 h-full">
-                    {/* Radar Chart */}
-                    <div className="bg-white dark:bg-white/5 rounded-xl shadow-xl overflow-hidden flex-1 min-h-[300px] relative">
-                        <div className="absolute top-4 right-4 z-10">
-                            <h3 className="font-bold text-sm bg-white/50 backdrop-blur px-2 py-1 rounded-lg">الأداء النوعي</h3>
-                        </div>
-                        <MonitoringRadar data={aggregatedData} selectedGroup={selectedGroup} />
-                    </div>
-
-                    {/* Quick KPI for selected Group or All */}
+            <div className={cn("grid grid-cols-1 gap-8", isSheikh ? "" : "lg:grid-cols-4")}>
+                {/* Main Interactive Chart - Only for Management */}
+                {!isSheikh && (
                     <Card className={cn(
-                        "border-none shadow-xl flex-shrink-0",
-                        theme.isLight ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white" : "bg-gradient-to-br from-indigo-900 to-purple-900 text-white"
+                        "lg:col-span-3 border-none shadow-2xl overflow-hidden flex flex-col",
+                        theme.isLight ? "bg-white text-slate-900" : "bg-white/5 text-white"
                     )}>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base font-bold flex items-center justify-between">
-                                <span>{selectedGroup === 'all' ? 'متوسط الأداء العام' : selectedGroup}</span>
-                                <Target className="h-4 w-4 opacity-80" />
-                            </CardTitle>
+                        <CardHeader className="pb-2 border-b border-gray-100 dark:border-white/10">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <CardTitle className="text-2xl font-headline font-bold flex items-center gap-3">
+                                        <Activity className="text-indigo-500 h-6 w-6" />
+                                        مراقبة نمو الأفواج
+                                    </CardTitle>
+                                    <CardDescription className="opacity-70 mt-1">
+                                        تحليل تفاعلي لتوزيع الطلبة ونشاطهم عبر المجموعات التعليمية
+                                    </CardDescription>
+                                </div>
+                                <div className="flex gap-2 text-xs font-bold">
+                                    <div className="flex items-center gap-1 bg-indigo-50 px-3 py-1 rounded-full text-indigo-700">
+                                        <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                                        <span>نشط</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 bg-slate-50 px-3 py-1 rounded-full text-slate-600 text-xs">
+                                        <div className="w-2 h-2 rounded-full bg-slate-300" />
+                                        <span>خامل</span>
+                                    </div>
+                                </div>
+                            </div>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex justify-between items-end border-b border-white/20 pb-2">
-                                <span className="text-xs opacity-80">نسبة الحضور</span>
-                                <span className="text-2xl font-black font-headline">
-                                    {selectedGroup === 'all'
-                                        ? (aggregatedData.length > 0 ? Math.round(aggregatedData.reduce((acc, curr) => acc + curr.attendanceRate, 0) / aggregatedData.length) : 0)
-                                        : (aggregatedData.find(g => g.groupName === selectedGroup)?.attendanceRate || 0)
-                                    }%
-                                </span>
-                            </div>
-                            <div className="flex justify-between items-end">
-                                <span className="text-xs opacity-80">التقييم العام</span>
-                                <span className="text-xl font-black font-headline text-amber-300">
-                                    {selectedGroup === 'all'
-                                        ? (aggregatedData.length > 0 ? Math.round(aggregatedData.reduce((acc, curr) => acc + curr.evaluationScore, 0) / aggregatedData.length) : 0)
-                                        : (aggregatedData.find(g => g.groupName === selectedGroup)?.evaluationScore || 0)
-                                    }
-                                    <span className="text-xs text-white/50 mr-1">/100</span>
-                                </span>
-                            </div>
+                        <CardContent className="flex-1 p-4 min-h-[400px]">
+                            <InteractiveGrowthChart data={stats.groupComparisonData} />
                         </CardContent>
                     </Card>
+                )}
+
+                {/* Radar & Summary - Compact Side Panel */}
+                <div className={cn("flex flex-col gap-6 h-full", isSheikh ? "w-full" : "")}>
+                    <div className={cn("grid grid-cols-1 gap-6", isSheikh ? "md:grid-cols-2" : "")}>
+                        {/* Radar Chart */}
+                        <div className="bg-white dark:bg-white/5 rounded-xl shadow-xl overflow-hidden min-h-[300px] relative">
+                            <div className="absolute top-4 right-4 z-10">
+                                <h3 className="font-bold text-sm bg-white/50 backdrop-blur px-2 py-1 rounded-lg">الأداء النوعي للفوج</h3>
+                            </div>
+                            <MonitoringRadar data={aggregatedData} selectedGroup={selectedGroup} />
+                        </div>
+
+                        {/* Quick KPI for selected Group or All */}
+                        <Card className={cn(
+                            "border-none shadow-xl flex flex-col justify-center",
+                            theme.isLight ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white" : "bg-gradient-to-br from-indigo-900 to-purple-900 text-white"
+                        )}>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-xl font-bold flex items-center justify-between">
+                                    <span>{selectedGroup === 'all' ? 'متوسط الأداء العام' : selectedGroup}</span>
+                                    <Target className="h-6 w-6 opacity-80" />
+                                </CardTitle>
+                                <CardDescription className="text-white/70">
+                                    تحليل الأداء بناءً على تقييمات الحصص الأخيرة
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6 pt-4">
+                                <div className="flex justify-between items-end border-b border-white/20 pb-4">
+                                    <span className="text-sm opacity-80">نسبة الحضور</span>
+                                    <span className="text-3xl font-black font-headline">
+                                        {selectedGroup === 'all'
+                                            ? (aggregatedData.length > 0 ? Math.round(aggregatedData.reduce((acc, curr) => acc + curr.attendanceRate, 0) / aggregatedData.length) : 0)
+                                            : (aggregatedData.find(g => g.groupName === selectedGroup)?.attendanceRate || 0)
+                                        }%
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-end border-b border-white/20 pb-4">
+                                    <span className="text-sm opacity-80">نسبة المراجعة</span>
+                                    <span className="text-3xl font-black font-headline text-emerald-300">
+                                        {selectedGroup === 'all'
+                                            ? (aggregatedData.length > 0 ? Math.round(aggregatedData.reduce((acc, curr) => acc + curr.reviewRate, 0) / aggregatedData.length) : 0)
+                                            : (aggregatedData.find(g => g.groupName === selectedGroup)?.reviewRate || 0)
+                                        }%
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-end">
+                                    <span className="text-sm opacity-80">تقييم الحفظ</span>
+                                    <span className="text-3xl font-black font-headline text-amber-300">
+                                        {selectedGroup === 'all'
+                                            ? (aggregatedData.length > 0 ? Math.round(aggregatedData.reduce((acc, curr) => acc + curr.evaluationScore, 0) / aggregatedData.length) : 0)
+                                            : (aggregatedData.find(g => g.groupName === selectedGroup)?.evaluationScore || 0)
+                                        }
+                                        <span className="text-sm text-white/50 mr-1">/100</span>
+                                    </span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
             </div>
 
@@ -418,30 +459,56 @@ export const ManagementDashboard = () => {
                     icon={Users}
                     color="bg-blue-500"
                     gradient="from-blue-500 to-cyan-400"
-                    description="+12% نمو شهري"
+                    description={isSheikh ? "طلاب فوجك الحالي" : "+12% نمو شهري"}
                     theme={theme}
                 />
-                <StatCard
-                    title="الكادر التعليمي"
-                    value={stats.totalSheikhs}
-                    icon={UserCheck}
-                    color="bg-emerald-500"
-                    gradient="from-emerald-500 to-teal-400"
-                    description="مشايخ وأساتذة"
-                    theme={theme}
-                />
-                <StatCard
-                    title="تسجيلات جديدة"
-                    value={stats.pendingRegs}
-                    icon={UserPlus}
-                    color="bg-amber-500"
-                    gradient="from-amber-500 to-orange-400"
-                    description="في انتظار الموافقة"
-                    theme={theme}
-                />
+                {!isSheikh && (
+                    <StatCard
+                        title="الكادر التعليمي"
+                        value={stats.totalSheikhs}
+                        icon={UserCheck}
+                        color="bg-emerald-500"
+                        gradient="from-emerald-500 to-teal-400"
+                        description="مشايخ وأساتذة"
+                        theme={theme}
+                    />
+                )}
+                {isSheikh && (
+                    <StatCard
+                        title="رقم الفوج"
+                        value={user?.group?.replace(/[^0-9]/g, '') || '-'}
+                        icon={Shield}
+                        color="bg-emerald-500"
+                        gradient="from-emerald-500 to-teal-400"
+                        description={user?.group || "فوجك التعليمي"}
+                        theme={theme}
+                    />
+                )}
+                {!isSheikh && (
+                    <StatCard
+                        title="تسجيلات جديدة"
+                        value={stats.pendingRegs}
+                        icon={UserPlus}
+                        color="bg-amber-500"
+                        gradient="from-amber-500 to-orange-400"
+                        description="في انتظار الموافقة"
+                        theme={theme}
+                    />
+                )}
+                {isSheikh && (
+                    <StatCard
+                        title="معدل الحضور"
+                        value={`${aggregatedData.find(g => g.groupName === selectedGroup)?.attendanceRate || 0}%`}
+                        icon={UserCheck}
+                        color="bg-amber-500"
+                        gradient="from-amber-500 to-orange-400"
+                        description="التزام الطلبة بالفوج"
+                        theme={theme}
+                    />
+                )}
                 <StatCard
                     title="معدل الإنجاز"
-                    value={stats.completionRate}
+                    value={isSheikh ? `${aggregatedData.find(g => g.groupName === selectedGroup)?.evaluationScore || 0}%` : stats.completionRate}
                     icon={Award}
                     color="bg-purple-500"
                     gradient="from-purple-500 to-pink-400"

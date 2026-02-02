@@ -85,10 +85,10 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
       router.push('/login');
     }
 
-    // Redirect authenticated users from public root to home
-    if (!authLoading && user && pathname === '/') {
-      router.push('/home');
-    }
+    // Redirect authenticated users from public root to home - DISABLED to allow access to public page
+    // if (!authLoading && user && pathname === '/') {
+    //   router.push('/home');
+    // }
   }, [user, authLoading, router, pathname]);
 
   useEffect(() => {
@@ -247,6 +247,22 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
               </SidebarMenuItem>
             );
           })}
+
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              tooltip="الواجهة العامة"
+              className={cn(
+                "rounded-xl h-10 px-3 transition-all duration-300",
+                theme.isLight ? "text-slate-600 hover:bg-slate-100" : "text-white/60 hover:bg-white/5 hover:text-white"
+              )}
+            >
+              <Link href="/" className="flex items-center gap-3">
+                <Home className="h-4 w-4 shrink-0" />
+                <span className="font-bold text-[11px] tracking-tight group-data-[collapsible=icon]:hidden">الواجهة العامة</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
 
           <SidebarMenuItem>
             <SidebarMenuButton
