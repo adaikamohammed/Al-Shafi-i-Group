@@ -73,6 +73,7 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'النافذة الإدارية',
         items: [
             { href: '/management/monitoring', label: 'نظام المراقبة', icon: BarChart3, primary: true },
+            { href: '/management/sheikh-monitoring', label: 'مراقبة المشايخ', icon: Activity },
             { href: '/admin/broadcast', label: 'مركز الإرسال', icon: Megaphone },
             { href: '/occasions', label: 'المناسبات الدينية', icon: MoonStar },
             { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus },
