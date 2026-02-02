@@ -256,9 +256,10 @@ body {
 
   .printable-section {
     position: absolute;
-    left: 0;
+    left: 5mm !important;
+    right: 5mm !important;
     top: 0;
-    width: 100%;
+    width: auto !important;
   }
 
   .no-print {
@@ -279,17 +280,31 @@ body {
   body {
     color: black !important;
     background-color: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   @page {
     size: 80mm auto;
-    margin: 0 5mm;
+    margin: 0;
   }
 
-  /* Ensure receipt uses correct width */
+  /* Ensure receipt uses correct width with safe margins */
   #printable-receipt {
-    width: 70mm !important;
+    width: 100% !important;
+    max-width: 70mm !important;
     margin: 0 auto !important;
     padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Force receipt container to respect the width */
+  .receipt-container {
+    width: 100% !important;
+    max-width: 70mm !important;
+    margin: 0 auto !important;
+    padding-left: 3mm !important;
+    padding-right: 3mm !important;
+    box-sizing: border-box !important;
   }
 }

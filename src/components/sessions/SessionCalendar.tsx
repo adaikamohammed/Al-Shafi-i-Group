@@ -51,7 +51,7 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
     const renderDays = () => {
         const daysInMonth = getDaysInMonth(currentDate);
         const firstDayOfMonth = getDay(startOfMonth(currentDate));
-        const startDayIndex = (firstDayOfMonth + 1) % 7;
+        const startDayIndex = firstDayOfMonth % 7;
         const days = [];
 
         // Empty cells for days before the 1st

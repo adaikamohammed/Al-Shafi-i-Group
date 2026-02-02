@@ -208,22 +208,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setActivityLogs(logsArray);
       };
 
-      // TEMPORARILY DISABLED: Admin aggregation requires Firebase security rules update
-      // The current rules don't allow reading /users node
-      // For now, admin users will see only their own data like regular sheikhs
-      console.warn('⚠️ Admin data aggregation disabled - Firebase rules need update');
-      console.warn('Admin users will see only their own data until rules are updated');
 
-      toast({
-        title: "تنبيه",
-        description: "عرض البيانات الإدارية محدود حالياً. يرجى تحديث قواعد Firebase لتفعيل العرض الشامل.",
-        variant: "default"
-      });
-
-      setLoading(false);
-      setAllUsers([]);
-
-      /* ORIGINAL CODE - REQUIRES FIREBASE RULES UPDATE:
       // 1. All Users Listener (available to all for transfer dialog)
       allUsersRef = ref(db, 'users');
       allUsersListener = onValue(allUsersRef, (snapshot: any) => {
@@ -354,7 +339,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
         if (isSuperAdmin || isManagement) setLoading(false);
       });
-      */
 
       // 2. Pre-registrations
       preRegsRef = ref(db, 'pre_registrations');
