@@ -49,6 +49,14 @@ export function SearchableSelect({
 
     const selectedOption = options.find((option) => option.value === value);
 
+    const normalize = (text: string) => {
+        return text.toLowerCase()
+            .replace(/[آأإ]/g, 'ا')
+            .replace(/ة/g, 'ه')
+            .replace(/ى/g, 'ي')
+            .trim();
+    };
+
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
@@ -65,7 +73,12 @@ export function SearchableSelect({
             {/* Hidden input for form submission support */}
             <input type="hidden" name={name} value={value} />
             <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                <Command className="w-full">
+                <Command
+                    className="w-full"
+                    filter={(value, search) => {
+                        return normalize(value).includes(normalize(search)) ? 1 : 0;
+                    }}
+                >
                     <CommandInput placeholder={searchPlaceholder} />
                     <CommandList>
                         <CommandEmpty>{emptyMessage}</CommandEmpty>
@@ -73,9 +86,9 @@ export function SearchableSelect({
                             {options.map((option) => (
                                 <CommandItem
                                     key={option.value}
-                                    value={option.value}
-                                    onSelect={(currentValue) => {
-                                        onValueChange(currentValue === value ? "" : currentValue);
+                                    value={option.label + " " + option.value}
+                                    onSelect={() => {
+                                        onValueChange(option.value === value ? "" : option.value);
                                         setOpen(false);
                                     }}
                                 >

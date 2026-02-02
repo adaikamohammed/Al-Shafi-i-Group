@@ -55,11 +55,20 @@ export default function AdminDocsPage() {
     // Search Logic
     const filteredStudents = useMemo(() => {
         if (!searchTerm.trim()) return [];
-        const term = searchTerm.toLowerCase();
+
+        const normalize = (text: string) => {
+            return text.toLowerCase()
+                .replace(/[آأإ]/g, 'ا')
+                .replace(/ة/g, 'ه')
+                .replace(/ى/g, 'ي')
+                .trim();
+        };
+
+        const term = normalize(searchTerm);
         return students.filter(s =>
-            s.fullName.toLowerCase().includes(term) ||
+            normalize(s.fullName).includes(term) ||
             (s.phone1 && s.phone1.includes(term))
-        ).slice(0, 5);
+        ).slice(0, 10);
     }, [students, searchTerm]);
 
     const selectedSheikhName = useMemo(() => {
@@ -622,7 +631,7 @@ export default function AdminDocsPage() {
                         width: 79mm !important;
                         min-width: 79mm !important;
                         max-width: 79mm !important;
-                        padding: 15mm 5mm 0 5mm !important;
+                        padding: 0 5mm 0 5mm !important;
                         margin: 0 !important;
                         box-shadow: none !important;
                         border: none !important;
@@ -642,17 +651,20 @@ export default function AdminDocsPage() {
                         line-height: 1.2 !important;
                     }
                     #printable-receipt p, #printable-receipt span {
-                        font-size: 13px !important;
-                        line-height: 1.3 !important;
+                        font-size: 15px !important;
+                        line-height: 1.4 !important;
+                        color: black !important;
                     }
                     .receipt-field-label {
-                        font-size: 11px !important;
+                        font-size: 14px !important;
                         margin-bottom: 0.5mm !important;
-                        font-weight: 900 !important;
+                        font-weight: 1000 !important;
+                        color: black !important;
                     }
                     .receipt-field-value {
-                        font-size: 15px !important;
+                        font-size: 19px !important;
                         font-weight: 1000 !important;
+                        color: black !important;
                     }
                     .receipt-ticket-number {
                         font-size: 14px !important;
