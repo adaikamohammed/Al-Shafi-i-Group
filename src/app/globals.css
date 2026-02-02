@@ -282,7 +282,14 @@ body {
   }
 
   @page {
-    size: A4 portrait;
-    margin: 1.5cm;
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  /* Ensure receipt uses correct width */
+  #printable-receipt {
+    width: 80mm !important;
+    margin: 0 !important;
+    padding: 5mm !important;
   }
 }
