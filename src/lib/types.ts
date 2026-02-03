@@ -114,6 +114,8 @@ export interface DailyReport {
   isPinned: boolean;
   priority?: 'normal' | 'urgent' | 'important';
   hasNewReply?: boolean;
+  isManagementMessage?: boolean;
+  recipientId?: string;
 }
 
 

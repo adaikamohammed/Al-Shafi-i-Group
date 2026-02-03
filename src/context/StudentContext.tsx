@@ -108,6 +108,7 @@ interface StudentContextType {
   internalNotifications: InternalNotification[];
   addInternalNotification: (recipientId: string, title: string, message: string, type: InternalNotification['type'], metadata?: any) => Promise<void>;
   markNotificationAsRead: (notificationId: string) => Promise<void>;
+  sendManagementMessage: (targetSheikhId: string, messageData: Partial<DailyReport>, alternateUids?: string[]) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -1013,8 +1014,52 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     };
 
     await set(reportRef, fullReportData);
-
   }
+
+  const sendManagementMessage = async (targetSheikhId: string, messageData: Partial<DailyReport>, alternateUids?: string[]) => {
+    if (!authContextUser || (!isSuperAdmin && !isManagement)) {
+      throw new Error("Only management can send messages to sheikhs");
+    }
+
+    const reportId = Date.now().toString();
+    const date = new Date().toISOString().split('T')[0];
+
+    const finalMessage: DailyReport = {
+      id: reportId,
+      date,
+      timestamp: new Date().toISOString(),
+      authorId: authContextUser.uid,
+      authorName: authContextUser.displayName || 'الإدارة',
+      note: messageData.note || '',
+      category: messageData.category || 'رسالة إدارية',
+      status: 'reviewed',
+      adminNotes: null,
+      isPinned: messageData.isPinned || false,
+      priority: messageData.priority || 'normal',
+      isManagementMessage: true,
+      hasNewReply: true
+    };
+
+    const allRecipientUids = [targetSheikhId, ...(alternateUids || [])];
+    const uploadOps = allRecipientUids.map(uid => {
+      const reportRef = ref(db, `users/${uid}/dailyReports/${date}/${reportId}`);
+      return set(reportRef, sanitizeData({ ...finalMessage, recipientId: uid }));
+    });
+
+    await Promise.all(uploadOps);
+
+    // Log the action
+    logActivity(
+      'ADMIN_MSG',
+      authContextUser.uid,
+      `رسالة إدارية إلى: ${targetSheikhId}`,
+      reportId,
+      finalMessage.note.substring(0, 50),
+      authContextUser.displayName || 'Admin',
+      'Management',
+      targetSheikhId
+    );
+  };
 
   const deleteDailyReport = async (reportId: string, date: string) => {
     if (!authContextUser) throw new Error("User not authenticated");
@@ -1708,7 +1753,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       meetings,
       internalNotifications,
       addInternalNotification,
-      markNotificationAsRead
+      markNotificationAsRead,
+      sendManagementMessage
     }}>
       {children}
     </StudentContext.Provider>

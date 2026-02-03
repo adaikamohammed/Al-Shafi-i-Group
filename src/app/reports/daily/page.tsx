@@ -12,7 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { format, parseISO, getMonth, getYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, MoreVertical, Edit, Trash2, Eye, CheckCircle, Pin, PinOff, Calendar } from 'lucide-react';
+import { Loader2, Save, MoreVertical, Edit, Trash2, Eye, CheckCircle, Pin, PinOff, Calendar, Shield, Send } from 'lucide-react';
 import type { DailyReport } from '@/lib/types';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -60,19 +60,26 @@ const ReportCard = ({ report, isSuperAdmin, isAdmin, onEdit, onDelete, onToggleP
     return (
         <Card key={report.id} className={cn(
             "overflow-hidden border-l-4",
-            report.isPinned ? 'border-yellow-400 ring-2 ring-yellow-400/20' : (categoryColors[report.category] || 'border-gray-300')
+            report.isManagementMessage ? 'border-purple-600 bg-purple-50/50 dark:bg-purple-900/10' :
+                report.isPinned ? 'border-yellow-400 ring-2 ring-yellow-400/20' : (categoryColors[report.category] || 'border-gray-300')
         )}>
+            {report.isManagementMessage && (
+                <div className="bg-purple-600 text-white text-[10px] uppercase font-black px-3 py-1 text-center tracking-widest">
+                    رسالة إدارية هامة
+                </div>
+            )}
             <CardHeader className="p-4 flex-row justify-between items-start">
                 <div>
                     <div className="flex items-center gap-2 flex-wrap">
                         {report.isPinned && <Pin className="h-4 w-4 text-yellow-500" />}
-                        <p><span className="font-semibold">التصنيف:</span> {report.category}</p>
+                        {report.isManagementMessage && <Shield className="h-4 w-4 text-purple-600" />}
+                        <p><span className="font-semibold">{report.isManagementMessage ? 'نوع الرسالة:' : 'التصنيف:'}</span> {report.category}</p>
                         {report.priority && report.priority !== 'normal' && (
                             <Badge className={priorityConfig[report.priority].color}>
                                 {priorityConfig[report.priority].label}
                             </Badge>
                         )}
-                        {report.hasNewReply && !isSuperAdmin && (
+                        {report.hasNewReply && !isAdmin && (
                             <Badge className="bg-blue-600 animate-bounce">رد جديد 🔥</Badge>
                         )}
                     </div>
@@ -177,7 +184,7 @@ const ReportCard = ({ report, isSuperAdmin, isAdmin, onEdit, onDelete, onToggleP
 };
 
 export default function DailyReportPage() {
-    const { dailyReports, saveDailyReport, deleteDailyReport, loading } = useStudentContext();
+    const { dailyReports, saveDailyReport, deleteDailyReport, sendManagementMessage, allUsers, loading } = useStudentContext();
     const { user, isSuperAdmin, isManagement } = useAuth();
     const { toast } = useToast();
 
@@ -187,6 +194,36 @@ export default function DailyReportPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [uploadStatus, setUploadStatus] = useState<string | null>(null);
     const [editingReport, setEditingReport] = useState<DailyReport | null>(null);
+
+    // Admin Messaging State
+    const [targetSheikhId, setTargetSheikhId] = useState<string>("");
+    const [adminMsgNote, setAdminMsgNote] = useState("");
+    const [isAdminSending, setIsAdminSending] = useState(false);
+
+    const sheikhs = useMemo(() => {
+        const filtered = allUsers.filter(u => u.role === 'sheikh' && u.group);
+        const groupsMap = new Map();
+
+        for (const u of filtered) {
+            const groupKey = u.group?.trim();
+            if (!groupKey) continue;
+            if (!groupsMap.has(groupKey)) {
+                groupsMap.set(groupKey, {
+                    ...u,
+                    group: groupKey,
+                    uids: [u.uid]
+                });
+            } else {
+                groupsMap.get(groupKey).uids.push(u.uid);
+            }
+        }
+
+        return Array.from(groupsMap.values()).sort((a, b) => {
+            const numA = parseInt(a.group?.replace(/[^0-9]/g, '') || '0');
+            const numB = parseInt(b.group?.replace(/[^0-9]/g, '') || '0');
+            return numA - numB;
+        });
+    }, [allUsers]);
 
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -208,7 +245,11 @@ export default function DailyReportPage() {
                     return getMonth(reportDate) === selectedMonth && getYear(reportDate) === selectedYear;
                 } catch (e) { return false; }
             })
-            .sort((a, b) => (b.isPinned ? 1 : -1) - (a.isPinned ? 1 : -1) || b.id.localeCompare(a.id));
+            .sort((a, b) =>
+                (b.isManagementMessage ? 1 : 0) - (a.isManagementMessage ? 1 : 0) ||
+                (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0) ||
+                b.id.localeCompare(a.id)
+            );
     }, [dailyReports, selectedMonth, selectedYear]);
 
     const filteredReports = useMemo(() => {
@@ -279,6 +320,41 @@ export default function DailyReportPage() {
         }
     };
 
+    const handleSendAdminMessage = async () => {
+        if (!targetSheikhId) {
+            toast({ title: "تنبيه", description: "يرجى اختيار الشيخ المستلم.", variant: "destructive" });
+            return;
+        }
+        if (!adminMsgNote.trim()) {
+            toast({ title: "تنبيه", description: "يرجى كتابة نص الرسالة.", variant: "destructive" });
+            return;
+        }
+
+        setIsAdminSending(true);
+        try {
+            const targetSheikh = sheikhs.find(s => s.uid === targetSheikhId);
+            const alternateUids = targetSheikh?.uids?.filter((id: string) => id !== targetSheikhId) || [];
+
+            await sendManagementMessage(targetSheikhId, {
+                note: adminMsgNote,
+                priority: 'important',
+                category: 'توجيه إداري'
+            }, alternateUids);
+            toast({ title: "✅ تم الإرسال", description: "تم إرسال الرسالة إلى حساب الشيخ بنجاح." });
+            setAdminMsgNote("");
+            setTargetSheikhId("");
+        } catch (error: any) {
+            console.error("Message Error:", error);
+            toast({
+                title: "خطأ",
+                description: `فشل إرسال الرسالة: ${error.message || 'مشكلة في الصلاحيات'}`,
+                variant: "destructive"
+            });
+        } finally {
+            setIsAdminSending(false);
+        }
+    };
+
     const handleEditClick = (report: DailyReport) => {
         setEditingReport(report);
         setNote(report.note);
@@ -345,6 +421,48 @@ export default function DailyReportPage() {
 
     return (
         <div className="space-y-6">
+            {isAdmin && (
+                <Card className="border-purple-500/20 bg-gradient-to-r from-purple-500/5 to-transparent border-r-4 border-r-purple-600 overflow-hidden shadow-lg animate-in slide-in-from-top-4 duration-500">
+                    <CardHeader className="py-4">
+                        <CardTitle className="text-lg flex items-center gap-2 text-purple-700">
+                            <Shield className="h-5 w-5" /> إرسال رسالة رسمية إلى شيخ
+                        </CardTitle>
+                        <CardDescription>هذه الرسالة ستظهر للشيخ في أعلى صفحته الخاصة بالتقارير اليومية وبشكل مميز.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="md:col-span-1">
+                                <Select value={targetSheikhId} onValueChange={setTargetSheikhId}>
+                                    <SelectTrigger className="bg-white rounded-xl h-11 border-purple-200">
+                                        <SelectValue placeholder="اختر الشيخ المستهدف" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {sheikhs.map(s => (
+                                            <SelectItem key={s.uid} value={s.uid}>{s.displayName} {s.group ? `(${s.group})` : ''}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="md:col-span-2 flex gap-2">
+                                <Input
+                                    placeholder="اكتب توجيهك الإداري هنا..."
+                                    value={adminMsgNote}
+                                    onChange={(e) => setAdminMsgNote(e.target.value)}
+                                    className="bg-white rounded-xl h-11 border-purple-200"
+                                />
+                                <Button
+                                    onClick={handleSendAdminMessage}
+                                    disabled={isAdminSending}
+                                    className="rounded-xl gap-2 font-bold px-6 bg-purple-600 hover:bg-purple-700 h-11"
+                                >
+                                    {isAdminSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} إرسال التوجيه
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {upcomingMeeting && !isSuperAdmin && (
                 <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent border-r-4 border-r-primary overflow-hidden shadow-lg animate-in slide-in-from-top-4 duration-500">
                     <CardHeader className="py-4">
@@ -496,7 +614,7 @@ export default function DailyReportPage() {
                                 </h3>
                                 <div className="space-y-4">
                                     {pinnedReports.map(report => (
-                                        <div key={report.id} onMouseEnter={() => markAsRead(report)}>
+                                        <div key={`${report.recipientId || report.authorId || 'admin'}_${report.id}`} onMouseEnter={() => markAsRead(report)}>
                                             <ReportCard
                                                 report={report}
                                                 isSuperAdmin={isSuperAdmin}
@@ -530,7 +648,7 @@ export default function DailyReportPage() {
                                 )}
                                 <div className="space-y-4">
                                     {unpinnedReports.map(report => (
-                                        <div key={report.id} onMouseEnter={() => markAsRead(report)}>
+                                        <div key={`${report.recipientId || report.authorId || 'admin'}_${report.id}`} onMouseEnter={() => markAsRead(report)}>
                                             <ReportCard
                                                 report={report}
                                                 isSuperAdmin={isSuperAdmin}
