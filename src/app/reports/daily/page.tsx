@@ -19,6 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 const defaultCategories = ["اقتراح", "شكوى", "ملاحظة عامة", "شكر", "طلب", "إذن غياب", "طلب صيانة", "إنجاز استثنائي", "حالة طارئة"];
@@ -215,7 +216,7 @@ export default function DailyReportPage() {
     const [editingReport, setEditingReport] = useState<DailyReport | null>(null);
 
     // Admin Messaging State
-    const [targetSheikhId, setTargetSheikhId] = useState<string>("");
+    const [targetSheikhIds, setTargetSheikhIds] = useState<string[]>([]);
     const [adminMsgNote, setAdminMsgNote] = useState("");
     const [isAdminSending, setIsAdminSending] = useState(false);
 
@@ -341,33 +342,41 @@ export default function DailyReportPage() {
     };
 
     const handleSendAdminMessage = async () => {
-        if (!targetSheikhId) {
-            toast({ title: "تنبيه", description: "يرجى اختيار الشيخ المستلم.", variant: "destructive" });
+        if (targetSheikhIds.length === 0) {
+            toast({ title: "تنبيه", description: "يرجى اختيار المشايخ المستلمون.", variant: "destructive" });
             return;
         }
         if (!adminMsgNote.trim()) {
-            toast({ title: "تنبيه", description: "يرجى كتابة نص الرسالة.", variant: "destructive" });
+            toast({ title: "تنبيه", description: "يرجى كتابة نص الرسالة الإدارية.", variant: "destructive" });
             return;
         }
 
         setIsAdminSending(true);
         try {
-            const targetSheikh = sheikhs.find(s => s.uid === targetSheikhId);
-            const alternateUids = targetSheikh?.uids?.filter((id: string) => id !== targetSheikhId) || [];
+            // Send sequentially to simplify error handling
+            for (const sheikhUid of targetSheikhIds) {
+                const targetSheikh = sheikhs.find(s => s.uid === sheikhUid);
+                const alternateUids = targetSheikh?.uids?.filter((id: string) => id !== sheikhUid) || [];
 
-            await sendManagementMessage(targetSheikhId, {
-                note: adminMsgNote,
-                priority: 'important',
-                category: 'توجيه إداري'
-            }, alternateUids);
-            toast({ title: "✅ تم الإرسال", description: "تم إرسال الرسالة إلى حساب الشيخ بنجاح." });
-            setAdminMsgNote("");
-            setTargetSheikhId("");
-        } catch (error: any) {
-            console.error("Message Error:", error);
+                await sendManagementMessage(sheikhUid, {
+                    note: adminMsgNote,
+                    priority: 'important',
+                    category: 'توجيه إداري'
+                }, alternateUids);
+            }
+
             toast({
-                title: "خطأ",
-                description: `فشل إرسال الرسالة: ${error.message || 'مشكلة في الصلاحيات'}`,
+                title: "✅ تمت العملية بنجاح",
+                description: `تم إرسال الرسالة إلى (${targetSheikhIds.length}) من المشايخ بنجاح.`
+            });
+
+            setAdminMsgNote("");
+            setTargetSheikhIds([]);
+        } catch (error: any) {
+            console.error("Batch Message Error:", error);
+            toast({
+                title: "خطأ في الإرسال",
+                description: `حدثت مشكلة أثناء إرسال الرسائل: ${error.message || 'مشكلة في الصلاحيات'}`,
                 variant: "destructive"
             });
         } finally {
@@ -451,34 +460,81 @@ export default function DailyReportPage() {
                         </CardTitle>
                         <CardDescription>هذه الرسالة ستظهر للشيخ في أعلى صفحته الخاصة بالتقارير اليومية وبشكل مميز.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4 pb-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div className="md:col-span-1">
-                                <Select value={targetSheikhId} onValueChange={setTargetSheikhId}>
-                                    <SelectTrigger className="bg-white rounded-xl h-11 border-purple-200">
-                                        <SelectValue placeholder="اختر الشيخ المستهدف" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {sheikhs.map(s => (
-                                            <SelectItem key={s.uid} value={s.uid}>{s.displayName} {s.group ? `(${s.group})` : ''}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                    <CardContent className="space-y-6 pb-6">
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <Label className="text-purple-700 font-bold">🎯 اختيار المشايخ المستهدفين:</Label>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        if (targetSheikhIds.length === sheikhs.length) {
+                                            setTargetSheikhIds([]);
+                                        } else {
+                                            setTargetSheikhIds(sheikhs.map(s => s.uid));
+                                        }
+                                    }}
+                                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 text-xs font-bold"
+                                >
+                                    {targetSheikhIds.length === sheikhs.length ? 'إلغاء تحديد الكل' : 'تحديد جميع المشايخ'}
+                                </Button>
                             </div>
-                            <div className="md:col-span-2 flex gap-2">
-                                <Input
-                                    placeholder="اكتب توجيهك الإداري هنا..."
+                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 bg-purple-50/50 p-4 rounded-2xl border border-purple-100 max-h-48 overflow-y-auto">
+                                {sheikhs.map(s => (
+                                    <div key={s.uid} className="flex items-center space-x-2 space-x-reverse bg-white p-2 rounded-xl border border-purple-100 shadow-sm hover:shadow-md transition-shadow">
+                                        <Checkbox
+                                            id={`sheikh-${s.uid}`}
+                                            checked={targetSheikhIds.includes(s.uid)}
+                                            onCheckedChange={(checked) => {
+                                                if (checked) {
+                                                    setTargetSheikhIds(prev => [...prev, s.uid]);
+                                                } else {
+                                                    setTargetSheikhIds(prev => prev.filter(id => id !== s.uid));
+                                                }
+                                            }}
+                                            className="border-purple-300 data-[state=checked]:bg-purple-600"
+                                        />
+                                        <Label
+                                            htmlFor={`sheikh-${s.uid}`}
+                                            className="text-xs font-semibold cursor-pointer truncate flex-1"
+                                            title={s.displayName}
+                                        >
+                                            {s.displayName} <span className="text-[10px] text-purple-400 block">{s.group}</span>
+                                        </Label>
+                                    </div>
+                                ))}
+                            </div>
+                            {targetSheikhIds.length > 0 && (
+                                <p className="text-[11px] text-purple-600 font-bold">
+                                    تم تحديد ({targetSheikhIds.length}) من المشايخ حالياً.
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="space-y-3">
+                            <Label htmlFor="admin-msg" className="text-purple-700 font-bold">📝 نص التوجيه الإداري:</Label>
+                            <div className="relative">
+                                <Textarea
+                                    id="admin-msg"
+                                    placeholder="اكتب توجيهك الإداري هنا... سيتم إرساله كرسالة رسمية لجميع المحددين."
                                     value={adminMsgNote}
                                     onChange={(e) => setAdminMsgNote(e.target.value)}
-                                    className="bg-white rounded-xl h-11 border-purple-200"
+                                    className="bg-white rounded-2xl border-purple-200 focus:ring-purple-500 min-h-[120px] pb-12 shadow-inner"
                                 />
-                                <Button
-                                    onClick={handleSendAdminMessage}
-                                    disabled={isAdminSending}
-                                    className="rounded-xl gap-2 font-bold px-6 bg-purple-600 hover:bg-purple-700 h-11"
-                                >
-                                    {isAdminSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} إرسال التوجيه
-                                </Button>
+                                <div className="absolute left-3 bottom-3 flex gap-2">
+                                    <Button
+                                        onClick={handleSendAdminMessage}
+                                        disabled={isAdminSending || targetSheikhIds.length === 0 || !adminMsgNote.trim()}
+                                        className="rounded-xl gap-2 font-black px-8 bg-purple-600 hover:bg-purple-700 h-11 shadow-lg shadow-purple-200"
+                                    >
+                                        {isAdminSending ? (
+                                            <Loader2 className="h-5 w-5 animate-spin" />
+                                        ) : (
+                                            <Send className="h-5 w-5" />
+                                        )}
+                                        إرسال التوجيه لـ ({targetSheikhIds.length}) مشايخ
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     </CardContent>
