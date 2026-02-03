@@ -1,5 +1,6 @@
 "use client";
 
+import Link from 'next/link';
 import PublicNavbar from '@/components/public/PublicNavbar';
 import HeroSection from '@/components/public/HeroSection';
 import StatsSection from '@/components/public/StatsSection';
@@ -85,7 +86,7 @@ export default function LandingPage() {
                             <p className="text-gray-600 leading-loose">
                                 تأسست مدرسة الإمام الشافعي لتكون منارة للعلم والتربية في المنطقة. نعتمد منهجية متكاملة تجمع بين الحفظ المتقن، والفهم العميق، والعمل الصالح. نحرص على توفير بيئة محفزة وباستخدام أحدث التقنيات لمتابعة أداء الطلاب والتواصل مع الأولياء.
                             </p>
-                            <ul className="space-y-3">
+                            <ul className="space-y-3 mb-8">
                                 {['كادر تعليمي متخصص ومجاز', 'بيئة تربوية آمنة ومحفزة', 'مناهج متدرجة تناسب جميع الأعمار', 'أنشطة ترفيهية وتربوية مرافقة'].map((item, i) => (
                                     <li key={i} className="flex items-center gap-3 text-gray-700">
                                         <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 text-xs">✓</div>
@@ -93,6 +94,13 @@ export default function LandingPage() {
                                     </li>
                                 ))}
                             </ul>
+
+                            <Link href="/about">
+                                <button className="bg-primary hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl font-black transition-all shadow-lg shadow-primary/20 flex items-center gap-3 group">
+                                    اكتشف تاريخنا الكامل
+                                    <span className="group-hover:translate-x-[-4px] transition-transform">←</span>
+                                </button>
+                            </Link>
                         </div>
                     </div>
                 </section>

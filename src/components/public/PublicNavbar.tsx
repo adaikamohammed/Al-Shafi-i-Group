@@ -28,10 +28,10 @@ export default function PublicNavbar() {
 
                 {/* Desktop Links */}
                 <div className="hidden md:flex items-center gap-8">
-                    <Link href="#stats" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">إحصائياتنا</Link>
-                    <Link href="#about" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">عن المدرسة</Link>
-                    <Link href="#gallery" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">معرض الصور</Link>
-                    <Link href="#contact" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">تواصل معنا</Link>
+                    <Link href="/#stats" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">إحصائياتنا</Link>
+                    <Link href="/about" className="text-sm font-bold text-primary font-black transition-colors">تاريخ المدرسة</Link>
+                    <Link href="/#gallery" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">معرض الصور</Link>
+                    <Link href="/#contact" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">تواصل معنا</Link>
                 </div>
 
                 {/* Actions */}
@@ -52,10 +52,10 @@ export default function PublicNavbar() {
                             </SheetTrigger>
                             <SheetContent side="right" className="pt-20">
                                 <div className="flex flex-col gap-6">
-                                    <Link href="#stats" className="text-lg font-bold text-gray-800">إحصائياتنا</Link>
-                                    <Link href="#about" className="text-lg font-bold text-gray-800">عن المدرسة</Link>
-                                    <Link href="#gallery" className="text-lg font-bold text-gray-800">معرض الصور</Link>
-                                    <Link href="#contact" className="text-lg font-bold text-gray-800">تواصل معنا</Link>
+                                    <Link href="/#stats" className="text-lg font-bold text-gray-800">إحصائياتنا</Link>
+                                    <Link href="/about" className="text-lg font-bold text-primary">تاريخ المدرسة</Link>
+                                    <Link href="/#gallery" className="text-lg font-bold text-gray-800">معرض الصور</Link>
+                                    <Link href="/#contact" className="text-lg font-bold text-gray-800">تواصل معنا</Link>
                                     <Link href="/login" className="w-full">
                                         <Button className="w-full rounded-xl py-6 font-bold text-lg">
                                             دخول المشايخ

@@ -80,8 +80,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const isParentPortal = pathname.startsWith('/parent-portal') || pathname.startsWith('/record') || pathname === '/';
-    if (!authLoading && !user && pathname !== '/login' && !isParentPortal) {
+    const isPublicPage = pathname === '/' || pathname === '/about' || pathname.startsWith('/parent-portal') || pathname.startsWith('/record');
+    if (!authLoading && !user && pathname !== '/login' && !isPublicPage) {
       router.push('/login');
     }
 
@@ -102,7 +102,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("keydown", down)
   }, [])
 
-  if (authLoading && !pathname.startsWith('/parent-portal') && !pathname.startsWith('/record') && pathname !== '/') {
+  const isPublicPage = pathname === '/' || pathname === '/about' || pathname.startsWith('/parent-portal') || pathname.startsWith('/record');
+  if (authLoading && !isPublicPage) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -110,7 +111,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if ((pathname.startsWith('/parent-portal') || pathname.startsWith('/record') || pathname === '/') && !user) {
+  if (isPublicPage && !user) {
     return <div className="max-w-full mx-auto">{children}</div>;
   }
 
@@ -289,7 +290,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   // Let's redirect logged-in users from '/' to '/dashboard' inside a useEffect or just render public page.
   // The user requirement implies '/' is public.
 
-  if (pathname === '/') {
+  if (isPublicPage) {
     return <div className="max-w-full mx-auto font-body">{children}</div>;
   }
 
