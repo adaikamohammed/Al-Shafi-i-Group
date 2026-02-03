@@ -89,6 +89,7 @@ interface StudentContextType {
   deleteMultiplePreRegistrations: (ids: string[]) => void;
   saveDailyReport: (reportData: Partial<DailyReport>, reportIdToUpdate?: string) => Promise<void>;
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
+  deleteMultipleDailyReports: (reportsToDelete: { id: string, date: string, authorId: string }[]) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
   bulkUpdateSurahStatus: (studentIds: string[], surahIds: number[], targetStatus: 0 | 1 | 2) => Promise<void>;
   addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
@@ -1076,6 +1077,24 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const reportAuthorId = dailyReports[date]?.[reportId]?.authorId || authContextUser.uid;
     const reportDbRef = ref(db, `users/${reportAuthorId}/dailyReports/${date}/${reportId}`);
     await remove(reportDbRef);
+  }
+
+  const deleteMultipleDailyReports = async (reportsToDelete: { id: string, date: string, authorId: string }[]) => {
+    if (!authContextUser) throw new Error("User not authenticated");
+
+    const updates: { [key: string]: null } = {};
+
+    reportsToDelete.forEach(({ id, date, authorId }) => {
+      // Security check: only allow if user is author or admin
+      if (isSuperAdmin || isManagement || authorId === authContextUser.uid) {
+        updates[`users/${authorId}/dailyReports/${date}/${id}`] = null;
+      }
+    });
+
+    if (Object.keys(updates).length > 0) {
+      const dbRef = ref(db);
+      await update(dbRef, updates);
+    }
   }
 
   const toggleSurahStatus = (studentId: string, surahId: number) => {

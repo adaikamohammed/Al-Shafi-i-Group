@@ -29,7 +29,8 @@ export default function PublicNavbar() {
                 {/* Desktop Links */}
                 <div className="hidden md:flex items-center gap-8">
                     <Link href="/#stats" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">إحصائياتنا</Link>
-                    <Link href="/about" className="text-sm font-bold text-primary font-black transition-colors">تاريخ المدرسة</Link>
+                    <Link href="/about" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">تاريخ المدرسة</Link>
+                    <Link href="/future" className="text-sm font-bold text-primary font-black transition-colors">رؤية المستقبل</Link>
                     <Link href="/#gallery" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">معرض الصور</Link>
                     <Link href="/#contact" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">تواصل معنا</Link>
                 </div>
@@ -53,7 +54,8 @@ export default function PublicNavbar() {
                             <SheetContent side="right" className="pt-20">
                                 <div className="flex flex-col gap-6">
                                     <Link href="/#stats" className="text-lg font-bold text-gray-800">إحصائياتنا</Link>
-                                    <Link href="/about" className="text-lg font-bold text-primary">تاريخ المدرسة</Link>
+                                    <Link href="/about" className="text-lg font-bold text-gray-800">تاريخ المدرسة</Link>
+                                    <Link href="/future" className="text-lg font-bold text-primary">رؤية المستقبل</Link>
                                     <Link href="/#gallery" className="text-lg font-bold text-gray-800">معرض الصور</Link>
                                     <Link href="/#contact" className="text-lg font-bold text-gray-800">تواصل معنا</Link>
                                     <Link href="/login" className="w-full">

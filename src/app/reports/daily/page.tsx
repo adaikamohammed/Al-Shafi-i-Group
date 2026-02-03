@@ -44,7 +44,7 @@ const priorityConfig = {
 
 type FilterStatus = 'all' | 'pending' | 'reviewed' | 'in_progress' | 'pinned';
 
-const ReportCard = ({ report, isSuperAdmin, isAdmin, currentUserId, onEdit, onDelete, onTogglePin, onReview, onSetStatus, onMarkRead }: {
+const ReportCard = ({ report, isSuperAdmin, isAdmin, currentUserId, onEdit, onDelete, onTogglePin, onReview, onSetStatus, onMarkRead, isSelected, onSelect }: {
     report: DailyReport;
     isSuperAdmin: boolean;
     isAdmin: boolean;
@@ -55,6 +55,8 @@ const ReportCard = ({ report, isSuperAdmin, isAdmin, currentUserId, onEdit, onDe
     onReview: (report: DailyReport, adminReply: string) => void;
     onSetStatus: (report: DailyReport, status: DailyReport['status']) => void;
     onMarkRead?: (report: DailyReport) => void;
+    isSelected: boolean;
+    onSelect: (checked: boolean) => void;
 }) => {
     const [adminReply, setAdminReply] = useState(report.adminNotes || '');
     const [isEditingReply, setIsEditingReply] = useState(false);
@@ -62,11 +64,22 @@ const ReportCard = ({ report, isSuperAdmin, isAdmin, currentUserId, onEdit, onDe
 
     return (
         <Card key={report.id} className={cn(
-            "overflow-hidden border-l-4 transition-all duration-300",
+            "overflow-hidden border-l-4 transition-all duration-300 relative group/card",
             report.isManagementMessage ?
                 (report.isReadByRecipient ? 'border-purple-400 bg-purple-50/30' : 'border-purple-600 bg-gradient-to-r from-purple-50 to-white dark:from-purple-950/20 dark:to-background shadow-md ring-1 ring-purple-600/20') :
-                report.isPinned ? 'border-yellow-400 ring-2 ring-yellow-400/20' : (categoryColors[report.category] || 'border-gray-300')
+                report.isPinned ? 'border-yellow-400 ring-2 ring-yellow-400/20' : (categoryColors[report.category] || 'border-gray-300'),
+            isSelected && "ring-2 ring-primary shadow-lg scale-[1.01]"
         )}>
+            <div className={cn(
+                "absolute top-3 left-3 z-20 transition-opacity",
+                isSelected ? "opacity-100" : "opacity-0 group-hover/card:opacity-100"
+            )}>
+                <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={(checked) => onSelect(checked as boolean)}
+                    className="w-6 h-6 border-2 border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                />
+            </div>
             {report.isManagementMessage && (
                 <div className={cn(
                     "text-white text-[10px] uppercase font-black px-3 py-1.5 text-center tracking-widest flex items-center justify-center gap-2",
@@ -204,7 +217,7 @@ const ReportCard = ({ report, isSuperAdmin, isAdmin, currentUserId, onEdit, onDe
 };
 
 export default function DailyReportPage() {
-    const { dailyReports, saveDailyReport, deleteDailyReport, sendManagementMessage, markManagementMessageAsRead, allUsers, loading } = useStudentContext();
+    const { dailyReports, saveDailyReport, deleteDailyReport, deleteMultipleDailyReports, sendManagementMessage, markManagementMessageAsRead, allUsers, loading } = useStudentContext();
     const { user, isSuperAdmin, isManagement } = useAuth();
     const { toast } = useToast();
 
@@ -214,6 +227,10 @@ export default function DailyReportPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [uploadStatus, setUploadStatus] = useState<string | null>(null);
     const [editingReport, setEditingReport] = useState<DailyReport | null>(null);
+
+    // Selection & Bulk Actions
+    const [selectedReportKeys, setSelectedReportKeys] = useState<Set<string>>(new Set());
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
     // Admin Messaging State
     const [targetSheikhIds, setTargetSheikhIds] = useState<string[]>([]);
@@ -433,6 +450,56 @@ export default function DailyReportPage() {
             toast({ title: "خطأ", description: "فشل تحديث حالة التقرير.", variant: "destructive" });
         }
     }
+
+    const toggleSelection = (report: DailyReport, checked: boolean) => {
+        const key = `${report.date}_${report.id}`;
+        setSelectedReportKeys(prev => {
+            const next = new Set(prev);
+            if (checked) next.add(key);
+            else next.delete(key);
+            return next;
+        });
+    };
+
+    const handleDeleteSelected = async () => {
+        if (selectedReportKeys.size === 0) return;
+        setIsBulkDeleting(true);
+        try {
+            const reportsToDelete = Array.from(selectedReportKeys).map(key => {
+                const [date, id] = key.split('_');
+                const report = dailyReports[date]?.[id];
+                return { id, date, authorId: report?.authorId || user?.uid || '' };
+            });
+
+            await deleteMultipleDailyReports(reportsToDelete);
+            setSelectedReportKeys(new Set());
+            toast({ title: "✅ نجاح", description: `تم حذف (${selectedReportKeys.size}) تقارير بنجاح.` });
+        } catch (error) {
+            toast({ title: "خطأ", description: "فشل في عملية الحذف الجماعي.", variant: "destructive" });
+        } finally {
+            setIsBulkDeleting(false);
+        }
+    };
+
+    const handleDeleteAll = async (reports: DailyReport[]) => {
+        if (reports.length === 0) return;
+        setIsBulkDeleting(true);
+        try {
+            const reportsToDelete = reports.map(r => ({
+                id: r.id,
+                date: r.date,
+                authorId: r.authorId
+            }));
+
+            await deleteMultipleDailyReports(reportsToDelete);
+            setSelectedReportKeys(new Set());
+            toast({ title: "✅ نجاح", description: `تم حذف جميع التقارير (${reports.length}) بنجاح.` });
+        } catch (error) {
+            toast({ title: "خطأ", description: "فشل في حذف جميع التقارير.", variant: "destructive" });
+        } finally {
+            setIsBulkDeleting(false);
+        }
+    };
 
     const markAsRead = async (report: DailyReport) => {
         if (!isSuperAdmin) {
@@ -656,9 +723,26 @@ export default function DailyReportPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex flex-col md:flex-row gap-4 justify-between bg-slate-100/50 dark:bg-slate-800/50 p-4 rounded-2xl">
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
+                            <Checkbox
+                                checked={filteredReports.length > 0 && filteredReports.every(r => selectedReportKeys.has(`${r.date}_${r.id}`))}
+                                onCheckedChange={(checked) => {
+                                    if (checked) {
+                                        const newSelection = new Set(selectedReportKeys);
+                                        filteredReports.forEach(r => newSelection.add(`${r.date}_${r.id}`));
+                                        setSelectedReportKeys(newSelection);
+                                    } else {
+                                        const newSelection = new Set(selectedReportKeys);
+                                        filteredReports.forEach(r => newSelection.delete(`${r.date}_${r.id}`));
+                                        setSelectedReportKeys(newSelection);
+                                    }
+                                }}
+                                className="w-5 h-5"
+                            />
+                            <span className="text-sm font-bold text-slate-600">تحديد الكل ({filteredReports.length})</span>
+                            <Separator orientation="vertical" className="h-4 mx-2" />
                             <Select dir="rtl" value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
-                                <SelectTrigger className="w-full md:w-[150px] bg-white"><SelectValue placeholder="الشهر" /></SelectTrigger>
+                                <SelectTrigger className="w-full md:w-[130px] bg-white h-9 text-xs"><SelectValue placeholder="الشهر" /></SelectTrigger>
                                 <SelectContent>
                                     {Array.from({ length: 12 }, (_, i) => (
                                         <SelectItem key={i} value={i.toString()}>{format(new Date(2000, i), 'MMMM', { locale: ar })}</SelectItem>
@@ -666,7 +750,7 @@ export default function DailyReportPage() {
                                 </SelectContent>
                             </Select>
                             <Select dir="rtl" value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
-                                <SelectTrigger className="w-full md:w-[100px] bg-white"><SelectValue placeholder="السنة" /></SelectTrigger>
+                                <SelectTrigger className="w-full md:w-[90px] bg-white h-9 text-xs"><SelectValue placeholder="السنة" /></SelectTrigger>
                                 <SelectContent>
                                     {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
                                         <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
@@ -674,6 +758,52 @@ export default function DailyReportPage() {
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {selectedReportKeys.size > 0 && (
+                            <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="destructive" size="sm" className="h-9 gap-2 px-4 shadow-md">
+                                            <Trash2 className="h-4 w-4" />
+                                            حذف المحدد ({selectedReportKeys.size})
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>حذف جماعي للتقارير</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                أنت على وشك حذف ({selectedReportKeys.size}) تقرير بشكل نهائي. هل أنت متأكد؟
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                            <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">تأكيد الحذف الجماعي</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="outline" size="sm" className="h-9 text-destructive border-destructive hover:bg-destructive/10">
+                                            حذف كافة النتائج المفلترة ({filteredReports.length})
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>حذف شامل لكافة التقارير المفلترة</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                سيتم حذف كافة التقارير المعروضة حالياً ({filteredReports.length} تقرير) بناءً على الفلاتر المختارة. هذا الإجراء لا يمكن التراجع عنه.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteAll(filteredReports)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">حذف الكل</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
+                        )}
+
                         <div className="flex items-center space-x-1 rounded-xl bg-white p-1 overflow-x-auto shadow-sm">
                             <Button variant={filterStatus === 'all' ? 'default' : 'ghost'} onClick={() => setFilterStatus('all')} className="h-9 px-4 rounded-lg">الكل</Button>
                             <Button variant={filterStatus === 'pending' ? 'default' : 'ghost'} onClick={() => setFilterStatus('pending')} className="h-9 px-4 rounded-lg">لم يراجع</Button>
@@ -692,7 +822,7 @@ export default function DailyReportPage() {
                                 </h3>
                                 <div className="space-y-4">
                                     {pinnedReports.map(report => (
-                                        <div key={`${report.recipientId || report.authorId || 'admin'}_${report.id}`} onMouseEnter={() => markAsRead(report)}>
+                                        <div key={`pinned_${report.date}_${report.id}`} onMouseEnter={() => markAsRead(report)}>
                                             <ReportCard
                                                 report={report}
                                                 isSuperAdmin={isSuperAdmin}
@@ -704,6 +834,8 @@ export default function DailyReportPage() {
                                                 onReview={handleReview}
                                                 onSetStatus={handleSetStatus}
                                                 onMarkRead={(r) => markManagementMessageAsRead(r.id, r.date)}
+                                                isSelected={selectedReportKeys.has(`${report.date}_${report.id}`)}
+                                                onSelect={(checked) => toggleSelection(report, checked)}
                                             />
                                             {report.hasNewReply && !isSuperAdmin && report.status === 'reviewed' && (
                                                 <div className="flex justify-center -mt-2 mb-4">
@@ -728,7 +860,7 @@ export default function DailyReportPage() {
                                 )}
                                 <div className="space-y-4">
                                     {unpinnedReports.map(report => (
-                                        <div key={`${report.recipientId || report.authorId || 'admin'}_${report.id}`} onMouseEnter={() => markAsRead(report)}>
+                                        <div key={`unpinned_${report.date}_${report.id}`} onMouseEnter={() => markAsRead(report)}>
                                             <ReportCard
                                                 report={report}
                                                 isSuperAdmin={isSuperAdmin}
@@ -740,6 +872,8 @@ export default function DailyReportPage() {
                                                 onReview={handleReview}
                                                 onSetStatus={handleSetStatus}
                                                 onMarkRead={(r) => markManagementMessageAsRead(r.id, r.date)}
+                                                isSelected={selectedReportKeys.has(`${report.date}_${report.id}`)}
+                                                onSelect={(checked) => toggleSelection(report, checked)}
                                             />
                                             {report.hasNewReply && !isSuperAdmin && report.status === 'reviewed' && (
                                                 <div className="flex justify-center -mt-2 mb-4">
