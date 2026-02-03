@@ -43,10 +43,11 @@ const priorityConfig = {
 
 type FilterStatus = 'all' | 'pending' | 'reviewed' | 'in_progress' | 'pinned';
 
-const ReportCard = ({ report, isSuperAdmin, isAdmin, onEdit, onDelete, onTogglePin, onReview, onSetStatus, onMarkRead }: {
+const ReportCard = ({ report, isSuperAdmin, isAdmin, currentUserId, onEdit, onDelete, onTogglePin, onReview, onSetStatus, onMarkRead }: {
     report: DailyReport;
     isSuperAdmin: boolean;
     isAdmin: boolean;
+    currentUserId?: string;
     onEdit: (report: DailyReport) => void;
     onDelete: (reportId: string, date: string) => void;
     onTogglePin: (report: DailyReport) => void;
@@ -186,11 +187,11 @@ const ReportCard = ({ report, isSuperAdmin, isAdmin, onEdit, onDelete, onToggleP
                     </div>
                 )}
 
-                {report.isManagementMessage && !report.isReadByRecipient && !isAdmin && (
+                {report.isManagementMessage && !report.isReadByRecipient && report.authorId !== currentUserId && (
                     <div className="mt-4 pt-4 border-t flex justify-center">
                         <Button
                             onClick={() => onMarkRead?.(report)}
-                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl px-8"
+                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl px-8 shadow-lg shadow-purple-200 dark:shadow-purple-900/20"
                         >
                             <CheckCircle className="ml-2 h-4 w-4" /> تم الاطلاع والموافقة
                         </Button>
@@ -426,9 +427,7 @@ export default function DailyReportPage() {
 
     const markAsRead = async (report: DailyReport) => {
         if (!isSuperAdmin) {
-            if (report.isManagementMessage && !report.isReadByRecipient) {
-                await markManagementMessageAsRead(report.id, report.date);
-            } else if (report.hasNewReply) {
+            if (report.hasNewReply) {
                 await saveDailyReport({ hasNewReply: false }, report.id);
             }
         }
@@ -642,6 +641,7 @@ export default function DailyReportPage() {
                                                 report={report}
                                                 isSuperAdmin={isSuperAdmin}
                                                 isAdmin={isAdmin}
+                                                currentUserId={user?.uid}
                                                 onEdit={handleEditClick}
                                                 onDelete={handleDeleteClick}
                                                 onTogglePin={handleTogglePin}
@@ -677,6 +677,7 @@ export default function DailyReportPage() {
                                                 report={report}
                                                 isSuperAdmin={isSuperAdmin}
                                                 isAdmin={isAdmin}
+                                                currentUserId={user?.uid}
                                                 onEdit={handleEditClick}
                                                 onDelete={handleDeleteClick}
                                                 onTogglePin={handleTogglePin}

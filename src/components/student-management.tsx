@@ -147,11 +147,11 @@ export function StudentManagement() {
     }, [students, searchTerm, statusFilter, levelFilter, user, isSuperAdmin, isManagement, selectedGroup, sortConfig, allUsers]);
 
     const unreadManagementMessages = useMemo(() => {
-        if (!user || isSuperAdmin || isManagement) return [];
+        if (!user || isSuperAdmin) return [];
         return Object.values(dailyReports || {})
             .flatMap(dayReports => Object.values(dayReports || {}))
-            .filter(r => r.isManagementMessage && r.recipientId === user.uid && !r.isReadByRecipient);
-    }, [dailyReports, user, isSuperAdmin, isManagement]);
+            .filter(r => r.isManagementMessage && !r.isReadByRecipient && r.authorId !== user.uid);
+    }, [dailyReports, user, isSuperAdmin]);
 
     const allStudents = useMemo(() => {
         let list = isSuperAdmin || isManagement ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
@@ -182,21 +182,47 @@ export function StudentManagement() {
         return <div className="flex items-center justify-center h-full"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
     }
 
+    const unreadMessagesAlert = unreadManagementMessages.length > 0 && (
+        <Alert className="border-purple-500 bg-purple-50 dark:bg-purple-900/20 border-r-8 border-r-purple-600 shadow-lg animate-bounce-subtle mb-6">
+            <ShieldAlert className="h-5 w-5 text-purple-600" />
+            <AlertTitle className="text-purple-800 dark:text-purple-300 font-headline font-bold text-lg mr-2">توجيه إداري جديد!</AlertTitle>
+            <AlertDescription className="mr-2 mt-1">
+                <p className="text-purple-700 dark:text-purple-400 font-medium">
+                    لديك ({unreadManagementMessages.length}) رسالة إدارية هامة في صفحة التقرير اليومي. يرجى الاطلاع عليها والرد أو التأكيد.
+                </p>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push('/reports/daily')}
+                    className="mt-3 border-purple-400 text-purple-700 hover:bg-purple-100 font-bold rounded-lg"
+                >
+                    <BellRing className="ml-2 h-4 w-4" /> عرض الرسائل الآن
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                </Button>
+            </AlertDescription>
+        </Alert>
+    );
+
     if (allStudents.length === 0 && !loading) {
         return (
-            <div className="flex flex-col items-center justify-center h-full">
-                <h1 className="text-2xl font-bold mb-4">لا يوجد طلاب بعد</h1>
-                <p className="text-muted-foreground mb-6">ابدأ بإضافة طالب جديد أو استيراد قائمة الطلاب.</p>
-                {!isSuperAdmin && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
-                    <DialogTrigger asChild><Button><PlusCircle className="ml-2 h-4 w-4" />إضافة طالب جديد</Button></DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px]">
-                        <DialogHeader>
-                            <DialogTitle>إضافة طالب جديد</DialogTitle>
-                            <DialogDescription>أدخل معلومات الطالب الجديد هنا لإضافته إلى النظام.</DialogDescription>
-                        </DialogHeader>
-                        <StudentForm addStudent={addStudent} onSuccess={() => setAddStudentDialogOpen(false)} onCancel={() => setAddStudentDialogOpen(false)} />
-                    </DialogContent>
-                </Dialog>}
+            <div className="space-y-6">
+                <DailyInspiration />
+                {unreadMessagesAlert}
+                <div className="flex flex-col items-center justify-center py-20 bg-muted/20 rounded-3xl border-2 border-dashed border-muted">
+                    <Users className="h-16 w-16 text-muted-foreground/30 mb-4" />
+                    <h1 className="text-2xl font-bold mb-2">لا يوجد طلاب بعد</h1>
+                    <p className="text-muted-foreground mb-6">ابدأ بإضافة طالب جديد أو استيراد قائمة الطلاب.</p>
+                    {!isSuperAdmin && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
+                        <DialogTrigger asChild><Button><PlusCircle className="ml-2 h-4 w-4" />إضافة طالب جديد</Button></DialogTrigger>
+                        <DialogContent className="sm:max-w-[600px]">
+                            <DialogHeader>
+                                <DialogTitle>إضافة طالب جديد</DialogTitle>
+                                <DialogDescription>أدخل معلومات الطالب الجديد هنا لإضافته إلى النظام.</DialogDescription>
+                            </DialogHeader>
+                            <StudentForm addStudent={addStudent} onSuccess={() => setAddStudentDialogOpen(false)} onCancel={() => setAddStudentDialogOpen(false)} />
+                        </DialogContent>
+                    </Dialog>}
+                </div>
             </div>
         )
     }
@@ -206,26 +232,7 @@ export function StudentManagement() {
             <div className="space-y-6 no-print">
                 <DailyInspiration />
 
-                {unreadManagementMessages.length > 0 && (
-                    <Alert className="border-purple-500 bg-purple-50 dark:bg-purple-900/20 border-r-8 border-r-purple-600 shadow-lg animate-bounce-subtle">
-                        <ShieldAlert className="h-5 w-5 text-purple-600" />
-                        <AlertTitle className="text-purple-800 dark:text-purple-300 font-headline font-bold text-lg mr-2">توجيه إداري جديد!</AlertTitle>
-                        <AlertDescription className="mr-2 mt-1">
-                            <p className="text-purple-700 dark:text-purple-400 font-medium">
-                                لديك ({unreadManagementMessages.length}) رسالة إدارية هامة في صفحة التقرير اليومي. يرجى الاطلاع عليها والرد أو التأكيد.
-                            </p>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => router.push('/reports/daily')}
-                                className="mt-3 border-purple-400 text-purple-700 hover:bg-purple-100 font-bold rounded-lg"
-                            >
-                                <BellRing className="ml-2 h-4 w-4" /> عرض الرسائل الآن
-                                <ArrowLeft className="mr-2 h-4 w-4" />
-                            </Button>
-                        </AlertDescription>
-                    </Alert>
-                )}
+                {unreadMessagesAlert}
 
                 {/* Global Dashboard Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
