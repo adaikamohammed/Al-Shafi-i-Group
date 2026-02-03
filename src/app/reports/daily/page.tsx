@@ -43,7 +43,7 @@ const priorityConfig = {
 
 type FilterStatus = 'all' | 'pending' | 'reviewed' | 'in_progress' | 'pinned';
 
-const ReportCard = ({ report, isSuperAdmin, isAdmin, onEdit, onDelete, onTogglePin, onReview, onSetStatus }: {
+const ReportCard = ({ report, isSuperAdmin, isAdmin, onEdit, onDelete, onTogglePin, onReview, onSetStatus, onMarkRead }: {
     report: DailyReport;
     isSuperAdmin: boolean;
     isAdmin: boolean;
@@ -52,6 +52,7 @@ const ReportCard = ({ report, isSuperAdmin, isAdmin, onEdit, onDelete, onToggleP
     onTogglePin: (report: DailyReport) => void;
     onReview: (report: DailyReport, adminReply: string) => void;
     onSetStatus: (report: DailyReport, status: DailyReport['status']) => void;
+    onMarkRead?: (report: DailyReport) => void;
 }) => {
     const [adminReply, setAdminReply] = useState(report.adminNotes || '');
     const [isEditingReply, setIsEditingReply] = useState(false);
@@ -59,13 +60,18 @@ const ReportCard = ({ report, isSuperAdmin, isAdmin, onEdit, onDelete, onToggleP
 
     return (
         <Card key={report.id} className={cn(
-            "overflow-hidden border-l-4",
-            report.isManagementMessage ? 'border-purple-600 bg-purple-50/50 dark:bg-purple-900/10' :
+            "overflow-hidden border-l-4 transition-all duration-300",
+            report.isManagementMessage ?
+                (report.isReadByRecipient ? 'border-purple-400 bg-purple-50/30' : 'border-purple-600 bg-gradient-to-r from-purple-50 to-white dark:from-purple-950/20 dark:to-background shadow-md ring-1 ring-purple-600/20') :
                 report.isPinned ? 'border-yellow-400 ring-2 ring-yellow-400/20' : (categoryColors[report.category] || 'border-gray-300')
         )}>
             {report.isManagementMessage && (
-                <div className="bg-purple-600 text-white text-[10px] uppercase font-black px-3 py-1 text-center tracking-widest">
-                    رسالة إدارية هامة
+                <div className={cn(
+                    "text-white text-[10px] uppercase font-black px-3 py-1.5 text-center tracking-widest flex items-center justify-center gap-2",
+                    report.isReadByRecipient ? "bg-purple-400" : "bg-purple-600"
+                )}>
+                    <Shield className="h-3 w-3" />
+                    {report.isReadByRecipient ? 'توجيه إداري (تم الاطلاع)' : 'توجيه إداري هام جداً'}
                 </div>
             )}
             <CardHeader className="p-4 flex-row justify-between items-start">
@@ -88,13 +94,14 @@ const ReportCard = ({ report, isSuperAdmin, isAdmin, onEdit, onDelete, onToggleP
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Badge variant={report.status === 'reviewed' ? 'default' : report.status === 'in_progress' ? 'secondary' : 'outline'}
+                    <Badge variant={report.isManagementMessage ? 'default' : (report.status === 'reviewed' ? 'default' : report.status === 'in_progress' ? 'secondary' : 'outline')}
                         className={cn(
-                            report.status === 'reviewed' && "bg-green-100 text-green-800 border border-green-300",
+                            (report.isManagementMessage || report.status === 'reviewed') && "bg-green-100 text-green-800 border border-green-300",
+                            report.isManagementMessage && (report.isReadByRecipient ? "bg-emerald-100 text-emerald-800 border-emerald-300" : "bg-purple-100 text-purple-800 border-purple-300"),
                             report.status === 'in_progress' && "bg-blue-100 text-blue-800 border border-blue-300"
                         )}>
-                        {report.status === 'reviewed' ? <CheckCircle className="ml-1 h-3 w-3" /> : <Eye className="ml-1 h-3 w-3" />}
-                        {report.status === 'reviewed' ? 'تمت المراجعة' : report.status === 'in_progress' ? 'قيد المعالجة' : 'لم يراجع بعد'}
+                        {report.isManagementMessage ? (report.isReadByRecipient ? <CheckCircle className="ml-1 h-3 w-3" /> : <Shield className="ml-1 h-3 w-3" />) : (report.status === 'reviewed' ? <CheckCircle className="ml-1 h-3 w-3" /> : <Eye className="ml-1 h-3 w-3" />)}
+                        {report.isManagementMessage ? (report.isReadByRecipient ? 'تم التأكيد' : 'توجيه رسمي') : (report.status === 'reviewed' ? 'تمت المراجعة' : report.status === 'in_progress' ? 'قيد المعالجة' : 'لم يراجع بعد')}
                     </Badge>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -178,13 +185,24 @@ const ReportCard = ({ report, isSuperAdmin, isAdmin, onEdit, onDelete, onToggleP
                         <p className="text-sm whitespace-pre-wrap">{report.adminNotes}</p>
                     </div>
                 )}
+
+                {report.isManagementMessage && !report.isReadByRecipient && !isAdmin && (
+                    <div className="mt-4 pt-4 border-t flex justify-center">
+                        <Button
+                            onClick={() => onMarkRead?.(report)}
+                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl px-8"
+                        >
+                            <CheckCircle className="ml-2 h-4 w-4" /> تم الاطلاع والموافقة
+                        </Button>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
 };
 
 export default function DailyReportPage() {
-    const { dailyReports, saveDailyReport, deleteDailyReport, sendManagementMessage, allUsers, loading } = useStudentContext();
+    const { dailyReports, saveDailyReport, deleteDailyReport, sendManagementMessage, markManagementMessageAsRead, allUsers, loading } = useStudentContext();
     const { user, isSuperAdmin, isManagement } = useAuth();
     const { toast } = useToast();
 
@@ -246,6 +264,7 @@ export default function DailyReportPage() {
                 } catch (e) { return false; }
             })
             .sort((a, b) =>
+                (b.isManagementMessage && !b.isReadByRecipient ? 1 : 0) - (a.isManagementMessage && !a.isReadByRecipient ? 1 : 0) ||
                 (b.isManagementMessage ? 1 : 0) - (a.isManagementMessage ? 1 : 0) ||
                 (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0) ||
                 b.id.localeCompare(a.id)
@@ -406,8 +425,12 @@ export default function DailyReportPage() {
     }
 
     const markAsRead = async (report: DailyReport) => {
-        if (!isSuperAdmin && report.hasNewReply) {
-            await saveDailyReport({ hasNewReply: false }, report.id);
+        if (!isSuperAdmin) {
+            if (report.isManagementMessage && !report.isReadByRecipient) {
+                await markManagementMessageAsRead(report.id, report.date);
+            } else if (report.hasNewReply) {
+                await saveDailyReport({ hasNewReply: false }, report.id);
+            }
         }
     }
 
@@ -624,6 +647,7 @@ export default function DailyReportPage() {
                                                 onTogglePin={handleTogglePin}
                                                 onReview={handleReview}
                                                 onSetStatus={handleSetStatus}
+                                                onMarkRead={(r) => markManagementMessageAsRead(r.id, r.date)}
                                             />
                                             {report.hasNewReply && !isSuperAdmin && report.status === 'reviewed' && (
                                                 <div className="flex justify-center -mt-2 mb-4">
@@ -658,6 +682,7 @@ export default function DailyReportPage() {
                                                 onTogglePin={handleTogglePin}
                                                 onReview={handleReview}
                                                 onSetStatus={handleSetStatus}
+                                                onMarkRead={(r) => markManagementMessageAsRead(r.id, r.date)}
                                             />
                                             {report.hasNewReply && !isSuperAdmin && report.status === 'reviewed' && (
                                                 <div className="flex justify-center -mt-2 mb-4">

@@ -109,6 +109,7 @@ interface StudentContextType {
   addInternalNotification: (recipientId: string, title: string, message: string, type: InternalNotification['type'], metadata?: any) => Promise<void>;
   markNotificationAsRead: (notificationId: string) => Promise<void>;
   sendManagementMessage: (targetSheikhId: string, messageData: Partial<DailyReport>, alternateUids?: string[]) => Promise<void>;
+  markManagementMessageAsRead: (reportId: string, date: string) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -1037,7 +1038,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       isPinned: messageData.isPinned || false,
       priority: messageData.priority || 'normal',
       isManagementMessage: true,
-      hasNewReply: true
+      recipientId: targetSheikhId,
+      hasNewReply: true,
+      isReadByRecipient: false
     };
 
     const allRecipientUids = [targetSheikhId, ...(alternateUids || [])];
@@ -1059,6 +1062,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       'Management',
       targetSheikhId
     );
+  };
+
+  const markManagementMessageAsRead = async (reportId: string, date: string) => {
+    if (!authContextUser) return;
+    const reportRef = ref(db, `users/${authContextUser.uid}/dailyReports/${date}/${reportId}`);
+    await update(reportRef, { isReadByRecipient: true });
+    toast({ title: '✅ تم توثيق قراءة التوجيه' });
   };
 
   const deleteDailyReport = async (reportId: string, date: string) => {
@@ -1754,7 +1764,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       internalNotifications,
       addInternalNotification,
       markNotificationAsRead,
-      sendManagementMessage
+      sendManagementMessage,
+      markManagementMessageAsRead
     }}>
       {children}
     </StudentContext.Provider>

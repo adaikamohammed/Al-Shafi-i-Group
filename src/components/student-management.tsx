@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, Search, Filter, Download, Trash2, Loader2, Users, UserCheck, UserMinus, Star, X, ArrowRightLeft, Edit } from 'lucide-react';
+import { PlusCircle, Search, Filter, Download, Trash2, Loader2, Users, UserCheck, UserMinus, Star, X, ArrowRightLeft, Edit, BellRing, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { useRouter } from 'next/navigation';
 import { Student, StudentStatus } from '@/lib/types';
@@ -33,7 +34,7 @@ const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ا
 
 export function StudentManagement() {
     const router = useRouter();
-    const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings, addStudent, allUsers } = useStudentContext();
+    const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings, addStudent, allUsers, dailyReports } = useStudentContext();
     const { user, isSuperAdmin, isManagement } = useAuth();
     const [selectedGroup, setSelectedGroup] = useState<string>('all');
     const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
@@ -145,6 +146,13 @@ export function StudentManagement() {
         return sortableStudents;
     }, [students, searchTerm, statusFilter, levelFilter, user, isSuperAdmin, isManagement, selectedGroup, sortConfig, allUsers]);
 
+    const unreadManagementMessages = useMemo(() => {
+        if (!user || isSuperAdmin || isManagement) return [];
+        return Object.values(dailyReports || {})
+            .flatMap(dayReports => Object.values(dayReports || {}))
+            .filter(r => r.isManagementMessage && r.recipientId === user.uid && !r.isReadByRecipient);
+    }, [dailyReports, user, isSuperAdmin, isManagement]);
+
     const allStudents = useMemo(() => {
         let list = isSuperAdmin || isManagement ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
         if (isManagement && selectedGroup !== 'all') {
@@ -197,6 +205,27 @@ export function StudentManagement() {
         <TooltipProvider>
             <div className="space-y-6 no-print">
                 <DailyInspiration />
+
+                {unreadManagementMessages.length > 0 && (
+                    <Alert className="border-purple-500 bg-purple-50 dark:bg-purple-900/20 border-r-8 border-r-purple-600 shadow-lg animate-bounce-subtle">
+                        <ShieldAlert className="h-5 w-5 text-purple-600" />
+                        <AlertTitle className="text-purple-800 dark:text-purple-300 font-headline font-bold text-lg mr-2">توجيه إداري جديد!</AlertTitle>
+                        <AlertDescription className="mr-2 mt-1">
+                            <p className="text-purple-700 dark:text-purple-400 font-medium">
+                                لديك ({unreadManagementMessages.length}) رسالة إدارية هامة في صفحة التقرير اليومي. يرجى الاطلاع عليها والرد أو التأكيد.
+                            </p>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => router.push('/reports/daily')}
+                                className="mt-3 border-purple-400 text-purple-700 hover:bg-purple-100 font-bold rounded-lg"
+                            >
+                                <BellRing className="ml-2 h-4 w-4" /> عرض الرسائل الآن
+                                <ArrowLeft className="mr-2 h-4 w-4" />
+                            </Button>
+                        </AlertDescription>
+                    </Alert>
+                )}
 
                 {/* Global Dashboard Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">

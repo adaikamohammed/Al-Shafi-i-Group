@@ -116,6 +116,7 @@ export interface DailyReport {
   hasNewReply?: boolean;
   isManagementMessage?: boolean;
   recipientId?: string;
+  isReadByRecipient?: boolean;
 }
 
 
