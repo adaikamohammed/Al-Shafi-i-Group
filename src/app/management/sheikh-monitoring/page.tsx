@@ -36,23 +36,37 @@ export default function SheikhMonitoringPage() {
     const currentThemeId = user?.portalTheme || 'midnight';
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
 
-    const sheikhs = useMemo(() =>
-        allUsers.filter(u => u.role === 'sheikh' && u.group).sort((a, b) => {
+    const sheikhs = useMemo(() => {
+        const filtered = allUsers.filter(u => u.role === 'sheikh' && u.group);
+        const groupsMap = new Map();
+
+        for (const u of filtered) {
+            if (!groupsMap.has(u.group)) {
+                groupsMap.set(u.group, {
+                    ...u,
+                    uids: new Set([u.uid])
+                });
+            } else {
+                groupsMap.get(u.group).uids.add(u.uid);
+            }
+        }
+
+        return Array.from(groupsMap.values()).sort((a, b) => {
             const numA = parseInt(a.group?.replace(/[^0-9]/g, '') || '0');
             const numB = parseInt(b.group?.replace(/[^0-9]/g, '') || '0');
             return numA - numB;
-        })
-        , [allUsers]);
+        });
+    }, [allUsers]);
 
     const monitoringData = useMemo(() => {
         if (!dailySessions) return [];
 
-        return sheikhs.map(sheikh => {
-            const sessionsBySheikh = [];
+        return sheikhs.map(groupRepresentative => {
+            const sessionsByGroup = [];
             Object.entries(dailySessions).forEach(([dateStr, daySessions]) => {
                 Object.values(daySessions).forEach(session => {
-                    if (session.ownerId === sheikh.uid) {
-                        sessionsBySheikh.push({
+                    if (groupRepresentative.uids.has(session.ownerId)) {
+                        sessionsByGroup.push({
                             ...session,
                             dateStr
                         });
@@ -61,8 +75,8 @@ export default function SheikhMonitoringPage() {
             });
 
             return {
-                sheikh,
-                sessions: sessionsBySheikh
+                sheikh: groupRepresentative,
+                sessions: sessionsByGroup
             };
         });
     }, [sheikhs, dailySessions]);
