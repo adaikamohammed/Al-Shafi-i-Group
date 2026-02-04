@@ -263,9 +263,7 @@ export default function FutureVisionPage() {
                                                 <div className="w-2 h-2 rounded-full bg-emerald-400" />
                                             </h4>
                                             <p className="text-white/90 leading-relaxed font-bold text-xl">
-                                                06XX XX XX XX
-                                                <br />
-                                                05XX XX XX XX
+                                                06 63 33 70 90
                                             </p>
                                         </div>
                                     </div>

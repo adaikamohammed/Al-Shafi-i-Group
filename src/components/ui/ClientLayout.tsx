@@ -80,7 +80,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const isPublicPage = pathname === '/' || pathname === '/about' || pathname.startsWith('/parent-portal') || pathname.startsWith('/record');
+    const isPublicPage = pathname === '/' || pathname === '/about' || pathname === '/future' || pathname === '/stats' || pathname.startsWith('/parent-portal') || pathname.startsWith('/record');
     if (!authLoading && !user && pathname !== '/login' && !isPublicPage) {
       router.push('/login');
     }
@@ -102,7 +102,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("keydown", down)
   }, [])
 
-  const isPublicPage = pathname === '/' || pathname === '/about' || pathname === '/future' || pathname.startsWith('/parent-portal') || pathname.startsWith('/record');
+  const isPublicPage = pathname === '/' || pathname === '/about' || pathname === '/future' || pathname === '/stats' || pathname.startsWith('/parent-portal') || pathname.startsWith('/record');
   if (authLoading && !isPublicPage) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">

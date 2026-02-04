@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import Image from 'next/image';
+import ContactModal from './ContactModal';
 
 export default function PublicNavbar() {
     return (
@@ -28,11 +29,13 @@ export default function PublicNavbar() {
 
                 {/* Desktop Links */}
                 <div className="hidden md:flex items-center gap-8">
-                    <Link href="/#stats" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">إحصائياتنا</Link>
+                    <Link href="/stats" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">إحصائياتنا</Link>
                     <Link href="/about" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">تاريخ المدرسة</Link>
                     <Link href="/future" className="text-sm font-bold text-primary font-black transition-colors">رؤية المستقبل</Link>
                     <Link href="/#gallery" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">معرض الصور</Link>
-                    <Link href="/#contact" className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">تواصل معنا</Link>
+                    <ContactModal>
+                        <button className="text-sm font-bold text-gray-600 hover:text-primary transition-colors cursor-pointer">تواصل معنا</button>
+                    </ContactModal>
                 </div>
 
                 {/* Actions */}
@@ -57,7 +60,9 @@ export default function PublicNavbar() {
                                     <Link href="/about" className="text-lg font-bold text-gray-800">تاريخ المدرسة</Link>
                                     <Link href="/future" className="text-lg font-bold text-primary">رؤية المستقبل</Link>
                                     <Link href="/#gallery" className="text-lg font-bold text-gray-800">معرض الصور</Link>
-                                    <Link href="/#contact" className="text-lg font-bold text-gray-800">تواصل معنا</Link>
+                                    <ContactModal>
+                                        <button className="text-lg font-bold text-gray-800 w-full text-right">تواصل معنا</button>
+                                    </ContactModal>
                                     <Link href="/login" className="w-full">
                                         <Button className="w-full rounded-xl py-6 font-bold text-lg">
                                             دخول المشايخ

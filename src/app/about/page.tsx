@@ -144,7 +144,7 @@ export default function AboutPage() {
                             </div>
 
                             {/* 2022-2026 */}
-                            <div className="bg-slate-900 rounded-[3rem] p-8 md:p-12 shadow-2xl text-white overflow-hidden relative">
+                            < div className="bg-slate-900 rounded-[3rem] p-8 md:p-12 shadow-2xl text-white overflow-hidden relative" >
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-gradient-to-b from-primary/20 to-transparent opacity-20" />
                                 <div className="relative z-10 text-center space-y-6">
                                     <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-primary/20 text-primary font-black text-sm">2022 - 2026</div>
@@ -162,13 +162,13 @@ export default function AboutPage() {
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </TabsContent>
+                            </div >
+                        </TabsContent >
 
                         {/* Team Tab */}
-                        <TabsContent value="team" className="space-y-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        < TabsContent value="team" className="space-y-16 animate-in fade-in slide-in-from-bottom-4 duration-700" >
                             {/* Management */}
-                            <div className="text-right">
+                            < div className="text-right" >
                                 <h3 className="text-2xl font-black text-emerald-600 mb-10 flex items-center gap-3 justify-end">
                                     طاقم الإدارة <div className="w-8 h-1 bg-emerald-600 rounded-full" />
                                 </h3>
@@ -185,12 +185,12 @@ export default function AboutPage() {
                                         </div>
                                     ))}
                                 </div>
-                            </div>
+                            </div >
 
                             {/* Educational Staff */}
-                            <div className="grid md:grid-cols-2 gap-16 text-right">
+                            < div className="grid md:grid-cols-2 gap-16 text-right" >
                                 {/* Sheikhs */}
-                                <div>
+                                < div >
                                     <h3 className="text-2xl font-black text-blue-600 mb-8 flex items-center gap-3 justify-end">
                                         أفواج الأكابر (المشايخ) <div className="w-8 h-1 bg-blue-600 rounded-full" />
                                     </h3>
@@ -210,10 +210,10 @@ export default function AboutPage() {
                                         ))}
                                     </div>
                                     <p className="mt-6 text-xs text-slate-400 font-medium italic">9 أفواج للمشايخ مخصصة للذكور من الرابعة ابتدائي فما فوق.</p>
-                                </div>
+                                </div >
 
                                 {/* Ustadhat */}
-                                <div>
+                                < div >
                                     <h3 className="text-2xl font-black text-rose-500 mb-8 flex items-center gap-3 justify-end">
                                         أفواج الأصاغر (الأستاذات) <div className="w-8 h-1 bg-rose-500 rounded-full" />
                                     </h3>
@@ -233,12 +233,12 @@ export default function AboutPage() {
                                             نظام الأفواج: 9 أفواج للأستاذات مخصصة للذكور والإناث إلى غاية السنة الثالثة ابتدائي، ثم يتم تحويل الذكور لأفواج المشايخ.
                                         </p>
                                     </div>
-                                </div>
-                            </div>
-                        </TabsContent>
+                                </div >
+                            </div >
+                        </TabsContent >
 
                         {/* Activities Tab */}
-                        <TabsContent value="activities" className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        < TabsContent value="activities" className="animate-in fade-in slide-in-from-bottom-4 duration-700" >
                             <div className="grid grid-cols-2 lg:grid-cols-3 gap-8">
                                 {activities.map((act, i) => (
                                     <motion.div
@@ -255,12 +255,12 @@ export default function AboutPage() {
                                     </motion.div>
                                 ))}
                             </div>
-                        </TabsContent>
-                    </Tabs>
-                </div>
+                        </TabsContent >
+                    </Tabs >
+                </div >
 
                 {/* Closing Quote */}
-                <section className="py-24 bg-white">
+                < section className="py-24 bg-white" >
                     <div className="container mx-auto px-4 text-center">
                         <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} className="max-w-4xl mx-auto space-y-12">
                             <Quote className="w-16 h-16 text-emerald-100 mx-auto" />
@@ -272,10 +272,10 @@ export default function AboutPage() {
                             </div>
                         </motion.div>
                     </div>
-                </section>
-            </main>
+                </section >
+            </main >
 
             <Footer />
-        </div>
+        </div >
     );
 }
