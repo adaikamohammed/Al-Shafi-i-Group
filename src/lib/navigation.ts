@@ -51,7 +51,7 @@ export const NAV_GROUPS: NavGroup[] = [
     {
         title: 'بوصلة المتابعة',
         items: [
-            { href: '/stats', label: 'المتابعة الأسبوعية', icon: Calendar },
+            { href: '/weekly-tracking', label: 'المتابعة الأسبوعية', icon: Calendar },
             { href: '/student-history', label: 'سجل الطالب', icon: LayoutDashboard },
             { href: '/logs', label: 'سجل النشاطات', icon: Activity },
             { href: '/yearly-performance', label: 'الأداء السنوي', icon: BarChart3 },
