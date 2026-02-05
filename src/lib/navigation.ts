@@ -79,6 +79,8 @@ export const NAV_GROUPS: NavGroup[] = [
             { href: '/registrations', label: 'التسجيلات الجديدة', icon: UserPlus },
             { href: '/meetings', label: 'الاجتماعات', icon: Calendar },
             { href: '/admin/admin-docs', label: 'الأوصال الإدارية', icon: ClipboardList },
+            { href: '/admin/summer-camp', label: 'مستلزمات المخيم', icon: ClipboardList },
+            { href: '/admin/documents', label: 'الوثائق الإدارية', icon: FileText },
             { href: '/updates', label: 'تحديثات الموقع', icon: Sparkles },
             { href: '/data', label: 'إدارة البيانات', icon: ArrowRightLeft },
             { href: '/dues', label: 'المستحقات (فصلي)', icon: DollarSign },

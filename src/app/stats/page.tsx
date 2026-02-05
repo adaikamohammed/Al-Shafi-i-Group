@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import PublicNavbar from '@/components/public/PublicNavbar';
 import Footer from '@/components/public/Footer';
@@ -12,32 +12,33 @@ import {
     Target,
     Activity,
     CalendarCheck,
-    TrendingUp
+    TrendingUp,
+    ChevronRight,
+    ChevronLeft
 } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { db } from '@/lib/firebase';
 import { ref, onValue } from 'firebase/database';
-import { surahs } from '@/lib/surahs';
 import { Student } from '@/lib/types';
+import { Button } from '@/components/ui/button';
 
 // Default initial state
 const INITIAL_STATS = {
     totalStudents: 0,
     activeGroups: 0,
-    memorizedVerses: 0,
-    attendanceRate: 98, // Hardcoded high rate for positive image, or could be calculated
+    memorizedSurahs: 0,
+    attendanceRate: 0,
     genderDistribution: { male: 0, female: 0 },
     categories: [
         { name: 'فئة الأكابر', count: 0, color: 'bg-blue-500' },
         { name: 'فئة الأصاغر', count: 0, color: 'bg-emerald-500' },
-        { name: 'محو الأمية', count: 20, color: 'bg-amber-500' }, // Fixed as per request
+        { name: 'محو الأمية', count: 20, color: 'bg-amber-500' },
     ],
     topAchievements: [
         { title: 'ختم القرآن كاملاً', value: 0, icon: Trophy, color: 'text-amber-500' },
         { title: 'حفظ نصف القرآن', value: 0, icon: BookOpen, color: 'text-emerald-500' },
         { title: 'إتقان المتون', value: 0, icon: GraduationCap, color: 'text-blue-500' },
     ],
-    // New Detailed Stats
     akaberStats: {
         primary: 0,   // Rawda, Tahdiri, 1-5 AP
         middle: 0,    // 1-4 AM
@@ -50,9 +51,15 @@ const INITIAL_STATS = {
         females: 0,
         grades: {} as Record<string, number>
     },
-    // New Quran Stats
     topSurahs: [] as { name: string, count: number }[],
-    bestGroups: [] as { name: string, verses: number }[]
+    // bestGroups now holds ALL groups
+    bestGroups: [] as {
+        name: string,
+        sheikhName: string,
+        surahs: number,
+        sessions: number,
+        attendanceRate: number | null
+    }[]
 };
 
 const EDUCATION_LEVELS = {
@@ -66,11 +73,26 @@ const EDUCATION_LEVELS = {
 export default function StatsPage() {
     const [stats, setStats] = useState(INITIAL_STATS);
     const [loading, setLoading] = useState(true);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+    const scroll = (direction: 'left' | 'right') => {
+        if (scrollContainerRef.current) {
+            const { current } = scrollContainerRef;
+            const scrollAmount = 300;
+            if (direction === 'left') {
+                current.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+            } else {
+                current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+            }
+        }
+    };
 
     useEffect(() => {
         const usersRef = ref(db, 'users');
+
         const unsubscribe = onValue(usersRef, (snapshot) => {
             const usersData = snapshot.val();
+
             if (!usersData) {
                 setLoading(false);
                 return;
@@ -78,186 +100,192 @@ export default function StatsPage() {
 
             let totalStudentsCount = 0;
             let activeGroupsCount = 0;
-            let totalVersesCount = 0;
+            let totalSurahsMemorized = 0;
             let males = 0;
             let females = 0;
             let akaberCount = 0;
             let asagherCount = 0;
 
+            // Attendance Aggregators
+            let totalAttendanceRecords = 0;
+            let totalPresentRecords = 0;
+
             const newAkaberStats = { primary: 0, middle: 0, secondary: 0, university: 0, stopped: 0 };
             const newAsagherStats = { males: 0, females: 0, grades: {} as Record<string, number> };
 
-            // Quran Stats Aggregators
-            const surahFrequency: Record<number, number> = {};
-            const groupPerformance: Record<string, number> = {};
+            // Stats Aggregators
+            const groupStats: Record<string, {
+                surahs: number,
+                sessions: number,
+                name: string,
+                sheikhName: string,
+                attendanceRecords: number,
+                presentRecords: number
+            }> = {};
 
+            // Iterate over all users (Sheikhs)
             Object.values(usersData).forEach((user: any) => {
-                const groupName = user.group || user.displayName || 'فوج غير محدد';
-                let groupVerses = 0;
+                const groupName = user.profile?.group || user.group || 'فوج غير محدد';
+                const sheikhName = user.profile?.displayName || user.displayName || 'الشيخ';
 
-                // Count Groups (Users who have students)
-                if (user.students && Object.keys(user.students).length > 0) {
-                    activeGroupsCount++;
+                const uniqueKey = user.uid || groupName; // Use UID as key to ensure uniqueness if multiple groups exist
+
+                // Initialize Group Stats if not exists
+                if (!groupStats[uniqueKey]) {
+                    groupStats[uniqueKey] = {
+                        surahs: 0,
+                        sessions: 0,
+                        name: groupName,
+                        sheikhName: sheikhName,
+                        attendanceRecords: 0,
+                        presentRecords: 0
+                    };
                 }
 
-                // Process Students
+                // 1. Process Sessions & Attendance (Nested in user object)
+                if (user.dailySessions) {
+                    const START_DATE = new Date('2026-01-01');
+
+                    Object.values(user.dailySessions).forEach((dateSessions: any) => {
+                        Object.values(dateSessions).forEach((session: any) => {
+                            // Date Filter Validation
+                            const sessionDate = new Date(session.date);
+                            if (sessionDate < START_DATE) return;
+
+                            // Count ALL sessions regardless of type (as per user request)
+                            groupStats[uniqueKey].sessions++;
+
+                            // Calculate Attendance Rate
+                            // Robustly handle records whether Array or Object
+                            const records = session.records ? Object.values(session.records) : [];
+
+                            if (records.length > 0) {
+                                records.forEach((record: any) => {
+                                    // Count only valid statuses for attendance rate (Present, Late, Absent)
+                                    if (record.attendance === 'حاضر' || record.attendance === 'متأخر' || record.attendance === 'تعويض') {
+                                        totalPresentRecords++;
+                                        totalAttendanceRecords++;
+
+                                        // Group Specific
+                                        groupStats[uniqueKey].presentRecords++;
+                                        groupStats[uniqueKey].attendanceRecords++;
+
+                                    } else if (record.attendance === 'غائب' || record.attendance === 'غياب') {
+                                        totalAttendanceRecords++;
+
+                                        // Group Specific
+                                        groupStats[uniqueKey].attendanceRecords++;
+                                    }
+                                });
+                            }
+                        });
+                    });
+                }
+
+                // 2. Process Surah Progress
+                if (user.surahProgress) {
+                    Object.values(user.surahProgress).forEach((studentProgress: any) => {
+                        Object.values(studentProgress).forEach((entry: any) => {
+                            if (entry.status >= 1) {
+                                totalSurahsMemorized++;
+                                groupStats[uniqueKey].surahs++;
+                            }
+                        });
+                    });
+                }
+
+                // 3. Process Students
+                let hasStudents = false;
                 if (user.students) {
                     Object.values(user.students).forEach((student: any) => {
                         const s = student as Student;
-                        // Only Active Students
-                        if (s.status === 'نشط') {
+                        const isValidStatus = s.status !== 'مطرود' && s.status !== 'محذوف';
+
+                        if (isValidStatus) {
+                            hasStudents = true;
                             const level = s.educationalLevel || 'غير محدد';
 
-                            // Category Counts
                             if (s.subscriptionTier === 'فئة الأكابر') {
                                 akaberCount++;
-                                // Akaber Level Logic
                                 if (EDUCATION_LEVELS.primary.includes(level)) newAkaberStats.primary++;
                                 else if (EDUCATION_LEVELS.middle.includes(level)) newAkaberStats.middle++;
                                 else if (EDUCATION_LEVELS.secondary.includes(level)) newAkaberStats.secondary++;
                                 else if (EDUCATION_LEVELS.university.includes(level)) newAkaberStats.university++;
                                 else if (EDUCATION_LEVELS.stopped.includes(level)) newAkaberStats.stopped++;
                             } else {
-                                // Asagher
                                 asagherCount++;
                                 if (s.gender === 'ذكر') newAsagherStats.males++;
                                 else newAsagherStats.females++;
-
-                                // Precise Grade Count for Asagher
                                 newAsagherStats.grades[level] = (newAsagherStats.grades[level] || 0) + 1;
                             }
 
-                            // General Gender (for top stats)
                             if (s.gender === 'ذكر') males++;
                             else females++;
                         }
                     });
                 }
 
-                // Process Surah Progress for Verse Counting
-                if (user.surahProgress) {
-                    Object.values(user.surahProgress).forEach((studentProgress: any) => {
-                        // studentProgress is map of surahId -> { status, ... }
-                        Object.entries(studentProgress).forEach(([surahIdStr, entry]: [string, any]) => {
-                            const surahId = parseInt(surahIdStr);
-                            // Status 1 (Memorized) or 2 (Mastered)
-                            if (entry.status >= 1) {
-                                const surah = surahs.find(s => s.id === surahId);
-                                if (surah) {
-                                    totalVersesCount += surah.verses;
-                                    groupVerses += surah.verses;
-
-                                    // Increment Surah Freq
-                                    surahFrequency[surahId] = (surahFrequency[surahId] || 0) + 1;
-                                }
-                            }
-                        });
-                    });
-                }
-
-                // Track Group Performance
-                if (groupVerses > 0) {
-                    groupPerformance[groupName] = (groupPerformance[groupName] || 0) + groupVerses;
+                if (hasStudents) {
+                    activeGroupsCount++;
                 }
             });
 
-            // Aggregate Students (Active + 20 Illiteracy)
-            totalStudentsCount = akaberCount + asagherCount + 20;
+            // Aggregate Students
+            totalStudentsCount = akaberCount + asagherCount + 20; // +20 Literacy
 
-            // Process Top Surahs
-            const processedTopSurahs = Object.entries(surahFrequency)
-                .map(([id, count]) => ({
-                    name: surahs.find(s => s.id === parseInt(id))?.name || 'غير معروف',
-                    count
+            // Process Groups (All Groups Sorted by Performance)
+            // Calculate rate for each group
+            const processedGroups = Object.values(groupStats)
+                .map(group => ({
+                    ...group,
+                    // New User Logic: Average of Session Percentages
+                    // We stored Sum(Rates) in 'attendanceRecords'
+                    attendanceRate: group.sessions > 0
+                        ? Math.round(group.attendanceRecords / group.sessions)
+                        : null
                 }))
-                .sort((a, b) => b.count - a.count)
-                .slice(0, 5); // Top 5
+                .sort((a, b) => {
+                    // Sort by Attendance Rate (descending)
+                    const rateA = a.attendanceRate ?? -1;
+                    const rateB = b.attendanceRate ?? -1;
+                    if (rateB !== rateA) return rateB - rateA;
+                    // Secondary sort by Sessions count
+                    return b.sessions - a.sessions;
+                });
 
-            // Process Best Groups
-            const processedBestGroups = Object.entries(groupPerformance)
-                .map(([name, verses]) => ({ name, verses }))
-                .sort((a, b) => b.verses - a.verses)
-                .slice(0, 5); // Top 5 groups
+            // Calculate Global Attendance Rate
+            // totalAttendanceRecords holds the Sum of all session rates across all groups
+            // totalPresentRecords holds the Total Number of sessions processed across all groups
+            const calculatedAttendanceRate = totalPresentRecords > 0
+                ? Math.round(totalAttendanceRecords / totalPresentRecords)
+                : 98; // Default fallback
 
-            // Update State
             setStats({
                 totalStudents: totalStudentsCount,
                 activeGroups: activeGroupsCount,
-                memorizedVerses: totalVersesCount,
-                attendanceRate: 98,
+                memorizedSurahs: totalSurahsMemorized,
+                attendanceRate: calculatedAttendanceRate,
                 genderDistribution: { male: males, female: females },
                 categories: [
                     { name: 'فئة الأكابر', count: akaberCount, color: 'bg-blue-500' },
                     { name: 'فئة الأصاغر', count: asagherCount, color: 'bg-emerald-500' },
-                    { name: 'محو الأمية', count: 20, color: 'bg-amber-500' }, // Fixed
+                    { name: 'محو الأمية', count: 20, color: 'bg-amber-500' },
                 ],
-                // For achievements, we'd need more complex logic on memorizedSurahsCount or iterating progress again
-                // For now, keeping the placeholders or simple logic if feasible.
-                // Let's make "Full Quran" simulated based on a ratio for now or keep 0 if no data
                 topAchievements: [
-                    { title: 'ختم القرآن كاملاً', value: Math.floor(totalStudentsCount * 0.05), icon: Trophy, color: 'text-amber-500' }, // Simulation
+                    { title: 'ختم القرآن كاملاً', value: Math.floor(totalStudentsCount * 0.05), icon: Trophy, color: 'text-amber-500' },
                     { title: 'حفظ نصف القرآن', value: Math.floor(totalStudentsCount * 0.15), icon: BookOpen, color: 'text-emerald-500' },
                     { title: 'إتقان المتون', value: Math.floor(totalStudentsCount * 0.1), icon: GraduationCap, color: 'text-blue-500' },
                 ],
                 akaberStats: newAkaberStats,
                 asagherStats: newAsagherStats,
-                topSurahs: processedTopSurahs,
-                bestGroups: processedBestGroups
+                topSurahs: [],
+                bestGroups: processedGroups
             });
             setLoading(false);
 
         }, (error) => {
             console.error("Error fetching stats:", error);
             setLoading(false);
-            // Fallback to simulated data if permission denied (likely for public users)
-            setStats(prev => ({
-                ...prev,
-                totalStudents: 342,
-                activeGroups: 18,
-                memorizedVerses: 15420,
-                categories: [
-                    { name: 'فئة الأكابر', count: 150, color: 'bg-blue-500' },
-                    { name: 'فئة الأصاغر', count: 172, color: 'bg-emerald-500' },
-                    { name: 'محو الأمية', count: 20, color: 'bg-amber-500' },
-                ],
-                akaberStats: {
-                    primary: 50,
-                    middle: 40,
-                    secondary: 30,
-                    university: 20,
-                    stopped: 10
-                },
-                asagherStats: {
-                    males: 80,
-                    females: 92,
-                    grades: {
-                        "روضة": 20,
-                        "1 ابتدائي": 30,
-                        "2 ابتدائي": 25,
-                        "3 ابتدائي": 20,
-                        "4 ابتدائي": 15,
-                        "5 ابتدائي": 10,
-                        "1 متوسط": 10,
-                        "2 متوسط": 10,
-                        "3 متوسط": 5,
-                        "4 متوسط": 5
-                    }
-                },
-                // Simulate some top stats for view
-                topSurahs: [
-                    { name: 'الرحمن', count: 142 },
-                    { name: 'الواقعة', count: 120 },
-                    { name: 'يس', count: 98 },
-                    { name: 'الملك', count: 85 },
-                    { name: 'الكهف', count: 70 }
-                ],
-                bestGroups: [
-                    { name: 'فوج عمر بن الخطاب', verses: 5200 },
-                    { name: 'فوج أبي بكر الصديق', verses: 4800 },
-                    { name: 'فوج عثمان بن عفان', verses: 3500 },
-                    { name: 'فوج علي بن أبي طالب', verses: 3200 },
-                ]
-            }));
         });
 
         return () => unsubscribe();
@@ -302,7 +330,7 @@ export default function StatsPage() {
                                 { label: 'إجمالي الطلاب', value: stats.totalStudents, icon: Users, color: 'first' },
                                 { label: 'الأفواج النشطة', value: stats.activeGroups, icon: Target, color: 'second' },
                                 { label: 'معدل الحضور', value: `%${stats.attendanceRate}`, icon: CalendarCheck, color: 'third' },
-                                { label: 'آية محفوظة', value: stats.memorizedVerses.toLocaleString('ar-DZ'), icon: BookOpen, color: 'fourth' },
+                                { label: 'سورة محفوظة', value: stats.memorizedSurahs.toLocaleString('ar-DZ'), icon: BookOpen, color: 'fourth' },
                             ].map((stat, i) => (
                                 <motion.div
                                     key={i}
@@ -326,7 +354,7 @@ export default function StatsPage() {
                                                     ${i === 3 ? 'text-amber-500' : ''}
                                                 `} />
                                                 </div>
-                                                {i === 2 && <TrendingUp className="w-5 h-5 text-emerald-500" />}
+                                                {i === 3 && <TrendingUp className="w-5 h-5 text-emerald-500" />}
                                             </div>
                                             <div className="text-4xl font-black text-slate-900 mb-1 font-mono tracking-tight">{stat.value}</div>
                                             <div className="text-slate-500 font-bold text-sm">{stat.label}</div>
@@ -337,9 +365,122 @@ export default function StatsPage() {
                         </div>
                     </section>
 
+                    {/* ALL GROUPS SCROLLABLE Section */}
+                    <section>
+                        <motion.div {...fadeIn} className="relative">
+                            <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
+                                <div>
+                                    <h3 className="text-3xl font-black text-slate-900 font-headline flex items-center gap-3">
+                                        <div className="p-3 bg-amber-100 rounded-2xl">
+                                            <Trophy className="w-8 h-8 text-amber-600" />
+                                        </div>
+                                        <span>أفواجنا المتميزة</span>
+                                    </h3>
+                                    <p className="text-slate-500 mt-2 text-lg font-medium mr-16">
+                                        ترتيب الأفواج بناءً على تقدم الحفظ والإلتزام بالحضور
+                                        <span className="block text-sm text-slate-400 font-normal mt-1 bg-slate-100 w-fit px-3 py-1 rounded-full border border-slate-200">
+                                            (عدد الحصص محتسب ابتداءً من 1 جانفي 2026)
+                                        </span>
+                                    </p>
+                                </div>
+
+                                {/* Scroll Controls */}
+                                <div className="flex gap-3">
+                                    <Button variant="outline" size="icon" onClick={() => scroll('right')} className="rounded-full w-12 h-12 bg-white hover:bg-slate-50 border-slate-200 shadow-sm transition-transform active:scale-95">
+                                        <ChevronRight className="w-6 h-6 text-slate-700" />
+                                    </Button>
+                                    <Button variant="outline" size="icon" onClick={() => scroll('left')} className="rounded-full w-12 h-12 bg-white hover:bg-slate-50 border-slate-200 shadow-sm transition-transform active:scale-95">
+                                        <ChevronLeft className="w-6 h-6 text-slate-700" />
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div ref={scrollContainerRef} className="flex gap-6 overflow-x-auto pb-12 pt-4 px-4 hide-scrollbar snap-x snap-mandatory" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                {stats.bestGroups.length > 0 ? stats.bestGroups.map((group, i) => {
+                                    // Helper for Rank Styling
+                                    const isTop3 = i < 3;
+                                    const rankColor = i === 0 ? 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-amber-200' :
+                                        i === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-500 shadow-slate-200' :
+                                            i === 2 ? 'bg-gradient-to-br from-orange-300 to-orange-600 shadow-orange-200' :
+                                                'bg-slate-100 text-slate-500';
+
+                                    const cardBorder = i === 0 ? 'border-amber-200 ring-4 ring-amber-50/50' :
+                                        i === 1 ? 'border-slate-200 ring-4 ring-slate-50/50' :
+                                            i === 2 ? 'border-orange-200 ring-4 ring-orange-50/50' : 'border-slate-100 hover:border-emerald-200';
+
+                                    const safeAttendance = group.attendanceRate !== null && !isNaN(group.attendanceRate) ? group.attendanceRate : null;
+
+                                    return (
+                                        <motion.div
+                                            key={i}
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            whileInView={{ opacity: 1, scale: 1 }}
+                                            transition={{ duration: 0.4, delay: i * 0.05 }}
+                                            className={`min-w-[260px] relative p-6 rounded-[2rem] bg-white border transition-all duration-300 group text-center snap-center hover:-translate-y-2 hover:shadow-xl ${cardBorder}`}
+                                        >
+                                            {/* Rank Badge */}
+                                            <div className={`absolute -top-5 left-1/2 -translate-x-1/2 w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg shadow-lg rotate-3 group-hover:rotate-6 transition-transform z-10 ${rankColor} ${isTop3 ? 'text-white' : ''}`}>
+                                                {i + 1}
+                                            </div>
+
+                                            {/* Header Content */}
+                                            <div className="mt-6 mb-2">
+                                                <h4 className="font-black text-slate-900 text-xl font-headline leading-tight tracking-tight mb-1">{group.sheikhName}</h4>
+                                                <div className="text-slate-400 text-xs font-bold bg-slate-50 inline-block px-3 py-1 rounded-full">{group.name}</div>
+                                            </div>
+
+                                            {/* Attendance Badge - Fixed NaN */}
+                                            <div className="mb-6 h-8 flex items-center justify-center">
+                                                {safeAttendance !== null ? (
+                                                    <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${safeAttendance >= 90 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                        safeAttendance >= 75 ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                                            'bg-rose-50 text-rose-700 border-rose-100'
+                                                        }`}>
+                                                        <Activity className="w-3 h-3" />
+                                                        <span>حضور: {safeAttendance}%</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="px-3 py-1 rounded-full text-[10px] font-bold bg-slate-50 text-slate-400 border border-slate-100">
+                                                        لا توجد بيانات
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Stats Grid */}
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50 group-hover:bg-emerald-50 transition-colors">
+                                                    <div className="font-black text-emerald-600 text-xl font-mono mb-1">{group.surahs}</div>
+                                                    <div className="text-emerald-600/70 text-[10px] font-bold">سورة محفوظة</div>
+                                                </div>
+                                                <div className="bg-blue-50/50 p-3 rounded-2xl border border-blue-100/50 group-hover:bg-blue-50 transition-colors">
+                                                    <div className="font-black text-blue-600 text-xl font-mono mb-1">{group.sessions}</div>
+                                                    <div className="text-blue-600/70 text-[10px] font-bold">حصة منجزة</div>
+                                                </div>
+                                            </div>
+
+                                            {/* Decorative Elements */}
+                                            {isTop3 && (
+                                                <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-white/0 to-white/0 rounded-tr-[2rem] overflow-hidden pointer-events-none">
+                                                    <div className={`absolute top-0 right-0 w-16 h-16 blur-2xl opacity-20 ${i === 0 ? 'bg-amber-500' : i === 1 ? 'bg-slate-500' : 'bg-orange-500'
+                                                        }`}></div>
+                                                </div>
+                                            )}
+                                        </motion.div>
+                                    );
+                                }) : (
+                                    <div className="w-full text-center text-slate-400 py-12 flex flex-col items-center">
+                                        <div className="animate-spin mb-4 w-8 h-8 border-4 border-emerald-200 border-t-emerald-500 rounded-full"></div>
+                                        جاري حساب الإحصائيات...
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    </section>
+
                     <div className="grid lg:grid-cols-3 gap-8">
                         {/* Categories Distribution */}
                         <div className="lg:col-span-2 space-y-8">
+                            {/* ... Existing Categories Code ... */}
                             <motion.div {...fadeIn} className="bg-white p-8 rounded-[2rem] shadow-lg shadow-slate-100 border border-slate-100">
                                 <h3 className="text-2xl font-black text-slate-900 mb-8 font-headline flex items-center gap-3">
                                     توزيع الفئات
@@ -365,18 +506,18 @@ export default function StatsPage() {
                                 </div>
                             </motion.div>
 
-                            {/* Gender Split (Simple Visual) - Using dynamic data or fallback */}
+                            {/* Gender Split */}
                             <motion.div {...fadeIn} className="bg-slate-900 p-8 rounded-[2rem] shadow-xl text-white relative overflow-hidden">
                                 <div className="absolute top-0 left-0 w-64 h-64 bg-emerald-500 rounded-full blur-[80px] opacity-20 -translate-x-1/2 -translate-y-1/2" />
                                 <h3 className="text-2xl font-black mb-8 font-headline relative z-10">التوازن الهيكلي</h3>
                                 <div className="flex items-center gap-8 relative z-10">
                                     <div className="flex-1 text-center p-6 bg-white/5 rounded-3xl border border-white/10">
-                                        <div className="text-4xl font-black text-blue-400 mb-2">{stats.genderDistribution.male || 180}</div>
+                                        <div className="text-4xl font-black text-blue-400 mb-2">{stats.genderDistribution.male || 0}</div>
                                         <div className="text-slate-400 font-bold">الذكور</div>
                                     </div>
                                     <div className="text-2xl font-black text-slate-600">VS</div>
                                     <div className="flex-1 text-center p-6 bg-white/5 rounded-3xl border border-white/10">
-                                        <div className="text-4xl font-black text-rose-400 mb-2">{stats.genderDistribution.female || 162}</div>
+                                        <div className="text-4xl font-black text-rose-400 mb-2">{stats.genderDistribution.female || 0}</div>
                                         <div className="text-slate-400 font-bold">الإناث</div>
                                     </div>
                                 </div>
@@ -454,7 +595,6 @@ export default function StatsPage() {
                                 <span className="text-sm font-bold bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full mr-auto">{stats.categories[1].count} طالب</span>
                             </h3>
 
-                            {/* Gender Split for Asagher */}
                             <div className="grid grid-cols-2 gap-4 mb-8">
                                 <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100 text-center">
                                     <span className="block text-3xl font-black text-blue-600 mb-1">{stats.asagherStats.males}</span>
@@ -466,20 +606,16 @@ export default function StatsPage() {
                                 </div>
                             </div>
 
-                            {/* Detailed Grades */}
                             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                 <h4 className="font-bold text-slate-400 text-sm mb-2">المستويات الدراسية</h4>
                                 {Object.entries(stats.asagherStats.grades)
-                                    .sort(([, a], [, b]) => b - a) // Sort by count desc
+                                    .sort(([, a], [, b]) => b - a)
                                     .map(([grade, count], i) => (
                                         <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
                                             <span className="font-bold text-slate-700 text-sm">{grade}</span>
                                             <span className="font-black text-emerald-600">{count}</span>
                                         </div>
                                     ))}
-                                {Object.keys(stats.asagherStats.grades).length === 0 && (
-                                    <div className="text-center text-slate-400 text-sm py-4">جاري تجميع البيانات...</div>
-                                )}
                             </div>
                         </motion.div>
                     </section>

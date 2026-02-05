@@ -226,7 +226,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
         <SidebarMenu className="gap-1">
           {filteredBottomNavItems.map((item) => {
-            const Icon = (currentThemeId === 'ramadan' && item.href === '/home') ? MoonStar : item.icon;
+            const Icon = item.icon;
 
             return (
               <SidebarMenuItem key={item.href}>
@@ -241,13 +241,50 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                   )}
                 >
                   <Link href={item.href} className="flex items-center gap-3">
-                    <Icon className={cn("h-4 w-4 shrink-0", currentThemeId === 'ramadan' && item.href === '/home' && "text-amber-500")} />
+                    <Icon className="h-4 w-4 shrink-0" />
                     <span className="font-bold text-[11px] tracking-tight group-data-[collapsible=icon]:hidden">{item.label}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             );
           })}
+
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  tooltip="تغيير المظهر"
+                  className={cn(
+                    "rounded-xl h-10 px-3 transition-all duration-300",
+                    theme.isLight ? "text-slate-600 hover:bg-slate-100" : "text-white/60 hover:bg-white/5 hover:text-white"
+                  )}
+                >
+                  <Palette className="h-4 w-4 shrink-0" />
+                  <span className="font-bold text-[11px] tracking-tight group-data-[collapsible=icon]:hidden">المظهر</span>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="start" className="w-64 bg-slate-900 border-white/10 text-white p-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                <div className="px-2 py-1.5 text-xs font-bold text-muted-foreground">اختر المظهر</div>
+                {Object.values(PORTAL_THEMES).map((t) => (
+                  <DropdownMenuItem
+                    key={t.id}
+                    onClick={() => updateUserProfile({ portalTheme: t.id })}
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/10 cursor-pointer mb-1 focus:bg-white/10 focus:text-white"
+                  >
+                    <div className={cn("h-8 w-8 rounded-lg border border-white/20 shrink-0 shadow-sm", t.preview)} />
+                    <div className="flex flex-col gap-0.5 overflow-hidden">
+                      <span className="font-bold text-xs truncate">{t.name}</span>
+                      <span className="text-[10px] text-muted-foreground truncate opacity-70">
+                        {t.isLight ? 'فاتح' : 'داكن'}
+                        {t.id === 'pink_horizon' ? ' (جديد)' : ''}
+                      </span>
+                    </div>
+                    {currentThemeId === t.id && <Check className="h-4 w-4 text-emerald-500 mr-auto" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
 
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -298,8 +335,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider defaultOpen={true}>
       <div className={cn(
         "min-h-screen w-full relative transition-colors duration-700 font-body",
-        theme.isLight ? "bg-slate-50 text-slate-900" : "bg-slate-950 text-white dark",
-        currentThemeId === 'ramadan' && "ramadan-pattern"
+        theme.isLight ? "bg-slate-50 text-slate-900" : "bg-slate-950 text-white dark"
       )}>
         {/* Global Theme Gradient */}
         <div className={cn("fixed inset-0 bg-gradient-to-tr transition-all duration-1000 opacity-20 pointer-events-none", theme.gradient)} />

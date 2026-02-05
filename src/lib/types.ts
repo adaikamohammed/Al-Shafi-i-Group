@@ -377,3 +377,27 @@ export interface SiteUpdate {
   version?: string;
 }
 
+export interface SummerCampItem {
+  id: string;
+  category: string;
+  name: string;
+  quantity: string;
+  provider: string; // The person responsible
+  isProvided: boolean;
+  providedAt?: string; // ISO String
+  notes?: string;
+  addedBy?: string;
+}
+
+export interface AdminDocument {
+  id: string;
+  title: string;
+  url: string;
+  storagePath: string;
+  type: string;
+  uploadedAt: string; // ISO String
+  uploadedBy?: string;
+  size?: number;
+  notes?: string;
+}
+

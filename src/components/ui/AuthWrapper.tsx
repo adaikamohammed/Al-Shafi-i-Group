@@ -25,6 +25,11 @@ const StudentProvider = dynamic(
   { ssr: false }
 );
 
+const AdminProvider = dynamic(
+  () => import('@/context/AdminContext').then(mod => ({ default: mod.AdminProvider })),
+  { ssr: false }
+);
+
 const ClientLayout = dynamic(
   () => import('./ClientLayout').then(mod => ({ default: mod.ClientLayout })),
   {
@@ -38,7 +43,9 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
     <Suspense fallback={<LoadingFallback />}>
       <AuthProvider>
         <StudentProvider>
-          <ClientLayout>{children}</ClientLayout>
+          <AdminProvider>
+            <ClientLayout>{children}</ClientLayout>
+          </AdminProvider>
         </StudentProvider>
       </AuthProvider>
     </Suspense>

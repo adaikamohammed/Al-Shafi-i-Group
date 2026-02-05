@@ -10,60 +10,31 @@ export interface PortalTheme {
 export const PORTAL_THEMES: Record<string, PortalTheme> = {
     midnight: {
         id: "midnight",
-        name: "ليلة النجوم (أزرق)",
-        gradient: "from-slate-950 via-slate-900 to-slate-950",
+        name: "ليلة النجوم",
+        gradient: "from-slate-950 via-slate-900 to-indigo-950",
         accent: "indigo",
         preview: "bg-slate-900"
     },
     emerald: {
         id: "emerald",
         name: "الواحة الخضراء",
-        gradient: "from-emerald-950 via-slate-900 to-slate-950",
+        gradient: "from-emerald-950 via-teal-950 to-slate-900",
         accent: "emerald",
         preview: "bg-emerald-900"
     },
-    ruby: {
-        id: "ruby",
-        name: "الياقوت الملكي (أحمر)",
-        gradient: "from-rose-950 via-slate-900 to-slate-950",
+    sakura: {
+        id: "sakura",
+        name: "أزهار الكرز",
+        gradient: "from-pink-100 via-rose-50 to-white",
         accent: "rose",
-        preview: "bg-rose-900"
-    },
-    amber: {
-        id: "amber",
-        name: "شمس الضحى (ذهبي)",
-        gradient: "from-amber-950 via-slate-900 to-slate-950",
-        accent: "amber",
-        preview: "bg-amber-900"
-    },
-    aurora: {
-        id: "aurora",
-        name: "أورورا (متدرج)",
-        gradient: "from-indigo-950 via-purple-900 to-rose-900",
-        accent: "purple",
-        preview: "bg-gradient-to-r from-indigo-500 to-purple-500"
-    },
-    deep_ocean: {
-        id: "deep_ocean",
-        name: "أعماق المحيط",
-        gradient: "from-cyan-950 via-slate-900 to-slate-950",
-        accent: "cyan",
-        preview: "bg-cyan-900"
-    },
-    classic: {
-        id: "classic",
-        name: "الأصالة الكلاسيكية (أبيض × ذهبي)",
-        gradient: "from-slate-100 via-slate-50 to-slate-100",
-        accent: "amber",
-        preview: "bg-white",
+        preview: "bg-gradient-to-r from-pink-400 to-rose-400",
         isLight: true
     },
-    ramadan: {
-        id: "ramadan",
-        name: "رمضان المبارك (روحاني)",
-        gradient: "from-emerald-50 via-white to-amber-50",
-        accent: "emerald",
-        preview: "bg-gradient-to-r from-emerald-100 to-amber-100",
-        isLight: true
+    golden_luxe: {
+        id: "golden_luxe",
+        name: "الفخامة الذهبية",
+        gradient: "from-slate-950 via-neutral-900 to-amber-950",
+        accent: "amber",
+        preview: "bg-gradient-to-r from-amber-600 to-yellow-600"
     }
 };
