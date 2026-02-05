@@ -23,10 +23,14 @@ interface RegistrationsChartsProps {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 const STATUS_COLORS: Record<string, string> = {
     'تم الإنضمام': '#22c55e', // green-500
+    'تم الإتصال': '#a855f7', // purple-500
+    'تم إرسال رسالة': '#06b6d4', // cyan-500
+    'لم يرد': '#6366f1', // indigo-500
     'مرشح': '#f97316', // orange-500
     'مؤجل': '#eab308', // yellow-500
     'مرفوض': '#ef4444', // red-500
     'إنضم لمدرسة أخرى': '#ef4444', // red-500
+    'مكرر': '#94a3b8', // slate-400
     'ملغى': '#94a3b8', // slate-400
 };
 

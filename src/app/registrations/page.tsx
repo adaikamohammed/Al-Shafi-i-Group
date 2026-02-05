@@ -90,6 +90,8 @@ const SHEIKHS_LIST = [
 
 const statusColors: Record<PreRegistrationStatus, string> = {
     "تم الإتصال": "bg-purple-100 dark:bg-purple-900/20",
+    "تم إرسال رسالة": "bg-cyan-100 dark:bg-cyan-900/20",
+    "لم يرد": "bg-indigo-100 dark:bg-indigo-900/20",
     "تم الإنضمام": "bg-green-100 dark:bg-green-900/20",
     "مرفوض": "bg-red-100 dark:bg-red-900/20",
     "مؤجل": "bg-yellow-100 dark:bg-yellow-900/20",
@@ -100,6 +102,8 @@ const statusColors: Record<PreRegistrationStatus, string> = {
 
 const statusHeaderColors: Record<PreRegistrationStatus, string> = {
     "تم الإتصال": "bg-purple-500",
+    "تم إرسال رسالة": "bg-cyan-500",
+    "لم يرد": "bg-indigo-500",
     "تم الإنضمام": "bg-green-500",
     "مرفوض": "bg-red-500",
     "مؤجل": "bg-yellow-500",
@@ -111,6 +115,8 @@ const statusHeaderColors: Record<PreRegistrationStatus, string> = {
 
 const statusBadgeColors: Record<PreRegistrationStatus, string> = {
     "تم الإتصال": "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800",
+    "تم إرسال رسالة": "bg-cyan-100 text-cyan-800 border-cyan-300 dark:bg-cyan-900/40 dark:text-cyan-300 dark:border-cyan-800",
+    "لم يرد": "bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-800",
     "تم الإنضمام": "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800",
     "مرفوض": "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800",
     "مؤجل": "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-800",
@@ -465,6 +471,8 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
                             <SelectContent>
                                 <SelectItem value="مرشح">مرشح</SelectItem>
                                 <SelectItem value="تم الإتصال">تم الإتصال</SelectItem>
+                                <SelectItem value="تم إرسال رسالة">تم إرسال رسالة</SelectItem>
+                                <SelectItem value="لم يرد">لم يرد</SelectItem>
                                 <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
                                 <SelectItem value="مرفوض">مرفوض</SelectItem>
                                 <SelectItem value="مؤجل">مؤجل</SelectItem>
@@ -565,6 +573,8 @@ const BulkEditModal = ({ open, onOpenChange, selectedCount, onSave }: { open: bo
                                 <SelectContent>
                                     <SelectItem value="مرشح">مرشح</SelectItem>
                                     <SelectItem value="تم الإتصال">تم الإتصال</SelectItem>
+                                    <SelectItem value="تم إرسال رسالة">تم إرسال رسالة</SelectItem>
+                                    <SelectItem value="لم يرد">لم يرد</SelectItem>
                                     <SelectItem value="تم الإنضمام">تم الإنضمام</SelectItem>
                                     <SelectItem value="مرفوض">مرفوض</SelectItem>
                                     <SelectItem value="مؤجل">مؤجل</SelectItem>
@@ -1015,7 +1025,7 @@ export default function PreRegistrationPage() {
     }
     const currentAccess = accessLevelConfig[accessLevel];
 
-    const statusOptions: PreRegistrationStatus[] = ["مرشح", "تم الإتصال", "تم الإنضمام", "مرفوض", "مؤجل", "إنضم لمدرسة أخرى", "مكرر"];
+    const statusOptions: PreRegistrationStatus[] = ["مرشح", "تم الإتصال", "تم إرسال رسالة", "لم يرد", "تم الإنضمام", "مرفوض", "مؤجل", "إنضم لمدرسة أخرى", "مكرر"];
 
     return (
         <div className="space-y-6">

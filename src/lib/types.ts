@@ -271,7 +271,7 @@ export interface HallOfFameData {
 }
 
 
-export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "مرشح" | "تم الإتصال" | "مكرر";
+export type PreRegistrationStatus = "مؤجل" | "تم الإنضمام" | "مرفوض" | "إنضم لمدرسة أخرى" | "مرشح" | "تم الإتصال" | "مكرر" | "تم إرسال رسالة" | "لم يرد";
 
 export interface PreRegistration {
   id: string;

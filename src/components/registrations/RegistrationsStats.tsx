@@ -10,12 +10,12 @@ interface RegistrationsStatsProps {
 export const RegistrationsStats = ({ registrations }: RegistrationsStatsProps) => {
     // Compute Stats
     const total = registrations.length;
-    // Pending: 'مؤجل' + 'مرشح'
-    const pending = registrations.filter(r => r.status === 'مؤجل' || r.status === 'مرشح').length;
+    // Pending: 'مؤجل' | 'مرشح' | 'تم الإتصال' | 'تم إرسال رسالة' | 'لم يرد'
+    const pending = registrations.filter(r => ['مؤجل', 'مرشح', 'تم الإتصال', 'تم إرسال رسالة', 'لم يرد'].includes(r.status)).length;
     // Accepted: 'تم الإنضمام'
     const accepted = registrations.filter(r => r.status === 'تم الإنضمام').length;
-    // Rejected: 'مرفوض' + 'إنضم لمدرسة أخرى' + 'مكرر'
-    const rejected = registrations.filter(r => r.status === 'مرفوض' || r.status === 'إنضم لمدرسة أخرى' || r.status === 'مكرر').length;
+    // Rejected: 'مرفوض' | 'إنضم لمدرسة أخرى' | 'مكرر'
+    const rejected = registrations.filter(r => ['مرفوض', 'إنضم لمدرسة أخرى', 'مكرر'].includes(r.status)).length;
 
     // Group by educational level
     const levelCounts = registrations.reduce((acc, curr) => {
