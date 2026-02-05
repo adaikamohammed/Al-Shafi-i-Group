@@ -314,7 +314,7 @@ export interface AdminLog {
   id: string;
   studentId: string;
   studentName: string;
-  type: 'summon' | 'exit' | 'absence' | 'payment' | 'entry';
+  type: 'summon' | 'exit' | 'absence' | 'payment' | 'entry' | 'join';
   date: string; // ISO string for the relevant action date
   sheikhName: string;
   groupName: string;

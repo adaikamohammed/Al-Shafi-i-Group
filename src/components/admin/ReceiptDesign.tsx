@@ -29,7 +29,7 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
             dir="rtl"
         >
             {/* Receipt Header */}
-            <div className="receipt-header border-b-2 border-black">
+            <div className="receipt-header border-b-2 border-black pt-0 mt-0">
                 <div className="flex flex-col items-center">
                     <h2 className="receipt-title text-black font-black">
                         {type === 'summon' && 'استدعاء ولي أمر'}
@@ -37,17 +37,15 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
                         {type === 'absence' && 'إشعار غياب مسبق'}
                         {type === 'payment' && 'وصل استلام مبلغ'}
                         {type === 'entry' && 'إذن دخول للحلقة'}
+                        {type === 'join' && 'طالب جديد'}
                     </h2>
                     <p className="text-[14px] font-[1000] text-black">المدرسة القرآنية للإمام الشافعي - حي تكسبت / الوادي</p>
                 </div>
-                <div className="receipt-ticket-number bg-white text-black border-2 border-black font-black">
-                    {details?.ticketNumber || 'TKT-######'}
-                </div>
             </div>
 
-            <div className="receipt-body">
+            <div className="receipt-body pt-1">
                 {/* Student Info */}
-                <div className="grid grid-cols-2 gap-4 border-b-2 border-black pb-3">
+                <div className="grid grid-cols-2 gap-1 border-b-2 border-black pb-1 mb-1">
                     <div className="receipt-field">
                         <span className="receipt-field-label text-black text-[14px] font-black">الطالب</span>
                         <span className="receipt-field-value text-black font-black">{studentName || '......'}</span>
@@ -66,10 +64,10 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
                 </div>
 
                 {/* Tab Specific Content */}
-                <div className="min-h-[100px]">
+                <div className="min-h-[50px]">
                     {type === 'summon' && (
-                        <div className="space-y-4">
-                            <div className="p-3 bg-white rounded-xl border-2 border-black">
+                        <div className="space-y-2">
+                            <div className="p-1.5 bg-white rounded-xl">
                                 <span className="receipt-field-label text-black text-[14px] font-black">موعد الحضور المقرر</span>
                                 <p className="text-sm font-black text-black">{details?.date || '......'}</p>
                             </div>
@@ -81,8 +79,8 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
                     )}
 
                     {type === 'exit' && (
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center p-3 bg-white rounded-xl border-2 border-black border-dashed">
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center p-1.5 bg-white rounded-xl">
                                 <span className="text-xs font-black text-black">وقت الخروج:</span>
                                 <span className="text-xl font-black text-black">{details?.time || '......'}</span>
                             </div>
@@ -94,8 +92,8 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
                     )}
 
                     {type === 'absence' && (
-                        <div className="space-y-4">
-                            <div className="p-3 bg-white rounded-xl border-2 border-black">
+                        <div className="space-y-2">
+                            <div className="p-1.5 bg-white rounded-xl">
                                 <span className="receipt-field-label text-black text-[13px] font-black">أيام الغياب المصرح بها</span>
                                 <p className="text-sm font-black text-black">{details?.dates || '......'}</p>
                             </div>
@@ -108,7 +106,7 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
 
                     {type === 'payment' && (
                         <div className="space-y-4">
-                            <div className="text-center p-4 bg-white rounded-2xl border-2 border-black border-dashed">
+                            <div className="text-center p-4 bg-white rounded-2xl">
                                 <p className="text-xs font-black text-black underline mb-2 tracking-wider">{details?.title || '......'}</p>
                                 <div className="text-2xl font-black text-black">
                                     {details?.amount ? `${Number(details.amount).toLocaleString()} د.ج` : '...... د.ج'}
@@ -118,8 +116,8 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
                     )}
 
                     {type === 'entry' && (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4 border-b-2 border-black pb-3">
+                        <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2 border-b-2 border-black pb-1 mb-1">
                                 <div className="receipt-field">
                                     <span className="receipt-field-label text-black text-[13px] font-black">أيام الغياب</span>
                                     <span className="receipt-field-value text-black font-black">{details?.absenceDays || '0'}</span>
@@ -129,20 +127,28 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
                                     <span className="receipt-field-value text-black font-black">{details?.reason || '......'}</span>
                                 </div>
                             </div>
-                            {details?.punishment && (
-                                <div className="bg-white p-2 rounded-lg border-2 border-black mb-2">
-                                    <span className="receipt-field-label text-black text-[13px] font-black">العقوبة المقررة</span>
-                                    <p className="text-xs font-black text-black">{details.punishment}</p>
+
+                            <div className="bg-white p-1 rounded-lg mb-1">
+                                <span className="receipt-field-label text-black text-[13px] font-black">العقوبة المقررة</span>
+                                <p className="text-xs font-black text-black">{details?.punishment || 'لا يوجد'}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {type === 'join' && (
+                        <div className="space-y-2">
+                            <div className="receipt-field mb-1">
+                                <span className="receipt-field-label text-black text-[13px] font-black">المستوى الدراسي</span>
+                                <span className="receipt-field-value text-black font-black">{details?.level || '......'}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 border-t-2 border-black pt-1">
+                                <div className="receipt-field">
+                                    <span className="receipt-field-label text-black text-[13px] font-black">أيام الدراسة</span>
+                                    <span className="receipt-field-value text-black font-black">{details?.studyDays || '......'}</span>
                                 </div>
-                            )}
-                            <div className="receipt-stats-grid bg-white border-2 border-black">
-                                <div className="receipt-stat-item">
-                                    <span className="receipt-stat-label text-black font-black">غياب</span>
-                                    <span className="receipt-stat-value text-black font-black">{details?.stats?.absences || 0}</span>
-                                </div>
-                                <div className="receipt-stat-item">
-                                    <span className="receipt-stat-label text-black font-black">تأخر</span>
-                                    <span className="receipt-stat-value text-black font-black">{details?.stats?.lates || 0}</span>
+                                <div className="receipt-field">
+                                    <span className="receipt-field-label text-black text-[13px] font-black">التوقيت</span>
+                                    <span className="receipt-field-value text-black font-black">{details?.timing || '......'}</span>
                                 </div>
                             </div>
                         </div>
@@ -162,7 +168,7 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
                             ختم الإدارة
                         </div>
                     </div>
-                    {qrCodeUrl && (
+                    {qrCodeUrl && type !== 'join' && (
                         <div className="receipt-qr-image border-black/10">
                             <img
                                 src={qrCodeUrl}

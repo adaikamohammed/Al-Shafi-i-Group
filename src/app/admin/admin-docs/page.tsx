@@ -11,7 +11,7 @@ import { Search, Printer, User, ClipboardList, ArrowLeft, Edit, Calendar, Clock,
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, subDays, isAfter } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Student, AdminLog } from '@/lib/types';
+import { Student, AdminLog, PreRegistration } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import { ReceiptDesign } from '@/components/admin/ReceiptDesign';
@@ -19,11 +19,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Trash2 } from 'lucide-react';
 
 export default function AdminDocsPage() {
-    const { students, allUsers, saveAdminLog, deleteAdminLog, getNextTicketNumber, adminLogs, dailySessions } = useStudentContext();
+    const { students, preRegistrations, allUsers, saveAdminLog, deleteAdminLog, adminLogs, dailySessions } = useStudentContext();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+    const [selectedPreRegistration, setSelectedPreRegistration] = useState<PreRegistration | null>(null);
     const [activeTab, setActiveTab] = useState('summon');
 
     // Filter states for History
@@ -52,8 +53,12 @@ export default function AdminDocsPage() {
     const [entryAbsenceReason, setEntryAbsenceReason] = useState('');
     const [entryPunishment, setEntryPunishment] = useState('');
 
+    // Join Receipt State
+    const [joinStudyDays, setJoinStudyDays] = useState('');
+    const [joinTiming, setJoinTiming] = useState('');
+
     // Search Logic
-    const filteredStudents = useMemo(() => {
+    const filteredResults = useMemo(() => {
         if (!searchTerm.trim()) return [];
 
         const normalize = (text: string) => {
@@ -65,11 +70,19 @@ export default function AdminDocsPage() {
         };
 
         const term = normalize(searchTerm);
+
+        if (activeTab === 'join') {
+            return preRegistrations.filter(r =>
+                normalize(r.fullName).includes(term) ||
+                (r.phone1 && r.phone1.includes(term))
+            ).slice(0, 10).map(r => ({ ...r, type: 'registration' as const }));
+        }
+
         return students.filter(s =>
             normalize(s.fullName).includes(term) ||
             (s.phone1 && s.phone1.includes(term))
-        ).slice(0, 10);
-    }, [students, searchTerm]);
+        ).slice(0, 10).map(s => ({ ...s, type: 'student' as const }));
+    }, [students, preRegistrations, searchTerm, activeTab]);
 
     const selectedSheikhName = useMemo(() => {
         if (!selectedStudent || !allUsers) return 'غير محدد';
@@ -104,11 +117,11 @@ export default function AdminDocsPage() {
     }, [selectedStudent, dailySessions]);
 
     const handlePrint = async () => {
-        if (!selectedStudent) return;
+        if (!selectedStudent && !selectedPreRegistration) return;
 
-        // Get next ticket number from Firebase
-        const nextTicketNum = await getNextTicketNumber();
-        const ticketNumber = `TKT-${nextTicketNum.toString().padStart(6, '0')}`;
+        // Ticket number removed entirely
+        // const nextTicketNum = await getNextTicketNumber();
+        const ticketNumber = '';
 
         let details: any = { ticketNumber };
         let logType: AdminLog['type'] = 'summon';
@@ -137,24 +150,32 @@ export default function AdminDocsPage() {
                     reason: entryAbsenceReason,
                     punishment: entryPunishment,
                     stats: stats30Days,
-                    ticketNumber: ticketNumber
+                    ticketNumber: ''
+                };
+                break;
+            case 'join':
+                logType = 'join' as any; // Using 'as any' temporarily if type definition isn't updated yet
+                details = {
+                    studyDays: joinStudyDays,
+                    timing: joinTiming,
+                    ticketNumber: ''
                 };
                 break;
         }
 
         // Save log to Firebase before printing
         await saveAdminLog({
-            studentId: selectedStudent.id,
-            studentName: selectedStudent.fullName,
+            studentId: selectedStudent?.id || selectedPreRegistration?.id || 'unknown',
+            studentName: selectedStudent?.fullName || selectedPreRegistration?.fullName || 'Unknown',
             type: logType,
             date: format(new Date(), 'yyyy-MM-dd'),
-            sheikhName: selectedSheikhName,
-            groupName: selectedStudent.groupName || 'بدون فوج',
+            sheikhName: selectedSheikhName, // Still relevant if we can map it, otherwise generic
+            groupName: selectedStudent?.groupName || 'تسجيل جديد',
             details: {
                 ...details,
-                ownerId: selectedStudent.ownerId,
-                guardianName: selectedStudent.guardianName,
-                guardianPhone: selectedStudent.phone1
+                ownerId: selectedStudent?.ownerId || 'admin',
+                guardianName: selectedStudent?.guardianName || selectedPreRegistration?.guardianName,
+                guardianPhone: selectedStudent?.phone1 || selectedPreRegistration?.phone
             }
         });
 
@@ -247,7 +268,7 @@ export default function AdminDocsPage() {
                                 <CardHeader className="border-b border-white/5">
                                     <CardTitle className="text-lg flex items-center gap-2 font-headline">
                                         <Search className="h-5 w-5 text-blue-400" />
-                                        1. اختيار الطالب
+                                        1. {activeTab === 'join' ? 'اختيار تسجيل جديد' : 'اختيار الطالب'}
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-6 space-y-4">
@@ -262,13 +283,19 @@ export default function AdminDocsPage() {
                                     </div>
 
                                     <AnimatePresence>
-                                        {searchTerm && filteredStudents.length > 0 && (
+                                        {searchTerm && filteredResults.length > 0 && (
                                             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-1">
-                                                {filteredStudents.map(student => (
+                                                {filteredResults.map((result: any) => (
                                                     <button
-                                                        key={student.id}
+                                                        key={result.id}
                                                         onClick={() => {
-                                                            setSelectedStudent(student);
+                                                            if (result.type === 'student') {
+                                                                setSelectedStudent(result);
+                                                                setSelectedPreRegistration(null);
+                                                            } else {
+                                                                setSelectedPreRegistration(result);
+                                                                setSelectedStudent(null);
+                                                            }
                                                             setSearchTerm('');
                                                             resetFields();
                                                         }}
@@ -279,8 +306,8 @@ export default function AdminDocsPage() {
                                                                 <User className="h-4 w-4 text-blue-400" />
                                                             </div>
                                                             <div>
-                                                                <div className="font-bold text-sm">{student.fullName}</div>
-                                                                <div className="text-[10px] text-muted-foreground">{student.groupName || 'بدون فوج'}</div>
+                                                                <div className="font-bold text-sm">{result.fullName}</div>
+                                                                <div className="text-[10px] text-muted-foreground">{result.groupName || (result.type === 'registration' ? 'تسجيل جديد' : 'بدون فوج')}</div>
                                                             </div>
                                                         </div>
                                                         <ArrowLeft className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all" />
@@ -290,25 +317,25 @@ export default function AdminDocsPage() {
                                         )}
                                     </AnimatePresence>
 
-                                    {selectedStudent && (
+                                    {(selectedStudent || selectedPreRegistration) && (
                                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-4 border-t border-white/5 flex items-center justify-between">
                                             <div className="flex items-center gap-3">
                                                 <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary/20">
                                                     <User className="h-5 w-5 text-primary" />
                                                 </div>
                                                 <div>
-                                                    <div className="font-black text-sm text-primary">{selectedStudent.fullName}</div>
-                                                    <div className="text-[10px] text-muted-foreground">الشيخ: {selectedSheikhName}</div>
+                                                    <div className="font-black text-sm text-primary">{selectedStudent?.fullName || selectedPreRegistration?.fullName}</div>
+                                                    <div className="text-[10px] text-muted-foreground">{selectedStudent ? `الشيخ: ${selectedSheikhName}` : 'طالب جديد'}</div>
                                                 </div>
                                             </div>
-                                            <Button variant="ghost" size="sm" onClick={() => setSelectedStudent(null)} className="h-8 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10">إلغاء</Button>
+                                            <Button variant="ghost" size="sm" onClick={() => { setSelectedStudent(null); setSelectedPreRegistration(null); }} className="h-8 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10">إلغاء</Button>
                                         </motion.div>
                                     )}
                                 </CardContent>
                             </Card>
 
                             <AnimatePresence>
-                                {selectedStudent && (
+                                {(selectedStudent || selectedPreRegistration) && (
                                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
                                         <Card className="border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl ring-1 ring-white/10">
                                             <CardHeader className="border-b border-white/5">
@@ -325,6 +352,7 @@ export default function AdminDocsPage() {
                                                         <TabsTrigger value="absence" className="py-2.5 rounded-lg font-bold data-[state=active]:bg-primary transition-all text-[11px] md:text-sm">غياب</TabsTrigger>
                                                         <TabsTrigger value="payment" className="py-2.5 rounded-lg font-bold data-[state=active]:bg-primary transition-all text-[11px] md:text-sm">سداد</TabsTrigger>
                                                         <TabsTrigger value="entry" className="py-2.5 rounded-lg font-bold data-[state=active]:bg-primary transition-all text-[11px] md:text-sm">دخول</TabsTrigger>
+                                                        <TabsTrigger value="join" className="py-2.5 rounded-lg font-bold data-[state=active]:bg-primary transition-all text-[11px] md:text-sm">إنضمام</TabsTrigger>
                                                     </TabsList>
 
                                                     <TabsContent value="summon" className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
@@ -406,6 +434,17 @@ export default function AdminDocsPage() {
                                                             </div>
                                                         </div>
                                                     </TabsContent>
+
+                                                    <TabsContent value="join" className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                                                        <div className="space-y-2">
+                                                            <Label className="text-xs font-bold text-muted-foreground">أيام الدراسة</Label>
+                                                            <Input placeholder="مثال: الجمعة والسبت" className="bg-white/5 border-white/10" value={joinStudyDays} onChange={(e) => setJoinStudyDays(e.target.value)} />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label className="text-xs font-bold text-muted-foreground">التوقيت</Label>
+                                                            <Input placeholder="مثال: 08:00 - 12:00" className="bg-white/5 border-white/10" value={joinTiming} onChange={(e) => setJoinTiming(e.target.value)} />
+                                                        </div>
+                                                    </TabsContent>
                                                 </Tabs>
                                             </CardContent>
                                         </Card>
@@ -423,34 +462,35 @@ export default function AdminDocsPage() {
 
                             <div className="sticky top-24 w-full flex flex-col items-center gap-6">
                                 {/* THE RECEIPT TARGET */}
-                                {selectedStudent && (
+                                {(selectedStudent || selectedPreRegistration) && (
                                     <ReceiptDesign
                                         log={{
                                             type: activeTab as any,
-                                            studentName: selectedStudent.fullName,
+                                            studentName: selectedStudent?.fullName || selectedPreRegistration?.fullName,
                                             sheikhName: selectedSheikhName,
-                                            groupName: selectedStudent.groupName || 'بدون فوج',
+                                            groupName: selectedStudent?.groupName || 'تسجيل جديد',
                                             details: {
                                                 ... (activeTab === 'summon' ? { date: summonDate, reason: summonReason } : {}),
                                                 ... (activeTab === 'exit' ? { time: exitTime, reason: exitReason } : {}),
                                                 ... (activeTab === 'absence' ? { dates: absenceDates, reason: absenceReason } : {}),
                                                 ... (activeTab === 'payment' ? { title: paymentTitle, amount: paymentAmount } : {}),
+                                                ... (activeTab === 'join' ? { studyDays: joinStudyDays, timing: joinTiming, level: selectedPreRegistration?.educationalLevel } : {}),
                                                 ... (activeTab === 'entry' ? {
                                                     absenceDays: entryAbsenceDays,
                                                     reason: entryAbsenceReason,
                                                     punishment: entryPunishment,
                                                     stats: stats30Days
                                                 } : {}),
-                                                ticketNumber: 'TKT-######',
-                                                guardianName: selectedStudent.guardianName,
-                                                guardianPhone: selectedStudent.phone1
+                                                ticketNumber: '',
+                                                guardianName: selectedStudent?.guardianName || selectedPreRegistration?.guardianName,
+                                                guardianPhone: selectedStudent?.phone1 || selectedPreRegistration?.phone1
                                             }
                                         }}
                                         qrCodeUrl={qrCodeUrl}
                                     />
                                 )}
 
-                                {selectedStudent && (
+                                {(selectedStudent || selectedPreRegistration) && (
                                     <div className="w-full max-w-[300px] space-y-3">
                                         <Button
                                             onClick={handlePrint}
@@ -666,11 +706,7 @@ export default function AdminDocsPage() {
                         font-weight: 1000 !important;
                         color: black !important;
                     }
-                    .receipt-ticket-number {
-                        font-size: 14px !important;
-                        padding: 1.5mm 4mm !important;
-                        font-weight: 1000 !important;
-                    }
+
                 }
             `}</style>
         </div>
