@@ -8,7 +8,9 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  output: 'export',
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -67,20 +69,6 @@ const nextConfig: NextConfig = {
       };
     }
     return config;
-  },
-  async redirects() {
-    return [
-      {
-        source: '/reports/monthly',
-        destination: '/dues',
-        permanent: true,
-      },
-      {
-        source: '/overview',
-        destination: '/home',
-        permanent: true,
-      },
-    ];
   },
 };
 
