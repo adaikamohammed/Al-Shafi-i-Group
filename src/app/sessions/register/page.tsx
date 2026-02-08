@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useStudentContext } from '@/context/StudentContext';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/use-debounce';
-import { format, parse, parseISO, subDays, isSameDay } from 'date-fns';
+import { format, parse, parseISO, subDays, isSameDay, getDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -154,7 +154,14 @@ function RegisterSessionContent() {
                             }
                         } else {
                             setCurrentSessionId(null); // Truly new
-                            setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة إضافية');
+
+                            // Default Thursday and Friday to 'يوم عطلة'
+                            const dayOfWeek = getDay(selectedDay);
+                            if (dayOfWeek === 4 || dayOfWeek === 5) { // Thursday is 4, Friday is 5
+                                setSessionType('يوم عطلة');
+                            } else {
+                                setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة إضافية');
+                            }
 
                             // Logic for admin5 auto-increment
                             if (isAdmin5 && sessionToOpen === 1) {
@@ -203,14 +210,32 @@ function RegisterSessionContent() {
 
     const handleUpdateRecord = (studentId: string, field: keyof AttendanceRecord, value: any) => {
         setIsDirty(true);
-        setAttendanceRecords(prev => ({
-            ...prev,
-            [studentId]: {
-                ...(prev[studentId] || { studentId, attendance: '' as AttendanceStatus, memorization: '' as PerformanceLevel, behavior: '' as BehaviorLevel, notes: '', review: false }),
+        setAttendanceRecords(prev => {
+            const currentRecord = prev[studentId] || {
+                studentId,
+                attendance: '' as AttendanceStatus,
+                memorization: '' as PerformanceLevel,
+                behavior: '' as BehaviorLevel,
+                notes: '',
+                review: false
+            };
+
+            const updatedRecord = {
+                ...currentRecord,
                 [field]: value,
-                attendance: field === 'attendance' ? value : (prev[studentId]?.attendance || 'حاضر')
+                attendance: field === 'attendance' ? value : (currentRecord.attendance || 'حاضر')
+            };
+
+            // Auto-set evaluation to "لم يحفظ" when marking present in basic session
+            if (field === 'attendance' && value === 'حاضر' && sessionType === 'حصة أساسية' && !updatedRecord.memorization) {
+                updatedRecord.memorization = 'لم يحفظ';
             }
-        }));
+
+            return {
+                ...prev,
+                [studentId]: updatedRecord
+            };
+        });
     };
 
     const handleMarkAllPresent = () => {
@@ -218,10 +243,21 @@ function RegisterSessionContent() {
         setAttendanceRecords(prev => {
             const newRecords = { ...prev };
             activeStudents.forEach(student => {
+                const currentRecord = newRecords[student.id] || {
+                    memorization: '' as PerformanceLevel,
+                    behavior: '' as BehaviorLevel,
+                    notes: '',
+                    review: false
+                };
+
                 newRecords[student.id] = {
-                    ...(newRecords[student.id] || { memorization: '' as PerformanceLevel, behavior: '' as BehaviorLevel, notes: '', review: false }),
+                    ...currentRecord,
                     studentId: student.id,
-                    attendance: 'حاضر'
+                    attendance: 'حاضر',
+                    // Auto-set evaluation to "لم يحفظ" in basic session if not already set
+                    memorization: (sessionType === 'حصة أساسية' && !currentRecord.memorization)
+                        ? 'لم يحفظ'
+                        : currentRecord.memorization
                 };
             });
             return newRecords;

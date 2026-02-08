@@ -91,6 +91,7 @@ interface StudentContextType {
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   deleteMultipleDailyReports: (reportsToDelete: { id: string, date: string, authorId: string }[]) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
+  setAdmin5SurahEvaluation: (studentId: string, surahId: number, evaluation: import('@/lib/types').Admin5SurahEvaluation) => Promise<void>;
   bulkUpdateSurahStatus: (studentIds: string[], surahIds: number[], targetStatus: 0 | 1 | 2) => Promise<void>;
   addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
   updatePaymentStatus: (paymentId: string, status: PaymentStatus, amount: number) => Promise<void>;

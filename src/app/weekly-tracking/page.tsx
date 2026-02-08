@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Loader2, AlertTriangle, ArrowLeft, ArrowRight, Star, Info } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, addDays, subDays, parseISO } from 'date-fns';
+import { format, startOfWeek, endOfWeek, addDays, subDays, parseISO, getDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import type { Student, DailySession, DailyRecord, PerformanceLevel } from '@/lib/types';
@@ -19,10 +19,13 @@ const getAttendanceColor = (status?: string) => {
     switch (status) {
         case 'حاضر': return 'bg-green-300';
         case 'غائب':
-        case 'غياب': return 'bg-red-400'; // Both غائب and غياب should be red
+        case 'غياب': return 'bg-red-400';
         case 'متأخر': return 'bg-yellow-400';
         case 'تعويض': return 'bg-blue-300';
-        case 'عطلة': return 'bg-gray-100';
+        case 'عطلة': return 'bg-sky-300 dark:bg-sky-700'; // VERY STRONG Blue - matches calendar
+        case 'نشاط': return 'bg-purple-300 dark:bg-purple-700'; // VERY STRONG Purple - matches calendar
+        case 'غياب الشيخ': return 'bg-red-300 dark:bg-red-700'; // VERY STRONG Red - matches calendar (no sub)
+        case 'غياب مع بديل': return 'bg-orange-300 dark:bg-orange-700'; // VERY STRONG Orange - matches calendar (with sub)
         default: return 'bg-gray-100';
     }
 };
@@ -70,10 +73,20 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
     const record1 = session1?.records?.find(r => r.studentId === student.id);
     const record2 = session2?.records?.find(r => r.studentId === student.id);
 
-    const isHoliday = session1?.sessionType === 'يوم عطلة' || session2?.sessionType === 'يوم عطلة';
+    // Check if Thursday (4) or Friday (5) - automatic weekend day
+    const dayOfWeek = getDay(date);
+    const isWeekendDay = dayOfWeek === 4 || dayOfWeek === 5;
+
+    const isHoliday = session1?.sessionType === 'يوم عطلة' || session2?.sessionType === 'يوم عطلة' || isWeekendDay;
+    const isActivity = session1?.sessionType === 'حصة أنشطة' || session2?.sessionType === 'حصة أنشطة';
+    const isTeacherAbsence = session1?.sessionType === 'غياب الشيخ' || session2?.sessionType === 'غياب الشيخ';
 
     const primaryRecord = record1 || record2;
-    let primaryStatus = isHoliday ? 'عطلة' : primaryRecord?.attendance;
+    let primaryStatus: string | undefined = primaryRecord?.attendance;
+
+    if (isHoliday) primaryStatus = 'عطلة';
+    else if (isTeacherAbsence) primaryStatus = 'غياب الشيخ';
+    else if (isActivity) primaryStatus = 'نشاط';
 
     // Check if student is absent: غائب or غياب
     const isAbsent = primaryStatus === 'غائب' || primaryStatus === 'غياب';
@@ -298,7 +311,11 @@ export default function WeeklyFollowUpPage() {
                                     <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-red-400"></div> غائب</li>
                                     <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-yellow-400"></div> متأخر</li>
                                     <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-blue-300"></div> تعويض</li>
-                                    <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-gray-100"></div> يوم عطلة / لم يسجل</li>
+                                    <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-sky-300 dark:bg-sky-700"></div> يوم عطلة</li>
+                                    <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-purple-300 dark:bg-purple-700"></div> حصة أنشطة</li>
+                                    <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-red-300 dark:bg-red-700"></div> غياب الشيخ</li>
+                                    <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-orange-300 dark:bg-orange-700"></div> غياب الشيخ مع بديل</li>
+                                    <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-gray-100"></div> لم يسجل</li>
                                 </ul>
                             </div>
                             <div>

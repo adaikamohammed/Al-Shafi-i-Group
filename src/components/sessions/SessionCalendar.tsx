@@ -66,23 +66,33 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
             const sessions = getSessionsForDay(formattedDate);
             const isTodayDate = isToday(dayDate);
 
-            // Determine Status Color
+            // Determine Status Color - Using STRONG, VISIBLE colors
             let statusClass = "bg-card hover:bg-accent/50 border-transparent shadow-sm"; // Default
+
+            // Check if it's Thursday (4) or Friday (5) - automatic holiday
+            const dayOfWeek = getDay(dayDate);
+            const isWeekendDay = dayOfWeek === 4 || dayOfWeek === 5; // Thursday or Friday
 
             if (sessions.length > 0) {
                 const hasHoliday = sessions.some(s => s.sessionType === 'يوم عطلة');
+                const hasActivity = sessions.some(s => s.sessionType === 'حصة أنشطة');
                 const hasAbsentNoSub = sessions.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
                 const hasAbsentWithSub = sessions.some(s => s.sessionType === 'غياب الشيخ' && s.substituteTeacher);
 
                 if (hasHoliday) {
-                    statusClass = 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'; // Holiday
+                    statusClass = 'bg-sky-300 dark:bg-sky-700 border-2 border-sky-500 dark:border-sky-400'; // VERY STRONG Blue for Holiday
+                } else if (hasActivity) {
+                    statusClass = 'bg-purple-300 dark:bg-purple-700 border-2 border-purple-500 dark:border-purple-400'; // VERY STRONG Purple for Activities
                 } else if (hasAbsentNoSub) {
-                    statusClass = 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900'; // Absent
+                    statusClass = 'bg-red-300 dark:bg-red-700 border-2 border-red-500 dark:border-red-400'; // VERY STRONG Red for Absent without Sub
                 } else if (hasAbsentWithSub) {
-                    statusClass = 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800'; // Absent with Sub
+                    statusClass = 'bg-orange-300 dark:bg-orange-700 border-2 border-orange-500 dark:border-orange-400'; // VERY STRONG Orange for Absent with Sub
                 } else {
-                    statusClass = 'bg-emerald-50 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-800'; // Completed/Normal
+                    statusClass = 'bg-emerald-300 dark:bg-emerald-700 border-2 border-emerald-500 dark:border-emerald-400'; // STRONG Green for Completed/Normal
                 }
+            } else if (isWeekendDay) {
+                // Thursday or Friday without session = automatic holiday color
+                statusClass = 'bg-sky-300 dark:bg-sky-700 border-2 border-sky-500 dark:border-sky-400'; // Weekend day - Holiday
             } else if (isPast(dayDate) && !isTodayDate) {
                 statusClass = 'bg-muted/30 border-muted/20 opacity-80'; // Empty past day
             }

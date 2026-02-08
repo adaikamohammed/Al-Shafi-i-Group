@@ -134,9 +134,12 @@ export type SurahStatus =
   | "مراجعة جماعية"
   | "مؤجلة مؤقتًا";
 
+export type Admin5SurahEvaluation = "ممتاز" | "جيد جداً" | "جيد" | "حسن" | "متوسط" | "لم يحفظ";
+
 export type SurahMasteryEntry = {
   status: 0 | 1 | 2; // 0: not memorized, 1: memorized, 2: mastered
-  completedAt?: string; // ISO string for when it was first marked as status 1 or 2
+  completedAt?: string; // ISO String
+  admin5Evaluation?: Admin5SurahEvaluation; // For Sheikh Ibrahim's detailed evaluation
 };
 
 export type SurahMastery = Record<number, SurahMasteryEntry>;

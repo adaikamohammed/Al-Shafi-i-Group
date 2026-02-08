@@ -23,6 +23,7 @@ import { SurahStatsChart } from '@/components/profile/SurahStatsChart';
 import { GroupComparisonCard } from '@/components/management/GroupComparisonCard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ManagementSurahsView } from '@/components/management/ManagementSurahsView';
+import { Admin5SurahStatsChart } from '@/components/profile/Admin5SurahStatsChart';
 
 
 export default function SurahProgressPage() {
@@ -35,6 +36,8 @@ export default function SurahProgressPage() {
     const [selectedSurahIds, setSelectedSurahIds] = useState<number[]>([]);
     const [isApplying, setIsApplying] = useState(false);
     const [selectedGroupForDetails, setSelectedGroupForDetails] = useState<string | null>(null);
+    const [evaluationDialogOpen, setEvaluationDialogOpen] = useState(false);
+    const [selectedSurahForEvaluation, setSelectedSurahForEvaluation] = useState<number | null>(null);
 
     const studentsToShow = useMemo(() => (students ?? []).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
     const studentOptions: SearchableSelectOption[] = useMemo(() => studentsToShow.map(s => ({ value: s.id, label: s.fullName })), [studentsToShow]);
@@ -157,6 +160,14 @@ export default function SurahProgressPage() {
             return;
         }
         if (!selectedStudent) return;
+
+        // For admin5, open evaluation dialog instead of toggling
+        if (isAdmin5) {
+            setSelectedSurahForEvaluation(surahId);
+            setEvaluationDialogOpen(true);
+            return;
+        }
+
         toggleSurahStatus(selectedStudent.id, surahId);
     };
 
@@ -209,6 +220,78 @@ export default function SurahProgressPage() {
 
     const { user } = useAuth();
     const isAdmin5 = user?.email === 'admin5@gmail.com';
+
+    // Temporary inline implementation of setAdmin5SurahEvaluation until StudentContext is updated
+    const setAdmin5SurahEvaluation = async (studentId: string, surahId: number, evaluation: import('@/lib/types').Admin5SurahEvaluation) => {
+        if (!user) return;
+
+        // We need to import firebase functions here
+        const { ref, set, remove } = await import('firebase/database');
+        const { db } = await import('@/lib/firebase');
+        const { logActivity } = await import('@/lib/activityLogger');
+
+        const student = students.find(s => s.id === studentId);
+        if (!student) return;
+
+        const studentOwnerId = student.ownerId;
+        const studentProgressMap = { ...(surahProgress[studentId] || {}) };
+        const currentEntry = studentProgressMap[surahId] || { status: 0 };
+
+        // Convert evaluation to status
+        let newStatus: 0 | 1 | 2;
+        if (evaluation === 'لم يحفظ') {
+            newStatus = 0;
+        } else if (evaluation === 'ممتاز') {
+            newStatus = 2; // متقنة
+        } else {
+            newStatus = 1; // محفوظة (for جيد جداً, جيد, حسن, متوسط)
+        }
+
+        const newEntry: import('@/lib/types').SurahMasteryEntry = {
+            status: newStatus,
+            admin5Evaluation: evaluation
+        };
+
+        // Set completion date when moving from 0 to >0
+        if (newStatus > 0 && currentEntry.status === 0) {
+            newEntry.completedAt = new Date().toISOString();
+        } else if (newStatus > 0) {
+            newEntry.completedAt = currentEntry.completedAt || new Date().toISOString();
+        }
+
+        const progressRef = ref(db, `users/${studentOwnerId}/surahProgress/${studentId}/${surahId}`);
+
+        if (newStatus === 0) {
+            await remove(progressRef);
+        } else {
+            await set(progressRef, newEntry);
+        }
+
+        logActivity(
+            'UPDATE_SURAH_PROGRESS',
+            user.uid,
+            `تقييم السورة (ID: ${surahId}): ${evaluation}`,
+            studentId,
+            student?.fullName || 'غير معروف',
+            user.displayName || 'Unknown',
+            student?.groupName || 'غير محدد',
+            studentOwnerId
+        );
+
+        toast({
+            title: `✅ تم تقييم السورة`,
+            description: `التقييم: ${evaluation}`,
+        });
+
+        setEvaluationDialogOpen(false);
+        setSelectedSurahForEvaluation(null);
+    };
+
+    const handleAdmin5Evaluation = (evaluation: import('@/lib/types').Admin5SurahEvaluation) => {
+        if (selectedStudentId && selectedSurahForEvaluation) {
+            setAdmin5SurahEvaluation(selectedStudentId, selectedSurahForEvaluation, evaluation);
+        }
+    };
 
     const lastSessionProgress = useMemo(() => {
         if (!selectedStudentId || !dailySessions) return null;
@@ -541,11 +624,25 @@ export default function SurahProgressPage() {
                         <CardContent className="p-3 sm:p-6">
                             <div className="grid grid-cols-[repeat(auto-fill,minmax(75px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-1.5 sm:gap-3">
                                 {allSurahs.map(surah => {
-                                    const status = isBulkMode ? (selectedSurahIds.includes(surah.id) ? 1 : 0) : (studentProgress[surah.id]?.status || 0);
+                                    const entry = studentProgress[surah.id];
+                                    const status = isBulkMode ? (selectedSurahIds.includes(surah.id) ? 1 : 0) : (entry?.status || 0);
                                     let buttonClass = "bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200";
+
                                     if (!isBulkMode) {
-                                        if (status === 1) buttonClass = "bg-green-200 hover:bg-green-300 text-green-800 dark:bg-green-800 dark:hover:bg-green-700 dark:text-green-100";
-                                        if (status === 2) buttonClass = "bg-green-600 hover:bg-green-700 text-white dark:bg-green-600 dark:hover:bg-green-500";
+                                        if (isAdmin5) {
+                                            // Admin5 Custom Colors
+                                            const evaluation = entry?.admin5Evaluation;
+                                            if (evaluation === 'ممتاز') buttonClass = "bg-emerald-600 hover:bg-emerald-700 text-white";
+                                            else if (evaluation === 'جيد جداً') buttonClass = "bg-emerald-500 hover:bg-emerald-600 text-white";
+                                            else if (evaluation === 'جيد') buttonClass = "bg-teal-500 hover:bg-teal-600 text-white";
+                                            else if (evaluation === 'حسن') buttonClass = "bg-cyan-500 hover:bg-cyan-600 text-white";
+                                            else if (evaluation === 'متوسط') buttonClass = "bg-orange-400 hover:bg-orange-500 text-white";
+                                            else if (status === 0) buttonClass = "bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200";
+                                        } else {
+                                            // Normal Users
+                                            if (status === 1) buttonClass = "bg-green-200 hover:bg-green-300 text-green-800 dark:bg-green-800 dark:hover:bg-green-700 dark:text-green-100";
+                                            if (status === 2) buttonClass = "bg-green-600 hover:bg-green-700 text-white dark:bg-green-600 dark:hover:bg-green-500";
+                                        }
                                     } else {
                                         if (selectedSurahIds.includes(surah.id)) buttonClass = "bg-primary text-primary-foreground hover:bg-primary/90";
                                     }
@@ -559,23 +656,43 @@ export default function SurahProgressPage() {
                                                     disabled={!isBulkMode && (!selectedStudentId || selectedStudent?.status === 'مطرود')}
                                                     className={cn("h-auto justify-between transition-all duration-200 px-1.5 py-1 sm:px-3 sm:py-2", buttonClass, isBulkMode && selectedSurahIds.includes(surah.id) && "ring-2 ring-primary ring-offset-2 scale-105")}
                                                 >
-                                                    <div className="flex items-center gap-1.5 overflow-hidden">
+                                                    <div className="flex items-center gap-1.5 overflow-hidden w-full justify-center sm:justify-start">
                                                         {!isBulkMode ? (
-                                                            <>
-                                                                {status === 1 && <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />}
-                                                                {status === 2 && <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />}
-                                                            </>
+                                                            isAdmin5 ? (
+                                                                // Admin5 View: Show Text
+                                                                <span className="text-[10px] sm:text-xs font-bold truncate">
+                                                                    {entry?.admin5Evaluation || (status === 0 ? "" : (status === 1 ? "محفوظة" : "متقنة"))}
+                                                                </span>
+                                                            ) : (
+                                                                // Normal View: Show Icons
+                                                                <>
+                                                                    {status === 1 && <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />}
+                                                                    {status === 2 && <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />}
+                                                                </>
+                                                            )
                                                         ) : (
                                                             selectedSurahIds.includes(surah.id) && <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
                                                         )}
-                                                        <span className="truncate text-[8px] xs:text-[9px] sm:text-xs font-medium">{surah.id}. {surah.name}</span>
+                                                        <span className={cn("truncate text-[8px] xs:text-[9px] sm:text-xs font-medium", isAdmin5 && !isBulkMode && "hidden sm:inline")}>
+                                                            {isAdmin5 && !isBulkMode ? (
+                                                                // For admin5, hide surah name on very small screens if evaluated, to show evaluation text
+                                                                entry?.admin5Evaluation ? "" : `${surah.id}. ${surah.name}`
+                                                            ) : (
+                                                                `${surah.id}. ${surah.name}`
+                                                            )}
+                                                        </span>
+                                                        {isAdmin5 && !isBulkMode && entry?.admin5Evaluation && (
+                                                            <span className="hidden sm:inline text-[8px] opacity-70">
+                                                                {surah.id}. {surah.name}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <span className="text-[8px] sm:text-[10px] opacity-70 shrink-0 hidden xs:inline">{surah.verses}</span>
                                                 </Button>
                                             </TooltipTrigger>
                                             <TooltipContent>
                                                 <p>
-                                                    {surah.name} - {isBulkMode ? (selectedSurahIds.includes(surah.id) ? "منتقاة للتعديل" : "غير منتقاة") : (status === 0 ? "غير محفوظة" : status === 1 ? "محفوظة" : "متقنة")}
+                                                    {surah.name} - {isBulkMode ? (selectedSurahIds.includes(surah.id) ? "منتقاة للتعديل" : "غير منتقاة") : (isAdmin5 ? (entry?.admin5Evaluation || "غير محفوظة") : (status === 0 ? "غير محفوظة" : status === 1 ? "محفوظة" : "متقنة"))}
                                                 </p>
                                             </TooltipContent>
                                         </Tooltip>
@@ -587,9 +704,63 @@ export default function SurahProgressPage() {
                 </div>
 
                 <div className="w-full">
-                    <SurahStatsChart students={students} surahProgress={surahProgress || {}} />
+                    {isAdmin5 ? (
+                        <Admin5SurahStatsChart students={students} surahProgress={surahProgress || {}} />
+                    ) : (
+                        <SurahStatsChart students={students} surahProgress={surahProgress || {}} />
+                    )}
                 </div>
             </div>
+
+            {/* Admin5 Evaluation Dialog */}
+            <Dialog open={evaluationDialogOpen} onOpenChange={setEvaluationDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>تقييم السورة</DialogTitle>
+                        <DialogDescription>
+                            يرجى اختيار تقييم الطالب للسورة المحددة.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid grid-cols-2 gap-3 py-4">
+                        <Button
+                            onClick={() => handleAdmin5Evaluation('ممتاز')}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white h-12 text-lg"
+                        >
+                            ممتاز
+                        </Button>
+                        <Button
+                            onClick={() => handleAdmin5Evaluation('جيد جداً')}
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white h-12 text-lg"
+                        >
+                            جيد جداً
+                        </Button>
+                        <Button
+                            onClick={() => handleAdmin5Evaluation('جيد')}
+                            className="bg-teal-500 hover:bg-teal-600 text-white h-12 text-lg"
+                        >
+                            جيد
+                        </Button>
+                        <Button
+                            onClick={() => handleAdmin5Evaluation('حسن')}
+                            className="bg-cyan-500 hover:bg-cyan-600 text-white h-12 text-lg"
+                        >
+                            حسن
+                        </Button>
+                        <Button
+                            onClick={() => handleAdmin5Evaluation('متوسط')}
+                            className="bg-orange-400 hover:bg-orange-500 text-white h-12 text-lg"
+                        >
+                            متوسط
+                        </Button>
+                        <Button
+                            onClick={() => handleAdmin5Evaluation('لم يحفظ')}
+                            className="bg-red-500 hover:bg-red-600 text-white h-12 text-lg"
+                        >
+                            لم يحفظ
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </TooltipProvider>
     );
 }
