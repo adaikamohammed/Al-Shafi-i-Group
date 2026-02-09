@@ -112,6 +112,7 @@ interface StudentContextType {
   markNotificationAsRead: (notificationId: string) => Promise<void>;
   sendManagementMessage: (targetSheikhId: string, messageData: Partial<DailyReport>, alternateUids?: string[]) => Promise<void>;
   markManagementMessageAsRead: (reportId: string, date: string) => Promise<void>;
+  moveDailySession: (sessionId: string, date: string, sourceOwnerId: string, targetOwnerId: string) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -1644,6 +1645,54 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+
+
+  const moveDailySession = async (sessionId: string, date: string, sourceOwnerId: string, targetOwnerId: string) => {
+    if (!authContextUser || !sessionId || !sourceOwnerId || !targetOwnerId) return;
+
+    const sourceRef = ref(db, `users/${sourceOwnerId}/dailySessions/${date}/${sessionId}`);
+
+    try {
+      const snapshot = await get(sourceRef);
+      if (snapshot.exists()) {
+        const sessionData = snapshot.val();
+        // Update ownerId in the data itself
+        const updatedSessionData = { ...sessionData, ownerId: targetOwnerId };
+
+        // Atomic update: write to target, remove from source
+        const updates: any = {};
+        updates[`users/${targetOwnerId}/dailySessions/${date}/${sessionId}`] = updatedSessionData;
+        updates[`users/${sourceOwnerId}/dailySessions/${date}/${sessionId}`] = null;
+
+        await update(ref(db), updates);
+
+        await logActivity(
+          'MOVE_SESSION',
+          authContextUser.uid,
+          `تم نقل حصة بتاريخ ${date} من المستخدم ${sourceOwnerId} إلى ${targetOwnerId}`,
+          sessionId,
+          sessionData.sessionType,
+          authContextUser.displayName || 'Unknown',
+          authContextUser.group || 'غير محدد',
+          targetOwnerId
+        );
+
+        toast({
+          title: "تم النقل بنجاح",
+          description: "تم نقل الحصة إلى حساب الشيخ المحدد.",
+        });
+      }
+    } catch (error) {
+      console.error("Error moving session:", error);
+      toast({
+        title: "خطأ في النقل",
+        description: "حدث خطأ أثناء نقل الحصة.",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   const bulkUpdateStudents = async (updates: Record<string, Partial<Student>>) => {
     if (!authContextUser) return;
     try {
@@ -1800,6 +1849,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       markNotificationAsRead,
       sendManagementMessage,
       markManagementMessageAsRead,
+      moveDailySession,
       deleteMultipleDailyReports,
       setAdmin5SurahEvaluation
     }}>

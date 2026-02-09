@@ -15,11 +15,12 @@ interface SessionCalendarProps {
     onDayClick: (day: number, sessionNumber?: 1 | 2) => void;
     getSessionsForDay: (dateString: string) => any[];
     isSuperAdmin: boolean;
-    onDeleteSession: (e: React.MouseEvent, sessionId: string, date: string) => void;
+    onDeleteSession: (e: React.MouseEvent, sessionId: string, date: string, ownerId?: string) => void;
     onExportSession: (e: React.MouseEvent, sessionId: string) => void;
+    onMoveSession: (e: React.MouseEvent, sessionId: string, date: string, currentOwnerId: string) => void;
 }
 
-export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSessionsForDay, isSuperAdmin, onDeleteSession, onExportSession }: SessionCalendarProps) => {
+export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSessionsForDay, isSuperAdmin, onDeleteSession, onExportSession, onMoveSession }: SessionCalendarProps) => {
 
     const year = getYear(currentDate);
     const month = getMonth(currentDate);
@@ -156,9 +157,19 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                                             <DropdownMenuItem onClick={(e) => onExportSession(e, session.id)} className="rounded-lg">
                                                 <Download className="ml-2 h-3.5 w-3.5" /> تصدير الملف
                                             </DropdownMenuItem>
+
+                                            {/* Transfer Session Button - Only for Admins */}
+                                            {isSuperAdmin && (
+                                                <DropdownMenuItem
+                                                    onClick={(e) => onMoveSession(e, session.id, formattedDate, session.ownerId)}
+                                                    className="rounded-lg text-blue-600 focus:text-blue-700 focus:bg-blue-50"
+                                                >
+                                                    <ChevronRight className="ml-2 h-3.5 w-3.5" /> نقل الحصة
+                                                </DropdownMenuItem>
+                                            )}
                                             <DropdownMenuItem
                                                 className="text-red-600 focus:text-red-700 focus:bg-red-50 rounded-lg font-bold"
-                                                onClick={(e) => onDeleteSession(e, session.id, formattedDate)}
+                                                onClick={(e) => onDeleteSession(e, session.id, formattedDate, session.ownerId)}
                                             >
                                                 <Trash2 className="ml-2 h-3.5 w-3.5" /> حذف الحصة نهائياً
                                             </DropdownMenuItem>

@@ -434,6 +434,7 @@ function RegisterSessionContent() {
 
         // Pass effectiveOwnerId if it differs from current user (i.e. Admin actions)
         const targetOwner = (effectiveOwnerId && effectiveOwnerId !== user?.uid) ? effectiveOwnerId : undefined;
+        console.log('📝 Saving Session:', { effectiveOwnerId, currentUserId: user?.uid, targetOwner, ownerIdParam });
         await addDailySession(sessionPayload, targetOwner);
     };
 
@@ -698,17 +699,36 @@ function RegisterSessionContent() {
 
     const handleDelete = async () => {
         if (confirm('هل أنت متأكد من حذف بيانات هذه الحصة؟')) {
-            const dateStr = format(selectedDay, 'yyyy-MM-dd');
-            const session = getSessionsForDay(dateStr).find(s => s.sessionNumber === sessionToOpen);
-            if (session) {
+            const sessionIdToDelete = currentSessionId || getSessionsForDay(format(selectedDay, 'yyyy-MM-dd')).find(s => s.sessionNumber === sessionToOpen)?.id;
+
+            if (sessionIdToDelete) {
                 // Pass effectiveOwnerId if it differs from current user
                 const targetOwner = (effectiveOwnerId && effectiveOwnerId !== user?.uid) ? effectiveOwnerId : undefined;
-                await deleteDailySession(session.id, undefined, targetOwner);
+                console.log('🗑️ Deleting Session:', { sessionIdToDelete, targetOwner, effectiveOwnerId, date: format(selectedDay, 'yyyy-MM-dd') });
+
+                // CRITICAL FIX: Must pass the date explicitly because session ID is a UUID and doesn't contain the date
+                const dateStr = format(selectedDay, 'yyyy-MM-dd');
+                await deleteDailySession(sessionIdToDelete, dateStr, targetOwner);
+
                 toast({ title: "تم الحذف", description: "تم حذف بيانات الحصة بنجاح." });
                 router.push('/sessions');
+            } else {
+                toast({ title: "خطأ", description: "لا يمكن العثور على معرف الحصة للحذف.", variant: "destructive" });
             }
         }
     };
+
+    // Diagnostic Alert: If Admin and no ownerId param, warn them
+    useEffect(() => {
+        if ((isSuperAdmin || isAdmin5 || isManagement) && !ownerIdParam) {
+            toast({
+                title: "تنبيه نظام",
+                description: "أنت تقوم بالتعديل باسمك الشخصي وليس باسم شيخ محدد. تأكد من اختيار الشيخ من القائمة السابقة.",
+                variant: "destructive",
+                duration: 5000
+            });
+        }
+    }, [isSuperAdmin, isAdmin5, isManagement, ownerIdParam, toast]);
 
     if (loading) {
         return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;

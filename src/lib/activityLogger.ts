@@ -12,7 +12,8 @@ export type ActivityAction =
     | 'DELETE_REPORT'
     | 'UPDATE_SURAH_PROGRESS'
     | 'UPDATE_PRE_REGISTRATION'
-    | 'DELETE_PRE_REGISTRATION';
+    | 'DELETE_PRE_REGISTRATION'
+    | 'MOVE_SESSION';
 
 interface LogEntry {
     action: ActivityAction;

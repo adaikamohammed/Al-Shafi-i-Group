@@ -50,7 +50,7 @@ import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
 
 export default function DailySessionsPage() {
   const { user, isSuperAdmin } = useAuth();
-  const { allUsers, students, dailySessions, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById } = useStudentContext();
+  const { allUsers, students, dailySessions, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById, moveDailySession } = useStudentContext();
   const { toast } = useToast();
   const router = useRouter();
   const isAdmin5 = user?.email === 'admin5@gmail.com';
@@ -65,6 +65,8 @@ export default function DailySessionsPage() {
   const [extraSessionNumber, setExtraSessionNumber] = useState<1 | 2>(1);
   const [selectedSheikhId, setSelectedSheikhId] = useState<string>('');
   const [sessionChoiceData, setSessionChoiceData] = useState<{ day: number, dateStr: string, sessions: any[] } | null>(null);
+  const [moveSessionData, setMoveSessionData] = useState<{ sessionId: string, date: string, currentOwnerId: string } | null>(null);
+  const [targetSheikhForMove, setTargetSheikhForMove] = useState<string>('');
 
   // Get the selected sheikh's group name for filtering
   const selectedGroupName = useMemo(() => {
@@ -173,11 +175,30 @@ export default function DailySessionsPage() {
     }
   };
 
-  const handleDeleteSession = (e: React.MouseEvent, sessionId: string, date: string) => {
+  const handleDeleteSession = (e: React.MouseEvent, sessionId: string, date: string, ownerId?: string) => {
     e.stopPropagation();
-    deleteDailySession(sessionId, date);
-    toast({ title: "تم الحذف", description: `تم حذف بيانات الحصة بنجاح.` });
+    if (confirm("هل أنت متأكد من حذف هذه الحصة نهائياً؟")) {
+      deleteDailySession(sessionId, date, ownerId);
+      toast({ title: "تم الحذف", description: `تم حذف بيانات الحصة بنجاح.` });
+    }
   }
+
+  const handleMoveSession = (e: React.MouseEvent, sessionId: string, date: string, currentOwnerId: string) => {
+    e.stopPropagation();
+    setMoveSessionData({ sessionId, date, currentOwnerId });
+    setTargetSheikhForMove(''); // Reset selection
+  };
+
+  const confirmMoveSession = async () => {
+    if (!moveSessionData || !targetSheikhForMove) return;
+
+    try {
+      await moveDailySession(moveSessionData.sessionId, moveSessionData.date, moveSessionData.currentOwnerId, targetSheikhForMove);
+      setMoveSessionData(null);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const handleAddExtraSession = () => {
     if (!extraSessionDate) {
@@ -378,6 +399,7 @@ export default function DailySessionsPage() {
           isSuperAdmin={isSuperAdmin}
           onDeleteSession={handleDeleteSession}
           onExportSession={handleExportSession}
+          onMoveSession={handleMoveSession}
         />
 
         {/* Session Choice Dialog */}
@@ -499,7 +521,42 @@ export default function DailySessionsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Move Session Dialog */}
+        <Dialog open={!!moveSessionData} onOpenChange={(open) => !open && setMoveSessionData(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>نقل الحصة إلى شيخ آخر</DialogTitle>
+              <DialogDescription>
+                اختر الشيخ الذي تريد نقل هذه الحصة إلى سجله. سيتم حذف الحصة من السجل الحالي وإضافتها للسجل الجديد.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>اختر الشيخ المستهدف</Label>
+                <Select value={targetSheikhForMove} onValueChange={setTargetSheikhForMove}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر الشيخ..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allUsers?.filter(u => u.role === 'sheikh').map(sheikh => (
+                      <SelectItem key={sheikh.uid} value={sheikh.uid}>
+                        {sheikh.displayName} ({sheikh.group})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setMoveSessionData(null)}>إلغاء</Button>
+              <Button onClick={confirmMoveSession} disabled={!targetSheikhForMove} className="bg-blue-600 hover:bg-blue-700 text-white">
+                تأكيد النقل
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-    </ProtectedPage>
+    </ProtectedPage >
   );
 }
