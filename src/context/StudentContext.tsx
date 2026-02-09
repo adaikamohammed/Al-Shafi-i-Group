@@ -1738,29 +1738,59 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
   const setAdmin5SurahEvaluation = async (studentId: string, surahId: number, evaluation: import('@/lib/types').Admin5SurahEvaluation) => {
     if (!authContextUser) return;
-    // Check permissions if needed, but for now allow if auth
+
     const student = students.find(s => s.id === studentId);
     if (!student) return;
 
-    const ownerId = student.ownerId;
-    const progressRef = ref(db, `users/${ownerId}/surahProgress/${studentId}/${surahId}/evaluation`);
+    const studentOwnerId = student.ownerId;
+    const studentProgressMap = { ...(surahProgress[studentId] || {}) };
+    const currentEntry = studentProgressMap[surahId] || { status: 0 };
 
-    await set(progressRef, evaluation);
+    // Convert evaluation to status
+    let newStatus: 0 | 1 | 2;
+    if (evaluation === 'لم يحفظ') {
+      newStatus = 0;
+    } else if (evaluation === 'ممتاز') {
+      newStatus = 2; // متقنة
+    } else {
+      newStatus = 1; // محفوظة (for جيد جداً, جيد, حسن, متوسط)
+    }
 
-    // Update local state if needed (though onValue should catch it)
-    // Log activity
+    const newEntry: import('@/lib/types').SurahMasteryEntry = {
+      status: newStatus,
+      admin5Evaluation: evaluation
+    };
+
+    // Set completion date when moving from 0 to >0
+    if (newStatus > 0 && currentEntry.status === 0) {
+      newEntry.completedAt = new Date().toISOString();
+    } else if (newStatus > 0) {
+      newEntry.completedAt = currentEntry.completedAt || new Date().toISOString();
+    }
+
+    const progressRef = ref(db, `users/${studentOwnerId}/surahProgress/${studentId}/${surahId}`);
+
+    if (newStatus === 0) {
+      await remove(progressRef);
+    } else {
+      await set(progressRef, newEntry);
+    }
+
     logActivity(
-      'UPDATE_SURAH_PROGRESS', // Or a new type if strictly needed
+      'UPDATE_SURAH_PROGRESS',
       authContextUser.uid,
-      `تقييم سورة (ID: ${surahId}): ${evaluation}`,
+      `تقييم السورة (ID: ${surahId}): ${evaluation}`,
       studentId,
-      student.fullName,
-      authContextUser.displayName || 'Admin5',
-      student.groupName,
-      ownerId
+      student?.fullName || 'غير معروف',
+      authContextUser.displayName || 'Unknown',
+      student?.groupName || 'غير محدد',
+      studentOwnerId
     );
 
-    toast({ title: '✅ تم حفظ التقييم' });
+    toast({
+      title: `✅ تم تقييم السورة`,
+      description: `التقييم: ${evaluation}`,
+    });
   };
 
   return (
@@ -1797,6 +1827,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       saveDailyReport,
       deleteDailyReport,
       toggleSurahStatus,
+      setAdmin5SurahEvaluation,
       bulkUpdateSurahStatus,
       addPayment,
       updatePaymentStatus,
@@ -1850,8 +1881,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       sendManagementMessage,
       markManagementMessageAsRead,
       moveDailySession,
-      deleteMultipleDailyReports,
-      setAdmin5SurahEvaluation
+      deleteMultipleDailyReports
     }}>
       {children}
     </StudentContext.Provider>
