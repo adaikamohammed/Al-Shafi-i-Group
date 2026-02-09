@@ -66,9 +66,13 @@ const renderRecordDetails = (record: DailyRecord, session?: DailySession) => {
 }
 
 const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], student: Student, date: Date }) => {
+    // Filter sessions for this specific student's group (owner)
+    // If ownerId is present (Admin view), it must match. If missing (Sheikh view), assume it's their own session.
+    const studentSessions = sessions?.filter(s => !s.ownerId || s.ownerId === student.ownerId);
+
     // Find both session 1 and session 2 if they exist
-    const session1 = sessions?.find(s => s.sessionNumber === 1);
-    const session2 = sessions?.find(s => s.sessionNumber === 2);
+    const session1 = studentSessions?.find(s => s.sessionNumber === 1);
+    const session2 = studentSessions?.find(s => s.sessionNumber === 2);
 
     const record1 = session1?.records?.find(r => r.studentId === student.id);
     const record2 = session2?.records?.find(r => r.studentId === student.id);

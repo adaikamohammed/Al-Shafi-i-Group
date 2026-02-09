@@ -34,9 +34,18 @@ function RegisterSessionContent() {
 
     const dateParam = searchParams.get('date');
     const sessionNumParam = searchParams.get('session');
+    const ownerIdParam = searchParams.get('ownerId');
 
     const [selectedDay] = useState<Date>(dateParam ? parse(dateParam, 'yyyy-MM-dd', new Date()) : new Date());
     const [sessionToOpen] = useState<1 | 2>(sessionNumParam === '2' ? 2 : 1);
+
+    // Determine the effective owner ID (either specified in URL for admins, or current user)
+    const effectiveOwnerId = useMemo(() => {
+        if ((isSuperAdmin || isAdmin5) && ownerIdParam) {
+            return ownerIdParam;
+        }
+        return user?.uid;
+    }, [isSuperAdmin, isAdmin5, ownerIdParam, user]);
 
     const [sessionType, setSessionType] = useState<'حصة أساسية' | 'حصة تعويضية' | 'يوم عطلة' | 'غياب الشيخ' | 'حصة أنشطة' | 'حصة إضافية'>('حصة أساسية');
     const [teacherAbsenceReason, setTeacherAbsenceReason] = useState('');
@@ -59,10 +68,14 @@ function RegisterSessionContent() {
 
     const activeStudents = useMemo(() =>
         (students ?? []).filter(s => {
+            // If specific owner is targeted, filter by that owner. Otherwise fall back to group name check or super admin view.
+            if (effectiveOwnerId && effectiveOwnerId !== user?.uid) {
+                return s.ownerId === effectiveOwnerId && s.status === "نشط";
+            }
             const isGroupMatch = isSuperAdmin ? true : s.groupName === user?.group;
             return s.status === "نشط" && isGroupMatch;
         }).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')),
-        [students, isSuperAdmin, user]);
+        [students, isSuperAdmin, user, effectiveOwnerId]);
 
     const DRAFT_KEY = useMemo(() => {
         return selectedDay ? `session_draft_${format(selectedDay, 'yyyy-MM-dd')}_s${sessionToOpen}` : null;
@@ -86,12 +99,16 @@ function RegisterSessionContent() {
             // ✅ قراءة مباشرة من Firebase (ليس من Context)
             const loadFromFirebase = async () => {
                 try {
-                    // 🔍 First, detect session owner from context
-                    let sessionOwnerId = user.uid; // Default to current user
-                    const contextSessions = getSessionsForDay(dateStr);
-                    const existingContextSession = contextSessions.find((s: any) => s.sessionNumber == sessionToOpen);
-                    if (existingContextSession && existingContextSession.ownerId) {
-                        sessionOwnerId = existingContextSession.ownerId;
+                    // 🔍 First, detect session owner
+                    let sessionOwnerId = effectiveOwnerId || user?.uid; // Default to effective owner or current user
+
+                    // Fallback to searching context if not explicit (legacy behavior)
+                    if (!ownerIdParam) {
+                        const contextSessions = getSessionsForDay(dateStr);
+                        const existingContextSession = contextSessions.find((s: any) => s.sessionNumber == sessionToOpen);
+                        if (existingContextSession && existingContextSession.ownerId) {
+                            sessionOwnerId = existingContextSession.ownerId;
+                        }
                     }
 
                     const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
@@ -133,7 +150,11 @@ function RegisterSessionContent() {
                         setAttendanceRecords(records);
                     } else {
                         // No DB Data - Check LocalStorage Draft
-                        const savedDraft = DRAFT_KEY ? localStorage.getItem(DRAFT_KEY) : null;
+                        // IMPORTANT: Only load draft if we are NOT editing another user as admin, OR if we handle draft key scoping properly. 
+                        // For now, disable draft loading when editing as admin to prevent cross-contamination.
+                        const isEditingOther = effectiveOwnerId && effectiveOwnerId !== user?.uid;
+                        const savedDraft = (DRAFT_KEY && !isEditingOther) ? localStorage.getItem(DRAFT_KEY) : null;
+
                         if (savedDraft) {
                             try {
                                 const draft = JSON.parse(savedDraft);
@@ -345,11 +366,14 @@ function RegisterSessionContent() {
         let existingRecords: any[] = [];
         try {
             // 🔍 Detect session owner
-            let sessionOwnerId = user.uid;
-            const contextSessions = getSessionsForDay(dateStr);
-            const existingContextSession = contextSessions.find((s: any) => s.id === id);
-            if (existingContextSession && existingContextSession.ownerId) {
-                sessionOwnerId = existingContextSession.ownerId;
+            let sessionOwnerId = effectiveOwnerId || user?.uid;
+
+            if (!ownerIdParam) {
+                const contextSessions = getSessionsForDay(dateStr);
+                const existingContextSession = contextSessions.find((s: any) => s.id === id);
+                if (existingContextSession && existingContextSession.ownerId) {
+                    sessionOwnerId = existingContextSession.ownerId;
+                }
             }
 
             const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
@@ -406,7 +430,9 @@ function RegisterSessionContent() {
             records: recordsArray
         };
 
-        await addDailySession(sessionPayload);
+        // Pass effectiveOwnerId if it differs from current user (i.e. Admin actions)
+        const targetOwner = (effectiveOwnerId && effectiveOwnerId !== user?.uid) ? effectiveOwnerId : undefined;
+        await addDailySession(sessionPayload, targetOwner);
     };
 
     // Save Draft to LocalStorage whenever debounced data changes
@@ -467,11 +493,14 @@ function RegisterSessionContent() {
             const dateStr = format(selectedDay, 'yyyy-MM-dd');
 
             // 🔍 Detect session owner from context
-            let sessionOwnerId = user.uid;
-            const contextSessions = getSessionsForDay(dateStr);
-            const existingContextSession = contextSessions.find((s: any) => s.sessionNumber == sessionToOpen);
-            if (existingContextSession && existingContextSession.ownerId) {
-                sessionOwnerId = existingContextSession.ownerId;
+            let sessionOwnerId = effectiveOwnerId || user.uid;
+
+            if (!ownerIdParam) {
+                const contextSessions = getSessionsForDay(dateStr);
+                const existingContextSession = contextSessions.find((s: any) => s.sessionNumber == sessionToOpen);
+                if (existingContextSession && existingContextSession.ownerId) {
+                    sessionOwnerId = existingContextSession.ownerId;
+                }
             }
 
             const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
@@ -670,7 +699,9 @@ function RegisterSessionContent() {
             const dateStr = format(selectedDay, 'yyyy-MM-dd');
             const session = getSessionsForDay(dateStr).find(s => s.sessionNumber === sessionToOpen);
             if (session) {
-                await deleteDailySession(session.id);
+                // Pass effectiveOwnerId if it differs from current user
+                const targetOwner = (effectiveOwnerId && effectiveOwnerId !== user?.uid) ? effectiveOwnerId : undefined;
+                await deleteDailySession(session.id, undefined, targetOwner);
                 toast({ title: "تم الحذف", description: "تم حذف بيانات الحصة بنجاح." });
                 router.push('/sessions');
             }
@@ -692,6 +723,11 @@ function RegisterSessionContent() {
                         <h1 className="text-xl font-headline font-bold flex items-center gap-2">
                             <FileText className="h-6 w-6 text-primary" />
                             تسجيل حصة: {format(selectedDay, 'd MMMM yyyy', { locale: ar })}
+                            {effectiveOwnerId && effectiveOwnerId !== user?.uid && (
+                                <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full mr-2">
+                                    نيابة عن شيخ
+                                </span>
+                            )}
                         </h1>
                         <div className="flex items-center gap-3">
                             <p className="text-xs text-muted-foreground font-body">

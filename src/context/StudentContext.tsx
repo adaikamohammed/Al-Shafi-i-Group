@@ -76,8 +76,8 @@ interface StudentContextType {
   deleteStudent: (studentId: string, ownerId: string) => void;
   deleteAllStudents: () => void;
   deleteMultipleStudents: (studentsToDelete: { id: string, ownerId: string }[]) => void;
-  addDailySession: (session: DailySession) => Promise<void>;
-  deleteDailySession: (sessionId: string, date?: string) => void;
+  addDailySession: (session: DailySession, targetOwnerId?: string) => Promise<void>;
+  deleteDailySession: (sessionId: string, date?: string, targetOwnerId?: string) => void;
   getSessionsForDay: (date: string) => DailySession[];
   getSessionById: (sessionId: string) => DailySession | undefined;
   getRecordsForDateRange: (startDate: string, endDate: string) => Record<string, DailySession[]>;
@@ -876,74 +876,61 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: `🗑️ تم حذف ${studentsToDelete.length} طالب`, description: "تم حذف الطلاب المحددين بنجاح." });
   };
 
-  const addDailySession = async (session: DailySession): Promise<void> => {
-    if (!authContextUser || isSuperAdmin) return;
+  const addDailySession = async (session: DailySession, targetOwnerId?: string): Promise<void> => {
+    // Allow if user is authenticated. If superAdmin, they MUST provide targetOwnerId (or use their own if debugging, but mainly for others)
+    if (!authContextUser) return;
 
-    // OPTIMISTIC UPDATE: تحديث الـ state المحلي فوراً
-    setDailySessions(prev => ({
-      ...prev,
-      [session.date]: {
-        ...prev[session.date],
-        [session.id]: session
-      }
-    }));
+    // Use targetOwnerId if provided (for Admins), otherwise use current user's UID
+    const ownerId = (isSuperAdmin || isManagement) && targetOwnerId ? targetOwnerId : authContextUser.uid;
 
     try {
       // الحفظ في Firebase
-      const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${session.date}/${session.id}`);
-      await set(sessionRef, sanitizeData(session));
+      const sessionRef = ref(db, `users/${ownerId}/dailySessions/${session.date}/${session.id}`);
+      await set(sessionRef, sanitizeData({ ...session, ownerId })); // Ensure ownerId is set in the record
 
       // تسجيل النشاط
       await logActivity(
         'ADD_SESSION',
         authContextUser.uid,
-        `تم تسجيل حصة جديدة بتاريخ: ${session.date}`,
+        `تم تسجيل حصة جديدة بتاريخ: ${session.date} ${targetOwnerId ? `(نيابة عن شيخ)` : ''}`,
         session.id,
         session.sessionType,
         authContextUser.displayName || 'Unknown',
         authContextUser.group || 'غير محدد',
-        authContextUser.uid
+        ownerId // The owner of the data
       );
     } catch (error) {
       console.error("Error saving session:", error);
-
-      // ROLLBACK: إزالة التحديث المتفائل عند الفشل
-      setDailySessions(prev => {
-        const updated = { ...prev };
-        if (updated[session.date]) {
-          const dateSessions = { ...updated[session.date] };
-          delete dateSessions[session.id];
-          updated[session.date] = dateSessions;
-        }
-        return updated;
-      });
-
-      throw error; // إعادة رمي الخطأ للتعامل معه في المكون
+      throw error;
     }
   };
 
-  const deleteDailySession = (sessionId: string, date?: string) => {
-    if (!authContextUser || isSuperAdmin || !sessionId) return;
+  const deleteDailySession = (sessionId: string, date?: string, targetOwnerId?: string) => {
+    if (!authContextUser || !sessionId) return;
+
+    // Determine the path owner
+    const ownerId = (isSuperAdmin || isManagement) && targetOwnerId ? targetOwnerId : authContextUser.uid;
 
     // استخدام التاريخ الممرر أو استخراجه من الـ ID كخيار احتياطي
     const targetDate = date || sessionId.substring(0, 10);
 
-    const sessionRef = ref(db, `users/${authContextUser.uid}/dailySessions/${targetDate}/${sessionId}`);
-    const sessionToDelete = dailySessions[targetDate]?.[sessionId];
+    const sessionRef = ref(db, `users/${ownerId}/dailySessions/${targetDate}/${sessionId}`);
+
+    // Attempt to find session in local state for logging (might not be accurate for admin view of others if not fully synced)
+    const sessionsForDate = dailySessions[targetDate] || {};
+    const sessionToDelete = Object.values(sessionsForDate).find(s => s.id === sessionId);
 
     remove(sessionRef).then(() => {
-      if (sessionToDelete) {
-        logActivity(
-          'DELETE_SESSION',
-          authContextUser.uid,
-          `تم حذف حصة بتاريخ: ${sessionToDelete.date}`,
-          sessionId,
-          sessionToDelete.sessionType,
-          authContextUser.displayName || 'Unknown',
-          authContextUser.group || 'غير محدد',
-          authContextUser.uid
-        );
-      }
+      logActivity(
+        'DELETE_SESSION',
+        authContextUser.uid,
+        `تم حذف حصة بتاريخ: ${targetDate} ${targetOwnerId ? '(نيابة عن شيخ)' : ''}`,
+        sessionId,
+        sessionToDelete?.sessionType || 'غير معروف',
+        authContextUser.displayName || 'Unknown',
+        authContextUser.group || 'غير محدد',
+        ownerId
+      );
     });
   }
 
@@ -1700,6 +1687,33 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const setAdmin5SurahEvaluation = async (studentId: string, surahId: number, evaluation: import('@/lib/types').Admin5SurahEvaluation) => {
+    if (!authContextUser) return;
+    // Check permissions if needed, but for now allow if auth
+    const student = students.find(s => s.id === studentId);
+    if (!student) return;
+
+    const ownerId = student.ownerId;
+    const progressRef = ref(db, `users/${ownerId}/surahProgress/${studentId}/${surahId}/evaluation`);
+
+    await set(progressRef, evaluation);
+
+    // Update local state if needed (though onValue should catch it)
+    // Log activity
+    logActivity(
+      'UPDATE_SURAH_PROGRESS', // Or a new type if strictly needed
+      authContextUser.uid,
+      `تقييم سورة (ID: ${surahId}): ${evaluation}`,
+      studentId,
+      student.fullName,
+      authContextUser.displayName || 'Admin5',
+      student.groupName,
+      ownerId
+    );
+
+    toast({ title: '✅ تم حفظ التقييم' });
+  };
+
   return (
     <StudentContext.Provider value={{
       students,
@@ -1785,7 +1799,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       addInternalNotification,
       markNotificationAsRead,
       sendManagementMessage,
-      markManagementMessageAsRead
+      markManagementMessageAsRead,
+      deleteMultipleDailyReports,
+      setAdmin5SurahEvaluation
     }}>
       {children}
     </StudentContext.Provider>
