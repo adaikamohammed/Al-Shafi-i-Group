@@ -39,13 +39,15 @@ function RegisterSessionContent() {
     const [selectedDay] = useState<Date>(dateParam ? parse(dateParam, 'yyyy-MM-dd', new Date()) : new Date());
     const [sessionToOpen] = useState<1 | 2>(sessionNumParam === '2' ? 2 : 1);
 
+    const isManagement = user?.role === 'management';
+
     // Determine the effective owner ID (either specified in URL for admins, or current user)
     const effectiveOwnerId = useMemo(() => {
-        if ((isSuperAdmin || isAdmin5) && ownerIdParam) {
+        if ((isSuperAdmin || isAdmin5 || isManagement) && ownerIdParam) {
             return ownerIdParam;
         }
         return user?.uid;
-    }, [isSuperAdmin, isAdmin5, ownerIdParam, user]);
+    }, [isSuperAdmin, isAdmin5, isManagement, ownerIdParam, user]);
 
     const [sessionType, setSessionType] = useState<'حصة أساسية' | 'حصة تعويضية' | 'يوم عطلة' | 'غياب الشيخ' | 'حصة أنشطة' | 'حصة إضافية'>('حصة أساسية');
     const [teacherAbsenceReason, setTeacherAbsenceReason] = useState('');

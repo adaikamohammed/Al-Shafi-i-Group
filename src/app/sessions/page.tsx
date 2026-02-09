@@ -50,17 +50,50 @@ import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
 
 export default function DailySessionsPage() {
   const { user, isSuperAdmin } = useAuth();
-  const { students, dailySessions, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById } = useStudentContext();
+  const { allUsers, students, dailySessions, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById } = useStudentContext();
   const { toast } = useToast();
   const router = useRouter();
-
   const isAdmin5 = user?.email === 'admin5@gmail.com';
+  const isManagement = user?.role === 'management';
+  const isAdminUser = isSuperAdmin || isAdmin5 || isManagement;
+
+  // State
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [isAddExtraDialogOpen, setIsAddExtraDialogOpen] = useState(false);
+  const [extraSessionDate, setExtraSessionDate] = useState('');
+  const [extraSessionType, setExtraSessionType] = useState<SessionType>('حصة أساسية');
+  const [extraSessionNumber, setExtraSessionNumber] = useState<1 | 2>(1);
+  const [selectedSheikhId, setSelectedSheikhId] = useState<string>('');
+  const [sessionChoiceData, setSessionChoiceData] = useState<{ day: number, dateStr: string, sessions: any[] } | null>(null);
+
+  // Get the selected sheikh's group name for filtering
+  const selectedGroupName = useMemo(() => {
+    return allUsers?.find(u => u.uid === selectedSheikhId)?.group || '';
+  }, [allUsers, selectedSheikhId]);
+
+  // Get all sheikh IDs that belong to the selected group
+  const groupSheikhIds = useMemo(() => {
+    if (!selectedGroupName || !allUsers) return [];
+    return allUsers.filter(u => u.role === 'sheikh' && u.group === selectedGroupName).map(u => u.uid);
+  }, [allUsers, selectedGroupName]);
+
+  // Effect to default to first sheikh if none selected and we are admin
+  React.useEffect(() => {
+    if (isAdminUser && !selectedSheikhId && allUsers) {
+      const sheikhs = allUsers.filter(u => u.role === 'sheikh');
+      if (sheikhs.length > 0) {
+        setSelectedSheikhId(sheikhs[0].uid);
+      }
+    }
+  }, [isAdminUser, selectedSheikhId, allUsers]);
 
   const globalProgress = useMemo(() => {
-    if (!isAdmin5 || !dailySessions) return null;
+    if (!isAdminUser || !dailySessions || !selectedSheikhId) return null;
+
+    // Filter sessions strictly by the selected sheikh
     const allSessions = Object.values(dailySessions).flatMap(day => Object.values(day as Record<string, any>));
     const sortedSessions = allSessions
-      .filter(s => s.sessionType === 'حصة أساسية' && s.surahId)
+      .filter(s => s.ownerId === selectedSheikhId && s.sessionType === 'حصة أساسية' && s.surahId)
       .sort((a, b) => b.date.localeCompare(a.date));
 
     const latest = sortedSessions[0];
@@ -74,31 +107,18 @@ export default function DailySessionsPage() {
       surahName: surah?.name || '',
       totalVerses: surah?.verses || 100
     };
-  }, [dailySessions, isAdmin5]);
+  }, [dailySessions, isAdminUser, selectedSheikhId]);
 
-  // State
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [isAddExtraDialogOpen, setIsAddExtraDialogOpen] = useState(false);
-  const [extraSessionDate, setExtraSessionDate] = useState('');
-  const [extraSessionType, setExtraSessionType] = useState<SessionType>('حصة أساسية');
-  const [extraSessionNumber, setExtraSessionNumber] = useState<1 | 2>(1);
-  // Admin View: Select Sheikh
-  const { allUsers } = useStudentContext();
-  const [selectedSheikhId, setSelectedSheikhId] = useState<string>('');
-
-  const [sessionChoiceData, setSessionChoiceData] = useState<{ day: number, dateStr: string, sessions: any[] } | null>(null);
-
-  // Filter sessions based on selected Sheikh (for Admins)
+  // Filter sessions based on selected Group (for Admins) - MERGED from all sheikhs in the group
   const filteredGetSessionsForDay = (date: string) => {
     const sessions = getSessionsForDay(date);
-    if ((isSuperAdmin || isAdmin5) && selectedSheikhId) {
-      return sessions.filter(s => s.ownerId === selectedSheikhId);
+    if (isAdminUser && groupSheikhIds.length > 0) {
+      // Merge sessions from ALL sheikhs in the same group
+      return sessions.filter(s => s.ownerId && groupSheikhIds.includes(s.ownerId));
     }
-    // If admin but no sheikh selected, show all? Or show none? 
-    // Let's show all for now, or maybe just their own if they have any.
-    // Actually, distinct behavior:
-    // 1. If Admin & Selected Sheikh -> Show only that Sheikh's sessions
-    // 2. If Admin & No Selection -> Show ALL sessions (Global View)
+    // Strict mode: if admin and no group selected, show nothing
+    if (isAdminUser) return [];
+
     return sessions;
   };
 
@@ -276,19 +296,37 @@ export default function DailySessionsPage() {
           </div>
 
           <div className="flex flex-col md:flex-row gap-3 items-end md:items-center">
-            {(isSuperAdmin || isAdmin5) && (
+            {isAdminUser && (
               <div className="w-full md:w-64">
                 <Select value={selectedSheikhId} onValueChange={setSelectedSheikhId}>
                   <SelectTrigger className="h-10">
                     <SelectValue placeholder="اختر الشيخ (للعرض/الإضافة)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all_sheikhs">-- عرض الكل --</SelectItem>
-                    {allUsers?.filter(u => u.role === 'sheikh').map(sheikh => (
-                      <SelectItem key={sheikh.uid} value={sheikh.uid}>
-                        {sheikh.displayName || 'شيخ مجهول'} ({sheikh.group || 'بدون فوج'})
-                      </SelectItem>
-                    ))}
+                    {/* Deduplicated and sorted by group number (فوج 1 to فوج 18) */}
+                    {allUsers?.filter(u => u.role === 'sheikh')
+                      .reduce((acc: any[], sheikh) => {
+                        // Deduplicate by group - keep only one sheikh per group
+                        const existingGroup = acc.find(s => s.group === sheikh.group);
+                        if (!existingGroup) {
+                          acc.push(sheikh);
+                        }
+                        return acc;
+                      }, [])
+                      .sort((a, b) => {
+                        // Extract group number from group name like "فوج 1", "فوج 2", etc.
+                        const getGroupNum = (group: string | undefined) => {
+                          if (!group) return 999;
+                          const match = group.match(/\d+/);
+                          return match ? parseInt(match[0], 10) : 999;
+                        };
+                        return getGroupNum(a.group) - getGroupNum(b.group);
+                      })
+                      .map(sheikh => (
+                        <SelectItem key={sheikh.uid} value={sheikh.uid}>
+                          {sheikh.displayName || 'شيخ مجهول'} ({sheikh.group || 'بدون فوج'})
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -301,11 +339,8 @@ export default function DailySessionsPage() {
           </div>
         </div>
 
-        {/* Global Progress Widget (Only show if NOT filtering by specific sheikh, or maybe just remove for admin view of specific sheikh to avoid confusion?) 
-            Actually, let's keep it but maybe it should reflect the selected sheikh? 
-            For now, leave as is (Global).
-        */}
-        {isAdmin5 && !selectedSheikhId && globalProgress && (
+        {/* Progress Widget - Only for admin5 */}
+        {isAdmin5 && selectedSheikhId && globalProgress && (
           <div className="bg-card p-6 rounded-2xl shadow-sm border space-y-4 animate-in fade-in slide-in-from-top-4 duration-1000">
             {/* ... existing progress code ... */}
             <div className="flex justify-between items-center">
@@ -388,7 +423,7 @@ export default function DailySessionsPage() {
         </Dialog>
 
         {/* Floating Action Button */}
-        {(!isSuperAdmin || selectedSheikhId) && (
+        {(!isAdminUser || selectedSheikhId) && (
           <Button
             onClick={() => setIsAddExtraDialogOpen(true)}
             className="fixed bottom-8 left-8 h-16 w-16 rounded-full shadow-2xl z-50 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 transition-all duration-300 hover:scale-110"
