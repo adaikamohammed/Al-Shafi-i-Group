@@ -384,7 +384,7 @@ export default function LeaguePage() {
                                                 <TableRow key={s.studentId} className={cn(rowClass)}>
                                                     <TableCell className="font-bold text-lg text-center">{rankDisplay}</TableCell>
                                                     <TableCell>
-                                                        <Link href={`/parent-portal/${s.studentId}`} className="flex items-center gap-3 hover:underline">
+                                                        <Link href={`/parent-portal?id=${s.studentId}`} className="flex items-center gap-3 hover:underline">
                                                             <Avatar className="h-9 w-9">
                                                                 <AvatarImage src={s.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${s.studentName}`} alt={s.studentName} />
                                                                 <AvatarFallback>{s.studentName.charAt(0)}</AvatarFallback>

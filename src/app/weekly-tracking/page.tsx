@@ -25,7 +25,7 @@ const getAttendanceColor = (status?: string) => {
         case 'عطلة': return 'bg-sky-300 dark:bg-sky-700'; // VERY STRONG Blue - matches calendar
         case 'نشاط': return 'bg-purple-300 dark:bg-purple-700'; // VERY STRONG Purple - matches calendar
         case 'غياب الشيخ': return 'bg-red-300 dark:bg-red-700'; // VERY STRONG Red - matches calendar (no sub)
-        case 'غياب مع بديل': return 'bg-orange-300 dark:bg-orange-700'; // VERY STRONG Orange - matches calendar (with sub)
+        case 'غياب الشيخ مع بديل': return 'bg-orange-300 dark:bg-orange-700'; // VERY STRONG Orange - matches calendar (with sub)
         default: return 'bg-gray-100';
     }
 };
@@ -41,10 +41,14 @@ const getBehaviorClass = (behavior?: string | null) => {
 
 const getEvaluationSymbol = (memorization?: PerformanceLevel | null) => {
     switch (memorization) {
-        case 'ممتاز': return '⭐';
+        case 'ممتاز': return '🌟';
         case 'جيد جداً':
-        case 'جيد جدا': return '★';
-        case 'جيد': return '✓';
+        case 'جيد جدا': return '✅';
+        case 'جيد': return '👍';
+        case 'مقبول':
+        case 'متوسط': return '⚠️';
+        case 'ضعيف': return '❌';
+        case 'لم يحفظ': return '🚫';
         default: return null;
     }
 }
@@ -89,7 +93,11 @@ const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], stude
     let primaryStatus: string | undefined = primaryRecord?.attendance;
 
     if (isHoliday) primaryStatus = 'عطلة';
-    else if (isTeacherAbsence) primaryStatus = 'غياب الشيخ';
+    else if (isTeacherAbsence) {
+        const hasSub = (session1?.sessionType === 'غياب الشيخ' && session1.substituteTeacher) ||
+            (session2?.sessionType === 'غياب الشيخ' && session2.substituteTeacher);
+        primaryStatus = hasSub ? 'غياب الشيخ مع بديل' : 'غياب الشيخ';
+    }
     else if (isActivity) primaryStatus = 'نشاط';
 
     // Check if student is absent: غائب or غياب
@@ -333,9 +341,12 @@ export default function WeeklyFollowUpPage() {
                             <div>
                                 <h4 className="font-semibold mb-2">التقييم (الرمز الداخلي)</h4>
                                 <ul className="space-y-1 text-sm">
-                                    <li className="flex items-center gap-2"><div className="text-lg">⭐</div> ممتاز</li>
-                                    <li className="flex items-center gap-2"><div className="text-lg">★</div> جيد جداً</li>
-                                    <li className="flex items-center gap-2"><div className="text-lg">✓</div> جيد</li>
+                                    <li className="flex items-center gap-2"><div className="text-lg">🌟</div> ممتاز</li>
+                                    <li className="flex items-center gap-2"><div className="text-lg">✅</div> جيد جداً</li>
+                                    <li className="flex items-center gap-2"><div className="text-lg">👍</div> جيد</li>
+                                    <li className="flex items-center gap-2"><div className="text-lg">⚠️</div> مقبول / متوسط</li>
+                                    <li className="flex items-center gap-2"><div className="text-lg">❌</div> ضعيف</li>
+                                    <li className="flex items-center gap-2"><div className="text-lg">🚫</div> لم يحفظ</li>
                                 </ul>
                             </div>
                             <div>

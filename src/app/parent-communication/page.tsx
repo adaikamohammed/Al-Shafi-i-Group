@@ -34,7 +34,7 @@ import { useRouter } from 'next/navigation';
 type MessageTemplate = "weekly_summary" | "absence_warning" | "memorization_alert" | "behavior_note" | "encouragement" | "meeting_invite";
 
 export default function ParentCommunicationPage() {
-    const { students, dailySessions, loading, shareStudentRecord } = useStudentContext();
+    const { students, allUsers, dailySessions, loading, shareStudentRecord } = useStudentContext();
     const { user } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
@@ -159,7 +159,7 @@ export default function ParentCommunicationPage() {
         const sName = selectedStudent.fullName;
         const gName = selectedStudent.guardianName || "ولي الأمر";
         const teacher = user?.displayName || "الشيخ";
-        const recordLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/record/${selectedStudent.id}`;
+        const recordLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/record?id=${selectedStudent.id}`;
 
         let msg = `السلام عليكم ورحمة الله وبركاته،\n`;
         msg += `السيد ${gName} المحترم،\n\n`;
@@ -224,10 +224,13 @@ export default function ParentCommunicationPage() {
                 }
             });
 
+            const sheikh = allUsers.find(u => u.uid === selectedStudent.ownerId);
+            const resolvedSheikhName = sheikh?.displayName || selectedStudent.sheikhName || 'غير محدد';
+
             const snapshot = {
                 student: {
                     ...selectedStudent,
-                    sheikhName: user?.displayName || 'غير محدد',
+                    sheikhName: resolvedSheikhName,
                 },
                 studentData: fullHistory,
                 generatedAt: new Date().toISOString()

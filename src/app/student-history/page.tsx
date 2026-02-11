@@ -246,9 +246,9 @@ function StudentHistoryContent() {
 
     const sheikhName = useMemo(() => {
         if (!selectedStudent || !allUsers) return null;
-        const sheikh = (allUsers || []).find(u => u.role === 'sheikh' && u.group === selectedStudent.groupName);
-        return sheikh?.displayName || null;
-    }, [selectedStudent, allUsers]);
+        const sheikh = (allUsers || []).find(u => u.uid === selectedStudent.ownerId);
+        return sheikh?.displayName || selectedStudent.sheikhName || null;
+    }, [allUsers, selectedStudent]);
 
     const currentYear = getYear(currentDate);
     const currentMonth = getMonth(currentDate);
@@ -453,7 +453,7 @@ function StudentHistoryContent() {
                                                     };
                                                     await shareStudentRecord(selectedStudentId, historySnapshot);
 
-                                                    const url = `${window.location.origin}/record/${selectedStudentId}`;
+                                                    const url = `${window.location.origin}/record?id=${selectedStudentId}`;
                                                     navigator.clipboard.writeText(url);
                                                     toast({
                                                         title: "✅ تم نسخ الرابط",
@@ -878,7 +878,7 @@ function StudentHistoryContent() {
                                                         <ReceiptDesign
                                                             log={log as any}
                                                             isHistory={true}
-                                                            qrCodeUrl={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/record/${log.studentId}`)}`}
+                                                            qrCodeUrl={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/record?id=${log.studentId}`)}`}
                                                         />
                                                     </div>
                                                     <div className="absolute inset-x-0 bottom-4 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">

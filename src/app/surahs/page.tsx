@@ -23,13 +23,13 @@ import { SurahStatsChart } from '@/components/profile/SurahStatsChart';
 import { GroupComparisonCard } from '@/components/management/GroupComparisonCard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ManagementSurahsView } from '@/components/management/ManagementSurahsView';
-import { Admin5SurahStatsChart } from '@/components/profile/Admin5SurahStatsChart';
-import { Admin5SurahEvaluationView } from '@/components/management/Admin5SurahEvaluationView';
+import { SurahEvaluationStatsChart } from '@/components/profile/SurahEvaluationStatsChart';
+import { SurahEvaluationView } from '@/components/management/SurahEvaluationView';
 
 
 export default function SurahProgressPage() {
-    const { students, dailySessions, surahProgress, toggleSurahStatus, bulkUpdateSurahStatus, loading } = useStudentContext();
-    const { isManagement, isSuperAdmin } = useAuth();
+    const { students, dailySessions, surahProgress, toggleSurahStatus, bulkUpdateSurahStatus, setSurahEvaluation, migrateSurahDataToEvaluationSystem, loading } = useStudentContext();
+    const { isManagement, isSuperAdmin, role } = useAuth();
     const { toast } = useToast();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
     const [isBulkMode, setIsBulkMode] = useState(false);
@@ -39,10 +39,7 @@ export default function SurahProgressPage() {
     const [selectedGroupForDetails, setSelectedGroupForDetails] = useState<string | null>(null);
     const [evaluationDialogOpen, setEvaluationDialogOpen] = useState(false);
     const [selectedSurahForEvaluation, setSelectedSurahForEvaluation] = useState<number | null>(null);
-    const [admin5ViewMode, setAdmin5ViewMode] = useState<'student' | 'surah'>('student');
-
-    // Add setAdmin5SurahEvaluation from context
-    const { setAdmin5SurahEvaluation } = useStudentContext();
+    const [viewMode, setViewMode] = useState<'student' | 'surah'>('student');
 
     const studentsToShow = useMemo(() => (students ?? []).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
     const studentOptions: SearchableSelectOption[] = useMemo(() => studentsToShow.map(s => ({ value: s.id, label: s.fullName })), [studentsToShow]);
@@ -74,9 +71,24 @@ export default function SurahProgressPage() {
     const leaderboard = useMemo(() => {
         return studentsToShow.map(student => {
             const progress = surahProgress ? (surahProgress[student.id] || {}) : {};
-            const memorizedCount = Object.values(progress).filter(entry => entry.status === 1).length;
-            const masteredCount = Object.values(progress).filter(entry => entry.status === 2).length;
-            const masteryScore = (memorizedCount * 1) + (masteredCount * 3);
+
+            // New 6-tier scoring weights
+            const weights: Record<string, number> = {
+                'ممتاز': 50,
+                'جيد جداً': 40,
+                'جيد': 30,
+                'حسن': 20,
+                'متوسط': 10,
+                'لم يحفظ': 0
+            };
+
+            const masteryScore = Object.values(progress).reduce((sum, entry) => {
+                const evalValue = entry.evaluation || (entry.status === 2 ? 'ممتاز' : entry.status === 1 ? 'جيد' : 'لم يحفظ');
+                return sum + (weights[evalValue] || 0);
+            }, 0);
+
+            const memorizedCount = Object.values(progress).filter(entry => entry.status > 0).length;
+            const masteredCount = Object.values(progress).filter(entry => entry.status === 2 || entry.evaluation === 'ممتاز').length;
 
             return {
                 ...student,
@@ -164,10 +176,16 @@ export default function SurahProgressPage() {
             );
             return;
         }
+
+        if (viewMode === 'surah') {
+            setSelectedSurahForEvaluation(surahId);
+            return;
+        }
+
         if (!selectedStudent) return;
 
-        // For admin5, open evaluation dialog instead of toggling
-        if (isAdmin5) {
+        // Open evaluation dialog instead of toggling for all users
+        if (isManagement) {
             setSelectedSurahForEvaluation(surahId);
             setEvaluationDialogOpen(true);
             return;
@@ -224,13 +242,9 @@ export default function SurahProgressPage() {
     };
 
     const { user } = useAuth();
-    const isAdmin5 = user?.email === 'admin5@gmail.com';
-
-    // Moved setAdmin5SurahEvaluation to StudentContext
-
-    const handleAdmin5Evaluation = (evaluation: import('@/lib/types').Admin5SurahEvaluation) => {
+    const handleEvaluation = (evaluation: import('@/lib/types').SurahEvaluation) => {
         if (selectedStudentId && selectedSurahForEvaluation) {
-            setAdmin5SurahEvaluation(selectedStudentId, selectedSurahForEvaluation, evaluation);
+            setSurahEvaluation(selectedStudentId, selectedSurahForEvaluation, evaluation);
         }
     };
 
@@ -288,32 +302,46 @@ export default function SurahProgressPage() {
                             <div>
                                 <CardTitle className="text-3xl font-headline font-bold">متابعة الحفظ والإتقان</CardTitle>
                                 <CardDescription className="flex flex-wrap items-center gap-2 mt-2">
-                                    <span>انقر على السورة لتغيير حالتها:</span>
-                                    <Badge variant="secondary" className="bg-gray-200 text-gray-800 hover:bg-gray-200">غير محفوظة</Badge>
-                                    <Badge variant="secondary" className="bg-green-200 text-green-800 hover:bg-green-200">محفوظة</Badge>
-                                    <Badge variant="secondary" className="bg-green-600 text-white hover:bg-green-600">متقنة</Badge>
+                                    <span>التقييمات:</span>
+                                    <Badge variant="secondary" className="bg-emerald-600 text-white hover:bg-emerald-600">ممتاز</Badge>
+                                    <Badge variant="secondary" className="bg-emerald-500 text-white hover:bg-emerald-500">جيد جداً</Badge>
+                                    <Badge variant="secondary" className="bg-teal-500 text-white hover:bg-teal-500">جيد</Badge>
+                                    <Badge variant="secondary" className="bg-cyan-500 text-white hover:bg-cyan-500">حسن</Badge>
+                                    <Badge variant="secondary" className="bg-orange-400 text-white hover:bg-orange-400">متوسط</Badge>
+                                    <Badge variant="secondary" className="bg-red-500 text-white hover:bg-red-500">لم يحفظ</Badge>
                                 </CardDescription>
                             </div>
                             <div className="flex gap-2">
-                                {isAdmin5 && (
+                                {(isManagement || isSuperAdmin || role === 'sheikh') && (
                                     <div className="flex bg-muted p-1 rounded-lg">
                                         <Button
-                                            variant={admin5ViewMode === 'student' ? 'default' : 'ghost'}
+                                            variant={viewMode === 'student' ? 'default' : 'ghost'}
                                             size="sm"
-                                            onClick={() => setAdmin5ViewMode('student')}
+                                            onClick={() => setViewMode('student')}
                                             className="text-xs"
                                         >
                                             تقييم طالب
                                         </Button>
                                         <Button
-                                            variant={admin5ViewMode === 'surah' ? 'default' : 'ghost'}
+                                            variant={viewMode === 'surah' ? 'default' : 'ghost'}
                                             size="sm"
-                                            onClick={() => setAdmin5ViewMode('surah')}
+                                            onClick={() => setViewMode('surah')}
                                             className="text-xs"
                                         >
                                             تقييم سورة
                                         </Button>
                                     </div>
+                                )}
+                                {isSuperAdmin && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={migrateSurahDataToEvaluationSystem}
+                                        className="text-xs hover:bg-orange-50 border-orange-200 text-orange-700"
+                                    >
+                                        <Layers className="h-4 w-4 ml-1" />
+                                        تحديث نظام التقييم
+                                    </Button>
                                 )}
                                 <Button
                                     variant={isBulkMode ? "destructive" : "default"}
@@ -333,11 +361,13 @@ export default function SurahProgressPage() {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        {isAdmin5 && admin5ViewMode === 'surah' ? (
-                            <Admin5SurahEvaluationView
+                        {(isManagement || isSuperAdmin || role === 'sheikh') && viewMode === 'surah' ? (
+                            <SurahEvaluationView
                                 students={students}
                                 surahProgress={surahProgress || {}}
-                                onUpdateEvaluation={setAdmin5SurahEvaluation}
+                                onUpdateEvaluation={setSurahEvaluation}
+                                externalSurahId={selectedSurahForEvaluation}
+                                onSurahChange={setSelectedSurahForEvaluation}
                             />
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
@@ -354,7 +384,7 @@ export default function SurahProgressPage() {
                                                 />
                                             </div>
 
-                                            {isAdmin5 && lastSessionProgress && (
+                                            {lastSessionProgress && (
                                                 <div className="bg-primary/5 p-3 rounded-xl border border-primary/10 animate-in fade-in slide-in-from-right-4 duration-500">
                                                     <div className="flex items-center gap-2 text-primary font-bold mb-1">
                                                         <Award className="h-4 w-4" />
@@ -600,22 +630,16 @@ export default function SurahProgressPage() {
                                     let buttonClass = "bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200";
 
                                     if (!isBulkMode) {
-                                        if (isAdmin5) {
-                                            // Admin5 Custom Colors
-                                            const evaluation = entry?.admin5Evaluation;
-                                            if (evaluation === 'ممتاز') buttonClass = "bg-emerald-600 hover:bg-emerald-700 text-white";
-                                            else if (evaluation === 'جيد جداً') buttonClass = "bg-emerald-500 hover:bg-emerald-600 text-white";
-                                            else if (evaluation === 'جيد') buttonClass = "bg-teal-500 hover:bg-teal-600 text-white";
-                                            else if (evaluation === 'حسن') buttonClass = "bg-cyan-500 hover:bg-cyan-600 text-white";
-                                            else if (evaluation === 'متوسط') buttonClass = "bg-orange-400 hover:bg-orange-500 text-white";
-                                            else if (status === 0) buttonClass = "bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200";
-                                        } else {
-                                            // Normal Users
-                                            if (status === 1) buttonClass = "bg-green-200 hover:bg-green-300 text-green-800 dark:bg-green-800 dark:hover:bg-green-700 dark:text-green-100";
-                                            if (status === 2) buttonClass = "bg-green-600 hover:bg-green-700 text-white dark:bg-green-600 dark:hover:bg-green-500";
-                                        }
+                                        const evaluation = entry?.evaluation || (entry?.status === 2 ? 'ممتاز' : entry?.status === 1 ? 'جيد' : 'لم يحفظ');
+                                        if (evaluation === 'ممتاز') buttonClass = "bg-gradient-to-br from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-md ring-1 ring-emerald-400/40";
+                                        else if (evaluation === 'جيد جداً') buttonClass = "bg-gradient-to-br from-emerald-400 to-emerald-600 hover:from-emerald-500 hover:to-emerald-700 text-white shadow-sm";
+                                        else if (evaluation === 'جيد') buttonClass = "bg-gradient-to-br from-teal-400 to-teal-600 hover:from-teal-500 hover:to-teal-700 text-white";
+                                        else if (evaluation === 'حسن') buttonClass = "bg-gradient-to-br from-cyan-400 to-cyan-600 hover:from-cyan-500 hover:to-cyan-700 text-white";
+                                        else if (evaluation === 'متوسط') buttonClass = "bg-gradient-to-br from-orange-300 to-orange-500 hover:from-orange-400 hover:to-orange-600 text-white";
+                                        else if (evaluation === 'لم يحفظ') buttonClass = "bg-gradient-to-br from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white shadow-inner";
+                                        else buttonClass = "bg-slate-100 dark:bg-slate-800/50 hover:bg-slate-200 text-slate-400";
                                     } else {
-                                        if (selectedSurahIds.includes(surah.id)) buttonClass = "bg-primary text-primary-foreground hover:bg-primary/90";
+                                        if (selectedSurahIds.includes(surah.id)) buttonClass = "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg ring-2 ring-primary ring-offset-2";
                                     }
 
                                     return (
@@ -629,33 +653,21 @@ export default function SurahProgressPage() {
                                                 >
                                                     <div className="flex items-center gap-1.5 overflow-hidden w-full justify-center sm:justify-start">
                                                         {!isBulkMode ? (
-                                                            isAdmin5 ? (
-                                                                // Admin5 View: Show Text
-                                                                <span className="text-[10px] sm:text-xs font-bold truncate">
-                                                                    {entry?.admin5Evaluation || (status === 0 ? "" : (status === 1 ? "محفوظة" : "متقنة"))}
+                                                            <div className="flex flex-col items-center sm:items-start overflow-hidden leading-tight">
+                                                                <span className="text-[9px] sm:text-[10px] font-bold truncate max-w-full">
+                                                                    {entry?.evaluation || (entry?.status === 2 ? 'ممتاز' : entry?.status === 1 ? 'جيد' : "")}
                                                                 </span>
-                                                            ) : (
-                                                                // Normal View: Show Icons
-                                                                <>
-                                                                    {status === 1 && <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />}
-                                                                    {status === 2 && <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />}
-                                                                </>
-                                                            )
+                                                                <span className="truncate text-[8px] xs:text-[9px] sm:text-[11px] font-medium opacity-90 max-w-full">
+                                                                    {`${surah.id}. ${surah.name}`}
+                                                                </span>
+                                                            </div>
                                                         ) : (
-                                                            selectedSurahIds.includes(surah.id) && <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
-                                                        )}
-                                                        <span className={cn("truncate text-[8px] xs:text-[9px] sm:text-xs font-medium", isAdmin5 && !isBulkMode && "hidden sm:inline")}>
-                                                            {isAdmin5 && !isBulkMode ? (
-                                                                // For admin5, hide surah name on very small screens if evaluated, to show evaluation text
-                                                                entry?.admin5Evaluation ? "" : `${surah.id}. ${surah.name}`
-                                                            ) : (
-                                                                `${surah.id}. ${surah.name}`
-                                                            )}
-                                                        </span>
-                                                        {isAdmin5 && !isBulkMode && entry?.admin5Evaluation && (
-                                                            <span className="hidden sm:inline text-[8px] opacity-70">
-                                                                {surah.id}. {surah.name}
-                                                            </span>
+                                                            <>
+                                                                {selectedSurahIds.includes(surah.id) && <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />}
+                                                                <span className="truncate text-[8px] xs:text-[9px] sm:text-xs font-medium">
+                                                                    {`${surah.id}. ${surah.name}`}
+                                                                </span>
+                                                            </>
                                                         )}
                                                     </div>
                                                     <span className="text-[8px] sm:text-[10px] opacity-70 shrink-0 hidden xs:inline">{surah.verses}</span>
@@ -663,7 +675,7 @@ export default function SurahProgressPage() {
                                             </TooltipTrigger>
                                             <TooltipContent>
                                                 <p>
-                                                    {surah.name} - {isBulkMode ? (selectedSurahIds.includes(surah.id) ? "منتقاة للتعديل" : "غير منتقاة") : (isAdmin5 ? (entry?.admin5Evaluation || "غير محفوظة") : (status === 0 ? "غير محفوظة" : status === 1 ? "محفوظة" : "متقنة"))}
+                                                    {surah.name} - {isBulkMode ? (selectedSurahIds.includes(surah.id) ? "منتقاة للتعديل" : "غير منتقاة") : (entry?.evaluation || "غير محفوظة")}
                                                 </p>
                                             </TooltipContent>
                                         </Tooltip>
@@ -675,15 +687,11 @@ export default function SurahProgressPage() {
                 </div>
 
                 <div className="w-full">
-                    {isAdmin5 ? (
-                        <Admin5SurahStatsChart students={students} surahProgress={surahProgress || {}} />
-                    ) : (
-                        <SurahStatsChart students={students} surahProgress={surahProgress || {}} />
-                    )}
+                    <SurahEvaluationStatsChart students={students} surahProgress={surahProgress || {}} />
                 </div>
             </div >
 
-            {/* Admin5 Evaluation Dialog */}
+            {/* Evaluation Dialog */}
             < Dialog open={evaluationDialogOpen} onOpenChange={setEvaluationDialogOpen} >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
@@ -694,37 +702,37 @@ export default function SurahProgressPage() {
                     </DialogHeader>
                     <div className="grid grid-cols-2 gap-3 py-4">
                         <Button
-                            onClick={() => handleAdmin5Evaluation('ممتاز')}
+                            onClick={() => handleEvaluation('ممتاز')}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white h-12 text-lg"
                         >
                             ممتاز
                         </Button>
                         <Button
-                            onClick={() => handleAdmin5Evaluation('جيد جداً')}
+                            onClick={() => handleEvaluation('جيد جداً')}
                             className="bg-emerald-500 hover:bg-emerald-600 text-white h-12 text-lg"
                         >
                             جيد جداً
                         </Button>
                         <Button
-                            onClick={() => handleAdmin5Evaluation('جيد')}
+                            onClick={() => handleEvaluation('جيد')}
                             className="bg-teal-500 hover:bg-teal-600 text-white h-12 text-lg"
                         >
                             جيد
                         </Button>
                         <Button
-                            onClick={() => handleAdmin5Evaluation('حسن')}
+                            onClick={() => handleEvaluation('حسن')}
                             className="bg-cyan-500 hover:bg-cyan-600 text-white h-12 text-lg"
                         >
                             حسن
                         </Button>
                         <Button
-                            onClick={() => handleAdmin5Evaluation('متوسط')}
+                            onClick={() => handleEvaluation('متوسط')}
                             className="bg-orange-400 hover:bg-orange-500 text-white h-12 text-lg"
                         >
                             متوسط
                         </Button>
                         <Button
-                            onClick={() => handleAdmin5Evaluation('لم يحفظ')}
+                            onClick={() => handleEvaluation('لم يحفظ')}
                             className="bg-red-500 hover:bg-red-600 text-white h-12 text-lg"
                         >
                             لم يحفظ

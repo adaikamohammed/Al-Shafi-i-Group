@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { PORTAL_THEMES } from '@/lib/themes';
 
-interface Admin5SurahStatsChartProps {
+interface SurahEvaluationStatsChartProps {
     students: Student[];
     surahProgress: Record<string, SurahMastery>;
 }
@@ -78,7 +78,7 @@ const EvaluationBar = ({ counts, total, label, isLight }: { counts: Record<strin
     );
 };
 
-export function Admin5SurahStatsChart({ students, surahProgress }: Admin5SurahStatsChartProps) {
+export function SurahEvaluationStatsChart({ students, surahProgress }: SurahEvaluationStatsChartProps) {
     const { user } = useAuth();
     const currentThemeId = user?.portalTheme || 'midnight';
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
@@ -99,7 +99,7 @@ export function Admin5SurahStatsChart({ students, surahProgress }: Admin5SurahSt
             if (activeStudents.some(s => s.id === studentId)) {
                 Object.entries(progress).forEach(([surahId, entry]) => {
                     const sId = parseInt(surahId);
-                    const evaluation = entry.admin5Evaluation;
+                    const evaluation = entry.evaluation;
 
                     if (evaluation && evaluation !== 'لم يحفظ') {
                         surahStats[sId][evaluation] = (surahStats[sId][evaluation] || 0) + 1;
@@ -110,7 +110,7 @@ export function Admin5SurahStatsChart({ students, surahProgress }: Admin5SurahSt
                             totalMemorized++;
                         }
                     } else if (entry.status > 0 && !evaluation) {
-                        // Fallback for old data without evaluation
+                        // Fallback for old data without evaluation (during migration)
                         const type = entry.status === 2 ? 'ممتاز' : 'جيد';
                         surahStats[sId][type] = (surahStats[sId][type] || 0) + 1;
                         if (type === 'ممتاز') totalExcellent++; else totalMemorized++;
@@ -156,7 +156,7 @@ export function Admin5SurahStatsChart({ students, surahProgress }: Admin5SurahSt
                             بصمة التميز والجودة
                         </CardTitle>
                         <CardDescription className={theme.isLight ? "text-slate-400" : "text-white/40"}>
-                            تحليل جودة الحفظ (ممتاز، جيد جداً...) لطلبة الشيخ إبراهيم.
+                            تحليل جودة الحفظ (ممتاز، جيد جداً...) لجميع الطلاب.
                         </CardDescription>
                     </div>
 
@@ -181,7 +181,7 @@ export function Admin5SurahStatsChart({ students, surahProgress }: Admin5SurahSt
                                 label={surah.name}
                                 counts={surah.counts}
                                 total={surah.activeCount}
-                                isLight={theme.isLight}
+                                isLight={!!theme.isLight}
                             />
                         ))}
                     </div>

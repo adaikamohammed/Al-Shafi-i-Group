@@ -91,7 +91,7 @@ interface StudentContextType {
   deleteDailyReport: (reportId: string, date: string) => Promise<void>;
   deleteMultipleDailyReports: (reportsToDelete: { id: string, date: string, authorId: string }[]) => Promise<void>;
   toggleSurahStatus: (studentId: string, surahId: number) => void;
-  setAdmin5SurahEvaluation: (studentId: string, surahId: number, evaluation: import('@/lib/types').Admin5SurahEvaluation) => Promise<void>;
+  setSurahEvaluation: (studentId: string, surahId: number, evaluation: import('@/lib/types').SurahEvaluation) => Promise<void>;
   bulkUpdateSurahStatus: (studentIds: string[], surahIds: number[], targetStatus: 0 | 1 | 2) => Promise<void>;
   addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
   updatePaymentStatus: (paymentId: string, status: PaymentStatus, amount: number) => Promise<void>;
@@ -107,6 +107,7 @@ interface StudentContextType {
   deleteMeeting: (meetingId: string) => Promise<void>;
   deleteMeetingSuggestion: (meetingId: string, suggestionId: string) => Promise<void>;
   addMeetingSuggestion: (meetingId: string, suggestion: any) => Promise<void>;
+  migrateSurahDataToEvaluationSystem: () => Promise<void>;
   internalNotifications: InternalNotification[];
   addInternalNotification: (recipientId: string, title: string, message: string, type: InternalNotification['type'], metadata?: any) => Promise<void>;
   markNotificationAsRead: (notificationId: string) => Promise<void>;
@@ -391,29 +392,29 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
       };
 
-      onValue(studentsRef, (s) => {
+      onValue(studentsRef, (s: any) => {
         const val = s.val();
         setStudents(val ? Object.entries(val).map(([id, st]: [string, any]) =>
-          processStudentData({ ...st, id }, authContextUser.uid, role === 'sheikh' ? authContextUser.group : st.groupName)
+          processStudentData({ ...st, id }, authContextUser.uid, (role === 'sheikh' ? authContextUser.group : st.groupName) as string)
         ) : []);
       }, handleError);
 
-      onValue(sessionsRef, (s) => setDailySessions(s.val() || {}), handleError);
-      onValue(reportsRef, (s) => setDailyReports(s.val() || {}), handleError);
-      onValue(progressRef, (s) => setSurahProgress(s.val() || {}), handleError);
-      onValue(paymentsRef, (s) => {
+      onValue(sessionsRef, (s: any) => setDailySessions(s.val() || {}), handleError);
+      onValue(reportsRef, (s: any) => setDailyReports(s.val() || {}), handleError);
+      onValue(progressRef, (s: any) => setSurahProgress(s.val() || {}), handleError);
+      onValue(paymentsRef, (s: any) => {
         const val = s.val();
         setPayments(val ? Object.entries(val).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : []);
       }, handleError);
-      onValue(adminLogsRef, (s) => {
+      onValue(adminLogsRef, (s: any) => {
         const val = s.val();
         setAdminLogs(val ? Object.entries(val).map(([id, l]) => ({ id, ...(l as Omit<AdminLog, 'id'>) })) : []);
       }, handleError);
-      onValue(activityLogsRef, (s) => {
+      onValue(activityLogsRef, (s: any) => {
         const val = s.val();
         setActivityLogs(val ? Object.entries(val).map(([id, l]) => ({ id, ...(l as any) })) : []);
       }, handleError);
-      onValue(settingsRef, (s) => setSettingsState(s.val() ? { ...DEFAULT_SETTINGS, ...s.val() } : DEFAULT_SETTINGS), handleError);
+      onValue(settingsRef, (s: any) => setSettingsState(s.val() ? { ...DEFAULT_SETTINGS, ...s.val() } : DEFAULT_SETTINGS), handleError);
 
       // Also listen to profile to keep role/group synced if they change
       onValue(profileRef, () => setLoading(false), handleError);
@@ -510,7 +511,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const behaviorKing = useMemo(() => {
     if (allSortedSessions.length === 0 || activeStudents.length === 0) return { id: undefined, name: undefined, streak: 0, photoURL: undefined };
     const sortedBasicSessions = allSortedSessions.filter(s => s.sessionType === 'حصة أساسية');
-    let maxStreak = 0; let king: Student | undefined = undefined;
+    let maxStreak = 0; let king: any = undefined;
     activeStudents.forEach(student => {
       let currentStreak = 0; let studentMaxStreak = 0;
       sortedBasicSessions.forEach(session => {
@@ -556,7 +557,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    return { id: guardian?.id, name: guardian?.fullName, count: maxCount, photoURL: guardian?.photoURL };
+    return { id: (guardian as any)?.id, name: (guardian as any)?.fullName, count: maxCount, photoURL: (guardian as any)?.photoURL };
   }, [activeStudents, surahProgress]);
 
   const persistentTeacher = useMemo(() => {
@@ -942,7 +943,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     // Ensure id is present in each session object
     return Object.entries(sessionsForDate).map(([id, session]) => ({
       ...session,
-      id: session.id || id
+      id: session.id || id,
+      ownerId: session.ownerId || (isManagement || isSuperAdmin ? undefined : authContextUser?.uid)
     }));
   }
 
@@ -1141,20 +1143,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       studentProgressMap[surahId] = newEntry; // Keep local map in sync
     }
 
-    const pointsMemorized = settings.points.surah['memorized'];
-    const pointsMastered = settings.points.surah['mastered'];
-
-    if (currentStatus === 0 && nextStatus === 1) {
-      toast({ title: `✅ +${pointsMemorized} نقطة`, description: 'تم إضافة نقاط للحفظ الجديد.' });
-    } else if (currentStatus === 1 && nextStatus === 2) {
-      toast({ title: `✅ +${pointsMastered} نقطة`, description: 'تم إضافة نقاط للإتقان.' });
-    } else if (currentStatus === 2 && nextStatus === 0) {
-      toast({ title: `🔄 -${pointsMemorized + pointsMastered} نقطة`, description: 'تم خصم نقاط الحفظ والإتقان.', variant: 'destructive' });
-    } else if (currentStatus === 1 && nextStatus === 0) {
-      toast({ title: `🔄 -${pointsMemorized} نقطة`, description: 'تم خصم نقاط الحفظ.', variant: 'destructive' });
-    } else if (currentStatus === 2 && nextStatus === 1) {
-      toast({ title: `🔄 -${pointsMastered} نقطة`, description: 'تم خصم نقاط الإتقان.', variant: 'destructive' });
-    }
+    // Old point system removed as requested by user. 
+    // Qualitative 6-tier evaluation now handles progress tracking.
 
     const surahProgressRef = ref(db, `users/${studentOwnerId}/surahProgress/${studentId}`);
     set(surahProgressRef, studentProgressMap);
@@ -1736,7 +1726,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const setAdmin5SurahEvaluation = async (studentId: string, surahId: number, evaluation: import('@/lib/types').Admin5SurahEvaluation) => {
+  const setSurahEvaluation = async (studentId: string, surahId: number, evaluation: import('@/lib/types').SurahEvaluation) => {
     if (!authContextUser) return;
 
     const student = students.find(s => s.id === studentId);
@@ -1746,31 +1736,24 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const studentProgressMap = { ...(surahProgress[studentId] || {}) };
     const currentEntry = studentProgressMap[surahId] || { status: 0 };
 
-    // Convert evaluation to status
-    let newStatus: 0 | 1 | 2;
-    if (evaluation === 'لم يحفظ') {
-      newStatus = 0;
-    } else if (evaluation === 'ممتاز') {
-      newStatus = 2; // متقنة
-    } else {
-      newStatus = 1; // محفوظة (for جيد جداً, جيد, حسن, متوسط)
-    }
+    // Set completion date when moving from 0 to >0
+    const needsCompletedAt = (evaluation !== 'لم يحفظ' && currentEntry.status === 0);
+
+    // Map evaluation to internal status for scoring/legacy compatibility
+    let status: 0 | 1 | 2 = 0;
+    if (evaluation === 'ممتاز') status = 2;
+    else if (evaluation === 'لم يحفظ') status = 0;
+    else status = 1;
 
     const newEntry: import('@/lib/types').SurahMasteryEntry = {
-      status: newStatus,
-      admin5Evaluation: evaluation
+      status,
+      evaluation,
+      completedAt: needsCompletedAt ? new Date().toISOString() : (currentEntry.completedAt || undefined)
     };
-
-    // Set completion date when moving from 0 to >0
-    if (newStatus > 0 && currentEntry.status === 0) {
-      newEntry.completedAt = new Date().toISOString();
-    } else if (newStatus > 0) {
-      newEntry.completedAt = currentEntry.completedAt || new Date().toISOString();
-    }
 
     const progressRef = ref(db, `users/${studentOwnerId}/surahProgress/${studentId}/${surahId}`);
 
-    if (newStatus === 0) {
+    if (evaluation === 'لم يحفظ') {
       await remove(progressRef);
     } else {
       await set(progressRef, newEntry);
@@ -1782,7 +1765,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       `تقييم السورة (ID: ${surahId}): ${evaluation}`,
       studentId,
       student?.fullName || 'غير معروف',
-      authContextUser.displayName || 'Unknown',
+      authContextUser.displayName || 'Sheikh',
       student?.groupName || 'غير محدد',
       studentOwnerId
     );
@@ -1791,6 +1774,59 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       title: `✅ تم تقييم السورة`,
       description: `التقييم: ${evaluation}`,
     });
+  };
+
+  const migrateSurahDataToEvaluationSystem = async () => {
+    if (!authContextUser || !isSuperAdmin) return;
+
+    toast({ title: "⏳ بدء هجرة البيانات..." });
+    let migratedCount = 0;
+
+    try {
+      for (const studentId in surahProgress) {
+        const student = students.find(s => s.id === studentId);
+        if (!student) continue;
+
+        const studentOwnerId = student.ownerId;
+        const progress = surahProgress[studentId];
+
+        for (const surahIdStr in progress) {
+          const surahId = parseInt(surahIdStr);
+          const entry = progress[surahId];
+
+          // Skip if already has evaluation or admin5Evaluation
+          if (entry.evaluation) continue;
+
+          // Legacy check for admin5Evaluation
+          // @ts-ignore - we are migrating away from this
+          const legacyEval = entry.admin5Evaluation;
+          if (legacyEval) {
+            await update(ref(db, `users/${studentOwnerId}/surahProgress/${studentId}/${surahId}`), {
+              evaluation: legacyEval
+            });
+            migratedCount++;
+            continue;
+          }
+
+          let newEvaluation: import('@/lib/types').SurahEvaluation | null = null;
+          if (entry.status === 2) newEvaluation = 'ممتاز';
+          else if (entry.status === 1) newEvaluation = 'جيد';
+          else if (entry.status === 0) newEvaluation = 'لم يحفظ';
+
+          if (newEvaluation) {
+            await update(ref(db, `users/${studentOwnerId}/surahProgress/${studentId}/${surahId}`), {
+              evaluation: newEvaluation
+            });
+            migratedCount++;
+          }
+        }
+      }
+
+      toast({ title: `✅ تمت الهجرة بنجاح`, description: `تم تحديث ${migratedCount} حصة.` });
+    } catch (error) {
+      console.error("Migration error:", error);
+      toast({ title: "❌ فشلت الهجرة", variant: "destructive" });
+    }
   };
 
   return (
@@ -1827,7 +1863,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       saveDailyReport,
       deleteDailyReport,
       toggleSurahStatus,
-      setAdmin5SurahEvaluation,
+      setSurahEvaluation,
       bulkUpdateSurahStatus,
       addPayment,
       updatePaymentStatus,
@@ -1881,7 +1917,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       sendManagementMessage,
       markManagementMessageAsRead,
       moveDailySession,
-      deleteMultipleDailyReports
+      deleteMultipleDailyReports,
+      migrateSurahDataToEvaluationSystem
     }}>
       {children}
     </StudentContext.Provider>

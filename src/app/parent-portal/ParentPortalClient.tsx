@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 
@@ -357,7 +357,15 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
 export default function ParentPortalStudentPage() {
     const { students, loading: contextLoading } = useStudentContext();
     const params = useParams();
-    const studentID = params?.studentID as string;
+    const searchParams = useSearchParams();
+
+    // Support both dynamic route /parent-portal/ID and query param /parent-portal?id=ID
+    const studentID = useMemo(() => {
+        const pId = params?.studentID as string;
+        const qId = searchParams.get('id');
+        if (pId && pId !== '1') return pId;
+        return qId;
+    }, [params, searchParams]);
 
     const student = useMemo(() => {
         if (!studentID || !students || students.length === 0) return null;

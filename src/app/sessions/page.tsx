@@ -81,19 +81,35 @@ export default function DailySessionsPage() {
 
   // Effect to default to first sheikh if none selected and we are admin
   React.useEffect(() => {
-    if (isAdminUser && !selectedSheikhId && allUsers) {
-      const sheikhs = allUsers.filter(u => u.role === 'sheikh');
-      if (sheikhs.length > 0) {
-        setSelectedSheikhId(sheikhs[0].uid);
+    if (isAdminUser && !selectedSheikhId) {
+      if (allUsers && allUsers.length > 0) {
+        const sheikhs = allUsers.filter(u => u.role === 'sheikh');
+        if (sheikhs.length > 0) {
+          // Preference: if user is themselves a sheikh (like admin5), default to self
+          const self = sheikhs.find(s => s.uid === user?.uid);
+          setSelectedSheikhId(self ? self.uid : sheikhs[0].uid);
+        }
+      } else if (isAdmin5 && user?.uid) {
+        // Special case: if admin5 but allUsers isn't aggregated (sheikh role), default to self
+        setSelectedSheikhId(user.uid);
       }
+    } else if (!isAdminUser && user?.uid && !selectedSheikhId) {
+      // For regular sheikhs, always default to self
+      setSelectedSheikhId(user.uid);
     }
-  }, [isAdminUser, selectedSheikhId, allUsers]);
+  }, [isAdminUser, selectedSheikhId, allUsers, user?.uid, isAdmin5]);
 
   const globalProgress = useMemo(() => {
     if (!isAdminUser || !dailySessions || !selectedSheikhId) return null;
 
     // Filter sessions strictly by the selected sheikh
-    const allSessions = Object.values(dailySessions).flatMap(day => Object.values(day as Record<string, any>));
+    // List and normalize sessions with fallback ownerId
+    const allSessions = Object.values(dailySessions).flatMap(day => Object.values(day as Record<string, any>))
+      .map(s => ({
+        ...s,
+        ownerId: s.ownerId || (isManagement || isSuperAdmin ? undefined : user?.uid)
+      }));
+
     const sortedSessions = allSessions
       .filter(s => s.ownerId === selectedSheikhId && s.sessionType === 'حصة أساسية' && s.surahId)
       .sort((a, b) => b.date.localeCompare(a.date));
@@ -114,13 +130,18 @@ export default function DailySessionsPage() {
   // Filter sessions based on selected Group (for Admins) - MERGED from all sheikhs in the group
   const filteredGetSessionsForDay = (date: string) => {
     const sessions = getSessionsForDay(date);
+
+    // If a group/sheikh is selected, filter strictly by that group
     if (isAdminUser && groupSheikhIds.length > 0) {
-      // Merge sessions from ALL sheikhs in the same group
       return sessions.filter(s => s.ownerId && groupSheikhIds.includes(s.ownerId));
     }
-    // Strict mode: if admin and no group selected, show nothing
-    if (isAdminUser) return [];
 
+    // Strict mode ONLY for full aggregators (management/superAdmin) who haven't selected anything
+    if ((isSuperAdmin || isManagement) && !selectedSheikhId) {
+      return [];
+    }
+
+    // Default: return everything we have (regular sheikhs see their own data only)
     return sessions;
   };
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { ref, onValue, off, type DataSnapshot } from 'firebase/database';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -219,7 +219,16 @@ const StatWidget = ({ title, value, unit, icon, colorClass }: { title: string, v
 
 export default function PublicStudentRecordPage() {
     const params = useParams();
-    const studentId = params.studentId as string;
+    const searchParams = useSearchParams();
+
+    // Support both dynamic route /record/ID and query param /record?id=ID
+    // This is necessary for static exports where dynamic paths might not be pre-generated
+    const studentId = useMemo(() => {
+        const pId = params?.studentId as string;
+        const qId = searchParams.get('id');
+        if (pId && pId !== '1') return pId;
+        return qId;
+    }, [params, searchParams]);
 
     const [loading, setLoading] = useState(true);
     const [snapshot, setSnapshot] = useState<any>(null);

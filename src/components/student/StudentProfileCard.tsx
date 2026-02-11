@@ -37,8 +37,8 @@ export const StudentProfileCard = memo(({ student, user, rankingData, medalHisto
 
     const supervisorName = useMemo(() => {
         const supervisor = allUsers.find(u => u.uid === student.ownerId);
-        return supervisor?.displayName || 'غير محدد';
-    }, [allUsers, student.ownerId]);
+        return supervisor?.displayName || student.sheikhName || 'غير محدد';
+    }, [allUsers, student.ownerId, student.sheikhName]);
 
     const { rank, commitmentBalance, stats } = useMemo(() => {
         const studentRankData = rankingData.find((r: any) => r.id === student.id);

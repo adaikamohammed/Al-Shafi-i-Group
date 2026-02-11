@@ -13,7 +13,8 @@ export type ActivityAction =
     | 'UPDATE_SURAH_PROGRESS'
     | 'UPDATE_PRE_REGISTRATION'
     | 'DELETE_PRE_REGISTRATION'
-    | 'MOVE_SESSION';
+    | 'MOVE_SESSION'
+    | 'ADMIN_MSG';
 
 interface LogEntry {
     action: ActivityAction;
