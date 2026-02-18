@@ -43,6 +43,7 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'الميدان التربوي',
         items: [
             { href: '/sessions', label: 'الحصص اليومية', icon: ClipboardList, primary: true },
+            { href: '/management/penalties', label: 'إدارة العقوبات', icon: Gavel },
             { href: '/surahs', label: 'متابعة الحفظ', icon: BookCheck },
             { href: '/dashboard', label: 'إدارة الطلبة', icon: Users },
             { href: '/reports/daily', label: 'التقرير اليومي', icon: Edit },
@@ -85,13 +86,19 @@ export const NAV_GROUPS: NavGroup[] = [
             { href: '/data', label: 'إدارة البيانات', icon: ArrowRightLeft },
             { href: '/dues', label: 'المستحقات (فصلي)', icon: DollarSign },
             { href: '/guide', label: 'دليل المستخدم', icon: HelpCircle },
+
+        ]
+    },
+    {
+        title: 'النظام والإعدادات',
+        items: [
+            { href: '/home', label: 'البوابة الرئيسية', icon: Home },
+            { href: '/', label: 'الواجهة العامة', icon: Home },
+            { href: '/profile', label: 'الملف الشخصي', icon: UserCog },
+            { href: '/settings', label: 'الإعدادات', icon: Settings },
+            { href: '/updates', label: 'التحديثات', icon: Sparkles },
         ]
     }
 ];
 
-export const BOTTOM_NAV_ITEMS = [
-    { href: '/home', label: 'البوابة الرئيسية', icon: Home },
-    { href: '/profile', label: 'الملف الشخصي', icon: UserCog },
-    { href: '/updates', label: 'التحديثات', icon: Sparkles },
-    { href: '/settings', label: 'الإعدادات', icon: Settings },
-];
+export const BOTTOM_NAV_ITEMS = [];

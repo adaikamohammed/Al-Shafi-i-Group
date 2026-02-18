@@ -401,14 +401,15 @@ export const StudentProfileCard = memo(({ student, user, rankingData, medalHisto
                                             const typeColors: any = {
                                                 'covenant': 'bg-primary/10 text-primary border-primary/20',
                                                 'expulsion': 'bg-red-100 text-red-700 border-red-200',
-                                                'transfer': 'bg-blue-100 text-blue-700 border-blue-200'
+                                                'transfer': 'bg-blue-100 text-blue-700 border-blue-200',
+                                                'إجراء تأديبي': 'bg-amber-100 text-amber-900 border-amber-200'
                                             };
 
                                             return (
                                                 <div key={index} className="relative animate-in-up" style={{ animationDelay: `${index * 50}ms` }}>
                                                     <div className={cn(
                                                         "absolute right-[-26px] top-1 h-4 w-4 rounded-full ring-4 ring-background z-10 flex items-center justify-center",
-                                                        isCovenant ? 'bg-primary' : timelineItem.type === 'transfer' ? 'bg-blue-600' : 'bg-red-600'
+                                                        isCovenant ? (item.type === 'إجراء تأديبي' ? 'bg-amber-500' : 'bg-primary') : timelineItem.type === 'transfer' ? 'bg-blue-600' : 'bg-red-600'
                                                     )}>
                                                         {timelineItem.type === 'transfer' && <ArrowRightLeft className="h-2 w-2 text-white" />}
                                                     </div>
@@ -437,9 +438,62 @@ export const StudentProfileCard = memo(({ student, user, rankingData, medalHisto
                                                                 <p className="text-sm font-medium">{isCovenant ? item.text : item.reason}</p>
                                                             )}
                                                             {isCovenant && (
-                                                                <div className="mt-2 text-[10px] font-bold flex items-center gap-1 opacity-70">
-                                                                    {item.status === 'تم الوفاء بها' ? <CheckCircle className="h-3 w-3 text-green-600" /> : <Loader2 className="h-3 w-3 animate-spin text-blue-600" />}
-                                                                    <span>الحالة: {item.status}</span>
+                                                                <div className="mt-2 text-[10px] space-y-2">
+                                                                    {item.type === 'إجراء تأديبي' ? (
+                                                                        <>
+                                                                            {/* Penalty Details */}
+                                                                            <div className="grid grid-cols-2 gap-2 bg-white/50 p-2 rounded border border-amber-200/50">
+                                                                                {item.absenceDays && (
+                                                                                    <div className="flex flex-col">
+                                                                                        <span className="text-muted-foreground text-[9px]">أيام الغياب</span>
+                                                                                        <span className="font-bold text-red-600">{item.absenceDays} أيام</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {item.writtenPenalty && (
+                                                                                    <div className="flex flex-col col-span-2">
+                                                                                        <span className="text-muted-foreground text-[9px]">العقوبة الكتابية</span>
+                                                                                        <div className="font-bold text-amber-900 leading-tight bg-amber-50 p-1.5 rounded text-xs mt-0.5 border border-amber-100">
+                                                                                            {item.writtenPenalty}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
+                                                                                {item.dueDate && (
+                                                                                    <div className="flex flex-col">
+                                                                                        <span className="text-muted-foreground text-[9px]">تاريخ الاستحقاق</span>
+                                                                                        <span className="font-bold">{format(parseISO(item.dueDate), 'd MMM yyyy', { locale: ar })}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+
+                                                                            {/* Compensation Details */}
+                                                                            {(item.compensationSessions || item.compensationDate) && (
+                                                                                <div className="mt-2 pt-2 border-t border-amber-200/50">
+                                                                                    <span className="text-[10px] font-bold text-blue-800 block mb-1">تفاصيل التعويض:</span>
+                                                                                    <div className="flex flex-wrap gap-2 text-[10px]">
+                                                                                        {item.compensationSessions && (
+                                                                                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                                                                                {item.compensationSessions} حصص
+                                                                                            </Badge>
+                                                                                        )}
+                                                                                        {item.compensationDate && (
+                                                                                            <span className="flex items-center gap-1 text-muted-foreground">
+                                                                                                <ArrowRight className="h-3 w-3" />
+                                                                                                {format(parseISO(item.compensationDate), 'd MMM', { locale: ar })}
+                                                                                            </span>
+                                                                                        )}
+                                                                                        <Badge variant={item.isCompensated ? "default" : "secondary"} className={cn("text-[9px]", item.isCompensated ? "bg-green-100 text-green-700 hover:bg-green-100" : "bg-gray-100 text-gray-500")}>
+                                                                                            {item.isCompensated ? "تم التعويض ✅" : "لم يتم التعويض بعد"}
+                                                                                        </Badge>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </>
+                                                                    ) : (
+                                                                        <div className="flex items-center gap-1 font-bold opacity-70">
+                                                                            {item.status === 'تم الوفاء بها' ? <CheckCircle className="h-3 w-3 text-green-600" /> : <Loader2 className="h-3 w-3 animate-spin text-blue-600" />}
+                                                                            <span>الحالة: {item.status}</span>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             )}
                                                         </div>

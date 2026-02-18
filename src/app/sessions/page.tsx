@@ -474,6 +474,7 @@ export default function DailySessionsPage() {
             students={filteredStudentsForTable}
             getSessionsForDay={filteredGetSessionsForDay}
             onDayClick={handleTableDayClick}
+            isAdmin5={isAdmin5}
           />
         )}
 

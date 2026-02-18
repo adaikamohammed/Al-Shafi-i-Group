@@ -1,18 +1,20 @@
 "use client";
 
 import React, { useMemo, useState } from 'react';
-import { format, addDays, startOfDay, isToday as isTodayFn } from 'date-fns';
+import { format, addDays, startOfDay, isToday as isTodayFn, getDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Student } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, RotateCcw, ExternalLink, Activity } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ChevronLeft, ChevronRight, RotateCcw, Activity } from 'lucide-react';
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { surahs } from '@/lib/surahs';
 
 interface WeeklyAttendanceTableProps {
     students: Student[];
     getSessionsForDay: (dateString: string) => any[];
     onDayClick: (dateStr: string, sessionNumber: number) => void;
+    isAdmin5?: boolean;
 }
 
 const getSaturday = (date: Date): Date => {
@@ -36,6 +38,7 @@ export const WeeklyAttendanceTable = ({
     students,
     getSessionsForDay,
     onDayClick,
+    isAdmin5 = false,
 }: WeeklyAttendanceTableProps) => {
 
     const [weekStart, setWeekStart] = useState(() => getSaturday(new Date()));
@@ -44,6 +47,10 @@ export const WeeklyAttendanceTable = ({
         return Array.from({ length: 7 }, (_, i) => {
             const date = addDays(weekStart, i);
             const dateStr = format(date, 'yyyy-MM-dd');
+            const dayOfWeek = getDay(date);
+            // Thursday (4) and Friday (5) are always holidays
+            const isWeekend = dayOfWeek === 4 || dayOfWeek === 5;
+
             return {
                 date,
                 dateStr,
@@ -52,6 +59,7 @@ export const WeeklyAttendanceTable = ({
                 dayNum: format(date, 'd'),
                 monthNum: format(date, 'MM'),
                 isToday: isTodayFn(date),
+                isWeekend,
             };
         });
     }, [weekStart]);
@@ -65,6 +73,36 @@ export const WeeklyAttendanceTable = ({
         });
         return data;
     }, [weekDays, getSessionsForDay]);
+
+    const getColumnStyle = (day: typeof weekDays[0], session: any) => {
+        if (day.isWeekend) return "bg-sky-50/70 border-sky-100"; // Weekend always blue-ish
+
+        if (!session) return "";
+
+        const type = session.sessionType;
+        if (type === 'يوم عطلة') return "bg-sky-50/70 border-sky-100";
+        if (type === 'حصة أنشطة') return "bg-purple-50/70 border-purple-100";
+        if (type === 'غياب الشيخ') {
+            return session.substituteTeacher
+                ? "bg-orange-50/70 border-orange-100" // With sub
+                : "bg-rose-50/70 border-rose-100";    // No sub
+        }
+        return "";
+    };
+
+    const getHeaderStyle = (day: typeof weekDays[0], session: any) => {
+        if (day.isWeekend) return "bg-sky-100/80 text-sky-900";
+
+        const type = session?.sessionType;
+        if (type === 'يوم عطلة') return "bg-sky-100/80 text-sky-900";
+        if (type === 'حصة أنشطة') return "bg-purple-100/80 text-purple-900";
+        if (type === 'غياب الشيخ') {
+            return session?.substituteTeacher
+                ? "bg-orange-100/80 text-orange-900"
+                : "bg-rose-100/80 text-rose-900";
+        }
+        return "group-hover:bg-muted/30";
+    };
 
     const getStudentDayInfo = (studentId: string, dateStr: string): StudentDayInfo => {
         const session = weekSessionData[dateStr];
@@ -86,7 +124,8 @@ export const WeeklyAttendanceTable = ({
         switch (status) {
             case 'حاضر': return <span className="text-emerald-600 font-bold text-lg">✅</span>;
             case 'متأخر': return <span className="text-amber-600 font-bold text-lg">⏰</span>;
-            case 'غائب': return <span className="text-red-500 font-bold text-lg">❌</span>;
+            case 'غائب':
+            case 'غياب': return <span className="text-red-500 font-bold text-lg">❌</span>;
             case 'تعويض': return <span className="text-blue-500 font-bold text-lg">🔄</span>;
             default: return null;
         }
@@ -136,17 +175,35 @@ export const WeeklyAttendanceTable = ({
 
     const getStudentWeeklyStats = (studentId: string) => {
         let present = 0;
+        let absent = 0;
+        let late = 0;
         let excellent = 0;
         let warnings = 0;
 
         weekDays.forEach(day => {
+            // Skip stats for weekends
+            if (day.isWeekend) return;
+
             const info = getStudentDayInfo(studentId, day.dateStr);
-            if (info.attendance === 'حاضر' || info.attendance === 'متأخر' || info.attendance === 'تعويض') present++;
+            const session = weekSessionData[day.dateStr];
+
+            // Skip stats for holidays/cancelled sessions
+            const sessionType = session?.sessionType;
+            if (sessionType === 'يوم عطلة' || sessionType === 'غياب الشيخ') return;
+
+            if (info.attendance === 'حاضر' || info.attendance === 'تعويض') present++;
+            if (info.attendance === 'متأخر') {
+                present++; // Counting late as present for "Presence" count? Or separate? 
+                // Usually Late is a form of presence. But we also count it separately.
+                late++;
+            }
+            if (info.attendance === 'غائب' || info.attendance === 'غياب') absent++;
+
             if (info.memorization === 'ممتاز') excellent++;
             if (info.behavior === 'مشاغب' || info.behavior === 'غير منضبط') warnings++;
         });
 
-        return { present, excellent, warnings };
+        return { present, absent, late, excellent, warnings };
     };
 
     const isCurrentWeek = useMemo(() => {
@@ -182,11 +239,42 @@ export const WeeklyAttendanceTable = ({
 
                 {/* Table container with horizontal scroll */}
                 <div className="overflow-x-auto w-full">
-                    <table className="w-full border-collapse min-w-[800px]">
+                    <table className="w-full border-collapse min-w-[700px]">
                         <thead>
+                            {/* Admin5 Wird Row - Only visible for admin5 */}
+                            {isAdmin5 && (
+                                <tr className="bg-amber-50/80 border-b border-amber-100">
+                                    <th className="sticky right-0 z-20 bg-amber-50 border-b border-l text-right p-2 text-[10px] font-bold text-amber-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                                        المقرر اليومي
+                                    </th>
+                                    <th className="border-b border-l bg-amber-50/50"></th>
+                                    {weekDays.map(day => {
+                                        const session = weekSessionData[day.dateStr];
+                                        const colClass = getColumnStyle(day, session);
+
+                                        let wirdText = "—";
+                                        if (session?.surahId) {
+                                            const surah = surahs.find(s => s.id === session.surahId);
+                                            wirdText = surah ? `سورة ${surah.name}` : "";
+                                            if (session.fromVerse && session.toVerse) {
+                                                wirdText += ` (${session.fromVerse}-${session.toVerse})`;
+                                            }
+                                        }
+                                        return (
+                                            <th key={`wird-${day.dateStr}`} className={cn(
+                                                "border-b border-l p-1 text-[10px] font-normal text-amber-900 text-center h-8",
+                                                colClass ? colClass : "bg-amber-50/30"
+                                            )}>
+                                                {wirdText !== "—" ? wirdText : <span className="opacity-30">—</span>}
+                                            </th>
+                                        );
+                                    })}
+                                </tr>
+                            )}
+
                             <tr className="bg-muted/5">
                                 {/* Sticky Student Name Column */}
-                                <th className="sticky right-0 z-20 bg-white border-b border-l text-right p-3 w-[140px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                                <th className="sticky right-0 z-20 bg-white border-b border-l text-right p-2 sm:p-3 w-[130px] sm:w-[140px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                                     <span className="text-xs font-bold text-muted-foreground flex items-center gap-1">
                                         <Activity className="h-3 w-3" />
                                         الطالب ({sortedStudents.length})
@@ -194,36 +282,41 @@ export const WeeklyAttendanceTable = ({
                                 </th>
 
                                 {/* Weekly Stats Header */}
-                                <th className="border-b border-l p-2 w-[80px] bg-emerald-50/30">
+                                <th className="border-b border-l p-2 w-[70px] sm:w-[80px] bg-emerald-50/30">
                                     <span className="text-[10px] font-bold text-emerald-700 block text-center">الإحصاءات</span>
                                 </th>
-
                                 {/* Days Headers */}
                                 {weekDays.map(day => {
                                     const session = weekSessionData[day.dateStr];
                                     const sessionType = session?.sessionType;
-                                    const isHoliday = sessionType === 'يوم عطلة' || sessionType === 'غياب الشيخ';
+                                    const colClass = getHeaderStyle(day, session);
+
+                                    // Override holiday check for visualization
+                                    const isHoliday = day.isWeekend || sessionType === 'يوم عطلة' || sessionType === 'غياب الشيخ';
 
                                     return (
                                         <th key={day.dateStr}
                                             onClick={() => handleCellClick(day.dateStr)}
                                             className={cn(
-                                                "border-b border-l p-2 min-w-[90px] transition-colors cursor-pointer hover:bg-muted/30 group",
-                                                day.isToday && "bg-primary/5 shadow-inner"
+                                                "border-b border-l p-2 min-w-[85px] transition-colors cursor-pointer group",
+                                                colClass,
+                                                day.isToday && !colClass.includes('bg-') && "bg-primary/5 shadow-inner"
                                             )}>
                                             <div className="flex flex-col items-center gap-1">
                                                 <span className={cn("text-xs font-bold", day.isToday && "text-primary")}>
                                                     {day.dayNameShort}
                                                 </span>
-                                                <span className="text-[10px] text-muted-foreground font-mono bg-white/50 px-1.5 rounded border border-transparent group-hover:border-border transition-colors">
+                                                <span className="text-[10px] opacity-70 font-mono">
                                                     {day.dayNum}
                                                 </span>
-                                                {sessionType && (
+                                                {(sessionType || day.isWeekend) && (
                                                     <span className={cn(
-                                                        "text-[9px] px-1 rounded-sm mt-0.5",
-                                                        isHoliday ? "bg-orange-100 text-orange-700" : "bg-emerald-100 text-emerald-700"
+                                                        "text-[9px] px-1 rounded-sm mt-0.5 whitespace-nowrap",
+                                                        isHoliday ? "bg-white/50 text-foreground/80 font-bold" : "bg-emerald-100 text-emerald-700"
                                                     )}>
-                                                        {isHoliday ? 'عطلة' : `حصة ${session.sessionNumber}`}
+                                                        {day.isWeekend ? 'عطلة' :
+                                                            isHoliday ? (sessionType === 'يوم عطلة' ? 'عطلة' : sessionType) :
+                                                                `حصة ${session?.sessionNumber || 1}`}
                                                     </span>
                                                 )}
                                             </div>
@@ -240,7 +333,7 @@ export const WeeklyAttendanceTable = ({
                                     <tr key={student.id} className={cn("group transition-colors", idx % 2 === 0 ? "bg-white" : "bg-gray-50/30 hover:bg-muted/5")}>
                                         {/* Sticky Student Name Cell */}
                                         <td className={cn(
-                                            "sticky right-0 z-10 border-l text-right p-3 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]",
+                                            "sticky right-0 z-10 border-l text-right p-2 sm:p-3 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]",
                                             idx % 2 === 0 ? "bg-white" : "bg-gray-50/30 group-hover:bg-gray-50",
                                         )}>
                                             <span className="text-xs font-bold text-gray-800 line-clamp-1">
@@ -251,10 +344,22 @@ export const WeeklyAttendanceTable = ({
                                         {/* Weekly Stats Cell */}
                                         <td className="border-b border-l p-1 sm:p-2 align-middle bg-emerald-50/10 active:bg-emerald-50/30">
                                             <div className="flex flex-col gap-1 items-center justify-center h-full text-[9px]">
-                                                <div className="flex items-center gap-1 w-full justify-between px-1" title="أيام الحضور">
+                                                <div className="flex items-center gap-1 w-full justify-between px-1" title="أيام الحضور (شامل التأخر)">
                                                     <span>✅</span>
                                                     <span className="font-bold">{stats.present}</span>
                                                 </div>
+                                                {stats.absent > 0 && (
+                                                    <div className="flex items-center gap-1 w-full justify-between px-1" title="أيام الغياب">
+                                                        <span>❌</span>
+                                                        <span className="font-bold text-red-600">{stats.absent}</span>
+                                                    </div>
+                                                )}
+                                                {stats.late > 0 && (
+                                                    <div className="flex items-center gap-1 w-full justify-between px-1" title="مرات التأخر">
+                                                        <span>⏰</span>
+                                                        <span className="font-bold text-amber-600">{stats.late}</span>
+                                                    </div>
+                                                )}
                                                 <div className="flex items-center gap-1 w-full justify-between px-1" title="مرات التميز">
                                                     <span>🌟</span>
                                                     <span className="font-bold text-amber-600">{stats.excellent}</span>
@@ -271,13 +376,18 @@ export const WeeklyAttendanceTable = ({
                                         {/* Day Cells */}
                                         {weekDays.map(day => {
                                             const info = getStudentDayInfo(student.id, day.dateStr);
-                                            const isHoliday = info.sessionType === 'يوم عطلة' || info.sessionType === 'غياب الشيخ';
+                                            const session = weekSessionData[day.dateStr];
+                                            const colClass = getColumnStyle(day, session);
+
+                                            // Determine visual state
+                                            const isHoliday = day.isWeekend || session?.sessionType === 'يوم عطلة' || session?.sessionType === 'غياب الشيخ';
                                             const hasData = !!info.attendance;
 
                                             return (
                                                 <td key={day.dateStr} className={cn(
                                                     "border-b border-l p-1 text-center align-top h-[70px]",
-                                                    day.isToday && "bg-primary/[0.02]"
+                                                    colClass,
+                                                    !colClass && day.isToday && "bg-primary/[0.02]"
                                                 )}>
                                                     {isHoliday ? (
                                                         <div className="h-full flex items-center justify-center text-muted-foreground/30 text-xl select-none">
@@ -288,12 +398,12 @@ export const WeeklyAttendanceTable = ({
                                                             onClick={() => handleCellClick(day.dateStr)}
                                                             className={cn(
                                                                 "h-full w-full rounded-md border flex flex-col items-center justify-between py-1 transition-all cursor-pointer hover:shadow-sm active:scale-[0.98]",
-                                                                hasData ? "bg-white border-border" : "bg-muted/5 border-dashed border-gray-200 hover:bg-muted/10"
+                                                                hasData ? "bg-white border-border shadow-sm" : "bg-white/50 border-dashed border-gray-300/50 hover:bg-white/80"
                                                             )}
                                                             title="اضغط للتعديل"
                                                         >
                                                             {!hasData ? (
-                                                                <span className="text-[9px] text-muted-foreground mt-4">تسجيل</span>
+                                                                <span className="text-[9px] text-muted-foreground mt-4 opacity-50">تسجيل</span>
                                                             ) : (
                                                                 <>
                                                                     {/* 1. Attendance Icon */}
@@ -330,9 +440,10 @@ export const WeeklyAttendanceTable = ({
                 {/* Footer Legend */}
                 <div className="bg-muted/10 border-t p-2 text-[10px] sm:text-[11px] flex flex-wrap gap-x-4 gap-y-2 justify-center text-muted-foreground">
                     <span className="flex items-center gap-1"><span className="text-emerald-600 font-bold">✅</span> حاضر</span>
+                    <span className="flex items-center gap-1"><span className="text-red-500 font-bold">❌</span> غائب</span>
+                    <span className="flex items-center gap-1"><span className="text-amber-600 font-bold">⏰</span> متأخر</span>
                     <span className="flex items-center gap-1"><span className="bg-emerald-100 text-emerald-700 px-1 rounded text-[9px]">ممتاز</span> حفظ ممتاز</span>
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 block"></span> سلوك هادئ</span>
-                    <span className="flex items-center gap-1"><span className="text-blue-500">📖</span> تمت المراجعة</span>
                 </div>
             </div>
         </TooltipProvider>

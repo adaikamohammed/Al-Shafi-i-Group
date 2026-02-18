@@ -4,7 +4,7 @@ export type StudentStatus = "نشط" | "مطرود" | "محذوف";
 export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "أكثر";
 export type SubscriptionTier = "فئة الأكابر" | "فئة الأصاغر";
 
-export type CovenantType = "تعهد غياب" | "ميثاق حفظ" | "التزام سلوكي";
+export type CovenantType = "تعهد غياب" | "ميثاق حفظ" | "التزام سلوكي" | "إجراء تأديبي";
 export type CovenantStatus = "نشط" | "تم الوفاء بها" | "نُقِض";
 export type CovenantCard = "بدون" | "بطاقة صفراء" | "بطاقة حمراء";
 
@@ -15,6 +15,12 @@ export interface Covenant {
   status: CovenantStatus;
   card: CovenantCard;
   date: string; // ISO String
+  absenceDays?: number;
+  writtenPenalty?: string;
+  dueDate?: string;
+  compensationSessions?: number;
+  compensationDate?: string;
+  isCompensated?: boolean;
 }
 
 export interface ExpulsionRecord {
