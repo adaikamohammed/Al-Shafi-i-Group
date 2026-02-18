@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useStudentContext } from '@/context/StudentContext';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/use-debounce';
-import { format, parse, parseISO, subDays, isSameDay, getDay } from 'date-fns';
+import { format, parse, parseISO, subDays, addDays, isSameDay, getDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Loader2, Save, FileText, UserCheck, AlertTriangle, ArrowRight, Trash2, BookOpen, Smile, RotateCcw, TimerOff, MessageSquare, CheckCircle, Copy, Trophy, Cloud, RefreshCw } from 'lucide-react';
+import { Loader2, Save, FileText, UserCheck, AlertTriangle, ArrowRight, ArrowLeft, Trash2, BookOpen, Smile, RotateCcw, TimerOff, MessageSquare, CheckCircle, Copy, Trophy, Cloud, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AttendanceList, AttendanceRecord } from '@/components/sessions/AttendanceList';
 import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
@@ -36,8 +36,8 @@ function RegisterSessionContent() {
     const sessionNumParam = searchParams.get('session');
     const ownerIdParam = searchParams.get('ownerId');
 
-    const [selectedDay] = useState<Date>(dateParam ? parse(dateParam, 'yyyy-MM-dd', new Date()) : new Date());
-    const [sessionToOpen] = useState<1 | 2>(sessionNumParam === '2' ? 2 : 1);
+    const selectedDay = useMemo(() => dateParam ? parse(dateParam, 'yyyy-MM-dd', new Date()) : new Date(), [dateParam]);
+    const sessionToOpen = useMemo(() => (sessionNumParam === '2' ? 2 : 1) as 1 | 2, [sessionNumParam]);
 
     const isManagement = user?.role === 'management';
 
@@ -65,6 +65,12 @@ function RegisterSessionContent() {
     const [isDirty, setIsDirty] = useState(false);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isNavigating, setIsNavigating] = useState(false);
+
+    // Swipe navigation refs
+    const touchStartX = useRef<number>(0);
+    const touchStartY = useRef<number>(0);
+    const isSwiping = useRef(false);
 
     const surahOptions: SearchableSelectOption[] = useMemo(() => surahs.map(s => ({ value: s.id.toString(), label: `${s.id}. ${s.name}` })), []);
 
@@ -98,13 +104,20 @@ function RegisterSessionContent() {
             .sort((a, b) => b.date.localeCompare(a.date)) // Newest first
             .map(s => {
                 const surah = surahs.find(su => su.id === s.surahId);
+                const sDate = parse(s.date, 'yyyy-MM-dd', new Date());
+                // Get IDs of students who were present (attended & memorized)
+                const presentStudentIds: string[] = (s.records || [])
+                    .filter((r: any) => r.attendance === 'حاضر' || r.attendance === 'متأخر')
+                    .map((r: any) => r.studentId);
                 return {
                     date: s.date,
+                    dayName: format(sDate, 'EEEE', { locale: ar }),
                     sessionNumber: s.sessionNumber,
                     surahId: s.surahId,
                     surahName: surah?.name || 'سورة مجهولة',
                     fromVerse: s.fromVerse,
-                    toVerse: s.toVerse
+                    toVerse: s.toVerse,
+                    presentStudentIds,
                 };
             });
     }, [isAdmin5, dailySessions, selectedDay]);
@@ -117,7 +130,6 @@ function RegisterSessionContent() {
         // Load initial data logic
         const loadFromFirebase = async () => {
             if (!selectedDay || !user) return;
-            setIsInitialLoad(true);
 
             try {
                 const dateStr = format(selectedDay, 'yyyy-MM-dd');
@@ -238,11 +250,12 @@ function RegisterSessionContent() {
             } finally {
                 setIsInitialLoad(false);
                 setIsDirty(false);
+                setIsNavigating(false);
             }
         };
 
         loadFromFirebase();
-    }, [loading, selectedDay, sessionToOpen, user, isInitialLoad]);
+    }, [loading, selectedDay, sessionToOpen, user]);
 
     const handleSessionTypeChange = (val: any) => {
         setSessionType(val);
@@ -504,6 +517,64 @@ function RegisterSessionContent() {
             toast({ title: "محفوظ", description: "جميع البيانات محفوظة." });
         }
         router.push('/sessions');
+    };
+
+    // Navigate to previous/next day
+    const navigateToDay = async (direction: -1 | 1) => {
+        if (isNavigating || isSaving) return;
+        setIsNavigating(true);
+
+        try {
+            // Save current data before navigating
+            if (isDirty) {
+                setIsSaving(true);
+                try {
+                    await performSave(sessionData);
+                } catch (e) {
+                    console.error("Save before navigate failed", e);
+                    toast({ title: "تنبيه", description: "قد لا تكون بعض التغييرات محفوظة.", variant: "destructive" });
+                } finally {
+                    setIsSaving(false);
+                }
+            }
+
+            const newDate = addDays(selectedDay, direction);
+            const newDateStr = format(newDate, 'yyyy-MM-dd');
+
+            const queryParams = new URLSearchParams();
+            queryParams.set('date', newDateStr);
+            queryParams.set('session', sessionToOpen.toString());
+            if (ownerIdParam) {
+                queryParams.set('ownerId', ownerIdParam);
+            }
+
+            router.push(`/sessions/register?${queryParams.toString()}`);
+        } catch (error) {
+            console.error("Navigation error:", error);
+            setIsNavigating(false);
+        }
+    };
+
+    // Swipe handlers
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStartX.current = e.touches[0].clientX;
+        touchStartY.current = e.touches[0].clientY;
+        isSwiping.current = false;
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+        const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+
+        // Only trigger if horizontal swipe is dominant and exceeds threshold
+        if (Math.abs(deltaX) > 60 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+            // RTL layout: swipe right = previous day, swipe left = next day
+            if (deltaX > 0) {
+                navigateToDay(-1); // Swipe right → previous day
+            } else {
+                navigateToDay(1);  // Swipe left → next day
+            }
+        }
     };
 
     // Manual Refresh: إعادة تحميل البيانات مباشرة من Firebase
@@ -778,23 +849,28 @@ function RegisterSessionContent() {
     }
 
     return (
-        <div className="container mx-auto p-4 max-w-4xl space-y-6 pb-24 rtl" dir="rtl">
-            <header className="flex items-center justify-between gap-4 bg-card p-4 rounded-2xl shadow-sm border">
+        <div
+            className="container mx-auto p-4 max-w-4xl space-y-6 pb-24 rtl"
+            dir="rtl"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+        >
+            <header className="bg-card p-4 rounded-2xl shadow-sm border space-y-3">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" onClick={() => router.push('/sessions')} className="rounded-xl">
                         <ArrowRight className="h-5 w-5" />
                     </Button>
-                    <div>
-                        <h1 className="text-xl font-headline font-bold flex items-center gap-2">
-                            <FileText className="h-6 w-6 text-primary" />
-                            تسجيل حصة: {format(selectedDay, 'd MMMM yyyy', { locale: ar })}
+                    <div className="flex-1 min-w-0">
+                        <h1 className="text-lg md:text-xl font-headline font-bold flex items-center gap-2">
+                            <FileText className="h-5 w-5 md:h-6 md:w-6 text-primary shrink-0" />
+                            <span className="truncate">تسجيل حصة: {format(selectedDay, 'd MMMM yyyy', { locale: ar })}</span>
                             {effectiveOwnerId && effectiveOwnerId !== user?.uid && (
-                                <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full mr-2">
+                                <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full mr-2 shrink-0">
                                     نيابة عن شيخ
                                 </span>
                             )}
                         </h1>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                             <p className="text-xs text-muted-foreground font-body">
                                 رقم الحصة: <span className="font-bold text-primary">{sessionToOpen}</span> (يوم {format(selectedDay, 'EEEE', { locale: ar })})
                             </p>
@@ -821,6 +897,47 @@ function RegisterSessionContent() {
                         </div>
                     </div>
                 </div>
+
+                {/* Day Navigation Bar */}
+                <div className="flex items-center justify-between bg-muted/40 rounded-xl px-1.5 sm:px-2 py-1 border border-border/50">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigateToDay(-1)}
+                        disabled={isNavigating || isSaving}
+                        className="h-10 rounded-lg font-bold text-[11px] sm:text-xs gap-0.5 sm:gap-1 hover:bg-primary/10 active:bg-primary/20 transition-all px-2 sm:px-3"
+                    >
+                        <ChevronRight className="h-4 w-4 shrink-0" />
+                        <span className="hidden sm:inline">{format(addDays(selectedDay, -1), 'EEEE', { locale: ar })}</span>
+                        <span className="sm:hidden">السابق</span>
+                    </Button>
+
+                    <div className="flex flex-col items-center gap-0 text-center min-w-0 px-1">
+                        <span className="text-[11px] sm:text-xs font-bold text-primary leading-tight">
+                            {format(selectedDay, 'EEEE', { locale: ar })}
+                        </span>
+                        <span className="text-[9px] sm:text-[10px] text-muted-foreground leading-tight">
+                            {format(selectedDay, 'dd/MM', { locale: ar })}
+                        </span>
+                    </div>
+
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigateToDay(1)}
+                        disabled={isNavigating || isSaving}
+                        className="h-10 rounded-lg font-bold text-[11px] sm:text-xs gap-0.5 sm:gap-1 hover:bg-primary/10 active:bg-primary/20 transition-all px-2 sm:px-3"
+                    >
+                        <span className="hidden sm:inline">{format(addDays(selectedDay, 1), 'EEEE', { locale: ar })}</span>
+                        <span className="sm:hidden">التالي</span>
+                        <ChevronLeft className="h-4 w-4 shrink-0" />
+                    </Button>
+                </div>
+                {isNavigating && (
+                    <div className="flex items-center justify-center gap-2 text-xs text-primary animate-pulse">
+                        <Loader2 className="h-3 w-3 animate-spin" /> جاري الانتقال...
+                    </div>
+                )}
             </header>
 
             <section className="bg-card p-4 rounded-2xl shadow-sm border space-y-4">
