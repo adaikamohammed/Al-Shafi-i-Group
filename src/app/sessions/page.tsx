@@ -37,7 +37,9 @@ import {
   Plus,
   Calendar as CalendarIcon,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Table,
+  CalendarDays
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -46,6 +48,7 @@ import { ProtectedPage } from '@/components/ui/ProtectedPage';
 // Custom Components
 import { SessionCalendar } from '@/components/sessions/SessionCalendar';
 import { AttendanceList, AttendanceRecord } from '@/components/sessions/AttendanceList';
+import { WeeklyAttendanceTable } from '@/components/sessions/WeeklyAttendanceTable';
 import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
 
 export default function DailySessionsPage() {
@@ -67,11 +70,34 @@ export default function DailySessionsPage() {
   const [sessionChoiceData, setSessionChoiceData] = useState<{ day: number, dateStr: string, sessions: any[] } | null>(null);
   const [moveSessionData, setMoveSessionData] = useState<{ sessionId: string, date: string, currentOwnerId: string } | null>(null);
   const [targetSheikhForMove, setTargetSheikhForMove] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
 
   // Get the selected sheikh's group name for filtering
   const selectedGroupName = useMemo(() => {
     return allUsers?.find(u => u.uid === selectedSheikhId)?.group || '';
   }, [allUsers, selectedSheikhId]);
+
+  // Filtered students for the table view (by selected sheikh's group)
+  const filteredStudentsForTable = useMemo(() => {
+    if (!students) return [];
+    // For superAdmin/management, use selectedGroupName from allUsers
+    // For admin5 or regular sheikhs, use user?.group as fallback
+    const groupToMatch = selectedGroupName || user?.group || '';
+    if (!groupToMatch) return [];
+    // Students may have `group` or `groupName` depending on data source
+    return students.filter(s => s.status === 'نشط' && ((s as any).group === groupToMatch || s.groupName === groupToMatch));
+  }, [students, selectedGroupName, user?.group]);
+
+  // Handler for table cell click → navigate to register page
+  const handleTableDayClick = (dateStr: string, sessionNumber: number) => {
+    const queryParams = new URLSearchParams();
+    queryParams.set('date', dateStr);
+    queryParams.set('session', sessionNumber.toString());
+    if (selectedSheikhId) {
+      queryParams.set('ownerId', selectedSheikhId);
+    }
+    router.push(`/sessions/register?${queryParams.toString()}`);
+  };
 
   // Get all sheikh IDs that belong to the selected group
   const groupSheikhIds = useMemo(() => {
@@ -378,6 +404,26 @@ export default function DailySessionsPage() {
               <Trophy className="h-5 w-5 text-emerald-600" />
               <span className="font-bold text-emerald-800 font-headline">الدوري نشط</span>
             </div>
+
+            {/* View Toggle - Available to all */}
+            <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border">
+              <Button
+                variant={viewMode === 'calendar' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('calendar')}
+                className={cn("h-8 gap-1.5 text-xs rounded-lg", viewMode === 'calendar' && "bg-primary text-white shadow-sm")}>
+                <CalendarDays className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">تقويم</span>
+              </Button>
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('table')}
+                className={cn("h-8 gap-1.5 text-xs rounded-lg", viewMode === 'table' && "bg-primary text-white shadow-sm")}>
+                <Table className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">جدول</span>
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -412,16 +458,24 @@ export default function DailySessionsPage() {
           </div>
         )}
 
-        <SessionCalendar
-          currentDate={currentDate}
-          onDateChange={setCurrentDate}
-          onDayClick={handleDayClick}
-          getSessionsForDay={filteredGetSessionsForDay}
-          isSuperAdmin={isSuperAdmin}
-          onDeleteSession={handleDeleteSession}
-          onExportSession={handleExportSession}
-          onMoveSession={handleMoveSession}
-        />
+        {viewMode === 'calendar' ? (
+          <SessionCalendar
+            currentDate={currentDate}
+            onDateChange={setCurrentDate}
+            onDayClick={handleDayClick}
+            getSessionsForDay={filteredGetSessionsForDay}
+            isSuperAdmin={isSuperAdmin}
+            onDeleteSession={handleDeleteSession}
+            onExportSession={handleExportSession}
+            onMoveSession={handleMoveSession}
+          />
+        ) : (
+          <WeeklyAttendanceTable
+            students={filteredStudentsForTable}
+            getSessionsForDay={filteredGetSessionsForDay}
+            onDayClick={handleTableDayClick}
+          />
+        )}
 
         {/* Session Choice Dialog */}
         <Dialog open={!!sessionChoiceData} onOpenChange={() => setSessionChoiceData(null)}>
