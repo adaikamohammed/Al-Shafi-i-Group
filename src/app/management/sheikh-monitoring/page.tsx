@@ -5,7 +5,7 @@ import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import {
     Calendar, Shield, ArrowLeft, Loader2, Info, CheckCircle2, XCircle,
-    CalendarDays, CalendarRange, CalendarCheck, History, User, Users,
+    CalendarDays, CalendarRange, CalendarCheck, History, User, Users, UserPlus,
     Clock, BookOpen, AlertCircle, ChevronLeft, ChevronRight, Activity,
     Calendar as CalendarIcon, Filter, Search, Download, Flame, Star, Megaphone
 } from 'lucide-react';
@@ -25,6 +25,28 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PORTAL_THEMES } from '@/lib/themes';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const getSessionColor = (type?: string, hasSubstitute?: boolean) => {
+    switch (type) {
+        case 'حصة أساسية': return 'bg-emerald-500';
+        case 'حصة أنشطة': return 'bg-purple-500';
+        case 'يوم عطلة': return 'bg-sky-500';
+        case 'غياب الشيخ': return hasSubstitute ? 'bg-orange-500' : 'bg-rose-500';
+        case 'حصة تعويضية': return 'bg-amber-500';
+        case 'حصة إضافية': return 'bg-indigo-500';
+        case 'غياب الشيخ مع بديل': return 'bg-orange-500';
+        default: return 'bg-slate-400';
+    }
+};
+
+const SESSION_LEGEND = [
+    { label: 'حصة أساسية', color: 'bg-emerald-500', icon: BookOpen },
+    { label: 'حصة أنشطة', color: 'bg-purple-500', icon: Activity },
+    { label: 'يوم عطلة', color: 'bg-sky-500', icon: CalendarIcon },
+    { label: 'غياب الشيخ', color: 'bg-rose-500', icon: XCircle },
+    { label: 'غياب مع بديل', color: 'bg-orange-500', icon: UserPlus },
+    { label: 'حصة تعويضية', color: 'bg-amber-500', icon: History },
+];
 
 export default function SheikhMonitoringPage() {
     const { dailySessions, allUsers, loading } = useStudentContext();
@@ -62,21 +84,28 @@ export default function SheikhMonitoringPage() {
         if (!dailySessions) return [];
 
         return sheikhs.map(groupRepresentative => {
-            const sessionsByGroup = [];
+            // Use a Map to ensure only one session per date and session number for this group
+            // This prevents duplicate types if a group has multiple sheikhs or historical data overlaps
+            const sessionsMap = new Map();
+
             Object.entries(dailySessions).forEach(([dateStr, daySessions]) => {
                 Object.values(daySessions).forEach(session => {
                     if (groupRepresentative.uids.has(session.ownerId)) {
-                        sessionsByGroup.push({
-                            ...session,
-                            dateStr
-                        });
+                        const key = `${dateStr}-s${session.sessionNumber}`;
+                        // Keep the first one encountered (usually most definitive)
+                        if (!sessionsMap.has(key)) {
+                            sessionsMap.set(key, {
+                                ...session,
+                                dateStr
+                            });
+                        }
                     }
                 });
             });
 
             return {
                 sheikh: groupRepresentative,
-                sessions: sessionsByGroup
+                sessions: Array.from(sessionsMap.values())
             };
         });
     }, [sheikhs, dailySessions]);
@@ -84,11 +113,12 @@ export default function SheikhMonitoringPage() {
     const dayStatus = useMemo(() => {
         const dateStr = format(selectedDate, 'yyyy-MM-dd');
         return monitoringData.map(data => {
-            const sessionToday = data.sessions.find(s => s.dateStr === dateStr);
+            const sessionsToday = data.sessions.filter(s => s.dateStr === dateStr).sort((a, b) => a.sessionNumber - b.sessionNumber);
             return {
                 ...data,
-                status: sessionToday ? 'recorded' : 'missing',
-                session: sessionToday
+                status: sessionsToday.length > 0 ? 'recorded' : 'missing',
+                sessions: sessionsToday,
+                session: sessionsToday[0] // Primary session for display
             };
         });
     }, [monitoringData, selectedDate]);
@@ -228,15 +258,13 @@ export default function SheikhMonitoringPage() {
                             </TabsTrigger>
                         </TabsList>
 
-                        <div className="flex gap-4">
-                            <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-                                <CheckCircle2 className="h-4 w-4" />
-                                <span className="text-xs font-black">تم التسجيل</span>
-                            </div>
-                            <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400">
-                                <AlertCircle className="h-4 w-4" />
-                                <span className="text-xs font-black">قيد الانتظار</span>
-                            </div>
+                        <div className="flex flex-wrap justify-center md:justify-end gap-3 max-w-2xl">
+                            {SESSION_LEGEND.map((item) => (
+                                <div key={item.label} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 shadow-sm">
+                                    <div className={cn("h-3 w-3 rounded-full", item.color)} />
+                                    <span className="text-[10px] font-bold opacity-70 whitespace-nowrap">{item.label}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
 
@@ -323,93 +351,113 @@ export default function SheikhMonitoringPage() {
 
 function SheikhCard({ data, theme, index }: { data: any, theme: any, index: number }) {
     const isRecorded = data.status === 'recorded';
+    const primarySession = data.session;
+    const sessionColor = getSessionColor(primarySession?.sessionType, !!primarySession?.substituteTeacher);
+    const hasMoreSessions = data.sessions.length > 1;
 
     return (
         <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.05 }}
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.6, delay: index * 0.05, ease: "easeOut" }}
         >
             <Card className={cn(
-                "relative h-full overflow-hidden transition-all duration-700 border-2 rounded-[2.5rem] group hover:shadow-2xl hover:-translate-y-2",
+                "relative h-full overflow-hidden transition-all duration-700 border-2 rounded-[2.5rem] group hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] hover:-translate-y-2",
                 theme.isLight
-                    ? (isRecorded ? "bg-white border-emerald-100 " : "bg-white border-rose-100")
-                    : (isRecorded ? "bg-slate-900/50 border-emerald-500/20" : "bg-slate-900/50 border-rose-500/20")
+                    ? (isRecorded ? "bg-white border-slate-100" : "bg-white border-rose-100")
+                    : (isRecorded ? "bg-slate-900/40 border-white/5" : "bg-slate-900/40 border-rose-500/10")
             )}>
-                {/* Background Glow */}
-                <div className={cn(
-                    "absolute -top-24 -right-24 w-48 h-48 blur-[80px] transition-all duration-1000 group-hover:blur-[60px]",
-                    isRecorded ? "bg-emerald-500/20" : "bg-rose-500/20"
-                )} />
+                {/* Dynamic Background Glow */}
+                {isRecorded ? (
+                    <div className={cn(
+                        "absolute -top-24 -right-24 w-64 h-64 blur-[100px] transition-all duration-1000 opacity-20 group-hover:opacity-40 animate-pulse",
+                        sessionColor
+                    )} />
+                ) : (
+                    <div className="absolute -top-24 -right-24 w-64 h-64 blur-[100px] transition-all duration-1000 opacity-20 group-hover:opacity-40 bg-rose-500" />
+                )}
 
-                <CardContent className="p-8 space-y-8 relative z-10 h-full flex flex-col justify-between">
+                <CardContent className="p-7 space-y-8 relative z-10 h-full flex flex-col justify-between">
                     <div className="space-y-6">
                         <div className="flex justify-between items-start">
                             <div className={cn(
-                                "h-16 w-16 rounded-[1.5rem] flex items-center justify-center border-2 transition-all duration-700 group-hover:rotate-12",
+                                "h-16 w-16 rounded-[1.8rem] flex items-center justify-center border-2 transition-all duration-700 shadow-xl group-hover:rotate-[15deg] group-hover:scale-110",
                                 isRecorded
-                                    ? "bg-emerald-500/10 border-emerald-500/30"
-                                    : "bg-rose-500/10 border-rose-500/30"
+                                    ? cn(sessionColor, "bg-opacity-10 border-white/20 shadow-black/5")
+                                    : "bg-rose-500/10 border-rose-500/30 shadow-rose-500/10"
                             )}>
                                 <User className={cn(
                                     "h-8 w-8",
-                                    isRecorded ? "text-emerald-500" : "text-rose-500"
+                                    isRecorded ? "text-white" : "text-rose-500",
+                                    isRecorded ? "filter drop-shadow-md" : ""
                                 )} />
                             </div>
-                            <div className={cn(
-                                "p-2 rounded-xl border border-white/10 backdrop-blur-md",
-                                isRecorded ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"
-                            )}>
-                                {isRecorded ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+
+                            <div className="flex flex-col items-end gap-2">
+                                <div className={cn(
+                                    "p-2.5 rounded-2xl border border-white/10 backdrop-blur-xl shadow-lg",
+                                    isRecorded ? cn("bg-opacity-20", sessionColor, "text-white") : "bg-rose-500/20 text-rose-400"
+                                )}>
+                                    {isRecorded ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5 animate-pulse" />}
+                                </div>
+                                {hasMoreSessions && (
+                                    <Badge variant="secondary" className="bg-white/10 text-[9px] font-black border-white/5 rounded-lg px-2 py-0.5">
+                                        يوجد {data.sessions.length} حصص
+                                    </Badge>
+                                )}
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <h3 className="text-xl font-black truncate tracking-tight">{data.sheikh.displayName}</h3>
-                            <div className="flex items-center gap-2">
+                            <h3 className="text-xl font-headline font-black truncate tracking-tight group-hover:text-primary transition-colors">
+                                {data.sheikh.displayName}
+                            </h3>
+                            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/5 w-fit">
                                 <Users className="h-3 w-3 opacity-40" />
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">{data.sheikh.group}</span>
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">{data.sheikh.group}</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="space-y-5">
+                    <div className="space-y-6">
                         <div className={cn(
-                            "p-4 rounded-3xl border transition-all duration-500",
-                            isRecorded
-                                ? (theme.isLight ? "bg-emerald-50 border-emerald-200" : "bg-emerald-500/5 border-emerald-500/10")
-                                : (theme.isLight ? "bg-rose-50 border-rose-200" : "bg-rose-500/5 border-rose-500/10")
+                            "p-5 rounded-[2rem] border transition-all duration-500 bg-white/5 shadow-inner",
+                            isRecorded ? "border-white/5" : "border-rose-500/10"
                         )}>
                             <div className="flex justify-between items-center mb-3">
-                                <span className="text-[10px] font-black opacity-40 uppercase tracking-widest">مستوى الالتزام</span>
-                                <span className={cn("text-[10px] font-black", isRecorded ? "text-emerald-500" : "text-rose-500")}>
-                                    {isRecorded ? 'نظامي' : 'متأخر'}
+                                <span className="text-[10px] font-black opacity-40 uppercase tracking-widest italic">Live Status</span>
+                                <span className={cn("text-[10px] font-black", isRecorded ? "text-emerald-400" : "text-rose-500")}>
+                                    {isRecorded ? 'تَمَّ التَّوْثِيقُ' : 'في الانتظار'}
                                 </span>
                             </div>
-                            <div className="h-1.5 w-full bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-2 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden shadow-inner">
                                 <motion.div
                                     initial={{ width: 0 }}
-                                    animate={{ width: isRecorded ? '100%' : '15%' }}
-                                    className={cn("h-full rounded-full", isRecorded ? "bg-emerald-500" : "bg-rose-500")}
+                                    animate={{ width: isRecorded ? '100%' : '20%' }}
+                                    transition={{ duration: 1, ease: "circOut" }}
+                                    className={cn("h-full rounded-full shadow-[0_0_15px_rgba(0,0,0,0.2)]", isRecorded ? sessionColor : "bg-rose-500")}
                                 />
                             </div>
                         </div>
 
-                        {data.session ? (
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <BookOpen className="h-4 w-4 text-primary" />
-                                    <span className="text-xs font-black">{data.session.sessionType}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
-                                    <Clock className="h-3 w-3" />
-                                    <span className="text-[10px] font-black">18:30</span>
-                                </div>
+                        {data.sessions.length > 0 ? (
+                            <div className="flex flex-col gap-2">
+                                {data.sessions.map((session: any) => (
+                                    <div key={`${session.id}-${session.ownerId}-${session.sessionNumber}`} className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group/item">
+                                        <div className="flex items-center gap-3">
+                                            <div className={cn("h-2.5 w-2.5 rounded-full", getSessionColor(session.sessionType, !!session.substituteTeacher))} />
+                                            <span className="text-[11px] font-bold">{session.sessionType}</span>
+                                        </div>
+                                        <Badge variant="outline" className="text-[9px] font-black opacity-50 group-hover/item:opacity-100 transition-opacity">
+                                            {session.sessionNumber === 1 ? 'صباحاً' : 'مساءً'}
+                                        </Badge>
+                                    </div>
+                                ))}
                             </div>
                         ) : (
-                            <Button variant="ghost" className="w-full rounded-2xl border-2 border-dashed border-rose-500/20 text-rose-500 h-10 group-hover:bg-rose-500/5">
+                            <Button variant="ghost" className="w-full rounded-2xl border-2 border-dashed border-rose-500/20 text-rose-500 h-12 group-hover:bg-rose-500/10 group-hover:border-rose-500/40 transition-all">
                                 <Megaphone className="h-4 w-4 ml-2" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">إرسال تنبيه</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest font-headline">طلب التسجيل للحصة</span>
                             </Button>
                         )}
                     </div>
@@ -471,52 +519,71 @@ function MatrixView({ sheikhs, interval, theme }: { sheikhs: any[], interval: Da
                                 </td>
                                 {interval.map((day) => {
                                     const dateStr = format(day, 'yyyy-MM-dd');
-                                    const sessionOnDay = data.sessions.find(s => s.dateStr === dateStr);
+                                    const sessionsOnDay = data.sessions.filter(s => s.dateStr === dateStr).sort((a, b) => a.sessionNumber - b.sessionNumber);
+
                                     return (
                                         <td key={day.toISOString()} className="p-4 text-center">
-                                            <TooltipProvider delayDuration={0}>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <motion.div
-                                                            whileHover={{ scale: 1.2, rotate: 5 }}
-                                                            className={cn(
-                                                                "h-10 w-10 rounded-2xl mx-auto flex items-center justify-center transition-all duration-500 cursor-pointer shadow-lg",
-                                                                sessionOnDay
-                                                                    ? "bg-emerald-500 shadow-emerald-500/20 text-white"
-                                                                    : "bg-slate-100 dark:bg-white/5 text-slate-300 dark:text-white/10"
-                                                            )}
-                                                        >
-                                                            {sessionOnDay ? (
-                                                                <CheckCircle2 className="h-5 w-5" />
-                                                            ) : (
-                                                                <XCircle className="h-5 w-5 opacity-40" />
-                                                            )}
-                                                        </motion.div>
-                                                    </TooltipTrigger>
-                                                    {sessionOnDay && (
-                                                        <TooltipContent className="bg-slate-900 border border-emerald-500/30 text-white p-5 rounded-[2rem] shadow-2xl min-w-[200px] backdrop-blur-3xl">
-                                                            <div className="space-y-4">
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="p-2 bg-emerald-500/20 rounded-xl">
-                                                                        <BookOpen className="h-4 w-4 text-emerald-400" />
+                                            <div className="flex items-center justify-center gap-1.5 min-h-[40px]">
+                                                {sessionsOnDay.length > 0 ? (
+                                                    sessionsOnDay.map((session) => (
+                                                        <TooltipProvider key={`${session.id}-${session.ownerId}-${session.sessionNumber}`} delayDuration={0}>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <motion.div
+                                                                        whileHover={{ scale: 1.2, rotate: 5 }}
+                                                                        className={cn(
+                                                                            "h-10 w-10 rounded-2xl flex items-center justify-center transition-all duration-500 cursor-pointer shadow-lg text-white",
+                                                                            getSessionColor(session.sessionType, !!session.substituteTeacher)
+                                                                        )}
+                                                                    >
+                                                                        {session.sessionNumber === 1 ? (
+                                                                            <span className="text-[10px] font-black opacity-80">1</span>
+                                                                        ) : (
+                                                                            <span className="text-[10px] font-black opacity-80">2</span>
+                                                                        )}
+                                                                    </motion.div>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent className="bg-slate-900 border border-white/10 text-white p-5 rounded-[2rem] shadow-2xl min-w-[220px] backdrop-blur-3xl z-50">
+                                                                    <div className="space-y-4">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <Badge variant="outline" className="text-[9px] font-black border-white/20 text-white/60">
+                                                                                الحصة {session.sessionNumber}
+                                                                            </Badge>
+                                                                            <div className={cn("h-2 w-2 rounded-full animate-pulse", getSessionColor(session.sessionType, !!session.substituteTeacher))} />
+                                                                        </div>
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className={cn("p-2 rounded-xl", getSessionColor(session.sessionType, !!session.substituteTeacher), "bg-opacity-20")}>
+                                                                                <BookOpen className="h-4 w-4" />
+                                                                            </div>
+                                                                            <p className="text-sm font-black">{session.sessionType}</p>
+                                                                        </div>
+                                                                        {session.substituteTeacher && (
+                                                                            <div className="p-3 bg-orange-500/10 border border-orange-500/20 rounded-2xl flex items-center gap-2">
+                                                                                <UserPlus className="h-3 w-3 text-orange-400" />
+                                                                                <p className="text-[10px] font-bold text-orange-200">الأستاذ البديل: {session.substituteTeacher}</p>
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="grid grid-cols-2 gap-3">
+                                                                            <div className="p-3 bg-white/5 rounded-2xl text-center">
+                                                                                <p className="text-[10px] opacity-40 font-bold mb-1">الطلاب</p>
+                                                                                <p className="text-xs font-black">{session.records?.length || 0}</p>
+                                                                            </div>
+                                                                            <div className="p-3 bg-white/5 rounded-2xl text-center">
+                                                                                <p className="text-[10px] opacity-40 font-bold mb-1">توثيق الحصة</p>
+                                                                                <p className="text-xs font-black">ناجح</p>
+                                                                            </div>
+                                                                        </div>
                                                                     </div>
-                                                                    <p className="text-sm font-black">{sessionOnDay.sessionType}</p>
-                                                                </div>
-                                                                <div className="grid grid-cols-2 gap-3">
-                                                                    <div className="p-3 bg-white/5 rounded-2xl text-center">
-                                                                        <p className="text-[10px] opacity-40 font-bold mb-1">الطلاب</p>
-                                                                        <p className="text-xs font-black">{sessionOnDay.records?.length || 0}</p>
-                                                                    </div>
-                                                                    <div className="p-3 bg-white/5 rounded-2xl text-center">
-                                                                        <p className="text-[10px] opacity-40 font-bold mb-1">الوقت</p>
-                                                                        <p className="text-xs font-black">19:45</p>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </TooltipContent>
-                                                    )}
-                                                </Tooltip>
-                                            </TooltipProvider>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    ))
+                                                ) : (
+                                                    <div className="h-10 w-10 rounded-2xl flex items-center justify-center bg-slate-100 dark:bg-white/5 text-slate-300 dark:text-white/10 border-2 border-dashed border-white/5">
+                                                        <XCircle className="h-5 w-5 opacity-20" />
+                                                    </div>
+                                                )}
+                                            </div>
                                         </td>
                                     );
                                 })}

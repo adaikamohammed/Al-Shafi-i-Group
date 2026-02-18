@@ -11,6 +11,14 @@ import { Student, AttendanceStatus, PerformanceLevel, BehaviorLevel } from '@/li
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/AuthContext';
 import { surahs } from '@/lib/surahs';
+import { CatchUpEntry } from '@/lib/types';
+import { Plus, Trash2, Rewind } from 'lucide-react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export interface AttendanceRecord {
     studentId: string;
@@ -22,6 +30,7 @@ export interface AttendanceRecord {
     surahId?: number;
     fromVerse?: number;
     toVerse?: number;
+    catchUpRecords?: CatchUpEntry[];
 }
 
 interface AttendanceListProps {
@@ -30,9 +39,10 @@ interface AttendanceListProps {
     onUpdateRecord: (studentId: string, field: keyof AttendanceRecord, value: any) => void;
     viewMode?: 'full' | 'attendance' | 'evaluation';
     sessionType?: string;
+    pastWirds?: { date: string, sessionNumber: number, surahId: number, surahName: string, fromVerse: number, toVerse: number }[];
 }
 
-export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = 'full', sessionType }: AttendanceListProps) => {
+export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = 'full', sessionType, pastWirds = [] }: AttendanceListProps) => {
     const { user } = useAuth();
     const isAdmin5 = user?.email === 'admin5@gmail.com';
     const isActivitySession = sessionType === 'حصة أنشطة';
@@ -156,6 +166,61 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                                     </SelectContent>
                                                 </Select>
                                             </div>
+
+                                            {/* Catch-up Wird Section (Admin5) */}
+                                            {isAdmin5 && !isActivitySession && (
+                                                <div className="flex flex-col gap-2 w-full mt-2 bg-emerald-50/50 p-2 rounded-lg border border-dashed border-emerald-100">
+                                                    <div className="flex flex-wrap gap-2 items-center">
+                                                        <span className="text-[10px] font-bold text-emerald-700 ml-2">أوراد فائتة:</span>
+                                                        {record.catchUpRecords?.map((catchUp, idx) => (
+                                                            <Badge key={idx} variant="secondary" className="bg-white border-emerald-200 text-emerald-700 text-[10px] flex items-center gap-1 hover:bg-red-50 hover:text-red-600 group cursor-pointer"
+                                                                onClick={() => {
+                                                                    const newRecords = [...(record.catchUpRecords || [])];
+                                                                    newRecords.splice(idx, 1);
+                                                                    onUpdateRecord(student.id, 'catchUpRecords', newRecords);
+                                                                }}
+                                                            >
+                                                                <span>{catchUp.surahName} ({catchUp.fromVerse}-{catchUp.toVerse})</span>
+                                                                <Trash2 className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                            </Badge>
+                                                        ))}
+
+                                                        {pastWirds.length > 0 && (
+                                                            <DropdownMenu dir="rtl">
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+                                                                        <Plus className="h-3 w-3 ml-1" /> إضافة تعويض
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="start" className="max-h-60 overflow-y-auto">
+                                                                    {pastWirds.map((wird, idx) => (
+                                                                        <DropdownMenuItem key={idx} className="text-right text-xs cursor-pointer" onClick={() => {
+                                                                            const newEntry: CatchUpEntry = {
+                                                                                date: wird.date,
+                                                                                sessionNumber: wird.sessionNumber,
+                                                                                surahId: wird.surahId,
+                                                                                surahName: wird.surahName,
+                                                                                fromVerse: wird.fromVerse,
+                                                                                toVerse: wird.toVerse,
+                                                                                completed: true
+                                                                            };
+                                                                            const currentRecords = record.catchUpRecords || [];
+                                                                            // Prevent duplicates
+                                                                            if (!currentRecords.some(r => r.date === wird.date && r.sessionNumber === wird.sessionNumber)) {
+                                                                                onUpdateRecord(student.id, 'catchUpRecords', [...currentRecords, newEntry]);
+                                                                            }
+                                                                        }}>
+                                                                            <span>{wird.surahName} {wird.fromVerse}-{wird.toVerse}</span>
+                                                                            <span className="text-muted-foreground mr-2 text-[10px]">({wird.date})</span>
+                                                                        </DropdownMenuItem>
+                                                                    ))}
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             <div className="flex gap-2">
                                                 <Input
                                                     className="h-8 md:h-9 text-[10px] md:text-xs bg-muted/20"

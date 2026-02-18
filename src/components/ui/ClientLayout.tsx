@@ -263,7 +263,11 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                   <span className="font-bold text-[11px] tracking-tight group-data-[collapsible=icon]:hidden">المظهر</span>
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent side="right" align="start" className="w-64 bg-slate-900 border-white/10 text-white p-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+              <DropdownMenuContent
+                side={isMobile ? "bottom" : "right"}
+                align={isMobile ? "end" : "start"}
+                className="w-64 bg-slate-900 border-white/10 text-white p-2 max-h-[300px] overflow-y-auto custom-scrollbar"
+              >
                 <div className="px-2 py-1.5 text-xs font-bold text-muted-foreground">اختر المظهر</div>
                 {Object.values(PORTAL_THEMES).map((t) => (
                   <DropdownMenuItem

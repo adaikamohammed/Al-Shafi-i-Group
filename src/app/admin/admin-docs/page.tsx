@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Printer, User, ClipboardList, ArrowLeft, Edit, Calendar, Clock, History, FileText, CheckCircle2, Filter } from 'lucide-react';
+import { Search, Printer, User, ClipboardList, ArrowLeft, Edit, Calendar, Clock, History, FileText, CheckCircle2, Filter, Link, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, subDays, isAfter } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -16,10 +16,19 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import { ReceiptDesign } from '@/components/admin/ReceiptDesign';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2 } from 'lucide-react';
 
 export default function AdminDocsPage() {
-    const { students, preRegistrations, allUsers, saveAdminLog, deleteAdminLog, adminLogs, dailySessions } = useStudentContext();
+    const {
+        students,
+        preRegistrations,
+        allUsers,
+        saveAdminLog,
+        deleteAdminLog,
+        adminLogs,
+        dailySessions,
+        shareStudentRecord,
+        updateStudent
+    } = useStudentContext();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState('');
@@ -112,9 +121,82 @@ export default function AdminDocsPage() {
                 }
             });
         });
-
         return { absences, lates, total: totalCount };
     }, [selectedStudent, dailySessions]);
+
+    const { absences, lates, total: totalCount } = stats30Days;
+
+    // Full History Data Aggregate (Needed for Sharing)
+    const studentData = useMemo(() => {
+        const data: any = {};
+        if (!dailySessions || !selectedStudent?.id) return data;
+
+        Object.keys(dailySessions).forEach(dateString => {
+            const sessionsOnDay = Object.values(dailySessions[dateString]);
+            if (sessionsOnDay.length === 0) return;
+
+            const isHoliday = sessionsOnDay.some(s => s.sessionType === 'يوم عطلة');
+            const isSheikhAbsentNoSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
+            const isSheikhAbsentWithSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && s.substituteTeacher);
+
+            const studentRecords = sessionsOnDay
+                .map(s => {
+                    const record = (s.records || []).find(r => r.studentId === selectedStudent.id);
+                    if (record) return { ...record, sessionType: s.sessionType, sessionNumber: s.sessionNumber || 1 };
+                    return null;
+                })
+                .filter(Boolean);
+
+            data[dateString] = {
+                id: dateString,
+                isHoliday,
+                isSheikhAbsentNoSub,
+                isSheikhAbsentWithSub,
+                records: studentRecords,
+                attendance: studentRecords[0]?.attendance || null,
+                memorization: studentRecords[0]?.memorization || null,
+                behavior: studentRecords[0]?.behavior || null,
+                notes: studentRecords[0]?.notes || null,
+                sessionType: studentRecords[0]?.sessionType || null,
+                sessionNumber: studentRecords[0]?.sessionNumber || null
+            };
+        });
+        return data;
+    }, [dailySessions, selectedStudent]);
+
+    // Full History Stats (For Sharing)
+    const fullStats = useMemo(() => {
+        if (!selectedStudent || !studentData) return { attendanceRate: 0, totalPresent: 0, totalAbsent: 0, totalLate: 0, avgEval: '---', sheikhAbsenceNoSub: 0, sheikhAbsenceWithSub: 0 };
+
+        const allRecords = Object.values(studentData).flatMap((d: any) => d.records || []);
+        const presentCount = allRecords.filter((r: any) => r.attendance === 'حاضر').length;
+        const lateCount = allRecords.filter((r: any) => r.attendance === 'متأخر').length;
+        const absentCount = allRecords.filter((r: any) => r.attendance === 'غياب' || r.attendance === 'غائب').length;
+
+        const sheikhAbsenceNoSub = Object.values(studentData).filter((d: any) => d.isSheikhAbsentNoSub).length;
+        const sheikhAbsenceWithSub = Object.values(studentData).filter((d: any) => d.isSheikhAbsentWithSub).length;
+
+        const totalWorkSessions = presentCount + lateCount + absentCount;
+        const rate = totalWorkSessions > 0 ? ((presentCount + lateCount) / totalWorkSessions) * 100 : 0;
+
+        const evals = allRecords.filter((r: any) => r.memorization).map((r: any) => r.memorization);
+        let dominantEval = '---';
+        if (evals.length > 0) {
+            const counts: any = {};
+            evals.forEach(e => counts[e] = (counts[e] || 0) + 1);
+            dominantEval = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+        }
+
+        return {
+            attendanceRate: rate.toFixed(0),
+            totalPresent: presentCount,
+            totalAbsent: absentCount,
+            totalLate: lateCount,
+            avgEval: dominantEval,
+            sheikhAbsenceNoSub,
+            sheikhAbsenceWithSub
+        };
+    }, [studentData, selectedStudent]);
 
     const handlePrint = async () => {
         if (!selectedStudent && !selectedPreRegistration) return;
@@ -163,6 +245,25 @@ export default function AdminDocsPage() {
                 break;
         }
 
+        // Before printing, update the public record snapshot if student is selected
+        if (selectedStudent) {
+            try {
+                const historySnapshot = {
+                    student: {
+                        ...selectedStudent,
+                        sheikhName: selectedSheikhName
+                    },
+                    studentData: studentData,
+                    stats: fullStats,
+                    generatedAt: new Date().toISOString(),
+                    adminLogs: adminLogs.filter(log => log.studentId === selectedStudent.id)
+                };
+                await shareStudentRecord(selectedStudent.id, historySnapshot);
+            } catch (err) {
+                console.error("Error updating public record:", err);
+            }
+        }
+
         // Save log to Firebase before printing
         await saveAdminLog({
             studentId: selectedStudent?.id || selectedPreRegistration?.id || 'unknown',
@@ -175,7 +276,7 @@ export default function AdminDocsPage() {
                 ...details,
                 ownerId: selectedStudent?.ownerId || 'admin',
                 guardianName: selectedStudent?.guardianName || selectedPreRegistration?.guardianName,
-                guardianPhone: selectedStudent?.phone1 || selectedPreRegistration?.phone
+                guardianPhone: selectedStudent?.phone1 || selectedPreRegistration?.phone1
             }
         });
 
@@ -214,9 +315,9 @@ export default function AdminDocsPage() {
 
     const studentRecordLink = useMemo(() => {
         if (!selectedStudent) return '';
-        // Using window.location.origin to get the current base URL
         const origin = typeof window !== 'undefined' ? window.location.origin : '';
-        return `${origin}/record/${selectedStudent.id}`;
+        // Using query param format for better static export support
+        return `${origin}/record?id=${selectedStudent.id}`;
     }, [selectedStudent]);
 
     const qrCodeUrl = useMemo(() => {
@@ -328,7 +429,45 @@ export default function AdminDocsPage() {
                                                     <div className="text-[10px] text-muted-foreground">{selectedStudent ? `الشيخ: ${selectedSheikhName}` : 'طالب جديد'}</div>
                                                 </div>
                                             </div>
-                                            <Button variant="ghost" size="sm" onClick={() => { setSelectedStudent(null); setSelectedPreRegistration(null); }} className="h-8 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10">إلغاء</Button>
+                                            <div className="flex items-center gap-2">
+                                                {selectedStudent && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-8 text-[10px] font-bold gap-1 border-primary/20 hover:bg-primary hover:text-white"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const historySnapshot = {
+                                                                    student: {
+                                                                        ...selectedStudent,
+                                                                        sheikhName: selectedSheikhName
+                                                                    },
+                                                                    studentData: studentData,
+                                                                    stats: fullStats,
+                                                                    generatedAt: new Date().toISOString(),
+                                                                    adminLogs: adminLogs.filter(log => log.studentId === selectedStudent.id)
+                                                                };
+                                                                await shareStudentRecord(selectedStudent.id, historySnapshot);
+                                                                navigator.clipboard.writeText(studentRecordLink);
+                                                                toast({
+                                                                    title: "✅ تم نسخ الرابط",
+                                                                    description: "يمكن الآن لولي الأمر مشاهدة السجل عبر الرابط المباشر.",
+                                                                });
+                                                            } catch (error) {
+                                                                toast({
+                                                                    title: "❌ خطأ",
+                                                                    description: "فشل في توليد رابط المشاركة.",
+                                                                    variant: "destructive"
+                                                                });
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Link className="h-3 w-3" />
+                                                        نسخ الرابط
+                                                    </Button>
+                                                )}
+                                                <Button variant="ghost" size="sm" onClick={() => { setSelectedStudent(null); setSelectedPreRegistration(null); }} className="h-8 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10">إلغاء</Button>
+                                            </div>
                                         </motion.div>
                                     )}
                                 </CardContent>
@@ -584,7 +723,7 @@ export default function AdminDocsPage() {
                                         <ReceiptDesign
                                             log={log}
                                             isHistory={true}
-                                            qrCodeUrl={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/record/${log.studentId}`)}`}
+                                            qrCodeUrl={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/record?id=${log.studentId}`)}`}
                                         />
                                     </div>
 

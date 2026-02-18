@@ -81,19 +81,19 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                 const hasAbsentWithSub = sessions.some(s => s.sessionType === 'غياب الشيخ' && s.substituteTeacher);
 
                 if (hasHoliday) {
-                    statusClass = 'bg-sky-300 dark:bg-sky-700 border-2 border-sky-500 dark:border-sky-400'; // VERY STRONG Blue for Holiday
+                    statusClass = 'bg-sky-500 text-white border-2 border-sky-600 shadow-sky-200'; // Vibrant Blue for Holiday
                 } else if (hasActivity) {
-                    statusClass = 'bg-purple-300 dark:bg-purple-700 border-2 border-purple-500 dark:border-purple-400'; // VERY STRONG Purple for Activities
+                    statusClass = 'bg-purple-500 text-white border-2 border-purple-600 shadow-purple-200'; // Vibrant Purple for Activities
                 } else if (hasAbsentNoSub) {
-                    statusClass = 'bg-red-300 dark:bg-red-700 border-2 border-red-500 dark:border-red-400'; // VERY STRONG Red for Absent without Sub
+                    statusClass = 'bg-rose-500 text-white border-2 border-rose-600 shadow-rose-200'; // Vibrant Red for Absent without Sub
                 } else if (hasAbsentWithSub) {
-                    statusClass = 'bg-orange-300 dark:bg-orange-700 border-2 border-orange-500 dark:border-orange-400'; // VERY STRONG Orange for Absent with Sub
+                    statusClass = 'bg-orange-500 text-white border-2 border-orange-600 shadow-orange-200'; // Vibrant Orange for Absent with Sub
                 } else {
-                    statusClass = 'bg-emerald-300 dark:bg-emerald-700 border-2 border-emerald-500 dark:border-emerald-400'; // STRONG Green for Completed/Normal
+                    statusClass = 'bg-emerald-500 text-white border-2 border-emerald-600 shadow-emerald-200'; // Vibrant Green for Completed/Normal
                 }
             } else if (isWeekendDay) {
                 // Thursday or Friday without session = automatic holiday color
-                statusClass = 'bg-sky-300 dark:bg-sky-700 border-2 border-sky-500 dark:border-sky-400'; // Weekend day - Holiday
+                statusClass = 'bg-sky-500 text-white border-2 border-sky-600 shadow-sky-200'; // Weekend day - Holiday
             } else if (isPast(dayDate) && !isTodayDate) {
                 statusClass = 'bg-muted/30 border-muted/20 opacity-80'; // Empty past day
             }

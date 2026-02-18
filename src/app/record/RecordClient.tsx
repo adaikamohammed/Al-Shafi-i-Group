@@ -107,7 +107,7 @@ const StudentYearView = ({ year, data, onDayClick, viewType }: { year: number, d
     const startDayIndex = (firstDayOfWeek + 1) % 7;
 
     return (
-        <div className="grid grid-cols-53 gap-1.5" style={{ direction: 'rtl' }}>
+        <div className="grid grid-cols-53 gap-1.5" dir="rtl">
             {Array.from({ length: startDayIndex }).map((_, i) => <div key={`empty-${i}`} />)}
             {days.map(day => {
                 const dateString = format(day, 'yyyy-MM-dd');
@@ -734,7 +734,7 @@ export default function PublicStudentRecordPage() {
                                                     <ReceiptDesign
                                                         log={log}
                                                         isHistory={true}
-                                                        qrCodeUrl={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/record/${log.studentId}`)}`}
+                                                        qrCodeUrl={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/record?id=${log.studentId}`)}`}
                                                     />
                                                 </div>
                                                 <div className="absolute inset-x-0 bottom-4 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">

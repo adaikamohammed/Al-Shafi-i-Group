@@ -70,20 +70,22 @@ const renderRecordDetails = (record: DailyRecord, session?: DailySession) => {
 }
 
 const DayCell = ({ sessions, student, date }: { sessions?: DailySession[], student: Student, date: Date }) => {
-    // Filter sessions for this specific student's group (owner)
-    // If ownerId is present (Admin view), it must match. If missing (Sheikh view), assume it's their own session.
-    const studentSessions = sessions?.filter(s => !s.ownerId || s.ownerId === student.ownerId);
+    // Higher-level session filtering: show all sessions where this student has a record
+    const studentSessions = useMemo(() => {
+        if (!sessions || !student) return [];
+        return sessions.filter((s: DailySession) => s.records?.some((r: DailyRecord) => r.studentId === student.id));
+    }, [sessions, student]);
 
-    // Find both session 1 and session 2 if they exist
-    const session1 = studentSessions?.find(s => s.sessionNumber === 1);
-    const session2 = studentSessions?.find(s => s.sessionNumber === 2);
+    // Find both session 1 and session 2 if they exist for this week/day
+    const session1 = studentSessions.find((s: DailySession) => s.sessionNumber === 1);
+    const session2 = studentSessions.find((s: DailySession) => s.sessionNumber === 2);
 
-    const record1 = session1?.records?.find(r => r.studentId === student.id);
-    const record2 = session2?.records?.find(r => r.studentId === student.id);
+    const record1 = session1?.records?.find((r: DailyRecord) => r.studentId === student.id);
+    const record2 = session2?.records?.find((r: DailyRecord) => r.studentId === student.id);
 
-    // Check if Thursday (4) or Friday (5) - automatic weekend day
+    // Check if Thursday or Friday - automatic weekend day (if no sessions exist)
     const dayOfWeek = getDay(date);
-    const isWeekendDay = dayOfWeek === 4 || dayOfWeek === 5;
+    const isWeekendDay = (dayOfWeek === 4 || dayOfWeek === 5) && studentSessions.length === 0;
 
     const isHoliday = session1?.sessionType === 'يوم عطلة' || session2?.sessionType === 'يوم عطلة' || isWeekendDay;
     const isActivity = session1?.sessionType === 'حصة أنشطة' || session2?.sessionType === 'حصة أنشطة';
@@ -151,9 +153,16 @@ export default function WeeklyFollowUpPage() {
     const activeStudents = useMemo(() => {
         let filtered = (students ?? []).filter(s => s.status === 'نشط');
 
-        // If admin/management, filter by selected group
+        // If admin/management, filter by selected group (selectedGroup is UID)
         if ((isSuperAdmin || isManagement) && selectedGroup !== 'all') {
-            filtered = filtered.filter(s => s.ownerId === selectedGroup);
+            const sheikh = allUsers.find(u => u.uid === selectedGroup);
+            if (sheikh?.group) {
+                // Filter by group name instead of UID to catch students reassigned or with mismatched ownerIds
+                filtered = filtered.filter(s => s.groupName === sheikh.group);
+            } else {
+                // Fallback to UID if sheikh group is not found
+                filtered = filtered.filter(s => s.ownerId === selectedGroup);
+            }
         }
 
         // Filter by specific student if selected
@@ -162,7 +171,7 @@ export default function WeeklyFollowUpPage() {
         }
 
         return filtered;
-    }, [students, selectedStudentId, selectedGroup, isSuperAdmin, isManagement]);
+    }, [students, selectedStudentId, selectedGroup, isSuperAdmin, isManagement, allUsers]);
 
     // Create unique groups list with numerical sorting
     const uniqueGroups = useMemo(() => {

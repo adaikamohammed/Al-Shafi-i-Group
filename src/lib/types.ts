@@ -67,12 +67,23 @@ export type PerformanceLevel = "ممتاز" | "جيد جدا" | "جيد جداً
 export type BehaviorLevel = "هادئ" | "متوسط" | "مقبول" | "غير منضبط" | "مشاغب" | "";
 export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة" | "حصة تعويضية" | "غياب الشيخ" | "حصة إضافية";
 
+export interface CatchUpEntry {
+  date: string;       // تاريخ الورد الأصلي
+  sessionNumber?: number; // رقم الحصة الأصلية
+  surahId: number;
+  surahName?: string;
+  fromVerse: number;
+  toVerse: number;
+  completed: boolean; // حالة الإتمام (عادة true عند الإضافة)
+}
+
 export interface DailyRecord {
   sessionId: string; // To link record to a specific session on a given date
   studentId: string;
   attendance: AttendanceStatus;
   memorization: PerformanceLevel | null;
   review: boolean | null;
+  catchUpRecords?: CatchUpEntry[];
   behavior: BehaviorLevel | null;
   notes?: string;
   surahId?: number;

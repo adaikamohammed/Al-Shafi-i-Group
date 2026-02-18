@@ -79,151 +79,169 @@ function RegisterSessionContent() {
         }).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')),
         [students, isSuperAdmin, user, effectiveOwnerId]);
 
+    // Calculate Past Wirds for Catch-up (Admin5 only)
+    const pastWirds = useMemo(() => {
+        if (!isAdmin5 || !dailySessions) return [];
+
+        const currentSessionDate = selectedDay;
+        // Flatten sessions from context
+        const allSessions = Object.values(dailySessions).flatMap(day => Object.values(day as Record<string, any>));
+
+        return allSessions
+            .filter(s => {
+                const sDate = parse(s.date, 'yyyy-MM-dd', new Date());
+                // Only past sessions, basic/extra type, and has surah info
+                return sDate < currentSessionDate &&
+                    (s.sessionType === 'حصة أساسية' || s.sessionType === 'حصة إضافية') &&
+                    s.surahId;
+            })
+            .sort((a, b) => b.date.localeCompare(a.date)) // Newest first
+            .map(s => {
+                const surah = surahs.find(su => su.id === s.surahId);
+                return {
+                    date: s.date,
+                    sessionNumber: s.sessionNumber,
+                    surahId: s.surahId,
+                    surahName: surah?.name || 'سورة مجهولة',
+                    fromVerse: s.fromVerse,
+                    toVerse: s.toVerse
+                };
+            });
+    }, [isAdmin5, dailySessions, selectedDay]);
+
     const DRAFT_KEY = useMemo(() => {
         return selectedDay ? `session_draft_${format(selectedDay, 'yyyy-MM-dd')}_s${sessionToOpen}` : null;
     }, [selectedDay, sessionToOpen]);
 
-    // حماية من إعادة التحميل: نتتبع آخر جلسة تم تحميلها
-    const lastLoadedSessionRef = useRef<string | null>(null);
-
     useEffect(() => {
-        if (!loading && selectedDay && user) {
-            const dateStr = format(selectedDay, 'yyyy-MM-dd');
-            const sessionKey = `${dateStr}-s${sessionToOpen}`;
+        // Load initial data logic
+        const loadFromFirebase = async () => {
+            if (!selectedDay || !user) return;
+            setIsInitialLoad(true);
 
-            // إذا كانت هذه الجلسة نفسها التي تم تحميلها سابقاً، لا نعيد التحميل
-            if (lastLoadedSessionRef.current === sessionKey && !isInitialLoad) {
-                return;
-            }
+            try {
+                const dateStr = format(selectedDay, 'yyyy-MM-dd');
 
-            lastLoadedSessionRef.current = sessionKey;
+                // 🔍 Detect session owner from context (if viewing as admin)
+                let sessionOwnerId = effectiveOwnerId || user.uid;
 
-            // ✅ قراءة مباشرة من Firebase (ليس من Context)
-            const loadFromFirebase = async () => {
-                try {
-                    // 🔍 First, detect session owner
-                    let sessionOwnerId = effectiveOwnerId || user?.uid; // Default to effective owner or current user
+                if (!ownerIdParam) {
+                    const contextSessions = getSessionsForDay(dateStr);
+                    const existingContextSession = contextSessions.find((s: any) => s.sessionNumber == sessionToOpen);
+                    if (existingContextSession && existingContextSession.ownerId) {
+                        sessionOwnerId = existingContextSession.ownerId;
+                    }
+                }
 
-                    // Fallback to searching context if not explicit (legacy behavior)
-                    if (!ownerIdParam) {
-                        const contextSessions = getSessionsForDay(dateStr);
-                        const existingContextSession = contextSessions.find((s: any) => s.sessionNumber == sessionToOpen);
-                        if (existingContextSession && existingContextSession.ownerId) {
-                            sessionOwnerId = existingContextSession.ownerId;
+                const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
+                const snapshot = await get(sessionsRef);
+
+                let existingSession = null;
+                if (snapshot.exists()) {
+                    const sessions = snapshot.val();
+                    existingSession = Object.values(sessions).find((s: any) => s.sessionNumber === sessionToOpen);
+                }
+
+                if (existingSession) {
+                    const session = existingSession as any;
+                    // DB Data Exists - Load from Firebase
+                    setCurrentSessionId(session.id); // LOCK ID
+                    setSessionType(session.sessionType as any);
+                    setTeacherAbsenceReason(session.teacherAbsenceReason || '');
+                    setSubstituteTeacher(session.substituteTeacher || '');
+                    setActivityType(session.activityType || '');
+                    setActivityDescription(session.activityDescription || '');
+                    if (session.surahId) setSurahId(session.surahId);
+                    if (session.fromVerse) setFromVerse(session.fromVerse);
+                    if (session.toVerse) setToVerse(session.toVerse);
+                    if (session.isReview) setIsReview(session.isReview);
+
+                    const records: any = {};
+                    session.records?.forEach((record: any) => {
+                        records[record.studentId] = {
+                            attendance: record.attendance,
+                            memorization: record.memorization,
+                            behavior: record.behavior,
+                            notes: record.notes,
+                            review: record.review,
+                            surahId: record.surahId,
+                            fromVerse: record.fromVerse,
+                            toVerse: record.toVerse,
+                            catchUpRecords: record.catchUpRecords || [] // Load catch-up
+                        };
+                    });
+                    setAttendanceRecords(records);
+                } else {
+                    // No DB Data - Check LocalStorage Draft
+                    const isEditingOther = effectiveOwnerId && effectiveOwnerId !== user?.uid;
+                    const savedDraft = (DRAFT_KEY && !isEditingOther) ? localStorage.getItem(DRAFT_KEY) : null;
+
+                    if (savedDraft) {
+                        try {
+                            const draft = JSON.parse(savedDraft);
+                            setCurrentSessionId(draft.id || null);
+                            setSessionType(draft.sessionType || 'حصة أساسية');
+                            setTeacherAbsenceReason(draft.teacherAbsenceReason || '');
+                            setSubstituteTeacher(draft.substituteTeacher || '');
+                            setActivityType(draft.activityType || '');
+                            setActivityDescription(draft.activityDescription || '');
+                            setSurahId(draft.surahId || 26);
+                            setFromVerse(draft.fromVerse || 1);
+                            setToVerse(draft.toVerse || 1);
+                            setIsReview(draft.isReview || false);
+                            setAttendanceRecords(draft.attendanceRecords || {});
+                            toast({ title: "مسودة محفوظة", description: "تم استرجاع بيانات غير محفوظة من المتصفح." });
+                        } catch (e) {
+                            console.error("Failed to parse draft", e);
                         }
-                    }
-
-                    const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
-                    const snapshot = await get(sessionsRef);
-
-                    let existingSession = null;
-                    if (snapshot.exists()) {
-                        const sessions = snapshot.val();
-                        existingSession = Object.values(sessions).find((s: any) => s.sessionNumber === sessionToOpen);
-                    }
-
-                    if (existingSession) {
-                        const session = existingSession as any;
-                        // DB Data Exists - Load from Firebase
-                        setCurrentSessionId(session.id); // LOCK ID
-                        setSessionType(session.sessionType as any);
-                        setTeacherAbsenceReason(session.teacherAbsenceReason || '');
-                        setSubstituteTeacher(session.substituteTeacher || '');
-                        setActivityType(session.activityType || '');
-                        setActivityDescription(session.activityDescription || '');
-                        if (session.surahId) setSurahId(session.surahId);
-                        if (session.fromVerse) setFromVerse(session.fromVerse);
-                        if (session.toVerse) setToVerse(session.toVerse);
-                        if (session.isReview) setIsReview(session.isReview);
-
-                        const records: any = {};
-                        session.records?.forEach((record: any) => {
-                            records[record.studentId] = {
-                                attendance: record.attendance,
-                                memorization: record.memorization,
-                                behavior: record.behavior,
-                                notes: record.notes,
-                                review: record.review,
-                                surahId: record.surahId,
-                                fromVerse: record.fromVerse,
-                                toVerse: record.toVerse
-                            };
-                        });
-                        setAttendanceRecords(records);
                     } else {
-                        // No DB Data - Check LocalStorage Draft
-                        // IMPORTANT: Only load draft if we are NOT editing another user as admin, OR if we handle draft key scoping properly. 
-                        // For now, disable draft loading when editing as admin to prevent cross-contamination.
-                        const isEditingOther = effectiveOwnerId && effectiveOwnerId !== user?.uid;
-                        const savedDraft = (DRAFT_KEY && !isEditingOther) ? localStorage.getItem(DRAFT_KEY) : null;
+                        setCurrentSessionId(null); // Truly new
 
-                        if (savedDraft) {
-                            try {
-                                const draft = JSON.parse(savedDraft);
-                                setCurrentSessionId(draft.id || null);
-                                setSessionType(draft.sessionType || 'حصة أساسية');
-                                setTeacherAbsenceReason(draft.teacherAbsenceReason || '');
-                                setSubstituteTeacher(draft.substituteTeacher || '');
-                                setActivityType(draft.activityType || '');
-                                setActivityDescription(draft.activityDescription || '');
-                                setSurahId(draft.surahId || 26);
-                                setFromVerse(draft.fromVerse || 1);
-                                setToVerse(draft.toVerse || 1);
-                                setIsReview(draft.isReview || false);
-                                setAttendanceRecords(draft.attendanceRecords || {});
-                                toast({ title: "مسودة محفوظة", description: "تم استرجاع بيانات غير محفوظة من المتصفح." });
-                            } catch (e) {
-                                console.error("Failed to parse draft", e);
-                            }
+                        // Default Thursday and Friday to 'يوم عطلة'
+                        const dayOfWeek = getDay(selectedDay);
+                        if (dayOfWeek === 4 || dayOfWeek === 5) { // Thursday is 4, Friday is 5
+                            setSessionType('يوم عطلة');
                         } else {
-                            setCurrentSessionId(null); // Truly new
+                            setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة إضافية');
+                        }
 
-                            // Default Thursday and Friday to 'يوم عطلة'
-                            const dayOfWeek = getDay(selectedDay);
-                            if (dayOfWeek === 4 || dayOfWeek === 5) { // Thursday is 4, Friday is 5
-                                setSessionType('يوم عطلة');
-                            } else {
-                                setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة إضافية');
-                            }
+                        // Logic for admin5 auto-increment
+                        if (isAdmin5 && sessionToOpen === 1) {
+                            const allSessions = Object.values(dailySessions || {}).flatMap(day => Object.values(day as Record<string, any>));
+                            const sortedSessions = allSessions
+                                .filter(s => s.sessionType === 'حصة أساسية' && s.surahId && !s.isReview)
+                                .sort((a, b) => b.date.localeCompare(a.date));
 
-                            // Logic for admin5 auto-increment
-                            if (isAdmin5 && sessionToOpen === 1) {
-                                const allSessions = Object.values(dailySessions || {}).flatMap(day => Object.values(day as Record<string, any>));
-                                const sortedSessions = allSessions
-                                    .filter(s => s.sessionType === 'حصة أساسية' && s.surahId && !s.isReview)
-                                    .sort((a, b) => b.date.localeCompare(a.date));
-
-                                const latestSession = sortedSessions[0];
-                                if (latestSession) {
-                                    const currentSurah = surahs.find(s => s.id === latestSession.surahId);
-                                    if (latestSession.toVerse && currentSurah && latestSession.toVerse < currentSurah.verses) {
-                                        setSurahId(latestSession.surahId);
-                                        setFromVerse(latestSession.toVerse + 1);
-                                        setToVerse(latestSession.toVerse + 1);
-                                    } else {
-                                        setSurahId((latestSession.surahId % 114) + 1);
-                                        setFromVerse(1);
-                                        setToVerse(1);
-                                    }
+                            const latestSession = sortedSessions[0];
+                            if (latestSession) {
+                                const currentSurah = surahs.find(s => s.id === latestSession.surahId);
+                                if (latestSession.toVerse && currentSurah && latestSession.toVerse < currentSurah.verses) {
+                                    setSurahId(latestSession.surahId);
+                                    setFromVerse(latestSession.toVerse + 1);
+                                    setToVerse(latestSession.toVerse + 1);
                                 } else {
-                                    setSurahId(26);
+                                    setSurahId((latestSession.surahId % 114) + 1);
                                     setFromVerse(1);
                                     setToVerse(1);
                                 }
+                            } else {
+                                setSurahId(26);
+                                setFromVerse(1);
+                                setToVerse(1);
                             }
                         }
                     }
-                } catch (error) {
-                    console.error("Error loading session from Firebase:", error);
-                    toast({ title: "خطأ", description: "فشل تحميل البيانات من الخادم.", variant: "destructive" });
-                } finally {
-                    setIsInitialLoad(false);
-                    setIsDirty(false);
                 }
-            };
+            } catch (error) {
+                console.error("Error loading session from Firebase:", error);
+                toast({ title: "خطأ", description: "فشل تحميل البيانات من الخادم.", variant: "destructive" });
+            } finally {
+                setIsInitialLoad(false);
+                setIsDirty(false);
+            }
+        };
 
-            loadFromFirebase();
-        }
+        loadFromFirebase();
     }, [loading, selectedDay, sessionToOpen, user, isInitialLoad]);
 
     const handleSessionTypeChange = (val: any) => {
@@ -409,6 +427,7 @@ function RegisterSessionContent() {
                     surahId: isAdmin5 ? data.surahId : (d.surahId || null),
                     fromVerse: isAdmin5 ? data.fromVerse : (d.fromVerse || null),
                     toVerse: isAdmin5 ? data.toVerse : (d.toVerse || null),
+                    catchUpRecords: d.catchUpRecords || [], // Save catch-up records
                 };
             }
         });
@@ -537,7 +556,8 @@ function RegisterSessionContent() {
                             review: record.review,
                             surahId: record.surahId,
                             fromVerse: record.fromVerse,
-                            toVerse: record.toVerse
+                            toVerse: record.toVerse,
+                            catchUpRecords: record.catchUpRecords || []
                         };
                     });
                     setAttendanceRecords(records);
@@ -633,9 +653,32 @@ function RegisterSessionContent() {
             dailyContent += `\n-------------\nقائمة الطلبة الغائبين: \n${absentStudents.join('\n')} `;
         }
 
+        // --- Add Catch-up Section to Daily Message ---
+        const catchUpGroups: Record<string, string[]> = {};
+
+        activeStudents.forEach(s => {
+            const record = attendanceRecords[s.id];
+            if (record && record.catchUpRecords && record.catchUpRecords.length > 0) {
+                record.catchUpRecords.forEach(c => {
+                    const key = `${c.surahName} (${c.fromVerse}-${c.toVerse}) - ${c.date}`;
+                    if (!catchUpGroups[key]) catchUpGroups[key] = [];
+                    catchUpGroups[key].push(s.fullName);
+                });
+            }
+        });
+
+        if (Object.keys(catchUpGroups).length > 0) {
+            dailyContent += `\n\n-------------\n📋 تم تعويض الأوراد التالية:\n`;
+            Object.entries(catchUpGroups).forEach(([key, students]) => {
+                dailyContent += `\n🔸 ${key}:\n`;
+                students.forEach((name, i) => {
+                    dailyContent += `${i + 1}. ${name}\n`;
+                });
+            });
+        }
+
         const dailyMessage = `${header} \n${dateLine} \n${dailyContent} `;
 
-        // Message 2: Weekly Harvest (Only on Saturday)
         let harvestMessage = "";
         if (isSaturday) {
             // Find Historical Range: last Sat to last Wed
@@ -929,6 +972,7 @@ function RegisterSessionContent() {
                             records={attendanceRecords}
                             onUpdateRecord={handleUpdateRecord}
                             sessionType={sessionType}
+                            pastWirds={pastWirds}
                         />
                     </div>
                 )}
