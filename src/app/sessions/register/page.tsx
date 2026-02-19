@@ -224,7 +224,8 @@ function RegisterSessionContent() {
                             setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة إضافية');
                         }
 
-                        // Logic for admin5 auto-increment
+                        // Logic for admin5 auto-increment - DISABLED per user request for "Empty Sessions"
+                        /*
                         if (isAdmin5 && sessionToOpen === 1) {
                             const allSessions = Object.values(dailySessions || {}).flatMap(day => Object.values(day as Record<string, any>));
                             const sortedSessions = allSessions
@@ -249,6 +250,7 @@ function RegisterSessionContent() {
                                 setToVerse(1);
                             }
                         }
+                        */
                     }
                 }
             } catch (error) {

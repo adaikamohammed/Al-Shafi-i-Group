@@ -23,7 +23,8 @@ import {
     MessageSquare,
     Sparkles,
     Megaphone,
-    Bell
+    Bell,
+    Database
 } from 'lucide-react';
 
 export interface NavItem {
@@ -85,6 +86,7 @@ export const NAV_GROUPS: NavGroup[] = [
             { href: '/updates', label: 'تحديثات الموقع', icon: Sparkles },
             { href: '/data', label: 'إدارة البيانات', icon: ArrowRightLeft },
             { href: '/dues', label: 'المستحقات (فصلي)', icon: DollarSign },
+            { href: '/sessions', label: 'أرشيف الحصص & النسخ', icon: Database },
             { href: '/guide', label: 'دليل المستخدم', icon: HelpCircle },
 
         ]

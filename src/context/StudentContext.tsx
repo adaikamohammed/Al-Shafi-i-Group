@@ -114,6 +114,7 @@ interface StudentContextType {
   sendManagementMessage: (targetSheikhId: string, messageData: Partial<DailyReport>, alternateUids?: string[]) => Promise<void>;
   markManagementMessageAsRead: (reportId: string, date: string) => Promise<void>;
   moveDailySession: (sessionId: string, date: string, sourceOwnerId: string, targetOwnerId: string) => Promise<void>;
+  restoreSessions: (sessions: DailySession[]) => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
