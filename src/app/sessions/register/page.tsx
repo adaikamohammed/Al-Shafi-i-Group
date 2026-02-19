@@ -214,6 +214,7 @@ function RegisterSessionContent() {
                         }
                     } else {
                         setCurrentSessionId(null); // Truly new
+                        setAttendanceRecords({}); // FIX: Reset records to prevent leakage from previous day
 
                         // Default Thursday and Friday to 'يوم عطلة'
                         const dayOfWeek = getDay(selectedDay);
