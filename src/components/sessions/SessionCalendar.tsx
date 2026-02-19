@@ -62,7 +62,8 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
 
         // Day cells
         for (let day = 1; day <= daysInMonth; day++) {
-            const dayDate = new Date(year, month, day);
+            // FIX: Set to NOON to avoid timezone shifts
+            const dayDate = new Date(year, month, day, 12, 0, 0);
             const formattedDate = format(dayDate, 'yyyy-MM-dd');
             const sessions = getSessionsForDay(formattedDate);
             const isTodayDate = isToday(dayDate);

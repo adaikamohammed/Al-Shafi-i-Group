@@ -435,7 +435,14 @@ export const StudentProfileCard = memo(({ student, user, rankingData, medalHisto
                                                                     <p className="text-xs text-muted-foreground">السبب: {item.reason}</p>
                                                                 </div>
                                                             ) : (
-                                                                <p className="text-sm font-medium">{isCovenant ? item.text : item.reason}</p>
+                                                                <p className="text-sm font-medium">
+                                                                    {isCovenant ? (
+                                                                        <span className="flex flex-col gap-1">
+                                                                            <span>{item.text}</span>
+                                                                            {item.commitmentType && <span className="text-[9px] bg-gray-100 text-gray-500 w-fit px-1.5 rounded">{item.commitmentType}</span>}
+                                                                        </span>
+                                                                    ) : item.reason}
+                                                                </p>
                                                             )}
                                                             {isCovenant && (
                                                                 <div className="mt-2 text-[10px] space-y-2">
@@ -463,6 +470,16 @@ export const StudentProfileCard = memo(({ student, user, rankingData, medalHisto
                                                                                         <span className="font-bold">{format(parseISO(item.dueDate), 'd MMM yyyy', { locale: ar })}</span>
                                                                                     </div>
                                                                                 )}
+                                                                            </div>
+
+                                                                            {/* Status Badge for Disciplinary */}
+                                                                            <div className="mt-2 flex items-center justify-between">
+                                                                                <Badge variant="outline" className={cn("text-[9px]",
+                                                                                    item.status === 'تم الوفاء بها' ? "bg-green-50 text-green-700 border-green-200" :
+                                                                                        item.status === 'نُقِض' ? "bg-red-50 text-red-700 border-red-200" : "bg-gray-100 text-gray-500"
+                                                                                )}>
+                                                                                    {item.status || 'نشط'}
+                                                                                </Badge>
                                                                             </div>
 
                                                                             {/* Compensation Details */}

@@ -21,6 +21,9 @@ export interface Covenant {
   compensationSessions?: number;
   compensationDate?: string;
   isCompensated?: boolean;
+  commitmentType?: string;
+  originalPenalty?: string;
+  originalDueDate?: string;
 }
 
 export interface ExpulsionRecord {

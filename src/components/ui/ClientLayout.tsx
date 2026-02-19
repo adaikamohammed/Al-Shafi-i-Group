@@ -53,7 +53,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
       ...group,
       items: group.items.filter(item => {
         // Special restriction for registrations and entry-permit page: ONLY admin00 can see it
-        if ((item.href === '/registrations' || item.href === '/admin/entry-permit' || item.href === '/management/penalties') && user?.email !== 'admin00@gmail.com') {
+        if ((item.href === '/registrations' || item.href === '/admin/entry-permit') && user?.email !== 'admin00@gmail.com') {
           return false;
         }
 

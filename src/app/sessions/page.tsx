@@ -176,7 +176,8 @@ export default function DailySessionsPage() {
   }, [allUsers, selectedSheikhId]);
 
   const handleDayClick = (day: number, sessionNumber?: 1 | 2) => {
-    const newSelectedDay = new Date(getYear(currentDate), getMonth(currentDate), day);
+    // Safe Date Construction: Set to NOON (12:00) to avoid timezone shifts at midnight
+    const newSelectedDay = new Date(getYear(currentDate), getMonth(currentDate), day, 12, 0, 0);
     const dateStr = format(newSelectedDay, 'yyyy-MM-dd');
     const daySessions = filteredGetSessionsForDay(dateStr);
 

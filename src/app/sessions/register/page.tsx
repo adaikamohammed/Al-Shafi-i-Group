@@ -36,7 +36,13 @@ function RegisterSessionContent() {
     const sessionNumParam = searchParams.get('session');
     const ownerIdParam = searchParams.get('ownerId');
 
-    const selectedDay = useMemo(() => dateParam ? parse(dateParam, 'yyyy-MM-dd', new Date()) : new Date(), [dateParam]);
+    const selectedDay = useMemo(() => {
+        if (!dateParam) return new Date();
+        // SAFE PARSING: Parse and Set to NOON
+        const d = parse(dateParam, 'yyyy-MM-dd', new Date());
+        d.setHours(12, 0, 0, 0);
+        return d;
+    }, [dateParam]);
     const sessionToOpen = useMemo(() => (sessionNumParam === '2' ? 2 : 1) as 1 | 2, [sessionNumParam]);
 
     const isManagement = user?.role === 'management';
