@@ -197,7 +197,9 @@ function RegisterSessionContent() {
                     });
                     setAttendanceRecords(records);
                 } else {
-                    // No DB Data - Check LocalStorage Draft
+                    // No DB Data
+                    // FIX: Disabled Local Storage Drafts per user request to prevent data leakage
+                    /*
                     const isEditingOther = effectiveOwnerId && effectiveOwnerId !== user?.uid;
                     const savedDraft = (DRAFT_KEY && !isEditingOther) ? localStorage.getItem(DRAFT_KEY) : null;
 
@@ -220,40 +222,41 @@ function RegisterSessionContent() {
                             console.error("Failed to parse draft", e);
                         }
                     } else {
-                        setCurrentSessionId(null); // Truly new
-                        setAttendanceRecords({}); // FIX: Reset records to prevent leakage from previous day
+                    */
+                    setCurrentSessionId(null); // Truly new
+                    setAttendanceRecords({}); // FIX: Reset records to prevent leakage from previous day
 
-                        // FIX: Stopped defaulting to Holiday on Thu/Fri per user request
-                        setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة إضافية');
+                    // FIX: Stopped defaulting to Holiday on Thu/Fri per user request
+                    setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة إضافية');
 
-                        // Logic for admin5 auto-increment - DISABLED per user request for "Empty Sessions"
-                        /*
-                        if (isAdmin5 && sessionToOpen === 1) {
-                            const allSessions = Object.values(dailySessions || {}).flatMap(day => Object.values(day as Record<string, any>));
-                            const sortedSessions = allSessions
-                                .filter(s => s.sessionType === 'حصة أساسية' && s.surahId && !s.isReview)
-                                .sort((a, b) => b.date.localeCompare(a.date));
+                    // Logic for admin5 auto-increment - DISABLED per user request for "Empty Sessions"
+                    /*
+                    if (isAdmin5 && sessionToOpen === 1) {
+                        const allSessions = Object.values(dailySessions || {}).flatMap(day => Object.values(day as Record<string, any>));
+                        const sortedSessions = allSessions
+                            .filter(s => s.sessionType === 'حصة أساسية' && s.surahId && !s.isReview)
+                            .sort((a, b) => b.date.localeCompare(a.date));
 
-                            const latestSession = sortedSessions[0];
-                            if (latestSession) {
-                                const currentSurah = surahs.find(s => s.id === latestSession.surahId);
-                                if (latestSession.toVerse && currentSurah && latestSession.toVerse < currentSurah.verses) {
-                                    setSurahId(latestSession.surahId);
-                                    setFromVerse(latestSession.toVerse + 1);
-                                    setToVerse(latestSession.toVerse + 1);
-                                } else {
-                                    setSurahId((latestSession.surahId % 114) + 1);
-                                    setFromVerse(1);
-                                    setToVerse(1);
-                                }
+                        const latestSession = sortedSessions[0];
+                        if (latestSession) {
+                            const currentSurah = surahs.find(s => s.id === latestSession.surahId);
+                            if (latestSession.toVerse && currentSurah && latestSession.toVerse < currentSurah.verses) {
+                                setSurahId(latestSession.surahId);
+                                setFromVerse(latestSession.toVerse + 1);
+                                setToVerse(latestSession.toVerse + 1);
                             } else {
-                                setSurahId(26);
+                                setSurahId((latestSession.surahId % 114) + 1);
                                 setFromVerse(1);
                                 setToVerse(1);
                             }
+                        } else {
+                            setSurahId(26);
+                            setFromVerse(1);
+                            setToVerse(1);
                         }
-                        */
                     }
+                    */
+                    //}
                 }
             } catch (error) {
                 console.error("Error loading session from Firebase:", error);
@@ -1009,18 +1012,22 @@ function RegisterSessionContent() {
                             </div>
                             <div className="flex items-center gap-2">
                                 <Button
-                                    onClick={() => setIsReview(!isReview)}
+                                    onClick={() => {
+                                        setIsReview(!isReview);
+                                        setIsDirty(true);
+                                    }}
                                     variant="outline"
                                     size="sm"
                                     className={cn(
-                                        "h-8 rounded-lg font-bold text-[10px] transition-all",
+                                        "h-9 px-3 rounded-lg font-bold text-[11px] transition-all border-2",
                                         isReview
-                                            ? "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200"
-                                            : "bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50 shadow-sm"
+                                            ? "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200"
+                                            : "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
                                     )}
+                                    title={isReview ? "هذه الآيات للمراجعة فقط ولا تضاف للرصيد" : "هذه الآيات حفظ جديد وتضاف للرصيد"}
                                 >
-                                    {isReview ? <RotateCcw className="ml-1 h-3 w-3 animate-spin-slow" /> : <TimerOff className="ml-1 h-3 w-3" />}
-                                    {isReview ? "وضع المراجعة (العداد متوقف)" : "توقيف العداد (مراجعة)"}
+                                    {isReview ? <RotateCcw className="ml-1.5 h-3.5 w-3.5" /> : <Trophy className="ml-1.5 h-3.5 w-3.5" />}
+                                    {isReview ? "وضع مراجعة (لا يُحسب في الرصيد)" : "وضع حفظ (يُحسب في الرصيد)"}
                                 </Button>
                                 <div className="text-[10px] bg-emerald-100 px-2 py-0.5 rounded-full text-emerald-700 font-bold">
                                     خاص بـ {user?.displayName || 'الشيخ'}
@@ -1033,7 +1040,10 @@ function RegisterSessionContent() {
                                 <SearchableSelect
                                     options={surahOptions}
                                     value={surahId.toString()}
-                                    onValueChange={(val) => setSurahId(parseInt(val))}
+                                    onValueChange={(val) => {
+                                        setSurahId(parseInt(val));
+                                        setIsDirty(true);
+                                    }}
                                     placeholder="اختر السورة"
                                     searchPlaceholder="ابحث عن سورة..."
                                     className="h-10 bg-white border-emerald-200 focus:ring-emerald-500"
@@ -1045,7 +1055,10 @@ function RegisterSessionContent() {
                                     <Input
                                         type="number"
                                         value={fromVerse}
-                                        onChange={(e) => setFromVerse(parseInt(e.target.value))}
+                                        onChange={(e) => {
+                                            setFromVerse(parseInt(e.target.value));
+                                            setIsDirty(true);
+                                        }}
                                         className="h-10 bg-white border-emerald-200 focus:border-emerald-500"
                                         min={1}
                                     />
@@ -1055,7 +1068,10 @@ function RegisterSessionContent() {
                                     <Input
                                         type="number"
                                         value={toVerse}
-                                        onChange={(e) => setToVerse(parseInt(e.target.value))}
+                                        onChange={(e) => {
+                                            setToVerse(parseInt(e.target.value));
+                                            setIsDirty(true);
+                                        }}
                                         className="h-10 bg-white border-emerald-200 focus:border-emerald-500"
                                         min={fromVerse}
                                         max={surahs.find(s => s.id === surahId)?.verses || 286}
