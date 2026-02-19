@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry, AdminLog, ActivityLog, Meeting, MeetingSuggestion, InternalNotification } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry, AdminLog, ActivityLog, Meeting, MeetingSuggestion, InternalNotification, WeeklyOutcome } from '@/lib/types';
 import { isWithinInterval, parseISO, isValid, isAfter, subDays } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -71,6 +71,8 @@ interface StudentContextType {
   activityLogs: ActivityLog[];
   meetings: Meeting[];
   loading: boolean;
+  weeklyOutcomes: Record<string, WeeklyOutcome>;
+  saveWeeklyOutcome: (outcome: WeeklyOutcome) => Promise<void>;
   addStudent: (student: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> & { photoFile?: File | null, ownerId: string, groupName: string }) => Promise<void>;
   updateStudent: (studentId: string, updatedData: Partial<Student> & { photoFile?: File | null }, ownerId: string) => Promise<void>;
   deleteStudent: (studentId: string, ownerId: string) => void;
@@ -134,6 +136,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [internalNotifications, setInternalNotifications] = useState<InternalNotification[]>([]);
+  const [weeklyOutcomes, setWeeklyOutcomes] = useState<Record<string, WeeklyOutcome>>({});
   const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
 
@@ -165,6 +168,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setActivityLogs([]);
       setMeetings([]);
       setInternalNotifications([]);
+      setWeeklyOutcomes({});
       return;
     }
 
@@ -379,6 +383,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const adminLogsRef = ref(db, `${userPath}/admin_logs`);
       const activityLogsRef = ref(db, `${userPath}/activity_logs`);
       const settingsRef = ref(db, `${userPath}/settings`);
+      const weeklyOutcomesRef = ref(db, `${userPath}/weeklyOutcomes`);
       const profileRef = ref(db, `${userPath}/profile`);
 
       const handleError = (error: any) => {
@@ -416,6 +421,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         setActivityLogs(val ? Object.entries(val).map(([id, l]) => ({ id, ...(l as any) })) : []);
       }, handleError);
       onValue(settingsRef, (s: any) => setSettingsState(s.val() ? { ...DEFAULT_SETTINGS, ...s.val() } : DEFAULT_SETTINGS), handleError);
+      onValue(weeklyOutcomesRef, (s: any) => {
+        setWeeklyOutcomes(s.val() || {});
+      }, handleError);
 
       // Also listen to profile to keep role/group synced if they change
       onValue(profileRef, () => setLoading(false), handleError);
@@ -1088,6 +1096,22 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       await update(dbRef, updates);
     }
   }
+
+  const restoreSessions = async (sessions: DailySession[]) => {
+    if (!authContextUser) return;
+    const updates: Record<string, any> = {};
+    sessions.forEach(session => {
+      updates[`users/${authContextUser.uid}/dailySessions/${session.date}/${session.id}`] = session;
+    });
+    await update(ref(db), updates);
+  };
+
+  const saveWeeklyOutcome = async (outcome: WeeklyOutcome) => {
+    if (!authContextUser) return;
+    const outcomeRef = ref(db, `users/${authContextUser.uid}/weeklyOutcomes/${outcome.id}`);
+    await set(outcomeRef, sanitizeData(outcome));
+    toast({ title: "✅ تم الحفظ", description: "تم حفظ تقييم الحصيلة الأسبوعية." });
+  };
 
   const toggleSurahStatus = (studentId: string, surahId: number) => {
     if (!authContextUser) return;
@@ -1918,6 +1942,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       sendManagementMessage,
       markManagementMessageAsRead,
       moveDailySession,
+      restoreSessions,
+      weeklyOutcomes,
+      saveWeeklyOutcome,
       deleteMultipleDailyReports,
       migrateSurahDataToEvaluationSystem
     }}>

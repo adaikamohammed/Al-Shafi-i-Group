@@ -424,3 +424,12 @@ export interface AdminDocument {
   notes?: string;
 }
 
+export interface WeeklyOutcome {
+  id: string; // studentId_weekStartDate
+  studentId: string;
+  weekStartDate: string; // YYYY-MM-DD
+  evaluation: PerformanceLevel;
+  timestamp: string;
+  notes?: string;
+}
+
