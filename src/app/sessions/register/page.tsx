@@ -72,6 +72,7 @@ function RegisterSessionContent() {
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isNavigating, setIsNavigating] = useState(false);
+    const [loadedDate, setLoadedDate] = useState<string | null>(null);
 
     // Swipe navigation refs
     const touchStartX = useRef<number>(0);
@@ -135,6 +136,12 @@ function RegisterSessionContent() {
     useEffect(() => {
         // Load initial data logic
         const loadFromFirebase = async () => {
+            // 1. Immediate State Reset on Date Change to prevent leakage
+            setLoadedDate(null);
+            setAttendanceRecords({});
+            setCurrentSessionId(null);
+            setSessionType('حصة أساسية'); // Default reset
+
             if (!selectedDay || !user) return;
 
             try {
@@ -216,13 +223,8 @@ function RegisterSessionContent() {
                         setCurrentSessionId(null); // Truly new
                         setAttendanceRecords({}); // FIX: Reset records to prevent leakage from previous day
 
-                        // Default Thursday and Friday to 'يوم عطلة'
-                        const dayOfWeek = getDay(selectedDay);
-                        if (dayOfWeek === 4 || dayOfWeek === 5) { // Thursday is 4, Friday is 5
-                            setSessionType('يوم عطلة');
-                        } else {
-                            setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة إضافية');
-                        }
+                        // FIX: Stopped defaulting to Holiday on Thu/Fri per user request
+                        setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة إضافية');
 
                         // Logic for admin5 auto-increment - DISABLED per user request for "Empty Sessions"
                         /*
@@ -260,6 +262,10 @@ function RegisterSessionContent() {
                 setIsInitialLoad(false);
                 setIsDirty(false);
                 setIsNavigating(false);
+                // 2. Mark this date as fully loaded
+                if (selectedDay) {
+                    setLoadedDate(format(selectedDay, 'yyyy-MM-dd'));
+                }
             }
         };
 
@@ -393,6 +399,13 @@ function RegisterSessionContent() {
     const performSave = async (data: typeof sessionData): Promise<void> => {
         if (!selectedDay || !user) return;
         const dateStr = format(selectedDay, 'yyyy-MM-dd');
+
+        // Race Condition Guard: Ensure we are saving data for the currently loaded day
+        // If loadedDate doesn't match dateStr, it means we navigated away but this save (from debounce) fired late.
+        if (loadedDate !== dateStr) {
+            console.warn("Save prevented: Race condition detected. Loaded:", loadedDate, "Target:", dateStr);
+            return;
+        }
 
         // Use LOCKED ID if available, otherwise find existing or generate deterministic
         let id = currentSessionId;
