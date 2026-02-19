@@ -44,6 +44,13 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ProtectedPage } from '@/components/ui/ProtectedPage';
+import { WeeklyOutcomeModal } from '@/components/admin/WeeklyOutcomeModal';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { startOfWeek, addDays, isSameDay } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Star } from 'lucide-react';
+
 
 // Custom Components
 import { SessionCalendar } from '@/components/sessions/SessionCalendar';
@@ -53,7 +60,8 @@ import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
 
 export default function DailySessionsPage() {
   const { user, isSuperAdmin } = useAuth();
-  const { allUsers, students, dailySessions, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById, moveDailySession } = useStudentContext();
+  const { allUsers, students, dailySessions, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById, moveDailySession, weeklyOutcomes } = useStudentContext();
+
   const { toast } = useToast();
   const router = useRouter();
   const isAdmin5 = user?.email === 'admin5@gmail.com';
@@ -71,6 +79,15 @@ export default function DailySessionsPage() {
   const [moveSessionData, setMoveSessionData] = useState<{ sessionId: string, date: string, currentOwnerId: string } | null>(null);
   const [targetSheikhForMove, setTargetSheikhForMove] = useState<string>('');
   const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
+  const [outcomeModalStudent, setOutcomeModalStudent] = useState<any | null>(null);
+
+  // Calculate week dates for Weekly Outcome (Sat-Wed) based on currentDate
+  const weekDates = useMemo(() => {
+    const start = startOfWeek(currentDate, { weekStartsOn: 6 }); // Saturday
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  }, [currentDate]);
+
+
 
   // Get the selected sheikh's group name for filtering
   const selectedGroupName = useMemo(() => {
@@ -87,6 +104,11 @@ export default function DailySessionsPage() {
     // Students may have `group` or `groupName` depending on data source
     return students.filter(s => s.status === 'نشط' && ((s as any).group === groupToMatch || s.groupName === groupToMatch));
   }, [students, selectedGroupName, user?.group]);
+
+  const activeStudentsForWeeklyOutcome = useMemo(() => {
+    if (!students) return [];
+    return filteredStudentsForTable;
+  }, [filteredStudentsForTable, students]);
 
   // Handler for table cell click → navigate to register page
   const handleTableDayClick = (dateStr: string, sessionNumber: number) => {
@@ -634,6 +656,155 @@ export default function DailySessionsPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Weekly Outcome Table - Admin5 Only */}
+      {isAdmin5 && (
+        <div className="container mx-auto p-4 max-w-7xl">
+          <Card className="border-2 border-purple-200 shadow-lg mt-8">
+            <CardHeader className="bg-purple-50/50">
+              <CardTitle className="text-purple-800 flex items-center gap-2">
+                <Star className="h-5 w-5 fill-purple-600 text-purple-600" />
+                جدول الحصيلة الأسبوعية
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="rounded-md border m-4 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                      <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[30%]">الطالب</th>
+                      <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[30%]">التفقد اليومي (السبت - الأربعاء)</th>
+                      <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[20%]">التقييم الأسبوعي</th>
+                      <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[20%]">إجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeStudentsForWeeklyOutcome.map((student) => {
+                      const weekStartStr = format(weekDates[0], 'yyyy-MM-dd');
+                      const outcomeId = `${student.id}_${weekStartStr}`;
+                      const outcome = weeklyOutcomes[outcomeId];
+
+                      // Calculate daily status dots
+                      const days = weekDates.slice(0, 5); // Sat to Wed
+
+                      return (
+                        <tr key={student.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                          <td className="p-4 align-middle font-medium">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-9 w-9 border">
+                                <AvatarImage src={student.photoUrl} alt={student.fullName} />
+                                <AvatarFallback>{student.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <span>{student.fullName}</span>
+                                <span className="text-xs text-muted-foreground">{student.groupName}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4 align-middle">
+                            <div className="flex items-center justify-center gap-2">
+                              {days.map((day) => {
+                                const dateStr = format(day, 'yyyy-MM-dd');
+                                const sessions = dailySessions[dateStr] ? Object.values(dailySessions[dateStr]) : [];
+                                // Fix: Define types properly or use any for now
+                                const studentSession = sessions.find((s: any) => s.records?.some((r: any) => r.studentId === student.id)) as any;
+                                const record = studentSession?.records?.find((r: any) => r.studentId === student.id);
+
+                                let colorClass = "bg-gray-200";
+                                let statusText = "غير مسجل";
+
+                                if (record) {
+                                  if (record.memorization === 'ممتاز' || record.memorization === 'جيد جداً' || record.memorization === 'جيد' || record.memorization === 'حسن') {
+                                    colorClass = "bg-green-500 shadow-sm shadow-green-200";
+                                    statusText = record.memorization;
+                                  } else if (record.memorization === 'متوسط' || record.memorization === 'لم يحفظ') {
+                                    colorClass = "bg-red-500 shadow-sm shadow-red-200";
+                                    statusText = record.memorization;
+                                  } else if (record.attendanceStatus === 'absent') {
+                                    colorClass = "bg-red-500";
+                                    statusText = "غائب";
+                                  } else if (record.attendanceStatus === 'authorized') {
+                                    colorClass = "bg-yellow-500";
+                                    statusText = "إجازة";
+                                  } else if (record.memorization) {
+                                    // Catch all for other memo types
+                                    colorClass = "bg-blue-400";
+                                    statusText = record.memorization;
+                                  }
+                                }
+
+                                return (
+                                  <TooltipProvider key={day.toISOString()}>
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <div className={`w-3 h-3 rounded-full ${colorClass}`} />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p className="text-xs font-bold">{format(day, 'EEEE', { locale: ar })}</p>
+                                        <p className="text-xs">{statusText}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                );
+                              })}
+                            </div>
+                          </td>
+                          <td className="p-4 align-middle text-center">
+                            {outcome ? (
+                              <div className={cn(
+                                "flex items-center justify-center gap-2 rounded-full py-1 px-3 w-fit mx-auto border shadow-sm",
+                                outcome.evaluation === 'ممتاز' ? "bg-green-100 text-green-700 border-green-200" :
+                                  outcome.evaluation === 'جيد جداً' ? "bg-blue-100 text-blue-700 border-blue-200" :
+                                    outcome.evaluation === 'جيد' ? "bg-cyan-100 text-cyan-700 border-cyan-200" :
+                                      outcome.evaluation === 'حسن' ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
+                                        "bg-red-100 text-red-700 border-red-200"
+                              )}>
+                                {/* Symbol logic could be extracted but keeping inline for now */}
+                                <span className="text-lg">
+                                  {outcome.evaluation === 'ممتاز' ? '🌟' :
+                                    outcome.evaluation === 'جيد جداً' ? '⭐' :
+                                      outcome.evaluation === 'جيد' ? '👍' :
+                                        outcome.evaluation === 'حسن' ? '👌' :
+                                          outcome.evaluation === 'متوسط' ? '⚠️' : '❌'}
+                                </span>
+                                <span className="font-bold text-xs">{outcome.evaluation}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs italic">لم يقيم بعد</span>
+                            )}
+                          </td>
+                          <td className="p-4 align-middle text-center">
+                            <Button
+                              size="sm"
+                              variant={outcome ? "ghost" : "default"}
+                              onClick={() => setOutcomeModalStudent(student)}
+                              className={cn("gap-2 text-xs", !outcome && "bg-purple-600 hover:bg-purple-700 shadow-md")}
+                            >
+                              <Star className="h-3 w-3" />
+                              {outcome ? 'تعديل' : 'تقييم'}
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {outcomeModalStudent && (
+        <WeeklyOutcomeModal
+          isOpen={!!outcomeModalStudent}
+          onClose={() => setOutcomeModalStudent(null)}
+          student={outcomeModalStudent}
+          weekStartDate={weekDates[0]}
+          currentOutcome={weeklyOutcomes[`${outcomeModalStudent.id}_${format(weekDates[0], 'yyyy-MM-dd')}`]}
+        />
+      )}
+
     </ProtectedPage >
   );
 }

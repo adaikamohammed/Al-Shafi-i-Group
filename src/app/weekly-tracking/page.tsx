@@ -13,8 +13,6 @@ import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import type { Student, DailySession, DailyRecord, PerformanceLevel } from '@/lib/types';
 import { ProtectedPage } from '@/components/ui/ProtectedPage';
-import { WeeklyOutcomeModal } from '@/components/admin/WeeklyOutcomeModal';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 
 
@@ -153,8 +151,6 @@ export default function WeeklyFollowUpPage() {
     const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
     const [selectedGroup, setSelectedGroup] = useState<string>('all'); // For admin/management filtering
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [outcomeModalStudent, setOutcomeModalStudent] = useState<Student | null>(null);
-    const { weeklyOutcomes } = useStudentContext();
 
     const isAdmin5 = user?.email === 'admin5@gmail.com';
 
@@ -321,131 +317,6 @@ export default function WeeklyFollowUpPage() {
                         </CardContent>
                     </Card>
 
-                    {isAdmin5 && (
-                        <Card className="border-2 border-purple-200 shadow-lg">
-                            <CardHeader className="bg-purple-50/50">
-                                <CardTitle className="text-purple-800 flex items-center gap-2">
-                                    <Star className="h-5 w-5 fill-purple-600 text-purple-600" />
-                                    جدول الحصيلة الأسبوعية
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="rounded-md border m-4">
-                                    <table className="w-full text-sm">
-                                        <thead className="bg-muted/50">
-                                            <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                                <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[30%]">الطالب</th>
-                                                <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[30%]">التفقد اليومي (السبت - الأربعاء)</th>
-                                                <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[20%]">التقييم الأسبوعي</th>
-                                                <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[20%]">إجراءات</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {activeStudents.map((student) => {
-                                                const weekStartStr = format(weekDates[0], 'yyyy-MM-dd');
-                                                const outcomeId = `${student.id}_${weekStartStr}`;
-                                                const outcome = weeklyOutcomes[outcomeId];
-
-                                                // Calculate daily status dots
-                                                const days = weekDates.slice(0, 5); // Sat to Wed
-
-                                                return (
-                                                    <tr key={student.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                                        <td className="p-4 align-middle font-medium">
-                                                            <div className="flex items-center gap-3">
-                                                                <Avatar className="h-9 w-9 border">
-                                                                    <AvatarImage src={student.photoUrl} alt={student.fullName} />
-                                                                    <AvatarFallback>{student.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}</AvatarFallback>
-                                                                </Avatar>
-                                                                <div className="flex flex-col">
-                                                                    <span>{student.fullName}</span>
-                                                                    <span className="text-xs text-muted-foreground">{student.groupName}</span>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-4 align-middle">
-                                                            <div className="flex items-center justify-center gap-2">
-                                                                {days.map((day) => {
-                                                                    const dateStr = format(day, 'yyyy-MM-dd');
-                                                                    const sessions = dailySessions[dateStr] ? Object.values(dailySessions[dateStr]) : [];
-                                                                    const studentSession = sessions.find(s => s.records?.some(r => r.studentId === student.id));
-                                                                    const record = studentSession?.records?.find(r => r.studentId === student.id);
-
-                                                                    let colorClass = "bg-gray-200";
-                                                                    let statusText = "غير مسجل";
-
-                                                                    if (record) {
-                                                                        if (record.memorization === 'ممتاز' || record.memorization === 'جيد جداً' || record.memorization === 'جيد' || record.memorization === 'حسن') {
-                                                                            colorClass = "bg-green-500 shadow-sm shadow-green-200";
-                                                                            statusText = record.memorization;
-                                                                        } else if (record.memorization === 'متوسط' || record.memorization === 'لم يحفظ') {
-                                                                            colorClass = "bg-red-500 shadow-sm shadow-red-200";
-                                                                            statusText = record.memorization;
-                                                                        } else if (record.attendanceStatus === 'absent') {
-                                                                            colorClass = "bg-red-500";
-                                                                            statusText = "غائب";
-                                                                        } else if (record.attendanceStatus === 'authorized') {
-                                                                            colorClass = "bg-yellow-500";
-                                                                            statusText = "إجازة";
-                                                                        } else if (record.memorization) {
-                                                                            // Catch all for other memo types
-                                                                            colorClass = "bg-blue-400";
-                                                                            statusText = record.memorization;
-                                                                        }
-                                                                    }
-
-                                                                    return (
-                                                                        <Tooltip key={day.toISOString()}>
-                                                                            <TooltipTrigger>
-                                                                                <div className={`w-3 h-3 rounded-full ${colorClass}`} />
-                                                                            </TooltipTrigger>
-                                                                            <TooltipContent>
-                                                                                <p className="text-xs font-bold">{format(day, 'EEEE', { locale: ar })}</p>
-                                                                                <p className="text-xs">{statusText}</p>
-                                                                            </TooltipContent>
-                                                                        </Tooltip>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-4 align-middle text-center">
-                                                            {outcome ? (
-                                                                <div className={cn(
-                                                                    "flex items-center justify-center gap-2 rounded-full py-1 px-3 w-fit mx-auto border shadow-sm",
-                                                                    outcome.evaluation === 'ممتاز' ? "bg-green-100 text-green-700 border-green-200" :
-                                                                        outcome.evaluation === 'جيد جداً' ? "bg-blue-100 text-blue-700 border-blue-200" :
-                                                                            outcome.evaluation === 'جيد' ? "bg-cyan-100 text-cyan-700 border-cyan-200" :
-                                                                                outcome.evaluation === 'حسن' ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
-                                                                                    "bg-red-100 text-red-700 border-red-200"
-                                                                )}>
-                                                                    <span className="text-lg">{getEvaluationSymbol(outcome.evaluation)}</span>
-                                                                    <span className="font-bold text-xs">{outcome.evaluation}</span>
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-muted-foreground text-xs italic">لم يقيم بعد</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="p-4 align-middle text-center">
-                                                            <Button
-                                                                size="sm"
-                                                                variant={outcome ? "ghost" : "default"}
-                                                                onClick={() => setOutcomeModalStudent(student)}
-                                                                className={cn("gap-2 text-xs", !outcome && "bg-purple-600 hover:bg-purple-700 shadow-md")}
-                                                            >
-                                                                <Star className="h-3 w-3" />
-                                                                {outcome ? 'تعديل' : 'تقييم'}
-                                                            </Button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
@@ -504,15 +375,6 @@ export default function WeeklyFollowUpPage() {
                     </Card>
                 </div>
             </TooltipProvider>
-            {outcomeModalStudent && (
-                <WeeklyOutcomeModal
-                    isOpen={!!outcomeModalStudent}
-                    onClose={() => setOutcomeModalStudent(null)}
-                    student={outcomeModalStudent}
-                    weekStartDate={weekDates[0]}
-                    currentOutcome={weeklyOutcomes[`${outcomeModalStudent.id}_${format(weekDates[0], 'yyyy-MM-dd')}`]}
-                />
-            )}
         </ProtectedPage>
     );
 }
