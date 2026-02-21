@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { db } from '@/lib/firebase';
+import { ref as dbRef, onValue, off } from 'firebase/database';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useStudentContext } from '@/context/StudentContext';
@@ -20,27 +22,65 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Loader2,
-  Save,
-  FileText,
-  UserCheck,
-  AlertTriangle,
-  Trophy,
-  Download,
-  Trash2,
-  Copy,
-  MoreVertical,
-  Dot,
+  Star,
+  Plus,
+  ArrowRight,
+  ArrowLeft,
+  Filter,
+  Search,
+  CheckCircle2,
+  AlertCircle,
+  ThumbsUp,
+  Clock,
+  Printer,
   ChevronRight,
   ChevronLeft,
-  BookOpen,
-  Plus,
+  Calendar,
   Calendar as CalendarIcon,
-  AlertCircle,
-  Sparkles,
+  CalendarDays,
+  Settings,
+  RefreshCw,
+  MoreVertical,
+  Edit,
+  Trash2,
+  FileText,
+  Share2,
+  UserPlus,
+  Circle,
+  TrendingUp,
+  Award,
+  BookOpen,
+  LayoutGrid,
+  List,
+  History,
+  Info,
+  ChevronDown,
+  Layout,
   Table,
-  CalendarDays
-} from 'lucide-react';
+  Table as TableIcon,
+  Download,
+  Share,
+  Users,
+  MessageSquare,
+  X,
+  PlusCircle,
+  CheckCircle,
+  UserMinus,
+  AlertTriangle,
+  MoveHorizontal,
+  ThumbsDown,
+  Zap,
+  Smile,
+  XCircle,
+  Minus,
+  Trophy,
+  Loader2,
+  Save,
+  Dot,
+  Sparkles,
+  UserCheck,
+  Copy
+} from "lucide-react";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ProtectedPage } from '@/components/ui/ProtectedPage';
@@ -49,7 +89,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { startOfWeek, addDays, isSameDay } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Star } from 'lucide-react';
 
 
 // Custom Components
@@ -57,6 +96,7 @@ import { SessionCalendar } from '@/components/sessions/SessionCalendar';
 import { AttendanceList, AttendanceRecord } from '@/components/sessions/AttendanceList';
 import { WeeklyAttendanceTable } from '@/components/sessions/WeeklyAttendanceTable';
 import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
+import { Admin5MessagesPanel } from '@/components/sessions/Admin5MessagesPanel';
 
 export default function DailySessionsPage() {
   const { user, isSuperAdmin } = useAuth();
@@ -70,6 +110,7 @@ export default function DailySessionsPage() {
 
   // State
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [outcomeWeekStart, setOutcomeWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 6 }));
   const [isAddExtraDialogOpen, setIsAddExtraDialogOpen] = useState(false);
   const [extraSessionDate, setExtraSessionDate] = useState('');
   const [extraSessionType, setExtraSessionType] = useState<SessionType>('حصة أساسية');
@@ -81,10 +122,54 @@ export default function DailySessionsPage() {
   const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
   const [outcomeModalStudent, setOutcomeModalStudent] = useState<any | null>(null);
 
-  // Calculate week dates for Weekly Outcome (Sat-Wed) based on currentDate
+  // State for selected sheikh's sessions loaded directly from Firebase
+  const [sheikhSessions, setSheikhSessions] = useState<Record<string, Record<string, any>>>({});
+  const [sheikhSessionsLoading, setSheikhSessionsLoading] = useState(false);
+
+  // Load sessions for the selected sheikh directly from Firebase (bypasses context)
+  useEffect(() => {
+    if (!selectedSheikhId) {
+      setSheikhSessions({});
+      return;
+    }
+
+    // If it's the current user, use context sessions directly (no re-fetch needed)
+    if (selectedSheikhId === user?.uid && !isAdmin5) {
+      setSheikhSessions(dailySessions || {});
+      return;
+    }
+
+    setSheikhSessionsLoading(true);
+    const sessionsRef = dbRef(db, `users/${selectedSheikhId}/dailySessions`);
+    const unsubscribe = onValue(sessionsRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      // Inject ownerId into each session so filters work correctly
+      const normalized: Record<string, Record<string, any>> = {};
+      Object.entries(data).forEach(([date, sessions]) => {
+        normalized[date] = {};
+        Object.entries(sessions as Record<string, any>).forEach(([sessionId, session]) => {
+          normalized[date][sessionId] = { ...session, ownerId: selectedSheikhId };
+        });
+      });
+      setSheikhSessions(normalized);
+      setSheikhSessionsLoading(false);
+    }, () => {
+      setSheikhSessionsLoading(false);
+    });
+
+    return () => off(sessionsRef, 'value', unsubscribe);
+  }, [selectedSheikhId, user?.uid]);
+
+  // Calculate week dates for Weekly Outcome (Sat-Wed) based on outcomeWeekStart
   const weekDates = useMemo(() => {
-    const start = startOfWeek(currentDate, { weekStartsOn: 6 }); // Saturday
-    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+    return Array.from({ length: 7 }, (_, i) => addDays(outcomeWeekStart, i));
+  }, [outcomeWeekStart]);
+
+  // Keep outcome week in sync if user navigates large month jumps, but allow independent week tweaking
+  React.useEffect(() => {
+    if (getMonth(outcomeWeekStart) !== getMonth(currentDate)) {
+      setOutcomeWeekStart(startOfWeek(currentDate, { weekStartsOn: 6 }));
+    }
   }, [currentDate]);
 
 
@@ -175,8 +260,14 @@ export default function DailySessionsPage() {
     };
   }, [dailySessions, isAdminUser, selectedSheikhId]);
 
-  // Filter sessions based on selected Group (for Admins) - MERGED from all sheikhs in the group
+  // Filter sessions based on selected Group (for Admins) - uses sheikhSessions for admin5
   const filteredGetSessionsForDay = (date: string) => {
+    // For admin5 viewing a specific sheikh, use our directly-loaded sessions
+    if (isAdmin5 && selectedSheikhId) {
+      const daySessions = sheikhSessions[date] ? Object.values(sheikhSessions[date]) : [];
+      return daySessions.filter((s: any) => s.ownerId === selectedSheikhId);
+    }
+
     const sessions = getSessionsForDay(date);
 
     // If a group/sheikh is selected, filter strictly by that group
@@ -498,7 +589,21 @@ export default function DailySessionsPage() {
             getSessionsForDay={filteredGetSessionsForDay}
             onDayClick={handleTableDayClick}
             isAdmin5={isAdmin5}
+            initialDate={currentDate}
           />
+        )}
+
+        {/* Admin5: Always show WeeklyAttendanceTable below calendar when in calendar view */}
+        {isAdmin5 && viewMode === 'calendar' && filteredStudentsForTable.length > 0 && (
+          <div className="mt-2">
+            <WeeklyAttendanceTable
+              students={filteredStudentsForTable}
+              getSessionsForDay={filteredGetSessionsForDay}
+              onDayClick={handleTableDayClick}
+              isAdmin5={true}
+              initialDate={currentDate}
+            />
+          </div>
         )}
 
         {/* Session Choice Dialog */}
@@ -661,11 +766,22 @@ export default function DailySessionsPage() {
       {isAdmin5 && (
         <div className="container mx-auto p-4 max-w-7xl">
           <Card className="border-2 border-purple-200 shadow-lg mt-8">
-            <CardHeader className="bg-purple-50/50">
+            <CardHeader className="bg-purple-50/50 flex flex-row items-center justify-between pb-4">
               <CardTitle className="text-purple-800 flex items-center gap-2">
                 <Star className="h-5 w-5 fill-purple-600 text-purple-600" />
                 جدول الحصيلة الأسبوعية
               </CardTitle>
+              <div className="flex items-center gap-2" dir="ltr">
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setOutcomeWeekStart(prev => addDays(prev, 7))}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <div className="text-sm font-bold text-purple-900 bg-white px-3 py-1 rounded-md border min-w-[120px] text-center shadow-sm">
+                  {format(weekDates[0], 'dd MMM', { locale: ar })} - {format(weekDates[4], 'dd MMM', { locale: ar })}
+                </div>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setOutcomeWeekStart(prev => addDays(prev, -7))}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="rounded-md border m-4 overflow-x-auto">
@@ -705,7 +821,7 @@ export default function DailySessionsPage() {
                             <div className="flex items-center justify-center gap-2">
                               {days.map((day) => {
                                 const dateStr = format(day, 'yyyy-MM-dd');
-                                const sessions = dailySessions[dateStr] ? Object.values(dailySessions[dateStr]) : [];
+                                const sessions = sheikhSessions[dateStr] ? Object.values(sheikhSessions[dateStr]) : [];
                                 // Fix: Define types properly or use any for now
                                 const studentSession = sessions.find((s: any) => s.records?.some((r: any) => r.studentId === student.id)) as any;
                                 const record = studentSession?.records?.find((r: any) => r.studentId === student.id);
@@ -730,18 +846,37 @@ export default function DailySessionsPage() {
                                     // Catch all for other memo types
                                     colorClass = "bg-blue-400";
                                     statusText = record.memorization;
+                                  } else {
+                                    statusText = "لا يوجد تقييم";
                                   }
                                 }
 
                                 return (
                                   <TooltipProvider key={day.toISOString()}>
                                     <Tooltip>
-                                      <TooltipTrigger>
-                                        <div className={`w-3 h-3 rounded-full ${colorClass}`} />
+                                      <TooltipTrigger asChild>
+                                        <div className={cn(
+                                          "flex items-center justify-center p-1 rounded-md transition-all hover:scale-110 border",
+                                          record?.memorization === 'ممتاز' ? "bg-green-50 border-green-200 text-green-600" :
+                                            record?.memorization === 'جيد جداً' ? "bg-blue-50 border-blue-200 text-blue-600" :
+                                              record?.memorization === 'جيد' ? "bg-cyan-50 border-cyan-200 text-cyan-600" :
+                                                record?.memorization === 'حسن' ? "bg-yellow-50 border-yellow-200 text-yellow-600" :
+                                                  record?.memorization === 'متوسط' ? "bg-amber-50 border-amber-200 text-amber-600" :
+                                                    record?.memorization === 'لم يحفظ' ? "bg-red-50 border-red-200 text-red-600" :
+                                                      "bg-gray-50 border-gray-100 text-gray-300"
+                                        )}>
+                                          {record?.memorization === 'ممتاز' && <Star className="h-3.5 w-3.5 fill-current" />}
+                                          {record?.memorization === 'جيد جداً' && <CheckCircle2 className="h-3.5 w-3.5" />}
+                                          {record?.memorization === 'جيد' && <ThumbsUp className="h-3.5 w-3.5" />}
+                                          {record?.memorization === 'حسن' && <Smile className="h-3.5 w-3.5" />}
+                                          {record?.memorization === 'متوسط' && <AlertCircle className="h-3.5 w-3.5" />}
+                                          {record?.memorization === 'لم يحفظ' && <XCircle className="h-3.5 w-3.5" />}
+                                          {(!record || !record.memorization) && <Minus className="h-3.5 w-3.5" />}
+                                        </div>
                                       </TooltipTrigger>
                                       <TooltipContent>
                                         <p className="text-xs font-bold">{format(day, 'EEEE', { locale: ar })}</p>
-                                        <p className="text-xs">{statusText}</p>
+                                        <p className="text-[10px]">{statusText}</p>
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
@@ -750,7 +885,7 @@ export default function DailySessionsPage() {
                             </div>
                           </td>
                           <td className="p-4 align-middle text-center">
-                            {outcome ? (
+                            {outcome && outcome.evaluation ? (
                               <div className={cn(
                                 "flex items-center justify-center gap-2 rounded-full py-1 px-3 w-fit mx-auto border shadow-sm",
                                 outcome.evaluation === 'ممتاز' ? "bg-green-100 text-green-700 border-green-200" :
@@ -776,12 +911,12 @@ export default function DailySessionsPage() {
                           <td className="p-4 align-middle text-center">
                             <Button
                               size="sm"
-                              variant={outcome ? "ghost" : "default"}
+                              variant={outcome && outcome.evaluation ? "ghost" : "default"}
                               onClick={() => setOutcomeModalStudent(student)}
-                              className={cn("gap-2 text-xs", !outcome && "bg-purple-600 hover:bg-purple-700 shadow-md")}
+                              className={cn("gap-2 text-xs", !(outcome && outcome.evaluation) && "bg-purple-600 hover:bg-purple-700 shadow-md")}
                             >
                               <Star className="h-3 w-3" />
-                              {outcome ? 'تعديل' : 'تقييم'}
+                              {outcome && outcome.evaluation ? 'تعديل' : 'تقييم'}
                             </Button>
                           </td>
                         </tr>
@@ -792,6 +927,16 @@ export default function DailySessionsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Admin5 WhatsApp Messages Panel */}
+          {isAdmin5 && selectedSheikhId && (
+            <Admin5MessagesPanel
+              dailySessions={sheikhSessions}
+              students={activeStudentsForWeeklyOutcome}
+              weekDates={weekDates}
+              weeklyOutcomes={weeklyOutcomes}
+            />
+          )}
         </div>
       )}
 

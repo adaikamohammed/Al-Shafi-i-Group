@@ -6,10 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { format, addDays, parseISO, isSameDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, Star, CheckCircle2, ThumbsUp, Smile, AlertCircle, XCircle, UserMinus, Minus } from 'lucide-react';
 import type { Student, DailySession, DailyRecord, WeeklyOutcome, PerformanceLevel } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
+import { surahs } from '@/lib/surahs';
+import { cn } from '@/lib/utils';
 
 interface WeeklyOutcomeModalProps {
     isOpen: boolean;
@@ -21,11 +23,40 @@ interface WeeklyOutcomeModalProps {
 
 const EVALUATION_OPTIONS: PerformanceLevel[] = ['ممتاز', 'جيد جداً', 'جيد', 'حسن', 'متوسط', 'لم يحفظ'];
 
+const getEvaluationIcon = (level: string | undefined) => {
+    switch (level) {
+        case 'ممتاز': return <Star className="h-4 w-4 text-green-600 fill-green-600" />;
+        case 'جيد جداً': return <CheckCircle2 className="h-4 w-4 text-blue-600" />;
+        case 'جيد': return <ThumbsUp className="h-4 w-4 text-cyan-600" />;
+        case 'حسن': return <Smile className="h-4 w-4 text-yellow-600" />;
+        case 'متوسط': return <AlertCircle className="h-4 w-4 text-amber-600" />;
+        case 'لم يحفظ': return <XCircle className="h-4 w-4 text-red-600" />;
+        case 'غائب':
+        case 'غياب': return <UserMinus className="h-4 w-4 text-gray-400" />;
+        default: return <Minus className="h-4 w-4 text-gray-300" />;
+    }
+};
+
+const getEvaluationColor = (level: string | undefined) => {
+    switch (level) {
+        case 'ممتاز': return 'bg-green-50 text-green-700 border-green-200';
+        case 'جيد جداً': return 'bg-blue-50 text-blue-700 border-blue-200';
+        case 'جيد': return 'bg-cyan-50 text-cyan-700 border-cyan-200';
+        case 'حسن': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+        case 'متوسط': return 'bg-amber-50 text-amber-700 border-amber-200';
+        case 'لم يحفظ': return 'bg-red-50 text-red-700 border-red-200';
+        default: return 'bg-gray-50 text-gray-500 border-gray-200';
+    }
+};
+
 export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, currentOutcome }: WeeklyOutcomeModalProps) {
-    const { dailySessions, saveWeeklyOutcome, addDailySession, user } = useStudentContext();
-    const [evaluation, setEvaluation] = useState<PerformanceLevel>(currentOutcome?.evaluation || '');
+    const { dailySessions, saveWeeklyOutcome, addDailySession } = useStudentContext();
+    const { user } = useAuth();
+    const [evaluation, setEvaluation] = useState<PerformanceLevel>(currentOutcome?.evaluation || '' as PerformanceLevel);
     const [isSaving, setIsSaving] = useState(false);
     const [dailyEvaluations, setDailyEvaluations] = useState<Record<string, PerformanceLevel>>({});
+    const [savingDay, setSavingDay] = useState<string | null>(null);
+    const scrollRef = React.useRef<HTMLDivElement>(null);
 
     // Generate days from Saturday to Wednesday (5 days)
     const weekDays = useMemo(() => {
@@ -47,22 +78,30 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
                 isRegistered: !!record,
                 memorization: record?.memorization,
                 session: studentSession,
-                record: record
+                record: record,
+                isCounterStopped: studentSession?.isCounterStopped || false,
+                talqinSurahId: record?.talqinSurahId || studentSession?.talqinSurahId,
+                talqinFromVerse: record?.talqinFromVerse || studentSession?.talqinFromVerse,
+                talqinToVerse: record?.talqinToVerse || studentSession?.talqinToVerse,
+                tasmieSurahId: record?.tasmieSurahId || studentSession?.tasmieSurahId,
+                tasmieFromVerse: record?.tasmieFromVerse || studentSession?.tasmieFromVerse,
+                tasmieToVerse: record?.tasmieToVerse || studentSession?.tasmieToVerse,
             };
         });
     }, [weekDays, dailySessions, student.id]);
 
     const handleSave = async () => {
-        if (!evaluation) return;
+        if (!evaluation && evaluation !== 'clear') return;
         setIsSaving(true);
         try {
             // 1. Save Weekly Outcome
             const outcomeId = `${student.id}_${format(weekStartDate, 'yyyy-MM-dd')}`;
+            const finalEvaluation = evaluation === 'clear' ? '' : evaluation;
             const outcome: WeeklyOutcome = {
                 id: outcomeId,
                 studentId: student.id,
                 weekStartDate: format(weekStartDate, 'yyyy-MM-dd'),
-                evaluation,
+                evaluation: finalEvaluation as PerformanceLevel,
                 timestamp: new Date().toISOString()
             };
             await saveWeeklyOutcome(outcome);
@@ -88,13 +127,9 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
                 let sessionToUpdate = dayStatus?.session;
                 let recordToUpdate = dayStatus?.record;
 
-                // Create session if missing (Standard Session 1)
+                // Create session if missing (Wait, creating an entire session is complex. We'll only update if session exists).
                 if (!sessionToUpdate) {
-                    // We need to create a session.
-                    // But we need a sessionId.
-                    // And logic to handle this... might be complex to create from scratch here.
-                    // But let's try to update if exists.
-                    return; // For now skip if no session exists to avoid complexity of creating clean sessions without proper checks.
+                    return;
                 }
 
                 if (sessionToUpdate && recordToUpdate) {
@@ -107,8 +142,21 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
                     });
                     await addDailySession({ ...sessionToUpdate, records: updatedRecords });
                 } else if (sessionToUpdate && !recordToUpdate) {
-                    // Session exists but student not in it? Add student?
-                    // Probably better not to touch this edge case for safety unless requested.
+                    // Session exists but student not in it (or wasn't registered). Add student as present.
+                    const newRecord: DailyRecord = {
+                        studentId: student.id,
+                        attendance: 'حاضر',
+                        behavior: 'هادئ',
+                        memorization: newMemo,
+                        talqinSurahId: sessionToUpdate.talqinSurahId,
+                        talqinFromVerse: sessionToUpdate.talqinFromVerse,
+                        talqinToVerse: sessionToUpdate.talqinToVerse,
+                        tasmieSurahId: sessionToUpdate.tasmieSurahId,
+                        tasmieFromVerse: sessionToUpdate.tasmieFromVerse,
+                        tasmieToVerse: sessionToUpdate.tasmieToVerse,
+                    };
+                    const updatedRecords = [...(sessionToUpdate.records || []), newRecord];
+                    await addDailySession({ ...sessionToUpdate, records: updatedRecords });
                 }
             });
 
@@ -122,67 +170,189 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
         }
     };
 
+    const handleSaveDay = async (dayStatus: any) => {
+        let newMemo = dailyEvaluations[dayStatus.dateStr];
+        if (!newMemo) return;
+        if (newMemo === 'clear') newMemo = undefined;
+
+        if (newMemo === dayStatus.memorization) return;
+        setSavingDay(dayStatus.dateStr);
+        try {
+            let sessionToUpdate = dayStatus.session;
+            let recordToUpdate = dayStatus.record;
+
+            if (!sessionToUpdate) return;
+
+            if (sessionToUpdate && recordToUpdate) {
+                const updatedRecords = sessionToUpdate.records.map((r: any) => {
+                    if (r.studentId === student.id) {
+                        return { ...r, memorization: newMemo };
+                    }
+                    return r;
+                });
+                await addDailySession({ ...sessionToUpdate, records: updatedRecords });
+            } else if (sessionToUpdate && !recordToUpdate) {
+                const newRecord: DailyRecord = {
+                    studentId: student.id,
+                    attendance: 'حاضر',
+                    behavior: 'هادئ',
+                    memorization: newMemo,
+                    talqinSurahId: sessionToUpdate.talqinSurahId,
+                    talqinFromVerse: sessionToUpdate.talqinFromVerse,
+                    talqinToVerse: sessionToUpdate.talqinToVerse,
+                    tasmieSurahId: sessionToUpdate.tasmieSurahId,
+                    tasmieFromVerse: sessionToUpdate.tasmieFromVerse,
+                    tasmieToVerse: sessionToUpdate.tasmieToVerse,
+                };
+                const updatedRecords = [...(sessionToUpdate.records || []), newRecord];
+                await addDailySession({ ...sessionToUpdate, records: updatedRecords });
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setSavingDay(null);
+        }
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                    <DialogTitle>الحصيلة الأسبوعية: {student.fullName}</DialogTitle>
-                    <DialogDescription>
-                        تقييم الحفظ المجمع من السبت إلى الأربعاء ({format(weekDays[0], 'd/MM')} - {format(weekDays[4], 'd/MM')})
+            <DialogContent className="w-[95vw] max-w-[550px] p-0 max-h-[90vh] overflow-y-auto rounded-2xl">
+                <DialogHeader className="p-4 sm:p-6 pb-2 sticky top-0 bg-background z-20 border-b">
+                    <DialogTitle className="text-lg sm:text-xl flex items-center justify-between">
+                        <span>الحصيلة الأسبوعية: {student.fullName}</span>
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">{student.groupName}</span>
+                    </DialogTitle>
+                    <DialogDescription className="text-right text-xs sm:text-sm mt-1 sm:mt-0">
+                        تتبع الأوراد اليومية وتقييم الأداء للأسبوع الحالي ({format(weekDays[0], 'd/MM')} - {format(weekDays[4], 'd/MM')})
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-6 py-4">
-                    {/* Retroactive Daily Evaluation */}
-                    <div className="space-y-3">
-                        <Label className="text-sm font-semibold text-muted-foreground">تفقد الأوراد اليومية (تعديل بأثر رجعي)</Label>
-                        <div className="grid gap-2">
-                            {dayStatuses.map((day) => (
-                                <div key={day.dateStr} className="flex items-center justify-between p-2 rounded-md border bg-muted/20">
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-2 h-2 rounded-full ${day.memorization === 'ممتاز' ? 'bg-green-500' : day.memorization ? 'bg-blue-500' : 'bg-red-300'}`} />
-                                        <span className="font-medium text-sm">{format(day.date, 'EEEE', { locale: ar })}</span>
-                                        <span className="text-xs text-muted-foreground">({day.memorization || 'غير مسجل'})</span>
-                                    </div>
+                <div className="px-4 sm:px-6">
+                    <div className="space-y-6 py-4">
+                        {/* Retroactive Daily Evaluation */}
+                        <div className="space-y-3">
+                            <Label className="text-sm font-semibold text-muted-foreground">تفقد الأوراد اليومية (تعديل بأثر رجعي)</Label>
+                            <div className="grid gap-2">
+                                {dayStatuses.map((day) => {
+                                    const talqinSurah = surahs.find(s => s.id === day.talqinSurahId);
+                                    const tasmieSurah = surahs.find(s => s.id === day.tasmieSurahId);
 
-                                    <Select
-                                        dir="rtl"
-                                        value={dailyEvaluations[day.dateStr] || day.memorization || ''}
-                                        onValueChange={(val) => setDailyEvaluations(prev => ({ ...prev, [day.dateStr]: val as PerformanceLevel }))}
-                                    >
-                                        <SelectTrigger className="h-8 w-[130px] text-xs">
-                                            <SelectValue placeholder="تقييم" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {EVALUATION_OPTIONS.map(opt => (
-                                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            ))}
+                                    return (
+                                        <div key={day.dateStr} className="flex flex-col gap-3 p-3 sm:p-4 rounded-xl border bg-card shadow-sm transition-all hover:border-purple-200">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                <div className="flex items-center gap-3 w-full sm:w-auto min-w-0">
+                                                    <div className={cn(
+                                                        "p-2 rounded-lg border flex items-center justify-center shrink-0",
+                                                        getEvaluationColor(day.memorization || undefined)
+                                                    )}>
+                                                        {getEvaluationIcon(day.memorization || undefined)}
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                        <span className="font-bold text-sm tracking-tight">{format(day.date, 'EEEE', { locale: ar })}</span>
+                                                        <span className="text-[10px] text-muted-foreground truncate">
+                                                            {day.memorization || 'غير مسجل'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {day.session ? (
+                                                    <div className="flex flex-col gap-2">
+                                                        <Select
+                                                            dir="rtl"
+                                                            value={dailyEvaluations[day.dateStr] || day.memorization || ''}
+                                                            onValueChange={(val) => setDailyEvaluations(prev => ({ ...prev, [day.dateStr]: val as PerformanceLevel }))}
+                                                        >
+                                                            <SelectTrigger className="h-9 w-full sm:w-[120px] text-xs font-bold border-purple-100 bg-purple-50/30">
+                                                                <SelectValue placeholder="لا يوجد تقييم" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="clear" className="text-xs font-bold text-red-600">إلغاء التقييم</SelectItem>
+                                                                {EVALUATION_OPTIONS.map(opt => (
+                                                                    <SelectItem key={opt} value={opt} className="text-xs font-bold">{opt}</SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        {dailyEvaluations[day.dateStr] && dailyEvaluations[day.dateStr] !== day.memorization && (
+                                                            <Button
+                                                                size="sm"
+                                                                className="h-7 text-[10px] w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                                onClick={() => handleSaveDay(day)}
+                                                                disabled={savingDay === day.dateStr}
+                                                            >
+                                                                {savingDay === day.dateStr ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : "حفظ التعديل"}
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[10px] text-muted-foreground italic px-2">لا توجد حصة مسجلة</span>
+                                                )}
+                                            </div>
+
+                                            {day.isCounterStopped ? (
+                                                <div className="flex items-center gap-2 text-[10px] text-amber-700 font-bold bg-amber-50 px-3 py-2 rounded-lg border border-amber-100 animate-pulse">
+                                                    <AlertCircle className="h-3 w-3" />
+                                                    العداد موقوف لهذا اليوم
+                                                </div>
+                                            ) : (talqinSurah || tasmieSurah) ? (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    {talqinSurah && (
+                                                        <div className="flex flex-col gap-1 bg-emerald-50/50 p-2 sm:px-3 rounded-lg border border-emerald-100">
+                                                            <span className="text-[9px] text-emerald-700 font-extrabold flex items-center gap-1">
+                                                                <div className="w-1 h-1 rounded-full bg-emerald-500" />
+                                                                التلقين
+                                                            </span>
+                                                            <span className="text-[10.5px] truncate leading-tight font-medium text-emerald-900">
+                                                                سورة {talqinSurah.name} ({day.talqinFromVerse}-{day.talqinToVerse})
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {tasmieSurah && (
+                                                        <div className="flex flex-col gap-1 bg-blue-50/50 p-2 sm:px-3 rounded-lg border border-blue-100">
+                                                            <span className="text-[9px] text-blue-700 font-extrabold flex items-center gap-1">
+                                                                <div className="w-1 h-1 rounded-full bg-blue-500" />
+                                                                التسميع
+                                                            </span>
+                                                            <span className="text-[10.5px] truncate leading-tight font-medium text-blue-900">
+                                                                سورة {tasmieSurah.name} ({day.tasmieFromVerse}-{day.tasmieToVerse})
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="text-[10px] text-muted-foreground italic bg-muted/20 px-3 py-2 rounded-lg border border-dashed">
+                                                    لم يتم تحديد ورد لهذا اليوم
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="space-y-2 pt-4 border-t">
-                        <Label>التقييم الأسبوعي العام (5 أوراد)</Label>
-                        <Select dir="rtl" value={evaluation} onValueChange={(val) => setEvaluation(val as PerformanceLevel)}>
-                            <SelectTrigger className="w-full text-lg font-bold h-12">
-                                <SelectValue placeholder="اختر التقييم الأسبوعي" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {EVALUATION_OPTIONS.map(opt => (
-                                    <SelectItem key={opt} value={opt} className="font-bold">{opt}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                        <div className="space-y-2 pt-4 border-t">
+                            <Label className="flex items-center gap-2">
+                                <Star className="h-4 w-4 text-purple-600" />
+                                التقييم الأسبوعي العام (5 أوراد)
+                            </Label>
+                            <Select dir="rtl" value={evaluation} onValueChange={(val) => setEvaluation(val as PerformanceLevel)}>
+                                <SelectTrigger className="w-full text-lg font-bold h-12">
+                                    <SelectValue placeholder="لا يوجد تقييم" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="clear" className="font-bold text-red-600">إلغاء التقييم</SelectItem>
+                                    {EVALUATION_OPTIONS.map(opt => (
+                                        <SelectItem key={opt} value={opt} className="font-bold">{opt}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
 
+                    </div>
                 </div>
 
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>إلغاء</Button>
-                    <Button onClick={handleSave} disabled={!evaluation || isSaving} className="gap-2">
+                <DialogFooter className="p-4 sm:p-6 sm:pt-4 border-t bg-muted/5 flex flex-col sm:flex-row gap-2 sticky bottom-0 z-20">
+                    <Button variant="outline" className="w-full sm:w-auto" onClick={onClose}>إلغاء</Button>
+                    <Button onClick={handleSave} disabled={(!evaluation && evaluation !== 'clear') || isSaving} className="w-full sm:w-auto gap-2 bg-purple-600 hover:bg-purple-700 text-white shadow-lg">
                         {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
                         <Save className="h-4 w-4" />
                         حفظ الحصيلة

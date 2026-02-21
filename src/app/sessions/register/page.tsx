@@ -64,6 +64,17 @@ function RegisterSessionContent() {
     const [fromVerse, setFromVerse] = useState<number>(1);
     const [toVerse, setToVerse] = useState<number>(1);
     const [isReview, setIsReview] = useState(false);
+    const [isCounterStopped, setIsCounterStopped] = useState(false);
+
+    // Admin5 Talqin Wird
+    const [talqinSurahId, setTalqinSurahId] = useState<number>(26);
+    const [talqinFromVerse, setTalqinFromVerse] = useState<number>(1);
+    const [talqinToVerse, setTalqinToVerse] = useState<number>(1);
+
+    // Admin5 Tasmie Wird
+    const [tasmieSurahId, setTasmieSurahId] = useState<number>(26);
+    const [tasmieFromVerse, setTasmieFromVerse] = useState<number>(1);
+    const [tasmieToVerse, setTasmieToVerse] = useState<number>(1);
     const [attendanceRecords, setAttendanceRecords] = useState<Record<string, AttendanceRecord>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -180,6 +191,15 @@ function RegisterSessionContent() {
                     if (session.fromVerse) setFromVerse(session.fromVerse);
                     if (session.toVerse) setToVerse(session.toVerse);
                     if (session.isReview) setIsReview(session.isReview);
+                    setIsCounterStopped(session.isCounterStopped || false);
+
+                    if (session.talqinSurahId) setTalqinSurahId(session.talqinSurahId);
+                    if (session.talqinFromVerse) setTalqinFromVerse(session.talqinFromVerse);
+                    if (session.talqinToVerse) setTalqinToVerse(session.talqinToVerse);
+
+                    if (session.tasmieSurahId) setTasmieSurahId(session.tasmieSurahId);
+                    if (session.tasmieFromVerse) setTasmieFromVerse(session.tasmieFromVerse);
+                    if (session.tasmieToVerse) setTasmieToVerse(session.tasmieToVerse);
 
                     const records: any = {};
                     session.records?.forEach((record: any) => {
@@ -393,8 +413,15 @@ function RegisterSessionContent() {
         fromVerse,
         toVerse,
         isReview,
+        isCounterStopped,
+        talqinSurahId,
+        talqinFromVerse,
+        talqinToVerse,
+        tasmieSurahId,
+        tasmieFromVerse,
+        tasmieToVerse,
         attendanceRecords
-    }), [sessionType, teacherAbsenceReason, substituteTeacher, activityType, activityDescription, surahId, fromVerse, toVerse, isReview, attendanceRecords]);
+    }), [sessionType, teacherAbsenceReason, substituteTeacher, activityType, activityDescription, surahId, fromVerse, toVerse, isReview, isCounterStopped, talqinSurahId, talqinFromVerse, talqinToVerse, tasmieSurahId, tasmieFromVerse, tasmieToVerse, attendanceRecords]);
 
     const debouncedSessionData = useDebounce(sessionData, 1500); // Auto-save after 1.5s of inactivity
 
@@ -462,9 +489,15 @@ function RegisterSessionContent() {
                     ...d,
                     sessionId: id,
                     studentId,
-                    surahId: isAdmin5 ? data.surahId : (d.surahId || null),
-                    fromVerse: isAdmin5 ? data.fromVerse : (d.fromVerse || null),
-                    toVerse: isAdmin5 ? data.toVerse : (d.toVerse || null),
+                    surahId: isAdmin5 ? (data.isCounterStopped ? null : data.talqinSurahId) : (d.surahId || null),
+                    fromVerse: isAdmin5 ? (data.isCounterStopped ? null : data.talqinFromVerse) : (d.fromVerse || null),
+                    toVerse: isAdmin5 ? (data.isCounterStopped ? null : data.talqinToVerse) : (d.toVerse || null),
+                    talqinSurahId: isAdmin5 ? data.talqinSurahId : null,
+                    talqinFromVerse: isAdmin5 ? data.talqinFromVerse : null,
+                    talqinToVerse: isAdmin5 ? data.talqinToVerse : null,
+                    tasmieSurahId: isAdmin5 ? data.tasmieSurahId : null,
+                    tasmieFromVerse: isAdmin5 ? data.tasmieFromVerse : null,
+                    tasmieToVerse: isAdmin5 ? data.tasmieToVerse : null,
                     catchUpRecords: d.catchUpRecords || [], // Save catch-up records
                 };
             }
@@ -483,9 +516,16 @@ function RegisterSessionContent() {
             activityType: (data.sessionType === 'حصة أنشطة' && data.activityType) ? data.activityType : null,
             activityDescription: (data.sessionType === 'حصة أنشطة' && data.activityDescription) ? data.activityDescription : null,
             surahId: isAdmin5 ? data.surahId : null,
-            fromVerse: isAdmin5 ? data.fromVerse : null,
-            toVerse: isAdmin5 ? data.toVerse : null,
+            fromVerse: isAdmin5 ? (data.isCounterStopped ? null : data.talqinFromVerse) : null,
+            toVerse: isAdmin5 ? (data.isCounterStopped ? null : data.talqinToVerse) : null,
             isReview: isAdmin5 ? data.isReview : false,
+            isCounterStopped: isAdmin5 ? data.isCounterStopped : false,
+            talqinSurahId: isAdmin5 ? data.talqinSurahId : null,
+            talqinFromVerse: isAdmin5 ? data.talqinFromVerse : null,
+            talqinToVerse: isAdmin5 ? data.talqinToVerse : null,
+            tasmieSurahId: isAdmin5 ? data.tasmieSurahId : null,
+            tasmieFromVerse: isAdmin5 ? data.tasmieFromVerse : null,
+            tasmieToVerse: isAdmin5 ? data.tasmieToVerse : null,
             records: recordsArray
         };
 
@@ -641,6 +681,15 @@ function RegisterSessionContent() {
                     if (session.fromVerse) setFromVerse(session.fromVerse);
                     if (session.toVerse) setToVerse(session.toVerse);
                     if (session.isReview) setIsReview(session.isReview);
+                    setIsCounterStopped(session.isCounterStopped || false);
+
+                    if (session.talqinSurahId) setTalqinSurahId(session.talqinSurahId);
+                    if (session.talqinFromVerse) setTalqinFromVerse(session.talqinFromVerse);
+                    if (session.talqinToVerse) setTalqinToVerse(session.talqinToVerse);
+
+                    if (session.tasmieSurahId) setTasmieSurahId(session.tasmieSurahId);
+                    if (session.tasmieFromVerse) setTasmieFromVerse(session.tasmieFromVerse);
+                    if (session.tasmieToVerse) setTasmieToVerse(session.tasmieToVerse);
 
                     const records: any = {};
                     session.records?.forEach((record: any) => {
@@ -731,10 +780,17 @@ function RegisterSessionContent() {
 
         // Message 1: Daily Progress
         let dailyContent = "";
-        if (isCompletion) {
-            dailyContent = `قائمة الطلبة الذين إستظهروا سورة ${currentSurah?.name || ''} : \n`;
+        if (isCounterStopped) {
+            dailyContent = `(العداد موقوف لهذا اليوم)\n`;
         } else {
-            dailyContent = `قائمة الطلبة الذين إستظهروا من الآية(${pad(fromVerse)}) إلى الآية(${pad(toVerse)}) من سورة ${currentSurah?.name || ''} : \n`;
+            const tasmieSurah = surahs.find(s => s.id === tasmieSurahId);
+            const isTasmieCompletion = tasmieToVerse === tasmieSurah?.verses;
+
+            if (isTasmieCompletion) {
+                dailyContent = `قائمة الطلبة الذين إستظهروا ورد التسميع (سورة ${tasmieSurah?.name || ''}) : \n`;
+            } else {
+                dailyContent = `قائمة الطلبة الذين إستظهروا ورد التسميع من الآية(${pad(tasmieFromVerse)}) إلى الآية(${pad(tasmieToVerse)}) من سورة ${tasmieSurah?.name || ''} : \n`;
+            }
         }
         dailyContent += recitedStudents.length > 0 ? recitedStudents.join('\n') : "لا يوجد";
 
@@ -1008,9 +1064,26 @@ function RegisterSessionContent() {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-emerald-800 font-bold">
                                 <BookOpen className="h-5 w-5" />
-                                <span>بيانات الحفظ الجماعية لسورة {surahs.find(s => s.id === surahId)?.name}</span>
+                                <span>{isCounterStopped ? "العداد موقوف" : `بيانات الأوراد الجماعية`}</span>
                             </div>
                             <div className="flex items-center gap-2">
+                                <Button
+                                    onClick={() => {
+                                        setIsCounterStopped(!isCounterStopped);
+                                        setIsDirty(true);
+                                    }}
+                                    variant="outline"
+                                    size="sm"
+                                    className={cn(
+                                        "h-9 px-3 rounded-lg font-bold text-[11px] transition-all border-2",
+                                        isCounterStopped
+                                            ? "bg-red-100 text-red-800 border-red-300 hover:bg-red-200"
+                                            : "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+                                    )}
+                                >
+                                    {isCounterStopped ? <TimerOff className="ml-1.5 h-3.5 w-3.5" /> : <RefreshCw className="ml-1.5 h-3.5 w-3.5" />}
+                                    {isCounterStopped ? "تشغيل العداد" : "توقيف العداد"}
+                                </Button>
                                 <Button
                                     onClick={() => {
                                         setIsReview(!isReview);
@@ -1027,58 +1100,100 @@ function RegisterSessionContent() {
                                     title={isReview ? "هذه الآيات للمراجعة فقط ولا تضاف للرصيد" : "هذه الآيات حفظ جديد وتضاف للرصيد"}
                                 >
                                     {isReview ? <RotateCcw className="ml-1.5 h-3.5 w-3.5" /> : <Trophy className="ml-1.5 h-3.5 w-3.5" />}
-                                    {isReview ? "وضع مراجعة (لا يُحسب في الرصيد)" : "وضع حفظ (يُحسب في الرصيد)"}
+                                    {isReview ? "وضع مراجعة" : "وضع حفظ"}
                                 </Button>
-                                <div className="text-[10px] bg-emerald-100 px-2 py-0.5 rounded-full text-emerald-700 font-bold">
-                                    خاص بـ {user?.displayName || 'الشيخ'}
-                                </div>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                            <div className="space-y-1 col-span-1 md:col-span-2">
-                                <Label className="text-[11px] font-bold text-emerald-700">السورة</Label>
-                                <SearchableSelect
-                                    options={surahOptions}
-                                    value={surahId.toString()}
-                                    onValueChange={(val) => {
-                                        setSurahId(parseInt(val));
-                                        setIsDirty(true);
-                                    }}
-                                    placeholder="اختر السورة"
-                                    searchPlaceholder="ابحث عن سورة..."
-                                    className="h-10 bg-white border-emerald-200 focus:ring-emerald-500"
-                                />
-                            </div>
-                            <div className="flex gap-4">
-                                <div className="space-y-1 flex-1">
-                                    <Label className="text-[11px] font-bold text-emerald-700">من آية</Label>
-                                    <Input
-                                        type="number"
-                                        value={fromVerse}
-                                        onChange={(e) => {
-                                            setFromVerse(parseInt(e.target.value));
-                                            setIsDirty(true);
-                                        }}
-                                        className="h-10 bg-white border-emerald-200 focus:border-emerald-500"
-                                        min={1}
-                                    />
+
+                        {!isCounterStopped && (
+                            <div className="space-y-4 animate-in fade-in duration-300">
+                                {/* Wird Al-Talqin */}
+                                <div className="p-3 bg-white/50 rounded-lg border border-emerald-100 space-y-2">
+                                    <Label className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">ورد التلقين (يُصحح اليوم)</Label>
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                                        <div className="col-span-1 md:col-span-2">
+                                            <SearchableSelect
+                                                options={surahOptions}
+                                                value={talqinSurahId.toString()}
+                                                onValueChange={(val) => {
+                                                    setTalqinSurahId(parseInt(val));
+                                                    setIsDirty(true);
+                                                }}
+                                                placeholder="اختر السورة"
+                                                className="h-9 bg-white border-emerald-100"
+                                            />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                type="number"
+                                                value={talqinFromVerse}
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value);
+                                                    setTalqinFromVerse(isNaN(val) ? '' as any : val);
+                                                    setIsDirty(true);
+                                                }}
+                                                className="h-9 bg-white border-emerald-100"
+                                                placeholder="من"
+                                            />
+                                            <Input
+                                                type="number"
+                                                value={talqinToVerse}
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value);
+                                                    setTalqinToVerse(isNaN(val) ? '' as any : val);
+                                                    setIsDirty(true);
+                                                }}
+                                                className="h-9 bg-white border-emerald-100"
+                                                placeholder="إلى"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="space-y-1 flex-1">
-                                    <Label className="text-[11px] font-bold text-emerald-700">إلى آية</Label>
-                                    <Input
-                                        type="number"
-                                        value={toVerse}
-                                        onChange={(e) => {
-                                            setToVerse(parseInt(e.target.value));
-                                            setIsDirty(true);
-                                        }}
-                                        className="h-10 bg-white border-emerald-200 focus:border-emerald-500"
-                                        min={fromVerse}
-                                        max={surahs.find(s => s.id === surahId)?.verses || 286}
-                                    />
+
+                                {/* Wird Al-Tasmie */}
+                                <div className="p-3 bg-white/50 rounded-lg border border-emerald-100 space-y-2">
+                                    <Label className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">ورد التسميع (تلقين الأمس)</Label>
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                                        <div className="col-span-1 md:col-span-2">
+                                            <SearchableSelect
+                                                options={surahOptions}
+                                                value={tasmieSurahId.toString()}
+                                                onValueChange={(val) => {
+                                                    setTasmieSurahId(parseInt(val));
+                                                    setIsDirty(true);
+                                                }}
+                                                placeholder="اختر السورة"
+                                                className="h-9 bg-white border-emerald-100"
+                                            />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                type="number"
+                                                value={tasmieFromVerse}
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value);
+                                                    setTasmieFromVerse(isNaN(val) ? '' as any : val);
+                                                    setIsDirty(true);
+                                                }}
+                                                className="h-9 bg-white border-emerald-100"
+                                                placeholder="من"
+                                            />
+                                            <Input
+                                                type="number"
+                                                value={tasmieToVerse}
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value);
+                                                    setTasmieToVerse(isNaN(val) ? '' as any : val);
+                                                    setIsDirty(true);
+                                                }}
+                                                className="h-9 bg-white border-emerald-100"
+                                                placeholder="إلى"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 )}
 

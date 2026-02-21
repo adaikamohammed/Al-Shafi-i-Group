@@ -72,7 +72,7 @@ export interface Student {
 }
 
 export type AttendanceStatus = "حاضر" | "غياب" | "غائب" | "متأخر" | "تعويض" | "";
-export type PerformanceLevel = "ممتاز" | "جيد جدا" | "جيد جداً" | "جيد" | "متوسط" | "مقبول" | "ضعيف" | "لم يحفظ" | "لا يوجد" | "";
+export type PerformanceLevel = "ممتاز" | "جيد جدا" | "جيد جداً" | "جيد" | "حسن" | "متوسط" | "مقبول" | "ضعيف" | "لم يحفظ" | "لا يوجد" | "";
 export type BehaviorLevel = "هادئ" | "متوسط" | "مقبول" | "غير منضبط" | "مشاغب" | "";
 export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة" | "حصة تعويضية" | "غياب الشيخ" | "حصة إضافية";
 
@@ -98,6 +98,14 @@ export interface DailyRecord {
   surahId?: number;
   fromVerse?: number;
   toVerse?: number;
+  // Talqin (Teaching)
+  talqinSurahId?: number;
+  talqinFromVerse?: number;
+  talqinToVerse?: number;
+  // Tasmie (Recitation)
+  tasmieSurahId?: number;
+  tasmieFromVerse?: number;
+  tasmieToVerse?: number;
 }
 
 // A day can have multiple sessions
@@ -115,6 +123,18 @@ export interface DailySession {
   fromVerse?: number;
   toVerse?: number;
   isReview?: boolean;
+  isCounterStopped?: boolean;
+
+  // Talqin (Teaching)
+  talqinSurahId?: number;
+  talqinFromVerse?: number;
+  talqinToVerse?: number;
+
+  // Tasmie (Recitation)
+  tasmieSurahId?: number;
+  tasmieFromVerse?: number;
+  tasmieToVerse?: number;
+
   ownerId?: string; // ID of the sheikh who created the session
   isTransferred?: boolean; // Flag for sessions moved between sheikhs
   transferredFrom?: string;

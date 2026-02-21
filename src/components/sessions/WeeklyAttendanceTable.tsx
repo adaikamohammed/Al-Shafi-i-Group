@@ -15,6 +15,7 @@ interface WeeklyAttendanceTableProps {
     getSessionsForDay: (dateString: string) => any[];
     onDayClick: (dateStr: string, sessionNumber: number) => void;
     isAdmin5?: boolean;
+    initialDate?: Date; // Optional: sync with external calendar date
 }
 
 const getSaturday = (date: Date): Date => {
@@ -39,9 +40,17 @@ export const WeeklyAttendanceTable = ({
     getSessionsForDay,
     onDayClick,
     isAdmin5 = false,
+    initialDate,
 }: WeeklyAttendanceTableProps) => {
 
-    const [weekStart, setWeekStart] = useState(() => getSaturday(new Date()));
+    const [weekStart, setWeekStart] = useState(() => getSaturday(initialDate || new Date()));
+
+    // Sync weekStart when initialDate changes from parent (calendar navigation)
+    React.useEffect(() => {
+        if (initialDate) {
+            setWeekStart(getSaturday(initialDate));
+        }
+    }, [initialDate?.toISOString().slice(0, 10)]);
 
     const weekDays = useMemo(() => {
         return Array.from({ length: 7 }, (_, i) => {
@@ -241,31 +250,90 @@ export const WeeklyAttendanceTable = ({
                 <div className="overflow-x-auto w-full">
                     <table className="w-full border-collapse min-w-[700px]">
                         <thead>
-                            {/* Admin5 Wird Row - Only visible for admin5 */}
+                            {/* Admin5 Talqin Wird Row */}
                             {isAdmin5 && (
-                                <tr className="bg-amber-50/80 border-b border-amber-100">
-                                    <th className="sticky right-0 z-20 bg-amber-50 border-b border-l text-right p-2 text-[10px] font-bold text-amber-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                                        المقرر اليومي
+                                <tr className="bg-emerald-50/80 border-b border-emerald-100">
+                                    <th className="sticky right-0 z-20 bg-emerald-50 border-b border-l text-right p-2 text-[10px] font-bold text-emerald-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap">
+                                        📗 ورد التلقين
                                     </th>
-                                    <th className="border-b border-l bg-amber-50/50"></th>
+                                    <th className="border-b border-l bg-emerald-50/50"></th>
                                     {weekDays.map(day => {
                                         const session = weekSessionData[day.dateStr];
                                         const colClass = getColumnStyle(day, session);
 
                                         let wirdText = "—";
-                                        if (session?.surahId) {
-                                            const surah = surahs.find(s => s.id === session.surahId);
-                                            wirdText = surah ? `سورة ${surah.name}` : "";
-                                            if (session.fromVerse && session.toVerse) {
-                                                wirdText += ` (${session.fromVerse}-${session.toVerse})`;
+                                        const sessionType = session?.sessionType;
+                                        const isHolidayOrAbsence = day.isWeekend || sessionType === 'يوم عطلة' || sessionType === 'غياب الشيخ' || sessionType === 'حصة أنشطة';
+
+                                        if (!isHolidayOrAbsence) {
+                                            // Admin5 uses talqinSurahId/talqinFromVerse/talqinToVerse
+                                            const talqinSurahId = session?.talqinSurahId;
+                                            if (talqinSurahId) {
+                                                const surah = surahs.find(s => s.id === talqinSurahId);
+                                                wirdText = surah ? `${surah.name}` : "";
+                                                if (session.talqinFromVerse && session.talqinToVerse) {
+                                                    wirdText += ` (${session.talqinFromVerse}-${session.talqinToVerse})`;
+                                                }
+                                            } else if (session?.surahId && !session?.tasmieSurahId) {
+                                                // Fallback to generic surahId if no specific talqin fields
+                                                const surah = surahs.find(s => s.id === session.surahId);
+                                                wirdText = surah ? `${surah.name}` : "";
+                                                if (session.fromVerse && session.toVerse) {
+                                                    wirdText += ` (${session.fromVerse}-${session.toVerse})`;
+                                                }
                                             }
                                         }
                                         return (
-                                            <th key={`wird-${day.dateStr}`} className={cn(
-                                                "border-b border-l p-1 text-[10px] font-normal text-amber-900 text-center h-8",
-                                                colClass ? colClass : "bg-amber-50/30"
+                                            <th key={`talqin-${day.dateStr}`} className={cn(
+                                                "border-b border-l p-1 text-[10px] font-normal text-emerald-900 text-center h-8",
+                                                colClass ? colClass : "bg-emerald-50/20"
                                             )}>
-                                                {wirdText !== "—" ? wirdText : <span className="opacity-30">—</span>}
+                                                {wirdText !== "—" ? (
+                                                    <span className="inline-block bg-emerald-100 text-emerald-800 rounded px-1 leading-tight">
+                                                        {wirdText}
+                                                    </span>
+                                                ) : <span className="opacity-30">—</span>}
+                                            </th>
+                                        );
+                                    })}
+                                </tr>
+                            )}
+
+                            {/* Admin5 Tasmie Wird Row */}
+                            {isAdmin5 && (
+                                <tr className="bg-purple-50/80 border-b border-purple-100">
+                                    <th className="sticky right-0 z-20 bg-purple-50 border-b border-l text-right p-2 text-[10px] font-bold text-purple-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap">
+                                        📘 ورد التسميع
+                                    </th>
+                                    <th className="border-b border-l bg-purple-50/50"></th>
+                                    {weekDays.map(day => {
+                                        const session = weekSessionData[day.dateStr];
+                                        const colClass = getColumnStyle(day, session);
+
+                                        let wirdText = "—";
+                                        const sessionType2 = session?.sessionType;
+                                        const isHolidayOrAbsence2 = day.isWeekend || sessionType2 === 'يوم عطلة' || sessionType2 === 'غياب الشيخ' || sessionType2 === 'حصة أنشطة';
+
+                                        if (!isHolidayOrAbsence2) {
+                                            const tasmieSurahId = session?.tasmieSurahId;
+                                            if (tasmieSurahId) {
+                                                const surah = surahs.find(s => s.id === tasmieSurahId);
+                                                wirdText = surah ? `${surah.name}` : "";
+                                                if (session.tasmieFromVerse && session.tasmieToVerse) {
+                                                    wirdText += ` (${session.tasmieFromVerse}-${session.tasmieToVerse})`;
+                                                }
+                                            }
+                                        }
+                                        return (
+                                            <th key={`tasmie-${day.dateStr}`} className={cn(
+                                                "border-b border-l p-1 text-[10px] font-normal text-purple-900 text-center h-8",
+                                                colClass ? colClass : "bg-purple-50/20"
+                                            )}>
+                                                {wirdText !== "—" ? (
+                                                    <span className="inline-block bg-purple-100 text-purple-800 rounded px-1 leading-tight">
+                                                        {wirdText}
+                                                    </span>
+                                                ) : <span className="opacity-30">—</span>}
                                             </th>
                                         );
                                     })}
