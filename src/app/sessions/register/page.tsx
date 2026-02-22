@@ -1069,7 +1069,10 @@ function RegisterSessionContent() {
                             <div className="flex items-center gap-2">
                                 <Button
                                     onClick={() => {
-                                        setIsCounterStopped(!isCounterStopped);
+                                        const newStopped = !isCounterStopped;
+                                        setIsCounterStopped(newStopped);
+                                        // admin5: auto-toggle review mode with counter
+                                        if (isAdmin5) setIsReview(newStopped);
                                         setIsDirty(true);
                                     }}
                                     variant="outline"

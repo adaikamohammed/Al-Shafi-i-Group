@@ -91,12 +91,12 @@ import { startOfWeek, addDays, isSameDay } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 
-// Custom Components
 import { SessionCalendar } from '@/components/sessions/SessionCalendar';
 import { AttendanceList, AttendanceRecord } from '@/components/sessions/AttendanceList';
 import { WeeklyAttendanceTable } from '@/components/sessions/WeeklyAttendanceTable';
 import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
 import { Admin5MessagesPanel } from '@/components/sessions/Admin5MessagesPanel';
+import { WeeklyStatsRow } from '@/components/sessions/WeeklyStatsRow';
 
 export default function DailySessionsPage() {
   const { user, isSuperAdmin } = useAuth();
@@ -471,18 +471,18 @@ export default function DailySessionsPage() {
     <ProtectedPage>
       <div className="container mx-auto p-4 space-y-8 pb-32 max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-700">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
-            <h1 className="text-3xl md:text-4xl font-headline font-bold text-gray-900">سجل الحصص اليومية</h1>
-            <p className="text-muted-foreground font-body text-lg">إدارة الحضور، التقييم، ومتابعة أداء الفوج.</p>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-headline font-bold text-gray-900">سجل الحصص اليومية</h1>
+            <p className="text-muted-foreground font-body text-sm sm:text-base hidden sm:block">إدارة الحضور، التقييم، ومتابعة أداء الفوج.</p>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-3 items-end md:items-center">
+          <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
             {isAdminUser && (
-              <div className="w-full md:w-64">
+              <div className="w-full sm:w-56">
                 <Select value={selectedSheikhId} onValueChange={setSelectedSheikhId}>
-                  <SelectTrigger className="h-10">
-                    <SelectValue placeholder="اختر الشيخ (للعرض/الإضافة)" />
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="اختر الشيخ" />
                   </SelectTrigger>
                   <SelectContent>
                     {/* Deduplicated and sorted by group number (فوج 1 to فوج 18) */}
@@ -514,12 +514,12 @@ export default function DailySessionsPage() {
               </div>
             )}
 
-            <div className="flex items-center gap-2 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
-              <Trophy className="h-5 w-5 text-emerald-600" />
-              <span className="font-bold text-emerald-800 font-headline">الدوري نشط</span>
+            <div className="hidden sm:flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">
+              <Trophy className="h-4 w-4 text-emerald-600" />
+              <span className="font-bold text-emerald-800 font-headline text-sm">الدوري نشط</span>
             </div>
 
-            {/* View Toggle - Available to all */}
+            {/* View Toggle */}
             <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border">
               <Button
                 variant={viewMode === 'calendar' ? 'default' : 'ghost'}
@@ -593,16 +593,33 @@ export default function DailySessionsPage() {
           />
         )}
 
-        {/* Admin5: Always show WeeklyAttendanceTable below calendar when in calendar view */}
-        {isAdmin5 && viewMode === 'calendar' && filteredStudentsForTable.length > 0 && (
-          <div className="mt-2">
+        {/* Weekly Attendance Table: shown always in calendar view when students are loaded */}
+        {viewMode === 'calendar' && filteredStudentsForTable.length > 0 && (
+          <div className="mt-2 space-y-3">
             <WeeklyAttendanceTable
               students={filteredStudentsForTable}
               getSessionsForDay={filteredGetSessionsForDay}
               onDayClick={handleTableDayClick}
-              isAdmin5={true}
+              isAdmin5={isAdmin5}
               initialDate={currentDate}
             />
+
+            {/* Per-day stats row */}
+            <WeeklyStatsRow
+              students={filteredStudentsForTable}
+              getSessionsForDay={filteredGetSessionsForDay}
+              initialDate={currentDate}
+            />
+
+            {/* Admin5 panel: WhatsApp messages + harvest */}
+            {isAdmin5 && (
+              <Admin5MessagesPanel
+                students={activeStudentsForWeeklyOutcome}
+                weekDates={weekDates}
+                dailySessions={isAdmin5 ? sheikhSessions : dailySessions}
+                weeklyOutcomes={weeklyOutcomes}
+              />
+            )}
           </div>
         )}
 

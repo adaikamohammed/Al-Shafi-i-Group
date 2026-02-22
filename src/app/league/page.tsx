@@ -83,14 +83,17 @@ export default function LeaguePage() {
                             break;
                     }
 
-                    if (record.memorization === 'ممتاز') {
-                        goalsFor += 2;
-                    } else if (record.memorization === 'جيد جداً') {
-                        goalsFor += 1;
-                    } else if (record.memorization === 'متوسط') {
-                        goalsAgainst += 1;
-                    } else if (record.memorization === 'ضعيف') {
-                        goalsAgainst += 2;
+                    // Skip memorization goal scoring if student is in review mode
+                    if (!record.review) {
+                        if (record.memorization === 'ممتاز') {
+                            goalsFor += 2;
+                        } else if (record.memorization === 'جيد جداً') {
+                            goalsFor += 1;
+                        } else if (record.memorization === 'متوسط') {
+                            goalsAgainst += 1;
+                        } else if (record.memorization === 'ضعيف') {
+                            goalsAgainst += 2;
+                        }
                     }
 
                     if (record.behavior === 'هادئ') {

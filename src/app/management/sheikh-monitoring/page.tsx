@@ -1,587 +1,445 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import {
-    Calendar, Shield, ArrowLeft, Loader2, Info, CheckCircle2, XCircle,
-    CalendarDays, CalendarRange, CalendarCheck, History, User, Users, UserPlus,
-    Clock, BookOpen, AlertCircle, ChevronLeft, ChevronRight, Activity,
-    Calendar as CalendarIcon, Filter, Search, Download, Flame, Star, Megaphone
+    Shield, Loader2, CheckCircle2, XCircle, Clock, BookOpen,
+    ChevronLeft, ChevronRight, Users, Activity, RotateCcw,
+    CalendarDays, BarChart2, AlertTriangle, UserX, Smile, UserPlus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
     format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
-    isWithinInterval, parseISO, isSameDay, eachDayOfInterval,
-    subDays, startOfDay, endOfDay
+    eachDayOfInterval, parseISO, addDays, subDays, getDay, isToday,
+    addMonths, subMonths
 } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { PORTAL_THEMES } from '@/lib/themes';
-import { motion, AnimatePresence } from 'framer-motion';
 
-const getSessionColor = (type?: string, hasSubstitute?: boolean) => {
-    switch (type) {
-        case 'حصة أساسية': return 'bg-emerald-500';
-        case 'حصة أنشطة': return 'bg-purple-500';
-        case 'يوم عطلة': return 'bg-sky-500';
-        case 'غياب الشيخ': return hasSubstitute ? 'bg-orange-500' : 'bg-rose-500';
-        case 'حصة تعويضية': return 'bg-amber-500';
-        case 'حصة إضافية': return 'bg-indigo-500';
-        case 'غياب الشيخ مع بديل': return 'bg-orange-500';
-        default: return 'bg-slate-400';
-    }
+// ─── Constants ─────────────────────────────────────────────────────────────
+const TYPE_CONFIG: Record<string, { label: string; dot: string; bg: string; text: string }> = {
+    'حصة أساسية': { label: 'أساسية', dot: 'bg-emerald-500', bg: 'bg-emerald-50  border-emerald-200', text: 'text-emerald-700' },
+    'حصة تعويضية': { label: 'تعويضية', dot: 'bg-amber-500', bg: 'bg-amber-50   border-amber-200', text: 'text-amber-700' },
+    'حصة إضافية': { label: 'إضافية', dot: 'bg-indigo-500', bg: 'bg-indigo-50  border-indigo-200', text: 'text-indigo-700' },
+    'حصة أنشطة': { label: 'أنشطة', dot: 'bg-purple-500', bg: 'bg-purple-50  border-purple-200', text: 'text-purple-700' },
+    'يوم عطلة': { label: 'عطلة', dot: 'bg-sky-400', bg: 'bg-sky-50     border-sky-200', text: 'text-sky-700' },
+    'غياب الشيخ': { label: 'غياب شيخ', dot: 'bg-rose-500', bg: 'bg-rose-50    border-rose-200', text: 'text-rose-700' },
 };
 
-const SESSION_LEGEND = [
-    { label: 'حصة أساسية', color: 'bg-emerald-500', icon: BookOpen },
-    { label: 'حصة أنشطة', color: 'bg-purple-500', icon: Activity },
-    { label: 'يوم عطلة', color: 'bg-sky-500', icon: CalendarIcon },
-    { label: 'غياب الشيخ', color: 'bg-rose-500', icon: XCircle },
-    { label: 'غياب مع بديل', color: 'bg-orange-500', icon: UserPlus },
-    { label: 'حصة تعويضية', color: 'bg-amber-500', icon: History },
-];
+const getAttColor = (pct: number | null) => {
+    if (pct === null) return 'text-muted-foreground';
+    if (pct >= 90) return 'text-emerald-700 font-bold';
+    if (pct >= 70) return 'text-amber-600 font-bold';
+    return 'text-rose-600 font-bold';
+};
 
+// ─── Page ───────────────────────────────────────────────────────────────────
 export default function SheikhMonitoringPage() {
-    const { dailySessions, allUsers, loading } = useStudentContext();
-    const { isManagement, user } = useAuth();
+    const { dailySessions, allUsers, loading, students } = useStudentContext();
+    const { isManagement } = useAuth();
+
     const [view, setView] = useState<'day' | 'week' | 'month'>('day');
     const [selectedDate, setSelectedDate] = useState(new Date());
 
-    // Theme Logic
-    const currentThemeId = user?.portalTheme || 'midnight';
-    const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
-
+    // ── Sheikhs grouped by group (one row per group) ──────────────────────
     const sheikhs = useMemo(() => {
-        const filtered = allUsers.filter(u => u.role === 'sheikh' && u.group);
-        const groupsMap = new Map();
-
-        for (const u of filtered) {
-            if (!groupsMap.has(u.group)) {
-                groupsMap.set(u.group, {
-                    ...u,
-                    uids: new Set([u.uid])
-                });
-            } else {
-                groupsMap.get(u.group).uids.add(u.uid);
-            }
-        }
-
-        return Array.from(groupsMap.values()).sort((a, b) => {
-            const numA = parseInt(a.group?.replace(/[^0-9]/g, '') || '0');
-            const numB = parseInt(b.group?.replace(/[^0-9]/g, '') || '0');
-            return numA - numB;
+        const map = new Map<string, any>();
+        allUsers.filter(u => u.role === 'sheikh' && u.group).forEach(u => {
+            if (!map.has(u.group!)) map.set(u.group!, { ...u, uids: new Set([u.uid]) });
+            else map.get(u.group!).uids.add(u.uid);
+        });
+        return Array.from(map.values()).sort((a, b) => {
+            const na = parseInt(a.group?.replace(/\D/g, '') || '0');
+            const nb = parseInt(b.group?.replace(/\D/g, '') || '0');
+            return na - nb;
         });
     }, [allUsers]);
 
-    const monitoringData = useMemo(() => {
-        if (!dailySessions) return [];
+    // ── Per-group sessions by date ─────────────────────────────────────────
+    const groupSessions = useMemo(() => {
+        const result = new Map<string, Map<string, any[]>>(); // group → date → sessions[]
+        sheikhs.forEach(sh => result.set(sh.group, new Map()));
 
-        return sheikhs.map(groupRepresentative => {
-            // Use a Map to ensure only one session per date and session number for this group
-            // This prevents duplicate types if a group has multiple sheikhs or historical data overlaps
-            const sessionsMap = new Map();
-
-            Object.entries(dailySessions).forEach(([dateStr, daySessions]) => {
-                Object.values(daySessions).forEach(session => {
-                    if (groupRepresentative.uids.has(session.ownerId)) {
-                        const key = `${dateStr}-s${session.sessionNumber}`;
-                        // Keep the first one encountered (usually most definitive)
-                        if (!sessionsMap.has(key)) {
-                            sessionsMap.set(key, {
-                                ...session,
-                                dateStr
-                            });
-                        }
-                    }
-                });
+        if (!dailySessions) return result;
+        Object.entries(dailySessions).forEach(([dateStr, daySessions]) => {
+            Object.values(daySessions).forEach((session: any) => {
+                const owner = sheikhs.find(sh => sh.uids.has(session.ownerId));
+                if (!owner) return;
+                const groupMap = result.get(owner.group)!;
+                const arr = groupMap.get(dateStr) || [];
+                // deduplicate by sessionNumber
+                if (!arr.some(s => s.sessionNumber === session.sessionNumber)) {
+                    arr.push({ ...session, dateStr });
+                    groupMap.set(dateStr, arr);
+                }
             });
-
-            return {
-                sheikh: groupRepresentative,
-                sessions: Array.from(sessionsMap.values())
-            };
         });
+        return result;
     }, [sheikhs, dailySessions]);
 
-    const dayStatus = useMemo(() => {
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        return monitoringData.map(data => {
-            const sessionsToday = data.sessions.filter(s => s.dateStr === dateStr).sort((a, b) => a.sessionNumber - b.sessionNumber);
-            return {
-                ...data,
-                status: sessionsToday.length > 0 ? 'recorded' : 'missing',
-                sessions: sessionsToday,
-                session: sessionsToday[0] // Primary session for display
-            };
+    // ── Per-group student count ────────────────────────────────────────────
+    const groupStudentCount = useMemo(() => {
+        const map: Record<string, number> = {};
+        sheikhs.forEach(sh => {
+            map[sh.group] = (students || []).filter(
+                s => s.status === 'نشط' && ((s as any).group === sh.group || s.groupName === sh.group)
+            ).length;
         });
-    }, [monitoringData, selectedDate]);
+        return map;
+    }, [sheikhs, students]);
 
-    const navigateDate = (direction: 'prev' | 'next') => {
-        const amount = direction === 'next' ? 1 : -1;
-        if (view === 'day') setSelectedDate(d => subDays(d, -amount));
-        else if (view === 'week') setSelectedDate(d => subDays(d, -amount * 7));
-        else if (view === 'month') {
-            const newDate = new Date(selectedDate);
-            newDate.setMonth(newDate.getMonth() + amount);
-            setSelectedDate(newDate);
+    // ── Day stats per group ────────────────────────────────────────────────
+    const getDayStats = useCallback((group: string, dateStr: string) => {
+        const sessions = groupSessions.get(group)?.get(dateStr) || [];
+        const session = sessions.find(s => s.sessionNumber === 1) || sessions[0] || null;
+        if (!session) return null;
+
+        const records: any[] = session.records || [];
+        const total = groupStudentCount[group] || 0;
+
+        if (!records.length || !total) {
+            return { session, type: session.sessionType, attendance: null, excellent: null, goodPlus: null, good: null, acceptable: null, weak: null, notMemorized: null };
         }
+
+        let present = 0, excellent = 0, goodPlus = 0, good = 0, acceptable = 0, weak = 0, notMem = 0;
+        records.forEach(r => {
+            if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') present++;
+            if (!r.review) {
+                if (r.memorization === 'ممتاز') excellent++;
+                else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') goodPlus++;
+                else if (r.memorization === 'جيد') good++;
+                else if (r.memorization === 'مقبول' || r.memorization === 'حسن') acceptable++;
+                else if (r.memorization === 'ضعيف' || r.memorization === 'متوسط') weak++;
+                else if (r.memorization === 'لم يحفظ') notMem++;
+            }
+        });
+        const pct = (n: number) => total > 0 ? Math.round((n / total) * 100) : 0;
+        return {
+            session,
+            type: session.sessionType,
+            attendance: pct(present),
+            excellent: pct(excellent),
+            goodPlus: pct(goodPlus),
+            good: pct(good),
+            acceptable: pct(acceptable),
+            weak: pct(weak),
+            notMemorized: pct(notMem),
+        };
+    }, [groupSessions, groupStudentCount]);
+
+    const todayStr = format(selectedDate, 'yyyy-MM-dd');
+
+    // ── Today summary ──────────────────────────────────────────────────────
+    const todaySummary = useMemo(() => {
+        let recorded = 0, missing = 0, totalAtt = 0, attCount = 0;
+        sheikhs.forEach(sh => {
+            const stats = getDayStats(sh.group, todayStr);
+            if (stats) { recorded++; if (stats.attendance !== null) { totalAtt += stats.attendance; attCount++; } }
+            else missing++;
+        });
+        return { recorded, missing, avgAtt: attCount > 0 ? Math.round(totalAtt / attCount) : null };
+    }, [sheikhs, getDayStats, todayStr]);
+
+    // ── Navigation ─────────────────────────────────────────────────────────
+    const navigate = (dir: -1 | 1) => {
+        if (view === 'day') setSelectedDate(d => addDays(d, dir));
+        else if (view === 'week') setSelectedDate(d => addDays(d, dir * 7));
+        else setSelectedDate(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
     };
 
-    if (!isManagement) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center space-y-4">
-                <Shield className="h-20 w-20 text-rose-500 animate-bounce" />
-                <h1 className="text-3xl font-headline font-black">عذراً، هذه الصفحة مخصصة للإدارة فقط</h1>
-                <Button asChild size="lg" className="rounded-2xl px-8"><Link href="/home">العودة للرئيسية</Link></Button>
-            </div>
-        );
-    }
+    const navLabel = view === 'day'
+        ? format(selectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
+        : view === 'week'
+            ? `${format(startOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM', { locale: ar })} — ${format(endOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM yyyy', { locale: ar })}`
+            : format(selectedDate, 'MMMM yyyy', { locale: ar });
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-950/20">
-                <div className="flex flex-col items-center gap-6">
-                    <Loader2 className="h-16 w-16 animate-spin text-primary" />
-                    <p className="text-primary font-bold animate-pulse tracking-[0.2em]">جاري تجهيز خارطة الانضباط...</p>
-                </div>
-            </div>
-        );
-    }
+    const interval = useMemo(() => {
+        if (view === 'week') return eachDayOfInterval({ start: startOfWeek(selectedDate, { weekStartsOn: 6 }), end: endOfWeek(selectedDate, { weekStartsOn: 6 }) });
+        if (view === 'month') return eachDayOfInterval({ start: startOfMonth(selectedDate), end: endOfMonth(selectedDate) });
+        return [];
+    }, [view, selectedDate]);
 
+    // ─── Guards ────────────────────────────────────────────────────────────
+    if (!isManagement) return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+            <Shield className="h-16 w-16 text-rose-500" />
+            <h1 className="text-2xl font-bold">هذه الصفحة للإدارة فقط</h1>
+            <Button asChild><Link href="/home">الرئيسية</Link></Button>
+        </div>
+    );
+    if (loading) return (
+        <div className="flex items-center justify-center min-h-[60vh]">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
+    );
+
+    // ─── Render ────────────────────────────────────────────────────────────
     return (
-        <div className={cn(
-            "min-h-screen p-2 md:p-6 lg:p-10 space-y-12 pb-40 transition-colors duration-700 font-body",
-            theme.isLight ? "text-slate-900" : "text-white"
-        )}>
-            {/* Premium Header Section */}
-            <div className="relative max-w-7xl mx-auto rounded-[3rem] overflow-hidden p-8 md:p-12 mb-10 shadow-2xl border border-white/10 group">
-                <div className={cn(
-                    "absolute inset-0 bg-gradient-to-br transition-all duration-1000",
-                    theme.isLight
-                        ? "from-slate-100 via-white to-slate-50 opacity-100"
-                        : "from-blue-600/30 via-indigo-600/10 to-transparent opacity-80"
-                )} />
-                <div className="absolute top-0 left-0 w-full h-full bg-[url('/noise.png')] opacity-[0.03] pointer-events-none" />
+        <TooltipProvider>
+            <div className="max-w-screen-xl mx-auto p-2 sm:p-4 space-y-4 pb-24 font-body" dir="rtl">
 
-                <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-10">
-                    <div className="space-y-4 text-center lg:text-right">
-                        <div className="inline-flex items-center gap-3 px-4 py-2 rounded-2xl bg-primary/10 border border-primary/20 text-primary mb-2">
-                            <Activity className="h-4 w-4 animate-pulse" />
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">مركز المتابعة الحية</span>
+                {/* ── Top Bar ── */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3">
+                    <div className="flex items-center gap-2">
+                        <div className="p-2 bg-primary/10 rounded-xl">
+                            <Shield className="h-5 w-5 text-primary" />
                         </div>
-                        <h1 className={cn(
-                            "text-4xl md:text-6xl font-headline font-black tracking-tight",
-                            theme.isLight ? "text-slate-900" : "text-transparent bg-clip-text bg-gradient-to-l from-white to-white/60"
-                        )}>
-                            مراقبة تسجيل الحصص
-                        </h1>
-                        <p className={cn(
-                            "text-lg font-medium max-w-xl mx-auto lg:mx-0 opacity-70",
-                            theme.isLight ? "text-slate-600" : "text-blue-100/70"
-                        )}>
-                            نظام متقدم لمتابعة انضباط المشايخ في توثيق المسار التعليمي وضمان استمرارية التقارير اليومية للأفواج.
-                        </p>
+                        <div>
+                            <h1 className="text-lg font-bold leading-tight">مراقبة المشايخ</h1>
+                            <p className="text-[11px] text-muted-foreground">{sheikhs.length} فوج مسجل</p>
+                        </div>
                     </div>
 
-                    {/* Navigation Dashboard */}
-                    <div className={cn(
-                        "flex flex-col items-center gap-4 p-6 rounded-[2.5rem] border border-white/20 backdrop-blur-3xl shadow-2xl transition-all duration-700",
-                        theme.isLight ? "bg-white/70" : "bg-white/5"
-                    )}>
-                        <div className="flex items-center gap-4">
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="rounded-2xl h-12 w-12 border-primary/20 hover:bg-primary/10 transition-all active:scale-95"
-                                onClick={() => navigateDate('prev')}
-                            >
-                                <ChevronRight className="h-6 w-6 text-primary" />
-                            </Button>
-
-                            <div className="text-center min-w-[180px]">
-                                <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-1">
-                                    {view === 'day' ? 'معاينة يوم' : view === 'week' ? 'معاينة أسبوع' : 'معاينة شهر'}
-                                </p>
-                                <h3 className="text-xl font-black whitespace-nowrap">
-                                    {view === 'day'
-                                        ? format(selectedDate, 'EEEE, d MMMM', { locale: ar })
-                                        : view === 'week'
-                                            ? `${format(startOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM')} - ${format(endOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM yyyy')}`
-                                            : format(selectedDate, 'MMMM yyyy', { locale: ar })
-                                    }
-                                </h3>
-                            </div>
-
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="rounded-2xl h-12 w-12 border-primary/20 hover:bg-primary/10 transition-all active:scale-95"
-                                onClick={() => navigateDate('next')}
-                            >
-                                <ChevronLeft className="h-6 w-6 text-primary" />
-                            </Button>
-                        </div>
-                        <Button
-                            variant="link"
-                            className="text-[10px] font-bold opacity-40 hover:opacity-100"
-                            onClick={() => setSelectedDate(new Date())}
-                        >
-                            العودة لليوم الحالي
-                        </Button>
+                    {/* View Toggle */}
+                    <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 border">
+                        {(['day', 'week', 'month'] as const).map(v => (
+                            <button key={v} onClick={() => setView(v)} className={cn(
+                                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                view === v ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-muted"
+                            )}>
+                                {v === 'day' ? 'اليوم' : v === 'week' ? 'الأسبوع' : 'الشهر'}
+                            </button>
+                        ))}
                     </div>
                 </div>
-            </div>
 
-            {/* View Switching Logic */}
-            <div className="max-w-7xl mx-auto space-y-10">
-                <Tabs value={view} onValueChange={(v: any) => setView(v)} className="w-full">
-                    <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-8">
-                        <TabsList className={cn(
-                            "p-2 h-auto grid grid-cols-3 gap-3 rounded-[2rem] border transition-all duration-700 w-full md:w-[450px]",
-                            theme.isLight ? "bg-slate-100/50 border-slate-200" : "bg-white/5 border-white/10"
-                        )}>
-                            <TabsTrigger value="day" className="rounded-2xl py-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-xl transition-all font-black text-xs">
-                                المتابعة اليومية
-                            </TabsTrigger>
-                            <TabsTrigger value="week" className="rounded-2xl py-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-xl transition-all font-black text-xs">
-                                سجل الأسبوع
-                            </TabsTrigger>
-                            <TabsTrigger value="month" className="rounded-2xl py-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-xl transition-all font-black text-xs">
-                                تقرير الشهر
-                            </TabsTrigger>
-                        </TabsList>
-
-                        <div className="flex flex-wrap justify-center md:justify-end gap-3 max-w-2xl">
-                            {SESSION_LEGEND.map((item) => (
-                                <div key={item.label} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 shadow-sm">
-                                    <div className={cn("h-3 w-3 rounded-full", item.color)} />
-                                    <span className="text-[10px] font-bold opacity-70 whitespace-nowrap">{item.label}</span>
-                                </div>
-                            ))}
-                        </div>
+                {/* ── Date Navigation ── */}
+                <div className="flex items-center justify-between bg-card border rounded-xl px-3 py-2">
+                    <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="h-8 px-2">
+                        <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <div className="flex flex-col items-center">
+                        <span className="text-sm font-bold">{navLabel}</span>
+                        {!isToday(selectedDate) && (
+                            <button onClick={() => setSelectedDate(new Date())} className="text-[10px] text-primary flex items-center gap-1 mt-0.5">
+                                <RotateCcw className="h-2.5 w-2.5" /> اليوم
+                            </button>
+                        )}
                     </div>
+                    <Button variant="ghost" size="sm" onClick={() => navigate(1)} className="h-8 px-2">
+                        <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                </div>
 
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={view}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ duration: 0.5 }}
-                        >
-                            <TabsContent value="day" className="mt-0 focus-visible:ring-0">
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                                    {dayStatus.map((data, idx) => (
-                                        <SheikhCard key={data.sheikh.uid} data={data} theme={theme} index={idx} />
-                                    ))}
-                                </div>
-                            </TabsContent>
+                {/* ── Summary Row (Day view only) ── */}
+                {view === 'day' && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <SummaryCard icon={<CheckCircle2 className="h-4 w-4 text-emerald-600" />} label="سجّلوا الحصة" value={todaySummary.recorded} color="emerald" />
+                        <SummaryCard icon={<Clock className="h-4 w-4 text-amber-500" />} label="لم يسجّلوا" value={todaySummary.missing} color="amber" />
+                        <SummaryCard icon={<Users className="h-4 w-4 text-blue-600" />} label="إجمالي الأفواج" value={sheikhs.length} color="blue" />
+                        <SummaryCard icon={<Activity className="h-4 w-4 text-purple-600" />} label="متوسط الحضور" value={todaySummary.avgAtt !== null ? `${todaySummary.avgAtt}%` : '—'} color="purple" />
+                    </div>
+                )}
 
-                            <TabsContent value="week" className="mt-0 focus-visible:ring-0">
-                                <MatrixView
-                                    sheikhs={monitoringData}
-                                    theme={theme}
-                                    interval={eachDayOfInterval({
-                                        start: startOfWeek(selectedDate, { weekStartsOn: 6 }),
-                                        end: endOfWeek(selectedDate, { weekStartsOn: 6 })
-                                    })}
-                                />
-                            </TabsContent>
+                {/* ── Legend ── */}
+                <div className="flex flex-wrap gap-2 text-[10px]">
+                    {Object.entries(TYPE_CONFIG).map(([, cfg]) => (
+                        <span key={cfg.label} className="flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded-full border">
+                            <span className={cn("w-2 h-2 rounded-full", cfg.dot)} />
+                            {cfg.label}
+                        </span>
+                    ))}
+                    <span className="flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded-full border">
+                        <span className="w-2 h-2 rounded-full bg-slate-300" />
+                        لم يسجّل
+                    </span>
+                </div>
 
-                            <TabsContent value="month" className="mt-0 focus-visible:ring-0">
-                                <MatrixView
-                                    sheikhs={monitoringData}
-                                    theme={theme}
-                                    interval={eachDayOfInterval({
-                                        start: startOfMonth(selectedDate),
-                                        end: endOfMonth(selectedDate)
-                                    })}
-                                />
-                            </TabsContent>
-                        </motion.div>
-                    </AnimatePresence>
-                </Tabs>
+                {/* ── Main Table ── */}
+                {view === 'day' ? <DayTable sheikhs={sheikhs} getDayStats={getDayStats} dateStr={todayStr} /> : (
+                    <MatrixTable sheikhs={sheikhs} groupSessions={groupSessions} interval={interval} />
+                )}
+
             </div>
+        </TooltipProvider>
+    );
+}
 
-            {/* Premium Stats Grid */}
-            <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 pt-10 border-t border-white/5">
-                <HighlightCard
-                    title="القدرة التشغيلية"
-                    value={`${sheikhs.length} فوج`}
-                    label="إجمالي الأفواج النشطة"
-                    icon={<Users className="h-6 w-6 text-blue-400" />}
-                    color="blue"
-                    theme={theme}
-                />
-                <HighlightCard
-                    title="معدل الإنجاز"
-                    value={`${dayStatus.filter(d => d.status === 'recorded').length}`}
-                    label="شيخاً سجلوا حصتهم اليوم"
-                    icon={<CheckCircle2 className="h-6 w-6 text-emerald-400" />}
-                    color="emerald"
-                    theme={theme}
-                />
-                <HighlightCard
-                    title="المتابعة المطلوبة"
-                    value={`${dayStatus.filter(d => d.status === 'missing').length}`}
-                    label="في انتظار توثيق الحصة"
-                    icon={<Clock className="h-6 w-6 text-amber-400" />}
-                    color="amber"
-                    theme={theme}
-                />
-                <HighlightCard
-                    title="نسبة الانضباط"
-                    value={`${Math.round((dayStatus.filter(d => d.status === 'recorded').length / (sheikhs.length || 1)) * 100)}%`}
-                    label="إجمالي دقة البيانات اليوم"
-                    icon={<Flame className="h-6 w-6 text-rose-400" />}
-                    color="rose"
-                    theme={theme}
-                />
+// ─── Summary Card ────────────────────────────────────────────────────────────
+function SummaryCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string | number; color: string }) {
+    const colorMap: Record<string, string> = {
+        emerald: 'bg-emerald-50 border-emerald-100',
+        amber: 'bg-amber-50 border-amber-100',
+        blue: 'bg-blue-50 border-blue-100',
+        purple: 'bg-purple-50 border-purple-100',
+    };
+    return (
+        <div className={cn("rounded-xl border p-3 flex items-center gap-3", colorMap[color] || 'bg-muted/30 border')}>
+            <div className="shrink-0">{icon}</div>
+            <div>
+                <div className="text-base font-bold leading-none">{value}</div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">{label}</div>
             </div>
         </div>
     );
 }
 
-function SheikhCard({ data, theme, index }: { data: any, theme: any, index: number }) {
-    const isRecorded = data.status === 'recorded';
-    const primarySession = data.session;
-    const sessionColor = getSessionColor(primarySession?.sessionType, !!primarySession?.substituteTeacher);
-    const hasMoreSessions = data.sessions.length > 1;
+// ─── Day Table ───────────────────────────────────────────────────────────────
+const EVAL_COLS = [
+    { key: 'attendance', label: 'الحضور', color: (v: number) => v >= 90 ? 'text-emerald-700 font-bold' : v >= 70 ? 'text-amber-600 font-bold' : 'text-rose-600 font-bold' },
+    { key: 'excellent', label: 'ممتاز', color: () => 'text-emerald-700' },
+    { key: 'goodPlus', label: 'ج.جداً', color: () => 'text-green-600' },
+    { key: 'good', label: 'جيد', color: () => 'text-blue-600' },
+    { key: 'acceptable', label: 'مقبول', color: () => 'text-orange-600' },
+    { key: 'weak', label: 'ضعيف', color: () => 'text-rose-600' },
+    { key: 'notMemorized', label: 'لم يحفظ', color: () => 'text-gray-500' },
+] as const;
 
+function DayTable({ sheikhs, getDayStats, dateStr }: {
+    sheikhs: any[];
+    getDayStats: (group: string, date: string) => any;
+    dateStr: string;
+}) {
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.6, delay: index * 0.05, ease: "easeOut" }}
-        >
-            <Card className={cn(
-                "relative h-full overflow-hidden transition-all duration-700 border-2 rounded-[2.5rem] group hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] hover:-translate-y-2",
-                theme.isLight
-                    ? (isRecorded ? "bg-white border-slate-100" : "bg-white border-rose-100")
-                    : (isRecorded ? "bg-slate-900/40 border-white/5" : "bg-slate-900/40 border-rose-500/10")
-            )}>
-                {/* Dynamic Background Glow */}
-                {isRecorded ? (
-                    <div className={cn(
-                        "absolute -top-24 -right-24 w-64 h-64 blur-[100px] transition-all duration-1000 opacity-20 group-hover:opacity-40 animate-pulse",
-                        sessionColor
-                    )} />
-                ) : (
-                    <div className="absolute -top-24 -right-24 w-64 h-64 blur-[100px] transition-all duration-1000 opacity-20 group-hover:opacity-40 bg-rose-500" />
-                )}
-
-                <CardContent className="p-7 space-y-8 relative z-10 h-full flex flex-col justify-between">
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-start">
-                            <div className={cn(
-                                "h-16 w-16 rounded-[1.8rem] flex items-center justify-center border-2 transition-all duration-700 shadow-xl group-hover:rotate-[15deg] group-hover:scale-110",
-                                isRecorded
-                                    ? cn(sessionColor, "bg-opacity-10 border-white/20 shadow-black/5")
-                                    : "bg-rose-500/10 border-rose-500/30 shadow-rose-500/10"
-                            )}>
-                                <User className={cn(
-                                    "h-8 w-8",
-                                    isRecorded ? "text-white" : "text-rose-500",
-                                    isRecorded ? "filter drop-shadow-md" : ""
-                                )} />
-                            </div>
-
-                            <div className="flex flex-col items-end gap-2">
-                                <div className={cn(
-                                    "p-2.5 rounded-2xl border border-white/10 backdrop-blur-xl shadow-lg",
-                                    isRecorded ? cn("bg-opacity-20", sessionColor, "text-white") : "bg-rose-500/20 text-rose-400"
-                                )}>
-                                    {isRecorded ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5 animate-pulse" />}
-                                </div>
-                                {hasMoreSessions && (
-                                    <Badge variant="secondary" className="bg-white/10 text-[9px] font-black border-white/5 rounded-lg px-2 py-0.5">
-                                        يوجد {data.sessions.length} حصص
-                                    </Badge>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <h3 className="text-xl font-headline font-black truncate tracking-tight group-hover:text-primary transition-colors">
-                                {data.sheikh.displayName}
-                            </h3>
-                            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/5 w-fit">
-                                <Users className="h-3 w-3 opacity-40" />
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">{data.sheikh.group}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-6">
-                        <div className={cn(
-                            "p-5 rounded-[2rem] border transition-all duration-500 bg-white/5 shadow-inner",
-                            isRecorded ? "border-white/5" : "border-rose-500/10"
-                        )}>
-                            <div className="flex justify-between items-center mb-3">
-                                <span className="text-[10px] font-black opacity-40 uppercase tracking-widest italic">Live Status</span>
-                                <span className={cn("text-[10px] font-black", isRecorded ? "text-emerald-400" : "text-rose-500")}>
-                                    {isRecorded ? 'تَمَّ التَّوْثِيقُ' : 'في الانتظار'}
-                                </span>
-                            </div>
-                            <div className="h-2 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden shadow-inner">
-                                <motion.div
-                                    initial={{ width: 0 }}
-                                    animate={{ width: isRecorded ? '100%' : '20%' }}
-                                    transition={{ duration: 1, ease: "circOut" }}
-                                    className={cn("h-full rounded-full shadow-[0_0_15px_rgba(0,0,0,0.2)]", isRecorded ? sessionColor : "bg-rose-500")}
-                                />
-                            </div>
-                        </div>
-
-                        {data.sessions.length > 0 ? (
-                            <div className="flex flex-col gap-2">
-                                {data.sessions.map((session: any) => (
-                                    <div key={`${session.id}-${session.ownerId}-${session.sessionNumber}`} className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group/item">
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn("h-2.5 w-2.5 rounded-full", getSessionColor(session.sessionType, !!session.substituteTeacher))} />
-                                            <span className="text-[11px] font-bold">{session.sessionType}</span>
-                                        </div>
-                                        <Badge variant="outline" className="text-[9px] font-black opacity-50 group-hover/item:opacity-100 transition-opacity">
-                                            {session.sessionNumber === 1 ? 'صباحاً' : 'مساءً'}
-                                        </Badge>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <Button variant="ghost" className="w-full rounded-2xl border-2 border-dashed border-rose-500/20 text-rose-500 h-12 group-hover:bg-rose-500/10 group-hover:border-rose-500/40 transition-all">
-                                <Megaphone className="h-4 w-4 ml-2" />
-                                <span className="text-[10px] font-black uppercase tracking-widest font-headline">طلب التسجيل للحصة</span>
-                            </Button>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-        </motion.div>
-    );
-}
-
-function MatrixView({ sheikhs, interval, theme }: { sheikhs: any[], interval: Date[], theme: any }) {
-    return (
-        <Card className={cn(
-            "rounded-[3rem] border-2 shadow-2xl overflow-hidden backdrop-blur-xl",
-            theme.isLight ? "bg-white border-slate-100" : "bg-slate-900 border-white/5"
-        )}>
-            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
-                <table className="w-full text-right border-collapse">
+        <div className="border rounded-xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
                     <thead>
-                        <tr>
-                            <th className={cn(
-                                "p-8 text-sm font-black whitespace-nowrap sticky right-0 z-20 w-64 border-l border-b",
-                                theme.isLight ? "bg-slate-50 border-slate-100" : "bg-slate-900/90 border-white/5"
-                            )}>
-                                الفوج / الشيخ
-                            </th>
-                            {interval.map((day) => (
-                                <th key={day.toISOString()} className={cn(
-                                    "p-8 min-w-[120px] text-center border-b",
-                                    theme.isLight ? "border-slate-100" : "border-white/5"
-                                )}>
-                                    <div className="flex flex-col items-center gap-1">
-                                        <span className="text-[10px] font-black opacity-40 uppercase tracking-[0.2em]">
-                                            {format(day, 'EEEE', { locale: ar })}
-                                        </span>
-                                        <span className="text-sm font-black tracking-tight">{format(day, 'd MMM')}</span>
-                                    </div>
-                                </th>
+                        <tr className="bg-muted/30 border-b">
+                            <th className="sticky right-0 z-20 bg-muted/30 text-right p-2 sm:p-3 text-xs font-bold border-l min-w-[120px] sm:min-w-[160px]">الفوج / الشيخ</th>
+                            <th className="p-2 text-center text-xs font-bold border-l min-w-[100px] whitespace-nowrap">نوع الحصة</th>
+                            {EVAL_COLS.map(col => (
+                                <th key={col.key} className="p-2 text-center text-xs font-bold border-l min-w-[55px]">{col.label}</th>
                             ))}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5">
-                        {sheikhs.map((data) => (
-                            <tr key={data.sheikh.uid} className="group hover:bg-primary/[0.02] transition-colors">
+                    <tbody>
+                        {sheikhs.map((sh, idx) => {
+                            const stats = getDayStats(sh.group, dateStr);
+                            const cfg = stats?.type ? TYPE_CONFIG[stats.type] : null;
+                            const isHoliday = stats?.type === 'يوم عطلة' || stats?.type === 'غياب الشيخ' || stats?.type === 'حصة أنشطة';
+
+                            return (
+                                <tr key={sh.uid} className={cn("border-b hover:bg-muted/10 transition-colors", idx % 2 === 0 ? 'bg-white' : 'bg-muted/10')}>
+                                    {/* Sticky group column */}
+                                    <td className={cn(
+                                        "sticky right-0 z-10 p-2 sm:p-3 border-l shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]",
+                                        idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
+                                    )}>
+                                        <div className="font-bold text-xs sm:text-sm leading-tight">{sh.group}</div>
+                                        <div className="text-[10px] text-muted-foreground truncate max-w-[110px] sm:max-w-none">{sh.displayName}</div>
+                                    </td>
+
+                                    {/* Session type badge */}
+                                    <td className="p-2 text-center border-l">
+                                        {stats ? (
+                                            <span className={cn(
+                                                "inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-lg border",
+                                                cfg?.bg || 'bg-muted/30 border-border'
+                                            )}>
+                                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", cfg?.dot || 'bg-gray-400')} />
+                                                <span className={cfg?.text || 'text-muted-foreground'}>{cfg?.label || stats.type}</span>
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] text-muted-foreground/50 border border-dashed rounded-lg px-2 py-1 inline-block">—</span>
+                                        )}
+                                    </td>
+
+                                    {/* Eval columns */}
+                                    {EVAL_COLS.map(col => {
+                                        const val: number | null = stats ? stats[col.key] : null;
+                                        const showDash = !stats || isHoliday || val === null;
+                                        return (
+                                            <td key={col.key} className="p-2 text-center border-l">
+                                                {showDash ? (
+                                                    <span className="text-muted-foreground/30 text-xs">—</span>
+                                                ) : (
+                                                    <span className={cn("text-xs", col.color(val as number))}>{val}%</span>
+                                                )}
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+// ─── Matrix Table (Week / Month) ─────────────────────────────────────────────
+function MatrixTable({ sheikhs, groupSessions, interval }: {
+    sheikhs: any[];
+    groupSessions: Map<string, Map<string, any[]>>;
+    interval: Date[];
+}) {
+    return (
+        <div className="border rounded-xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+                <table className="border-collapse text-xs w-full">
+                    <thead>
+                        <tr className="bg-muted/30 border-b">
+                            <th className="sticky right-0 z-20 bg-muted/30 text-right p-2 text-xs font-bold border-l min-w-[130px]">الفوج / الشيخ</th>
+                            {interval.map(day => {
+                                const isWk = getDay(day) === 4 || getDay(day) === 5;
+                                return (
+                                    <th key={day.toISOString()} className={cn(
+                                        "p-1.5 text-center border-l min-w-[48px]",
+                                        isWk ? "bg-sky-50/60 text-sky-600" : "text-foreground",
+                                        isToday(day) && "bg-primary/5 text-primary"
+                                    )}>
+                                        <div className="font-bold text-[10px]">{format(day, 'EEE', { locale: ar })}</div>
+                                        <div className="text-[9px] opacity-60">{format(day, 'd')}</div>
+                                    </th>
+                                );
+                            })}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sheikhs.map((sh, idx) => (
+                            <tr key={sh.uid} className={cn("border-b hover:bg-muted/5 transition-colors", idx % 2 === 0 ? 'bg-white' : 'bg-muted/10')}>
                                 <td className={cn(
-                                    "p-6 sticky right-0 z-10 border-l transition-colors duration-700",
-                                    theme.isLight ? "bg-white border-slate-100 group-hover:bg-slate-50" : "bg-slate-900/95 border-white/5 group-hover:bg-slate-950/50"
+                                    "sticky right-0 z-10 p-2 border-l shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]",
+                                    idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
                                 )}>
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-12 w-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                                            <User className="h-6 w-6 text-primary" />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-black truncate mb-1">{data.sheikh.displayName}</p>
-                                            <Badge variant="outline" className="text-[10px] font-black border-primary/20 text-primary">
-                                                {data.sheikh.group}
-                                            </Badge>
-                                        </div>
-                                    </div>
+                                    <div className="font-bold text-[11px] leading-tight">{sh.group}</div>
+                                    <div className="text-[9px] text-muted-foreground truncate max-w-[120px]">{sh.displayName}</div>
                                 </td>
-                                {interval.map((day) => {
+                                {interval.map(day => {
                                     const dateStr = format(day, 'yyyy-MM-dd');
-                                    const sessionsOnDay = data.sessions.filter(s => s.dateStr === dateStr).sort((a, b) => a.sessionNumber - b.sessionNumber);
+                                    const dayOfWeek = getDay(day);
+                                    const isWk = dayOfWeek === 4 || dayOfWeek === 5;
+                                    const sessions = groupSessions.get(sh.group)?.get(dateStr) || [];
+                                    const s1 = sessions.find(s => s.sessionNumber === 1);
+                                    const s2 = sessions.find(s => s.sessionNumber === 2);
 
                                     return (
-                                        <td key={day.toISOString()} className="p-4 text-center">
-                                            <div className="flex items-center justify-center gap-1.5 min-h-[40px]">
-                                                {sessionsOnDay.length > 0 ? (
-                                                    sessionsOnDay.map((session) => (
-                                                        <TooltipProvider key={`${session.id}-${session.ownerId}-${session.sessionNumber}`} delayDuration={0}>
-                                                            <Tooltip>
+                                        <td key={day.toISOString()} className={cn("p-1 text-center border-l", isWk && "bg-sky-50/30", isToday(day) && "bg-primary/[0.03]")}>
+                                            <div className="flex items-center justify-center gap-0.5 min-h-[28px]">
+                                                {sessions.length === 0 ? (
+                                                    isWk ? null : <span className="w-5 h-5 rounded border border-dashed border-slate-200 flex items-center justify-center">
+                                                        <XCircle className="h-3 w-3 text-slate-200" />
+                                                    </span>
+                                                ) : (
+                                                    [s1, s2].filter(Boolean).map(s => {
+                                                        const cfg = TYPE_CONFIG[s!.sessionType];
+                                                        return (
+                                                            <Tooltip key={`${s!.id}-${s!.sessionNumber}`} delayDuration={0}>
                                                                 <TooltipTrigger asChild>
-                                                                    <motion.div
-                                                                        whileHover={{ scale: 1.2, rotate: 5 }}
-                                                                        className={cn(
-                                                                            "h-10 w-10 rounded-2xl flex items-center justify-center transition-all duration-500 cursor-pointer shadow-lg text-white",
-                                                                            getSessionColor(session.sessionType, !!session.substituteTeacher)
-                                                                        )}
-                                                                    >
-                                                                        {session.sessionNumber === 1 ? (
-                                                                            <span className="text-[10px] font-black opacity-80">1</span>
-                                                                        ) : (
-                                                                            <span className="text-[10px] font-black opacity-80">2</span>
-                                                                        )}
-                                                                    </motion.div>
+                                                                    <div className={cn(
+                                                                        "w-5 h-5 rounded-md flex items-center justify-center text-white font-bold text-[9px] cursor-default shadow-sm",
+                                                                        cfg?.dot ? cfg.dot : 'bg-emerald-500'
+                                                                    )}>
+                                                                        {s!.sessionNumber}
+                                                                    </div>
                                                                 </TooltipTrigger>
-                                                                <TooltipContent className="bg-slate-900 border border-white/10 text-white p-5 rounded-[2rem] shadow-2xl min-w-[220px] backdrop-blur-3xl z-50">
-                                                                    <div className="space-y-4">
-                                                                        <div className="flex items-center justify-between">
-                                                                            <Badge variant="outline" className="text-[9px] font-black border-white/20 text-white/60">
-                                                                                الحصة {session.sessionNumber}
-                                                                            </Badge>
-                                                                            <div className={cn("h-2 w-2 rounded-full animate-pulse", getSessionColor(session.sessionType, !!session.substituteTeacher))} />
-                                                                        </div>
-                                                                        <div className="flex items-center gap-3">
-                                                                            <div className={cn("p-2 rounded-xl", getSessionColor(session.sessionType, !!session.substituteTeacher), "bg-opacity-20")}>
-                                                                                <BookOpen className="h-4 w-4" />
-                                                                            </div>
-                                                                            <p className="text-sm font-black">{session.sessionType}</p>
-                                                                        </div>
-                                                                        {session.substituteTeacher && (
-                                                                            <div className="p-3 bg-orange-500/10 border border-orange-500/20 rounded-2xl flex items-center gap-2">
-                                                                                <UserPlus className="h-3 w-3 text-orange-400" />
-                                                                                <p className="text-[10px] font-bold text-orange-200">الأستاذ البديل: {session.substituteTeacher}</p>
-                                                                            </div>
-                                                                        )}
-                                                                        <div className="grid grid-cols-2 gap-3">
-                                                                            <div className="p-3 bg-white/5 rounded-2xl text-center">
-                                                                                <p className="text-[10px] opacity-40 font-bold mb-1">الطلاب</p>
-                                                                                <p className="text-xs font-black">{session.records?.length || 0}</p>
-                                                                            </div>
-                                                                            <div className="p-3 bg-white/5 rounded-2xl text-center">
-                                                                                <p className="text-[10px] opacity-40 font-bold mb-1">توثيق الحصة</p>
-                                                                                <p className="text-xs font-black">ناجح</p>
-                                                                            </div>
-                                                                        </div>
+                                                                <TooltipContent side="top" className="text-xs p-2 max-w-[180px]">
+                                                                    <div className="space-y-1">
+                                                                        <div className="font-bold">{sh.group} — {format(day, 'd MMM', { locale: ar })}</div>
+                                                                        <div>{s!.sessionType}</div>
+                                                                        {s!.substituteTeacher && <div className="text-amber-300">البديل: {s!.substituteTeacher}</div>}
+                                                                        <div className="text-muted-foreground">{s!.records?.length || 0} طالب</div>
                                                                     </div>
                                                                 </TooltipContent>
                                                             </Tooltip>
-                                                        </TooltipProvider>
-                                                    ))
-                                                ) : (
-                                                    <div className="h-10 w-10 rounded-2xl flex items-center justify-center bg-slate-100 dark:bg-white/5 text-slate-300 dark:text-white/10 border-2 border-dashed border-white/5">
-                                                        <XCircle className="h-5 w-5 opacity-20" />
-                                                    </div>
+                                                        );
+                                                    })
                                                 )}
                                             </div>
                                         </td>
@@ -592,41 +450,6 @@ function MatrixView({ sheikhs, interval, theme }: { sheikhs: any[], interval: Da
                     </tbody>
                 </table>
             </div>
-        </Card>
-    );
-}
-
-function HighlightCard({ title, value, label, icon, color, theme }: { title: string, value: string | number, label: string, icon: React.ReactNode, color: string, theme: any }) {
-    const colorMap: any = {
-        blue: "from-blue-500 to-indigo-600 shadow-blue-500/20 text-blue-500",
-        emerald: "from-emerald-500 to-teal-600 shadow-emerald-500/20 text-emerald-500",
-        amber: "from-amber-500 to-orange-600 shadow-amber-500/20 text-amber-500",
-        rose: "from-rose-500 to-red-600 shadow-rose-500/20 text-rose-500"
-    };
-
-    return (
-        <Card className={cn(
-            "relative overflow-hidden transition-all duration-700 rounded-[2.5rem] border shadow-xl hover:shadow-2xl hover:-translate-y-2 group",
-            theme.isLight ? "bg-white border-slate-100" : "bg-slate-900 border-white/5"
-        )}>
-            <div className={cn(
-                "absolute -top-12 -right-12 w-32 h-32 blur-[60px] opacity-10 transition-all duration-700 group-hover:scale-150 group-hover:opacity-20",
-                `bg-${color}-500/40`
-            )} />
-
-            <CardContent className="p-8 space-y-4">
-                <div className="flex justify-between items-center">
-                    <div className={cn("p-4 rounded-2xl bg-white/5 border border-white/5 shadow-inner", colorMap[color].split(' ')[2])}>
-                        {icon}
-                    </div>
-                    <Star className="h-4 w-4 opacity-10 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <div>
-                    <p className="text-xs font-black opacity-40 uppercase tracking-[0.3em] mb-2">{title}</p>
-                    <h3 className="text-4xl font-headline font-black mb-1 tracking-tighter">{value}</h3>
-                    <p className="text-[10px] font-bold opacity-30">{label}</p>
-                </div>
-            </CardContent>
-        </Card>
+        </div>
     );
 }

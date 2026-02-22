@@ -129,29 +129,46 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                             <div className="flex flex-wrap gap-1 md:gap-2 items-center">
                                                 {!isActivitySession && (
                                                     <>
-                                                        <Select value={record.memorization} onValueChange={(val) => onUpdateRecord(student.id, 'memorization', val)} dir="rtl">
-                                                            <SelectTrigger className="h-8 md:h-9 text-[10px] md:text-xs font-bold w-[90px] md:w-[110px]">
-                                                                <SelectValue placeholder="الحفظ" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="ممتاز">🌟 ممتاز</SelectItem>
-                                                                <SelectItem value="جيد جدا">✅ جيد جداً</SelectItem>
-                                                                <SelectItem value="جيد">👍 جيد</SelectItem>
-                                                                <SelectItem value="مقبول">⚠️ مقبول</SelectItem>
-                                                                <SelectItem value="ضعيف">❌ ضعيف</SelectItem>
-                                                                <SelectItem value="لم يحفظ">🚫 لم يحفظ</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
+                                                        {/* Per-student Review Toggle - prominent button */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const newReview = !record.review;
+                                                                onUpdateRecord(student.id, 'review', newReview);
+                                                                // Clear memorization when review mode is turned on
+                                                                if (newReview) onUpdateRecord(student.id, 'memorization', '');
+                                                            }}
+                                                            className={cn(
+                                                                "flex items-center gap-1 h-8 md:h-9 px-2 md:px-3 rounded-lg border-2 font-bold text-[10px] md:text-xs transition-all",
+                                                                record.review
+                                                                    ? "bg-blue-100 border-blue-400 text-blue-800 shadow-sm"
+                                                                    : "bg-muted/30 border-muted-foreground/20 text-muted-foreground hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700"
+                                                            )}
+                                                        >
+                                                            <BookOpen className="h-3 w-3 md:h-4 md:w-4" />
+                                                            مراجعة
+                                                        </button>
 
-                                                        <div className="flex items-center gap-1 bg-muted/30 px-1.5 md:px-2 rounded-md h-8 md:h-9 border cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => onUpdateRecord(student.id, 'review', !record.review)}>
-                                                            <Checkbox
-                                                                checked={record.review}
-                                                                onCheckedChange={(checked) => onUpdateRecord(student.id, 'review', checked)}
-                                                                id={`review-${student.id}`}
-                                                                className="h-3.5 w-3.5 md:h-4 md:w-4"
-                                                            />
-                                                            <label htmlFor={`review-${student.id}`} className="text-[10px] md:text-xs font-bold cursor-pointer select-none">مراجعة</label>
-                                                        </div>
+                                                        {/* Memorization dropdown — hidden when review mode is active */}
+                                                        {!record.review ? (
+                                                            <Select value={record.memorization} onValueChange={(val) => onUpdateRecord(student.id, 'memorization', val)} dir="rtl">
+                                                                <SelectTrigger className="h-8 md:h-9 text-[10px] md:text-xs font-bold w-[90px] md:w-[110px]">
+                                                                    <SelectValue placeholder="الحفظ" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="ممتاز">🌟 ممتاز</SelectItem>
+                                                                    <SelectItem value="جيد جدا">✅ جيد جداً</SelectItem>
+                                                                    <SelectItem value="جيد">👍 جيد</SelectItem>
+                                                                    <SelectItem value="مقبول">⚠️ مقبول</SelectItem>
+                                                                    <SelectItem value="ضعيف">❌ ضعيف</SelectItem>
+                                                                    <SelectItem value="لم يحفظ">🚫 لم يحفظ</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 h-8 md:h-9 px-2 md:px-3 rounded-lg bg-blue-50 border border-blue-300 text-blue-700 font-bold text-[10px] md:text-xs">
+                                                                <BookOpen className="h-3 w-3" /> وضع مراجعة
+                                                            </span>
+                                                        )}
                                                     </>
                                                 )}
 
@@ -166,8 +183,6 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                                     </SelectContent>
                                                 </Select>
                                             </div>
-
-
 
                                             <div className="flex gap-2">
                                                 <Input

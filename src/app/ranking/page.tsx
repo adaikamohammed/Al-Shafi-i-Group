@@ -104,7 +104,9 @@ export default function RankingPage() {
                         if (record.attendance === 'متأخر') studentScores[studentId].stats.late++;
                         if (record.attendance === 'تعويض') studentScores[studentId].stats.makeup++;
                     }
-                    if (record.memorization && pointsConfig.evaluation) {
+                    // Only count memorization evaluation if NOT in review mode
+                    // (review sessions are excluded from evaluation scoring to avoid unfair zero-point penalty)
+                    if (!record.review && record.memorization && pointsConfig.evaluation) {
                         const hifzPoints = pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] ?? 0;
                         studentScores[studentId].pointsBreakdown.hifz += hifzPoints;
                         if (record.memorization === 'ممتاز') studentScores[studentId].stats.excellent++;
