@@ -9,6 +9,7 @@ import {
     Gavel,
     Edit,
     BookCheck,
+    BookOpen,
     FileText,
     HelpCircle,
     DollarSign,
@@ -47,6 +48,8 @@ export const NAV_GROUPS: NavGroup[] = [
             { href: '/management/penalties', label: 'إدارة العقوبات', icon: Gavel },
             { href: '/surahs', label: 'متابعة الحفظ', icon: BookCheck },
             { href: '/dashboard', label: 'إدارة الطلبة', icon: Users },
+            { href: '/competition', label: 'المسابقة النهائية', icon: Award },
+            { href: '/surah-eval', label: 'تقييم حفظ السور', icon: BookOpen },
             { href: '/reports/daily', label: 'التقرير اليومي', icon: Edit },
         ]
     },

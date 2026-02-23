@@ -60,7 +60,7 @@ export const PenaltiesReport = ({ logs, groupName, date }: PenaltiesReportProps)
             <div className="flex items-center justify-between mb-8 border-b border-black pb-4">
                 <div className="flex flex-col gap-1">
                     <h1 className="text-2xl font-bold text-black">تقرير العقوبات والمخالفات</h1>
-                    <p className="text-sm text-gray-600">مقرأة الشافعي - مدرسة زيد بن ثابت</p>
+                    <p className="text-sm text-gray-600">المدرسة القرآنية للإمام الشافعي</p>
                 </div>
                 <div className="text-left text-sm text-black">
                     <p><strong>تاريخ التقرير:</strong> {format(date, 'dd/MM/yyyy')}</p>
@@ -116,7 +116,7 @@ export const PenaltiesReport = ({ logs, groupName, date }: PenaltiesReportProps)
             </table>
 
             <div className="mt-8 pt-4 border-t border-black flex justify-between items-center text-xs text-black">
-                <div>تم استخراج هذا التقرير آلياً من نظام إدارة المقرأة</div>
+                <div>تم استخراج هذا التقرير آلياً من نظام إدارة المدرسة</div>
                 <div className="flex gap-4">
                     <span>التوقيع: .......................................</span>
                     <span>الختم: .......................................</span>

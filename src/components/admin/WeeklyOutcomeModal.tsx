@@ -145,7 +145,7 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
                     // Session exists but student not in it (or wasn't registered). Add student as present.
                     const newRecord: DailyRecord = {
                         studentId: student.id,
-                        attendance: 'حاضر',
+                        attendance: 'غائب',
                         behavior: 'هادئ',
                         memorization: newMemo,
                         talqinSurahId: sessionToUpdate.talqinSurahId,
@@ -194,7 +194,7 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
             } else if (sessionToUpdate && !recordToUpdate) {
                 const newRecord: DailyRecord = {
                     studentId: student.id,
-                    attendance: 'حاضر',
+                    attendance: 'غائب',
                     behavior: 'هادئ',
                     memorization: newMemo,
                     talqinSurahId: sessionToUpdate.talqinSurahId,

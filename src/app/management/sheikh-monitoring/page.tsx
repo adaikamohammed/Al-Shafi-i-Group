@@ -1,23 +1,27 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import {
     Shield, Loader2, CheckCircle2, XCircle, Clock, BookOpen,
     ChevronLeft, ChevronRight, Users, Activity, RotateCcw,
-    TrendingUp, TrendingDown, Minus, BarChart2, Star, Award, AlertTriangle
+    TrendingUp, TrendingDown, Minus, BarChart2, Star, Award, AlertTriangle,
+    UserX, XOctagon, Filter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
     format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
-    eachDayOfInterval, getDay, isToday, addDays, addMonths, subMonths,
-    getISOWeek, eachWeekOfInterval, min, max, parseISO
+    eachDayOfInterval, getDay, isToday, addDays, addMonths, subMonths
 } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell,
+    PieChart, Pie, LineChart, Line
+} from 'recharts';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface GroupSheikhInfo {
@@ -128,8 +132,12 @@ export default function SheikhMonitoringPage() {
     const { dailySessions, allUsers, loading, students } = useStudentContext();
     const { isManagement } = useAuth();
 
-    type ViewMode = 'day' | 'week' | 'month' | 'stats';
+    type ViewMode = 'day' | 'week' | 'month' | 'stats' | 'students';
     const [view, setView] = useState<ViewMode>('day');
+    const [studentPeriod, setStudentPeriod] = useState<'day' | 'week' | 'month'>('month');
+    const [studentGroupFilter, setStudentGroupFilter] = useState<string>('all');
+    const [studentSort, setStudentSort] = useState<'absences' | 'notMem'>('absences');
+    const [studentSelectedDate, setStudentSelectedDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [statsMonth, setStatsMonth] = useState(new Date());
     const [sortStat, setSortStat] = useState<'group' | 'att' | 'commit' | 'excellent'>('group');
@@ -311,21 +319,130 @@ export default function SheikhMonitoringPage() {
         return { recorded, missing, avgAtt: attCount > 0 ? Math.round(totalAtt / attCount) : null };
     }, [sheikhs, getDayStats, todayStr]);
 
+    // ── Student tracking data ─────────────────────────────────────────────
+    const studentTrackingData = useMemo(() => {
+        // Date set for the selected period
+        const periodDateSet = new Set<string>();
+        if (studentPeriod === 'day') {
+            periodDateSet.add(format(studentSelectedDate, 'yyyy-MM-dd'));
+        } else if (studentPeriod === 'week') {
+            const dow = getDay(studentSelectedDate);
+            const wSat = addDays(studentSelectedDate, dow === 6 ? 0 : -(dow + 1));
+            eachDayOfInterval({ start: wSat, end: addDays(wSat, 4) })
+                .forEach(d => periodDateSet.add(format(d, 'yyyy-MM-dd')));
+        } else {
+            eachDayOfInterval({ start: startOfMonth(studentSelectedDate), end: endOfMonth(studentSelectedDate) })
+                .forEach(d => periodDateSet.add(format(d, 'yyyy-MM-dd')));
+        }
+
+        // Build per-student accumulator — only active (نشط) students
+        const studentMap = new Map<string, {
+            id: string; name: string; group: string;
+            absences: number; notMem: number; lateDays: number;
+            absentDates: string[]; notMemDates: string[];
+        }>();
+        (students || []).filter(s => s.status === 'نشط').forEach(s => {
+            studentMap.set(s.id, {
+                id: s.id, name: s.fullName,
+                group: (s as any).group || s.groupName || '—',
+                absences: 0, notMem: 0, lateDays: 0,
+                absentDates: [], notMemDates: []
+            });
+        });
+
+        // Build group→studentIds for cross-reference (only active students)
+        const groupStudentIds = new Map<string, Set<string>>();
+        sheikhs.forEach(sh => groupStudentIds.set(sh.group, new Set()));
+        (students || []).filter(s => s.status === 'نشط').forEach(s => {
+            const grp = (s as any).group || s.groupName || '';
+            groupStudentIds.get(grp)?.add(s.id);
+        });
+
+        // Scan ALL dailySessions for the period dates directly
+        if (dailySessions) {
+            Object.entries(dailySessions).forEach(([dateStr, daySessions]) => {
+                if (!periodDateSet.has(dateStr)) return;
+                if (!daySessions) return;
+
+                Object.values(daySessions as Record<string, any>).forEach((session: any) => {
+                    if (!session) return;
+                    const sType = session.sessionType;
+                    const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
+                    if (!isReal) return;
+
+                    const records: any[] = Array.isArray(session.records)
+                        ? session.records
+                        : session.records ? Object.values(session.records) : [];
+
+                    if (!records.length) return;
+
+                    // Track which student IDs appear in this session's records
+                    const recordedIds = new Set<string>(records.map(r => r.studentId).filter(Boolean));
+
+                    records.forEach(r => {
+                        const sid = r.studentId;
+                        if (!sid || !studentMap.has(sid)) return;
+                        const st = studentMap.get(sid)!;
+                        if (r.attendance === 'غائب' || r.attendance === 'غياب') {
+                            st.absences++;
+                            if (!st.absentDates.includes(dateStr)) st.absentDates.push(dateStr);
+                        }
+                        if (r.attendance === 'متأخر') st.lateDays++;
+                        if (!r.review && r.memorization === 'لم يحفظ') {
+                            st.notMem++;
+                            if (!st.notMemDates.includes(dateStr)) st.notMemDates.push(dateStr);
+                        }
+                    });
+
+                    // Cross-reference: find which group this session belongs to
+                    // by checking the ownerId against sheikhs
+                    const shOwner = sheikhs.find(sh => sh.uids.has(session.ownerId));
+                    if (shOwner) {
+                        // Students in this group NOT in records → absent
+                        (groupStudentIds.get(shOwner.group) || new Set()).forEach(sid => {
+                            if (!recordedIds.has(sid) && studentMap.has(sid)) {
+                                const st = studentMap.get(sid)!;
+                                if (!st.absentDates.includes(dateStr)) {
+                                    st.absences++;
+                                    st.absentDates.push(dateStr);
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+        }
+
+        return Array.from(studentMap.values())
+            .filter(s => s.absences > 0 || s.notMem > 0)
+            .sort((a, b) => b.absences - a.absences);
+    }, [students, dailySessions, sheikhs, studentPeriod, studentSelectedDate]);
+
     // ── Navigation ──────────────────────────────────────────────────────────
     const navigate = (dir: -1 | 1) => {
-        if (view === 'day') setSelectedDate(d => addDays(d, dir));
+        if (view === 'students') {
+            if (studentPeriod === 'day') setStudentSelectedDate(d => addDays(d, dir));
+            else if (studentPeriod === 'week') setStudentSelectedDate(d => addDays(d, dir * 7));
+            else setStudentSelectedDate(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
+        } else if (view === 'day') setSelectedDate(d => addDays(d, dir));
         else if (view === 'week') setSelectedDate(d => addDays(d, dir * 7));
         else if (view === 'month') setSelectedDate(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
         else setStatsMonth(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
     };
 
-    const navLabel = view === 'day'
-        ? format(selectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
-        : view === 'week'
-            ? `${format(startOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM', { locale: ar })} — ${format(endOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM yyyy', { locale: ar })}`
-            : view === 'month'
-                ? format(selectedDate, 'MMMM yyyy', { locale: ar })
-                : format(statsMonth, 'MMMM yyyy', { locale: ar });
+    const navLabel = view === 'students'
+        ? (studentPeriod === 'day'
+            ? format(studentSelectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
+            : studentPeriod === 'week'
+                ? `سبت ${format(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 'd MMM', { locale: ar })} — أرب ${format(addDays(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 4), 'd MMM yyyy', { locale: ar })}`
+                : format(studentSelectedDate, 'MMMM yyyy', { locale: ar }))
+        : view === 'day'
+            ? format(selectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
+            : view === 'week'
+                ? `${format(startOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM', { locale: ar })} — ${format(endOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM yyyy', { locale: ar })}`
+                : view === 'month'
+                    ? format(selectedDate, 'MMMM yyyy', { locale: ar })
+                    : format(statsMonth, 'MMMM yyyy', { locale: ar });
 
     const interval = useMemo(() => {
         if (view === 'week') return eachDayOfInterval({ start: startOfWeek(selectedDate, { weekStartsOn: 6 }), end: endOfWeek(selectedDate, { weekStartsOn: 6 }) });
@@ -358,9 +475,9 @@ export default function SheikhMonitoringPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 border">
-                        {(['day', 'week', 'month', 'stats'] as const).map(v => (
+                        {(['day', 'week', 'month', 'stats', 'students'] as const).map(v => (
                             <button key={v} onClick={() => setView(v)} className={cn("px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all", view === v ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-muted")}>
-                                {v === 'day' ? '📅 اليوم' : v === 'week' ? '📆 الأسبوع' : v === 'month' ? '🗓 الشهر' : '📊 إحصائيات'}
+                                {v === 'day' ? '📅 اليوم' : v === 'week' ? '📆 الأسبوع' : v === 'month' ? '🗓 الشهر' : v === 'stats' ? '📊 إحصائيات' : '📋 متابعة الطلاب'}
                             </button>
                         ))}
                     </div>
@@ -371,7 +488,7 @@ export default function SheikhMonitoringPage() {
                     <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="h-8 px-2"><ChevronRight className="h-4 w-4" /></Button>
                     <div className="flex flex-col items-center">
                         <span className="text-sm font-bold">{navLabel}</span>
-                        {view !== 'stats' && !isToday(selectedDate) && (
+                        {(view !== 'stats') && !isToday(selectedDate) && (
                             <button onClick={() => setSelectedDate(new Date())} className="text-[10px] text-primary flex items-center gap-1 mt-0.5">
                                 <RotateCcw className="h-2.5 w-2.5" /> اليوم
                             </button>
@@ -391,7 +508,7 @@ export default function SheikhMonitoringPage() {
                 )}
 
                 {/* ── Legend (day/week/month only) ── */}
-                {view !== 'stats' && (
+                {(view === 'day' || view === 'week' || view === 'month') && (
                     <div className="flex flex-wrap gap-2 text-[10px]">
                         {Object.entries(TYPE_CONFIG).map(([, cfg]) => (
                             <span key={cfg.label} className="flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded-full border">
@@ -407,10 +524,23 @@ export default function SheikhMonitoringPage() {
                 {/* ── Main Content ── */}
                 {view === 'day' && <DayTable sheikhs={sheikhs} getDayStats={getDayStats} dateStr={todayStr} />}
                 {(view === 'week' || view === 'month') && (
-                    <MatrixTable sheikhs={sheikhs} groupSessions={groupSessions} interval={interval} />
+                    <MatrixTable sheikhs={sheikhs} groupSessions={groupSessions} interval={interval} getDayStats={getDayStats} />
                 )}
                 {view === 'stats' && (
                     <StatsView sortedStats={sortedStats} monthlyStats={monthlyStats} statsMonth={statsMonth} sortStat={sortStat} sortDir={sortDir} toggleSort={toggleSort} />
+                )}
+                {view === 'students' && (
+                    <StudentTrackingView
+                        data={studentTrackingData}
+                        period={studentPeriod}
+                        setPeriod={setStudentPeriod}
+                        selectedDate={studentSelectedDate}
+                        groupFilter={studentGroupFilter}
+                        setGroupFilter={setStudentGroupFilter}
+                        sort={studentSort}
+                        setSort={setStudentSort}
+                        sheikhs={sheikhs}
+                    />
                 )}
             </div>
         </TooltipProvider>
@@ -419,128 +549,226 @@ export default function SheikhMonitoringPage() {
 
 // ─── DayTable Component ───────────────────────────────────────────────────────
 function DayTable({ sheikhs, getDayStats, dateStr }: { sheikhs: GroupSheikhInfo[]; getDayStats: (g: string, d: string) => DayStats | null; dateStr: string }) {
+
+    const typeCounts: Record<string, number> = { 'لم يسجل': 0 };
+    const attendanceData: { name: string; attendance: number; fill: string }[] = [];
+
+    sheikhs.forEach(sh => {
+        const stats = getDayStats(sh.group, dateStr);
+        if (!stats) {
+            typeCounts['لم يسجل']++;
+        } else {
+            const rawType = stats.type;
+            const t = TYPE_CONFIG[rawType]?.label || rawType;
+            typeCounts[t] = (typeCounts[t] || 0) + 1;
+
+            if (stats.attendance !== null) {
+                attendanceData.push({
+                    name: sh.group.replace('فوج ', ''),
+                    attendance: stats.attendance,
+                    fill: stats.attendance >= 90 ? '#10b981' : stats.attendance >= 70 ? '#f59e0b' : '#ef4444'
+                });
+            }
+        }
+    });
+
+    const pieData = Object.entries(typeCounts).filter(([, v]) => v > 0).map(([k, v]) => ({ name: k, value: v }));
+    const pieColors: Record<string, string> = {
+        'أساسية': '#10b981', 'تعويضية': '#f59e0b', 'إضافية': '#6366f1',
+        'أنشطة': '#a855f7', 'عطلة': '#38bdf8', 'غياب شيخ': '#f43f5e', 'لم يسجل': '#cbd5e1'
+    };
+
     return (
-        <div className="border rounded-xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-sm">
-                    <thead>
-                        <tr className="bg-muted/30 border-b">
-                            <th className="sticky right-0 z-20 bg-muted/30 text-right p-2 sm:p-3 text-xs font-bold border-l min-w-[120px] sm:min-w-[160px]">الفوج / الشيخ</th>
-                            <th className="p-2 text-center text-xs font-bold border-l min-w-[100px] whitespace-nowrap">نوع الحصة</th>
-                            {EVAL_COLS.map(col => <th key={col.key} className="p-2 text-center text-xs font-bold border-l min-w-[55px]">{col.label}</th>)}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sheikhs.map((sh, idx) => {
-                            const stats = getDayStats(sh.group, dateStr);
-                            const cfg = stats?.type ? TYPE_CONFIG[stats.type] : null;
-                            const isHoliday = stats?.type === 'يوم عطلة' || stats?.type === 'غياب الشيخ' || stats?.type === 'حصة أنشطة';
-                            return (
-                                <tr key={sh.uid} className={cn("border-b hover:bg-muted/10 transition-colors", idx % 2 === 0 ? 'bg-white' : 'bg-muted/10')}>
-                                    <td className={cn("sticky right-0 z-10 p-2 sm:p-3 border-l shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]", idx % 2 === 0 ? 'bg-white' : 'bg-slate-50')}>
-                                        <div className="font-bold text-xs sm:text-sm leading-tight">{sh.group}</div>
-                                        <div className="text-[10px] text-muted-foreground truncate max-w-[110px] sm:max-w-none">{sh.displayName}</div>
-                                    </td>
-                                    <td className="p-2 text-center border-l">
-                                        {stats ? (
-                                            <span className={cn("inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-lg border", cfg?.bg || 'bg-muted/30 border-border')}>
-                                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", cfg?.dot || 'bg-gray-400')} />
-                                                <span className={cfg?.text || 'text-muted-foreground'}>{cfg?.label || stats.type}</span>
-                                            </span>
-                                        ) : (
-                                            <span className="text-[10px] text-muted-foreground/50 border border-dashed rounded-lg px-2 py-1 inline-block">—</span>
-                                        )}
-                                    </td>
-                                    {EVAL_COLS.map(col => {
-                                        const val: number | null = stats ? (stats as any)[col.key] : null;
-                                        const showDash = !stats || isHoliday || val === null;
-                                        return (
-                                            <td key={col.key} className="p-2 text-center border-l">
-                                                {showDash ? <span className="text-muted-foreground/30 text-xs">—</span> : <span className={cn("text-xs", col.color(val as number))}>{val}%</span>}
-                                            </td>
-                                        );
-                                    })}
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+        <div className="space-y-4">
+            {/* ── Charts ── */}
+            <div className="grid md:grid-cols-2 gap-4 print:hidden">
+                <div className="border rounded-xl p-4 bg-white shadow-sm flex flex-col">
+                    <h3 className="text-sm font-bold mb-4 text-center">توزيع الحصص</h3>
+                    <div className="h-48 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                                    {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={pieColors[entry.name] || '#94a3b8'} />)}
+                                </Pie>
+                                <RechartsTooltip formatter={(value: number) => [value, 'عدد الأفواج']} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+                <div className="border rounded-xl p-4 bg-white shadow-sm flex flex-col">
+                    <h3 className="text-sm font-bold mb-4 text-center">نسبة الحضور للأفواج المتوفرة</h3>
+                    <div className="h-48 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={attendanceData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" />
+                                <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                                <RechartsTooltip cursor={{ fill: '#f1f5f9' }} formatter={(value: number) => [`${value}%`, 'الحضور']} />
+                                <Bar dataKey="attendance" radius={[4, 4, 0, 0]}>
+                                    {attendanceData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
+
+            <div className="border rounded-xl overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-sm">
+                        <thead>
+                            <tr className="bg-muted/30 border-b">
+                                <th className="sticky right-0 z-20 bg-muted/30 text-right p-2 sm:p-3 text-xs font-bold border-l min-w-[120px] sm:min-w-[160px]">الفوج / الشيخ</th>
+                                <th className="p-2 text-center text-xs font-bold border-l min-w-[100px] whitespace-nowrap">نوع الحصة</th>
+                                {EVAL_COLS.map(col => <th key={col.key} className="p-2 text-center text-xs font-bold border-l min-w-[55px]">{col.label}</th>)}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sheikhs.map((sh, idx) => {
+                                const stats = getDayStats(sh.group, dateStr);
+                                const cfg = stats?.type ? TYPE_CONFIG[stats.type] : null;
+                                const isHoliday = stats?.type === 'يوم عطلة' || stats?.type === 'غياب الشيخ' || stats?.type === 'حصة أنشطة';
+                                return (
+                                    <tr key={sh.uid} className={cn("border-b hover:bg-muted/10 transition-colors", idx % 2 === 0 ? 'bg-white' : 'bg-muted/10')}>
+                                        <td className={cn("sticky right-0 z-10 p-2 sm:p-3 border-l shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]", idx % 2 === 0 ? 'bg-white' : 'bg-slate-50')}>
+                                            <div className="font-bold text-xs sm:text-sm leading-tight">{sh.group}</div>
+                                            <div className="text-[10px] text-muted-foreground truncate max-w-[110px] sm:max-w-none">{sh.displayName}</div>
+                                        </td>
+                                        <td className="p-2 text-center border-l">
+                                            {stats ? (
+                                                <span className={cn("inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-lg border", cfg?.bg || 'bg-muted/30 border-border')}>
+                                                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", cfg?.dot || 'bg-gray-400')} />
+                                                    <span className={cfg?.text || 'text-muted-foreground'}>{cfg?.label || stats.type}</span>
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] text-muted-foreground/50 border border-dashed rounded-lg px-2 py-1 inline-block">—</span>
+                                            )}
+                                        </td>
+                                        {EVAL_COLS.map(col => {
+                                            const val: number | null = stats ? (stats as any)[col.key] : null;
+                                            const showDash = !stats || isHoliday || val === null;
+                                            return (
+                                                <td key={col.key} className="p-2 text-center border-l">
+                                                    {showDash ? <span className="text-muted-foreground/30 text-xs">—</span> : <span className={cn("text-xs", col.color(val as number))}>{val}%</span>}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
 }
 
 // ─── MatrixTable Component ────────────────────────────────────────────────────
-function MatrixTable({ sheikhs, groupSessions, interval }: { sheikhs: GroupSheikhInfo[]; groupSessions: Map<string, Map<string, any[]>>; interval: Date[] }) {
-    return (
-        <div className="border rounded-xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-                <table className="border-collapse text-xs w-full">
-                    <thead>
-                        <tr className="bg-muted/30 border-b">
-                            <th className="sticky right-0 z-20 bg-muted/30 text-right p-2 text-xs font-bold border-l min-w-[130px]">الفوج / الشيخ</th>
-                            {interval.map(day => {
-                                const isWk = getDay(day) === 4 || getDay(day) === 5;
-                                return (
-                                    <th key={day.toISOString()} className={cn("p-1.5 text-center border-l min-w-[48px]", isWk ? "bg-sky-50/60 text-sky-600" : "", isToday(day) && "bg-primary/5 text-primary")}>
-                                        <div className="font-bold text-[10px]">{format(day, 'EEE', { locale: ar })}</div>
-                                        <div className="text-[9px] opacity-60">{format(day, 'd')}</div>
-                                    </th>
-                                );
-                            })}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sheikhs.map((sh, idx) => (
-                            <tr key={sh.uid} className={cn("border-b hover:bg-muted/5 transition-colors", idx % 2 === 0 ? 'bg-white' : 'bg-muted/10')}>
-                                <td className={cn("sticky right-0 z-10 p-2 border-l shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]", idx % 2 === 0 ? 'bg-white' : 'bg-slate-50')}>
-                                    <div className="font-bold text-[11px] leading-tight">{sh.group}</div>
-                                    <div className="text-[9px] text-muted-foreground truncate max-w-[120px]">{sh.displayName}</div>
-                                </td>
-                                {interval.map(day => {
-                                    const dateStr = format(day, 'yyyy-MM-dd');
-                                    const isWk = getDay(day) === 4 || getDay(day) === 5;
-                                    const sessions = groupSessions.get(sh.group)?.get(dateStr) || [];
-                                    const s1 = sessions.find(s => s.sessionNumber === 1);
-                                    const s2 = sessions.find(s => s.sessionNumber === 2);
+function MatrixTable({ sheikhs, groupSessions, interval, getDayStats }: { sheikhs: GroupSheikhInfo[]; groupSessions: Map<string, Map<string, any[]>>; interval: Date[]; getDayStats: (g: string, d: string) => DayStats | null }) {
+    const trendData = interval.map(day => {
+        const dateStr = format(day, 'yyyy-MM-dd');
+        let total = 0, count = 0;
+        sheikhs.forEach(sh => {
+            const st = getDayStats(sh.group, dateStr);
+            if (st && st.attendance !== null) {
+                total += st.attendance;
+                count++;
+            }
+        });
+        return {
+            name: format(day, 'd MMM', { locale: ar }),
+            attendance: count > 0 ? Math.round(total / count) : null
+        };
+    }).filter(d => d.attendance !== null);
 
+    return (
+        <div className="space-y-4">
+            {trendData.length > 0 && (
+                <div className="border rounded-xl p-4 bg-white shadow-sm flex flex-col print:hidden">
+                    <h3 className="text-sm font-bold mb-4 text-center">متوسط الحضور اليومي للمدرسة</h3>
+                    <div className="h-48 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                                <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                                <RechartsTooltip formatter={(value: number) => [`${value}%`, 'الحضور']} />
+                                <Line type="monotone" dataKey="attendance" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
+            <div className="border rounded-xl overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                    <table className="border-collapse text-xs w-full">
+                        <thead>
+                            <tr className="bg-muted/30 border-b">
+                                <th className="sticky right-0 z-20 bg-muted/30 text-right p-2 text-xs font-bold border-l min-w-[130px]">الفوج / الشيخ</th>
+                                {interval.map(day => {
+                                    const isWk = getDay(day) === 4 || getDay(day) === 5;
                                     return (
-                                        <td key={day.toISOString()} className={cn("p-1 text-center border-l", isWk && "bg-sky-50/30", isToday(day) && "bg-primary/[0.03]")}>
-                                            <div className="flex items-center justify-center gap-0.5 min-h-[28px]">
-                                                {sessions.length === 0 ? (isWk ? null : (
-                                                    <span className="w-5 h-5 rounded border border-dashed border-slate-200 flex items-center justify-center">
-                                                        <XCircle className="h-3 w-3 text-slate-200" />
-                                                    </span>
-                                                )) : (
-                                                    [s1, s2].filter(Boolean).map(s => {
-                                                        const cfg = TYPE_CONFIG[s!.sessionType];
-                                                        return (
-                                                            <Tooltip key={`${s!.id}-${s!.sessionNumber}`} delayDuration={0}>
-                                                                <TooltipTrigger asChild>
-                                                                    <div className={cn("w-5 h-5 rounded-md flex items-center justify-center text-white font-bold text-[9px] cursor-default shadow-sm", cfg?.dot || 'bg-emerald-500')}>
-                                                                        {s!.sessionNumber}
-                                                                    </div>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent side="top" className="text-xs p-2 max-w-[180px]">
-                                                                    <div className="space-y-1">
-                                                                        <div className="font-bold">{sh.group} — {format(day, 'd MMM', { locale: ar })}</div>
-                                                                        <div>{s!.sessionType}</div>
-                                                                        {s!.substituteTeacher && <div className="text-amber-500">البديل: {s!.substituteTeacher}</div>}
-                                                                        <div className="text-muted-foreground">{s!.records?.length || 0} طالب</div>
-                                                                    </div>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                        );
-                                                    })
-                                                )}
-                                            </div>
-                                        </td>
+                                        <th key={day.toISOString()} className={cn("p-1.5 text-center border-l min-w-[48px]", isWk ? "bg-sky-50/60 text-sky-600" : "", isToday(day) && "bg-primary/5 text-primary")}>
+                                            <div className="font-bold text-[10px]">{format(day, 'EEE', { locale: ar })}</div>
+                                            <div className="text-[9px] opacity-60">{format(day, 'd')}</div>
+                                        </th>
                                     );
                                 })}
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {sheikhs.map((sh, idx) => (
+                                <tr key={sh.uid} className={cn("border-b hover:bg-muted/5 transition-colors", idx % 2 === 0 ? 'bg-white' : 'bg-muted/10')}>
+                                    <td className={cn("sticky right-0 z-10 p-2 border-l shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]", idx % 2 === 0 ? 'bg-white' : 'bg-slate-50')}>
+                                        <div className="font-bold text-[11px] leading-tight">{sh.group}</div>
+                                        <div className="text-[9px] text-muted-foreground truncate max-w-[120px]">{sh.displayName}</div>
+                                    </td>
+                                    {interval.map(day => {
+                                        const dateStr = format(day, 'yyyy-MM-dd');
+                                        const isWk = getDay(day) === 4 || getDay(day) === 5;
+                                        const sessions = groupSessions.get(sh.group)?.get(dateStr) || [];
+                                        const s1 = sessions.find(s => s.sessionNumber === 1);
+                                        const s2 = sessions.find(s => s.sessionNumber === 2);
+
+                                        return (
+                                            <td key={day.toISOString()} className={cn("p-1 text-center border-l", isWk && "bg-sky-50/30", isToday(day) && "bg-primary/[0.03]")}>
+                                                <div className="flex items-center justify-center gap-0.5 min-h-[28px]">
+                                                    {sessions.length === 0 ? (isWk ? null : (
+                                                        <span className="w-5 h-5 rounded border border-dashed border-slate-200 flex items-center justify-center">
+                                                            <XCircle className="h-3 w-3 text-slate-200" />
+                                                        </span>
+                                                    )) : (
+                                                        [s1, s2].filter(Boolean).map(s => {
+                                                            const cfg = TYPE_CONFIG[s!.sessionType];
+                                                            return (
+                                                                <Tooltip key={`${s!.id}-${s!.sessionNumber}`} delayDuration={0}>
+                                                                    <TooltipTrigger asChild>
+                                                                        <div className={cn("w-5 h-5 rounded-md flex items-center justify-center text-white font-bold text-[9px] cursor-default shadow-sm", cfg?.dot || 'bg-emerald-500')}>
+                                                                            {s!.sessionNumber}
+                                                                        </div>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent side="top" className="text-xs p-2 max-w-[180px]">
+                                                                        <div className="space-y-1">
+                                                                            <div className="font-bold">{sh.group} — {format(day, 'd MMM', { locale: ar })}</div>
+                                                                            <div>{s!.sessionType}</div>
+                                                                            {s!.substituteTeacher && <div className="text-amber-500">البديل: {s!.substituteTeacher}</div>}
+                                                                            <div className="text-muted-foreground">{s!.records?.length || 0} طالب</div>
+                                                                        </div>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            );
+                                                        })
+                                                    )}
+                                                </div>
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
@@ -589,6 +817,23 @@ function StatsView({ sortedStats, monthlyStats, statsMonth, sortStat, sortDir, t
                         <div className="text-xs text-muted-foreground">{m.val}</div>
                     </div>
                 ))}
+            </div>
+
+            {/* ── Average Attendance & Commitment Chart ── */}
+            <div className="border rounded-xl p-4 bg-white shadow-sm flex flex-col print:hidden">
+                <h3 className="text-sm font-bold mb-4 text-center">مقارنة الالتزام ومتوسط الحضور</h3>
+                <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={sortedStats.map(s => ({ name: s.group.replace('فوج ', ''), attendance: s.avgAttendance || 0, commitment: s.commitmentRate || 0 }))} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" />
+                            <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} />
+                            <RechartsTooltip cursor={{ fill: '#f8fafc' }} formatter={(value: number, name: string) => [`${value}%`, name === 'attendance' ? 'الحضور' : 'الالتزام']} />
+                            <Bar dataKey="commitment" name="commitment" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={20} />
+                            <Bar dataKey="attendance" name="attendance" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
             </div>
 
             {/* ── Main table ── */}
@@ -775,6 +1020,367 @@ function StatsView({ sortedStats, monthlyStats, statsMonth, sortStat, sortDir, t
             <p className="text-[10px] text-muted-foreground text-center">
                 * انتظام الشيخ = عدد الجلسات المسجلة ÷ أيام العمل الفعلية (مطروحاً منها العطل وأيام غياب الشيخ)
                 &nbsp;|&nbsp; اضغط على أي صف لعرض التفصيل الأسبوعي
+            </p>
+        </div>
+    );
+}
+
+// ─── StudentTrackingView Component ───────────────────────────────────────────
+interface StudentRecord {
+    id: string; name: string; group: string;
+    absences: number; notMem: number; lateDays: number;
+    absentDates: string[]; notMemDates: string[];
+}
+
+function StudentTrackingView({
+    data, period, setPeriod, selectedDate, groupFilter, setGroupFilter, sort, setSort, sheikhs
+}: {
+    data: StudentRecord[];
+    period: 'day' | 'week' | 'month';
+    setPeriod: (p: 'day' | 'week' | 'month') => void;
+    selectedDate: Date;
+    groupFilter: string;
+    setGroupFilter: (g: string) => void;
+    sort: 'absences' | 'notMem';
+    setSort: (s: 'absences' | 'notMem') => void;
+    sheikhs: GroupSheikhInfo[];
+}) {
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
+    const filtered = data
+        .filter(s => groupFilter === 'all' || s.group === groupFilter)
+        .sort((a, b) => sort === 'absences' ? b.absences - a.absences : b.notMem - a.notMem);
+
+    // Reset pagination when data or filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [period, selectedDate, groupFilter, sort, data]);
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+    const paginatedData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    const topAbsent = [...data].sort((a, b) => b.absences - a.absences)[0];
+    const topNotMem = [...data].sort((a, b) => b.notMem - a.notMem)[0];
+    const topLate = [...data].sort((a, b) => b.lateDays - a.lateDays)[0];
+    const totalFlagged = data.length;
+    const totalAbsences = data.reduce((s, r) => s + r.absences, 0);
+
+    const periodLabel = period === 'day'
+        ? format(selectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
+        : period === 'week' ? 'الأسبوع الدراسي' : format(selectedDate, 'MMMM yyyy', { locale: ar });
+
+    const handlePrint = () => window.print();
+
+    const downloadCSV = () => {
+        if (!filtered.length) return;
+        const headers = ['الطالب', 'الفوج', 'غياب', 'تأخر', 'لم يحفظ', 'تواريخ الغياب', 'تواريخ (لم يحفظ)'];
+        const rows = filtered.map(s => [
+            s.name, s.group, s.absences, s.lateDays, s.notMem,
+            s.absentDates.join(' | '), s.notMemDates.join(' | ')
+        ]);
+        const csv = ['\uFEFF' + headers.join(','), ...rows.map(r => r.map(f => `"${String(f).replace(/"/g, '""')}"`).join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `غياب_${period}_${format(selectedDate, 'yyyy-MM-dd')}.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    };
+
+    const isAllGroups = groupFilter === 'all';
+
+    // Aggregations for charts
+    const absData: Record<string, number> = {};
+    const notMemData: Record<string, number> = {};
+
+    filtered.forEach(s => {
+        const key = isAllGroups ? s.group.replace('فوج ', '') : s.name.split(' ').slice(0, 2).join(' ');
+        if (s.absences > 0) absData[key] = (absData[key] || 0) + s.absences;
+        if (s.notMem > 0) notMemData[key] = (notMemData[key] || 0) + s.notMem;
+    });
+
+    const absencePieData = Object.entries(absData).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, isAllGroups ? 8 : 5);
+    const notMemPieData = Object.entries(notMemData).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, isAllGroups ? 8 : 5);
+    const PIE_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#06b6d4', '#3b82f6', '#8b5cf6'];
+
+    return (
+        <div className="space-y-4">
+            {/* ── Analytical Charts ── */}
+            <div className="grid md:grid-cols-2 gap-4 print:hidden">
+                <div className="border rounded-xl p-4 bg-white shadow-sm flex flex-col">
+                    <h3 className="text-sm font-bold mb-4 text-center">أكثر {isAllGroups ? 'الأفواج' : 'الطلاب'} غياباً</h3>
+                    <div className="h-48 w-full">
+                        {absencePieData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie data={absencePieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, value }) => `${name} (${value})`}>
+                                        {absencePieData.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
+                                    </Pie>
+                                    <RechartsTooltip formatter={(value: number) => [value, 'غياب']} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-muted-foreground text-xs">لا توجد غيابات مسجلة</div>
+                        )}
+                    </div>
+                </div>
+                <div className="border rounded-xl p-4 bg-white shadow-sm flex flex-col">
+                    <h3 className="text-sm font-bold mb-4 text-center">أكثر {isAllGroups ? 'الأفواج' : 'الطلاب'} بضبط (لم يحفظ)</h3>
+                    <div className="h-48 w-full">
+                        {notMemPieData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie data={notMemPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, value }) => `${name} (${value})`}>
+                                        {notMemPieData.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
+                                    </Pie>
+                                    <RechartsTooltip formatter={(value: number) => [value, 'لم يحفظ']} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-muted-foreground text-xs">لا توجد حالات (لم يحفظ) مسجلة</div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Print-only report (hidden on screen) ── */}
+            <style type="text/css" media="print">{`
+                @page { size: A4 landscape; margin: 10mm; }
+                thead th { background-color: #e5e7eb !important; print-color-adjust: exact; }
+                body { background-color: white !important; }
+            `}</style>
+
+            <div className="student-tracking-print hidden print:block" dir="rtl">
+                {Array.from({ length: Math.ceil(Math.max(1, filtered.length) / 10) }).map((_, pageIndex) => {
+                    const pageStudents = filtered.slice(pageIndex * 10, (pageIndex + 1) * 10);
+                    const isLastPage = pageIndex === Math.ceil(Math.max(1, filtered.length) / 10) - 1;
+                    return (
+                        <div key={pageIndex} className="page-break-after-always relative min-h-[190mm]">
+                            <div className="flex items-center justify-between mb-6 border-b border-black pb-3">
+                                <div>
+                                    <h1 className="text-xl font-bold">تقرير الغيابات و(لم يحفظ) — {periodLabel}</h1>
+                                    <p className="text-sm text-gray-600">المدرسة القرآنية للإمام الشافعي · فوج: {groupFilter === 'all' ? 'جميع الأفواج' : groupFilter}</p>
+                                </div>
+                                <div className="text-sm flex flex-col items-end gap-1">
+                                    <span>تاريخ: {format(new Date(), 'dd/MM/yyyy')}</span>
+                                    <span className="text-xs text-muted-foreground">صفحة {pageIndex + 1} من {Math.ceil(Math.max(1, filtered.length) / 10)}</span>
+                                </div>
+                            </div>
+                            <table className="w-full border-collapse border border-black text-sm text-right">
+                                <thead className="bg-gray-200">
+                                    <tr>
+                                        <th className="p-2 border border-black w-12">#</th>
+                                        <th className="p-2 border border-black w-48">الطالب</th>
+                                        <th className="p-2 border border-black w-24">الفوج</th>
+                                        <th className="p-2 border border-black w-16 text-center">غياب</th>
+                                        <th className="p-2 border border-black w-16 text-center">تأخر</th>
+                                        <th className="p-2 border border-black w-20 text-center">لم يحفظ</th>
+                                        <th className="p-2 border border-black text-center">تواريخ الغياب</th>
+                                        <th className="p-2 border border-black text-center">تواريخ (لم يحفظ)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {pageStudents.map((s, i) => (
+                                        <tr key={s.id} className="border-b border-black">
+                                            <td className="p-1.5 border border-black text-center">{pageIndex * 10 + i + 1}</td>
+                                            <td className="p-1.5 border border-black font-bold whitespace-nowrap">{s.name}</td>
+                                            <td className="p-1 border border-black text-center">{s.group}</td>
+                                            <td className="p-1 border border-black text-center font-bold">{s.absences || '—'}</td>
+                                            <td className="p-1 border border-black text-center">{s.lateDays || '—'}</td>
+                                            <td className="p-1 border border-black text-center font-bold text-red-600 print:text-black">{s.notMem || '—'}</td>
+                                            <td className="p-1 border border-black text-[10px] leading-tight" dir="ltr">
+                                                <div className="flex flex-wrap gap-0.5 justify-end">{s.absentDates.map(d => <span key={d} className="bg-gray-100 px-0.5 rounded">{format(new Date(d), 'd/M')}</span>)}</div>
+                                            </td>
+                                            <td className="p-1 border border-black text-[10px] leading-tight" dir="ltr">
+                                                <div className="flex flex-wrap gap-0.5 justify-end">{s.notMemDates.map(d => <span key={d} className="bg-gray-100 px-0.5 rounded">{format(new Date(d), 'd/M')}</span>)}</div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {!filtered.length && (
+                                        <tr><td colSpan={8} className="p-4 text-center border border-black">لا توجد بيانات (الجميع ملتزمون ولله الحمد)</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                            {isLastPage && (
+                                <div className="mt-8 flex justify-between text-xs border-t border-black pt-4">
+                                    <span>تم استخراج هذا التقرير آلياً من نظام الإدارة</span>
+                                    <span>التوقيع: .......................................&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;الختم: .......................................</span>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* ── Controls ── */}
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-card border rounded-xl p-3 print:hidden">
+                <div className="flex items-center gap-1">
+                    {(['day', 'week', 'month'] as const).map(p => (
+                        <button key={p} onClick={() => setPeriod(p)} className={cn("px-3 py-1 rounded-lg text-xs font-bold border transition-all", period === p ? "bg-primary text-white border-primary" : "border-border text-muted-foreground hover:bg-muted")}>
+                            {p === 'day' ? 'اليوم' : p === 'week' ? 'الأسبوع' : 'الشهر'}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex items-center gap-2">
+                    <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                    <select aria-label="تصفية حسب الفوج" value={groupFilter} onChange={e => setGroupFilter(e.target.value)} className="text-xs border rounded-lg px-2 py-1 bg-background font-medium" dir="rtl">
+                        <option value="all">كل الأفواج</option>
+                        {sheikhs.map(sh => <option key={sh.group} value={sh.group}>{sh.group}</option>)}
+                    </select>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <button onClick={downloadCSV} className="flex items-center gap-1 text-xs border rounded-lg px-2.5 py-1 hover:bg-muted font-bold transition-colors">
+                        ⬇️ تصدير Excel
+                    </button>
+                    <button onClick={handlePrint} className="flex items-center gap-1 text-xs border rounded-lg px-2.5 py-1 hover:bg-muted font-bold transition-colors">
+                        🖨️ طباعة
+                    </button>
+                </div>
+                <div className="text-[10px] text-muted-foreground italic">{periodLabel}</div>
+            </div>
+
+            {/* ── Medal cards ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 print:hidden">
+                <div className="rounded-xl border bg-rose-50 border-rose-100 p-3 space-y-0.5">
+                    <div className="text-lg">🏅</div>
+                    <div className="text-[10px] text-muted-foreground">الأكثر غياباً</div>
+                    <div className="font-bold text-sm text-rose-700 leading-tight truncate">{topAbsent?.name || '—'}</div>
+                    <div className="text-[10px] text-rose-500">{topAbsent?.absences ?? 0} غياب · {topAbsent?.group || ''}</div>
+                </div>
+                <div className="rounded-xl border bg-amber-50 border-amber-100 p-3 space-y-0.5">
+                    <div className="text-lg">📚</div>
+                    <div className="text-[10px] text-muted-foreground">الأكثر (لم يحفظ)</div>
+                    <div className="font-bold text-sm text-amber-700 leading-tight truncate">{topNotMem?.name || '—'}</div>
+                    <div className="text-[10px] text-amber-500">{topNotMem?.notMem ?? 0} مرة · {topNotMem?.group || ''}</div>
+                </div>
+                <div className="rounded-xl border bg-orange-50 border-orange-100 p-3 space-y-0.5">
+                    <div className="text-lg">⏰</div>
+                    <div className="text-[10px] text-muted-foreground">الأكثر تأخراً</div>
+                    <div className="font-bold text-sm text-orange-700 leading-tight truncate">{topLate?.name || '—'}</div>
+                    <div className="text-[10px] text-orange-500">{topLate?.lateDays ?? 0} يوم · {topLate?.group || ''}</div>
+                </div>
+                <div className="rounded-xl border bg-blue-50 border-blue-100 p-3 space-y-0.5">
+                    <div className="text-lg">📊</div>
+                    <div className="text-[10px] text-muted-foreground">إجمالي</div>
+                    <div className="font-bold text-sm text-blue-700">{totalFlagged} طالب مُلاحَظ</div>
+                    <div className="text-[10px] text-blue-500">{totalAbsences} غياب إجمالاً</div>
+                </div>
+            </div>
+
+            {/* ── Sort toggles ── */}
+            <div className="flex items-center gap-2 text-xs print:hidden">
+                <span className="text-muted-foreground font-medium">ترتيب حسب:</span>
+                <button onClick={() => setSort('absences')} className={cn("px-2.5 py-1 rounded-lg border font-bold transition-all", sort === 'absences' ? "bg-rose-100 text-rose-700 border-rose-200" : "border-border text-muted-foreground hover:bg-muted")}>
+                    <UserX className="h-3 w-3 inline-block ml-1" />الغياب
+                </button>
+                <button onClick={() => setSort('notMem')} className={cn("px-2.5 py-1 rounded-lg border font-bold transition-all", sort === 'notMem' ? "bg-amber-100 text-amber-700 border-amber-200" : "border-border text-muted-foreground hover:bg-muted")}>
+                    <XOctagon className="h-3 w-3 inline-block ml-1" />لم يحفظ
+                </button>
+            </div>
+
+            {/* ── Table (screen) ── */}
+            {filtered.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground space-y-2 print:hidden">
+                    <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto" />
+                    <div className="font-bold text-sm text-emerald-700">لا توجد غيابات أو (لم يحفظ) في هذه الفترة 🎉</div>
+                </div>
+            ) : (
+                <div className="border rounded-xl overflow-hidden shadow-sm print:hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-xs">
+                            <thead>
+                                <tr className="bg-muted/30 border-b">
+                                    <th className="sticky right-0 z-20 bg-muted/30 text-right p-2 border-l min-w-[120px] font-bold">#  الطالب</th>
+                                    <th className="p-2 text-center border-l min-w-[80px] font-bold">الفوج</th>
+                                    <th className="p-2 text-center border-l min-w-[60px] font-bold text-rose-700">غياب</th>
+                                    <th className="p-2 text-center border-l min-w-[60px] font-bold text-orange-600">تأخر</th>
+                                    <th className="p-2 text-center border-l min-w-[70px] font-bold text-amber-700">لم يحفظ</th>
+                                    <th className="p-2 text-center border-l min-w-[100px] font-bold text-muted-foreground">تواريخ الغياب</th>
+                                    <th className="p-2 text-center border-l min-w-[100px] font-bold text-muted-foreground">تواريخ (لم يحفظ)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedData.map((s, idx) => (
+                                    <tr key={s.id} className={cn("border-b hover:bg-muted/10 transition-colors", idx % 2 === 0 ? 'bg-white' : 'bg-muted/10')}>
+                                        <td className={cn("sticky right-0 z-10 p-2 border-l shadow-[2px_0_4px_-2px_rgba(0,0,0,0.07)]", idx % 2 === 0 ? 'bg-white' : 'bg-slate-50')}>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-[9px] text-muted-foreground font-bold w-4">{(currentPage - 1) * itemsPerPage + idx + 1}</span>
+                                                <span className="font-bold text-[11px] leading-tight">{s.name}</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-2 text-center border-l">
+                                            <span className="text-[10px] bg-muted/40 px-1.5 py-0.5 rounded-md font-medium">{s.group}</span>
+                                        </td>
+                                        <td className="p-2 text-center border-l">
+                                            {s.absences > 0 ? (
+                                                <span className={cn("font-bold text-xs px-1.5 py-0.5 rounded-md", s.absences >= 4 ? 'bg-rose-100 text-rose-700' : s.absences >= 2 ? 'bg-amber-50 text-amber-700' : 'text-orange-500')}>{s.absences}</span>
+                                            ) : <span className="text-muted-foreground/30">—</span>}
+                                        </td>
+                                        <td className="p-2 text-center border-l">
+                                            {s.lateDays > 0 ? <span className="text-orange-500 font-semibold">{s.lateDays}</span> : <span className="text-muted-foreground/30">—</span>}
+                                        </td>
+                                        <td className="p-2 text-center border-l">
+                                            {s.notMem > 0 ? (
+                                                <span className={cn("font-bold text-xs px-1.5 py-0.5 rounded-md", s.notMem >= 3 ? 'bg-amber-100 text-amber-800' : 'text-amber-600')}>{s.notMem}</span>
+                                            ) : <span className="text-muted-foreground/30">—</span>}
+                                        </td>
+                                        <td className="p-2 border-l">
+                                            <div className="flex flex-wrap gap-0.5 justify-center">
+                                                {s.absentDates.slice(0, 5).map(d => (
+                                                    <span key={d} className="text-[9px] bg-rose-50 text-rose-600 border border-rose-100 px-1 py-0.5 rounded">{format(new Date(d), 'd MMM', { locale: ar })}</span>
+                                                ))}
+                                                {s.absentDates.length > 5 && <span className="text-[9px] text-muted-foreground">+{s.absentDates.length - 5}</span>}
+                                            </div>
+                                        </td>
+                                        <td className="p-2 border-l">
+                                            <div className="flex flex-wrap gap-0.5 justify-center">
+                                                {s.notMemDates.slice(0, 5).map(d => (
+                                                    <span key={d} className="text-[9px] bg-amber-50 text-amber-700 border border-amber-100 px-1 py-0.5 rounded">{format(new Date(d), 'd MMM', { locale: ar })}</span>
+                                                ))}
+                                                {s.notMemDates.length > 5 && <span className="text-[9px] text-muted-foreground">+{s.notMemDates.length - 5}</span>}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    {/* Pagination Controls */}
+                    {filtered.length > 0 && (
+                        <div className="flex items-center justify-between p-3 border-t bg-muted/30">
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="h-8 text-xs"
+                                >
+                                    السابق
+                                </Button>
+                                <span className="text-xs font-medium px-2">
+                                    صفحة {currentPage} من {totalPages}
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="h-8 text-xs"
+                                >
+                                    التالي
+                                </Button>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                عرض {(currentPage - 1) * itemsPerPage + 1} إلى {Math.min(currentPage * itemsPerPage, filtered.length)} من أصل {filtered.length} طالب
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+            <p className="text-[10px] text-muted-foreground text-center print:hidden">
+                * الغياب = مسجّل غائب + طلاب لم تظهر أسماؤهم في سجلات الحصة &nbsp;|&nbsp; أحمر ≥ 4 / برتقالي 2–3
             </p>
         </div>
     );

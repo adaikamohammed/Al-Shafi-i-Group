@@ -13,6 +13,8 @@ export const PAGE_PERMISSIONS: PagePermission[] = [
     { path: '/sessions', label: 'الحصص اليومية', icon: 'Calendar', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/registrations', label: 'التسجيلات', icon: 'UserPlus', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/surahs', label: 'السور', icon: 'Book', allowedRoles: ['sheikh', 'super_admin', 'management'] },
+    { path: '/competition', label: 'المسابقة النهائية', icon: 'Award', allowedRoles: ['sheikh', 'super_admin', 'management'] },
+    { path: '/surah-eval', label: 'تقييم حفظ السور', icon: 'BookOpen', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/points', label: 'النقاط', icon: 'Award', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/ranking', label: 'الترتيب', icon: 'TrendingUp', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/league', label: 'الدوري', icon: 'Trophy', allowedRoles: ['sheikh', 'super_admin', 'management'] },

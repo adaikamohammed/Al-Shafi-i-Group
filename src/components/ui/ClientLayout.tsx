@@ -612,21 +612,21 @@ function AppSidebarContent({
 
   return (
     <div className={cn(
-      "min-h-screen w-full relative transition-colors duration-700 font-body",
+      "min-h-screen w-full relative transition-colors duration-700 font-body print:min-h-0 print:h-auto print:overflow-visible",
       theme.isLight ? "bg-slate-50 text-slate-900" : "bg-slate-950 text-white dark"
     )}>
       {/* Global Theme Gradient */}
-      <div className={cn("fixed inset-0 bg-gradient-to-tr transition-all duration-1000 opacity-20 pointer-events-none", theme.gradient)} />
-      <div className="fixed inset-0 bg-[url('/noise.png')] opacity-5 pointer-events-none" />
+      <div className={cn("fixed inset-0 bg-gradient-to-tr transition-all duration-1000 opacity-20 pointer-events-none print:hidden", theme.gradient)} />
+      <div className="fixed inset-0 bg-[url('/noise.png')] opacity-5 pointer-events-none print:hidden" />
 
       <CommandBar students={students ?? []} isOpen={isCommandBarOpen} onOpenChange={setCommandBarOpen} router={router} />
 
-      <div className="flex min-h-screen relative z-10 rtl overflow-x-hidden">
+      <div className="flex min-h-screen relative z-10 rtl overflow-x-hidden print:overflow-visible print:h-auto print:min-h-0">
         {isMobile ? (
           <Sheet>
             <div className="flex flex-col flex-1 min-w-0">
               <header className={cn(
-                "flex h-16 items-center justify-between gap-4 border-b px-6 backdrop-blur-md sticky top-0 z-50",
+                "flex h-16 items-center justify-between gap-4 border-b px-6 backdrop-blur-md sticky top-0 z-50 print:hidden",
                 theme.isLight ? "bg-white/60 border-slate-200" : "bg-slate-950/60 border-white/5"
               )}>
                 <div className="flex items-center gap-4">
@@ -648,11 +648,11 @@ function AppSidebarContent({
                   <Search className="h-5 w-5" />
                 </Button>
               </header>
-              <main className="flex-grow p-4 animate-in fade-in duration-700">
+              <main className="flex-grow p-4 animate-in fade-in duration-700 print:p-0">
                 {children}
               </main>
             </div>
-            <SheetContent side="right" className="flex flex-col p-0 bg-card border-none w-72">
+            <SheetContent side="right" className="flex flex-col p-0 bg-card border-none w-72 print:hidden">
               {sidebarContent}
             </SheetContent>
           </Sheet>
@@ -662,14 +662,14 @@ function AppSidebarContent({
               side="right"
               collapsible="icon"
               className={cn(
-                "border-l transition-all duration-300",
+                "border-l transition-all duration-300 print:hidden",
                 theme.isLight ? "border-slate-200" : "border-white/5"
               )}
             >
               {sidebarContent}
             </Sidebar>
-            <main className="flex-1 min-h-screen p-6 transition-all duration-300 ease-in-out min-w-0">
-              <div className="flex justify-between items-center mb-8">
+            <main className="flex-1 min-h-screen p-6 transition-all duration-300 ease-in-out min-w-0 print:p-0 print:min-h-0">
+              <div className="flex justify-between items-center mb-8 print:hidden">
                 <div className="flex items-center gap-4">
                   <SidebarTrigger className="h-10 w-10 rounded-xl hover:bg-white/5" />
                   {pathname !== '/home' && (
