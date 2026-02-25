@@ -21,6 +21,28 @@ interface Admin5MessagesPanelProps {
 
 const pad = (num: number) => num < 10 ? `0${num}` : num.toString();
 
+// Convert a Gregorian Date to a Hijri date string, e.g. "08 رمضان 1447"
+const toHijri = (date: Date): string => {
+    try {
+        const fmt = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric',
+        });
+        // Intl returns something like "٠٨ رمضان ١٤٤٧ هـ"
+        // We want to return pure Arabic text without the era suffix
+        const parts = fmt.formatToParts(date);
+        const day = parts.find(p => p.type === 'day')?.value || '';
+        const month = parts.find(p => p.type === 'month')?.value || '';
+        const year = parts.find(p => p.type === 'year')?.value || '';
+        // Convert Arabic-Indic numerals to Western numerals
+        const toWestern = (s: string) => s.replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+        return `${toWestern(day)} ${month} ${toWestern(year)}`;
+    } catch {
+        return '';
+    }
+};
+
 const getSaturday = (date: Date): Date => {
     const d = new Date(date);
     d.setHours(12, 0, 0, 0);
@@ -87,10 +109,14 @@ export const Admin5MessagesPanel = ({
         if (sessionType !== 'حصة أساسية' && sessionType !== 'حصة تعويضية' && sessionType !== 'حصة إضافية') return '';
 
         const selectedDate = parse(selectedDateStr, 'yyyy-MM-dd', new Date());
-        const dateStr = format(selectedDate, 'EEEE dd-MM-yyyy', { locale: ar });
+        const dayName = format(selectedDate, 'EEEE', { locale: ar });
+        const gregorianStr = format(selectedDate, 'dd-MM-yyyy');
+        const hijriStr = toHijri(selectedDate);
 
         const header = 'السلام عليكم ورحمة الله وبركاته';
-        const dateLine = `اليوم ${dateStr}`;
+        const dateLine = hijriStr
+            ? `اليوم ${dayName} ${hijriStr} الموافق لـ : ${gregorianStr}`
+            : `اليوم ${dayName} ${gregorianStr}`;
 
         const records: any[] = session.records || [];
 
