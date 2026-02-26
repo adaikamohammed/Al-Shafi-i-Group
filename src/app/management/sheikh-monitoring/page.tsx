@@ -1,5 +1,8 @@
 ﻿"use client";
 
+import { db } from '@/lib/firebase';
+import { ref, set, get, onValue, off } from 'firebase/database';
+
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
@@ -8,7 +11,7 @@ import {
     ChevronLeft, ChevronRight, Users, Activity, RotateCcw,
     TrendingUp, TrendingDown, Minus, BarChart2, Star, Award, AlertTriangle,
     UserX, XOctagon, Filter, Printer, ImageDown, CalendarDays, CalendarRange,
-    ChevronDown, ChevronUp, FileDown, FileSpreadsheet
+    ChevronDown, ChevronUp, FileDown, FileSpreadsheet, Save
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -21,7 +24,7 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell,
-    PieChart, Pie, LineChart, Line
+    PieChart, Pie, LineChart, Line, Legend
 } from 'recharts';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -244,7 +247,7 @@ export default function SheikhMonitoringPage() {
             const workingDays = allDays.length - holidays - sheikhabsences;
             const commitmentRate = workingDays > 0 ? Math.round((sessionDays / workingDays) * 100) : 0;
 
-            // weekly breakdown — school week = Saturday (6) → Wednesday (6+4)
+            // weekly breakdown — school week = Saturday (6) → Friday (6+6)
             // A week BELONGS TO a month if its Wednesday falls within that month.
             // → collect all Saturdays where (Saturday + 4) is within [start, end]
             const firstEligibleSat = addDays(start, -4); // earliest Sat whose Wed = start
@@ -253,8 +256,7 @@ export default function SheikhMonitoringPage() {
                 .filter(d => getDay(d) === 6); // only Saturdays
 
             const weeklyBreakdown: WeekStats[] = weekStarts.map((wStart, i) => {
-                const wEnd = addDays(wStart, 4); // always Wednesday, no clipping
-                // School days: Sat(6), Sun(0), Mon(1), Tue(2), Wed(3) — already guaranteed by Sat+0..4
+                const wEnd = addDays(wStart, 6); // Saturday → Friday (full week)
                 const wDays = eachDayOfInterval({ start: wStart, end: wEnd });
                 let wSessions = 0;
                 const wAtt: (number | null)[] = [];
@@ -329,7 +331,7 @@ export default function SheikhMonitoringPage() {
         } else if (studentPeriod === 'week') {
             const dow = getDay(studentSelectedDate);
             const wSat = addDays(studentSelectedDate, dow === 6 ? 0 : -(dow + 1));
-            eachDayOfInterval({ start: wSat, end: addDays(wSat, 4) })
+            eachDayOfInterval({ start: wSat, end: addDays(wSat, 6) })
                 .forEach(d => periodDateSet.add(format(d, 'yyyy-MM-dd')));
         } else {
             eachDayOfInterval({ start: startOfMonth(studentSelectedDate), end: endOfMonth(studentSelectedDate) })
@@ -524,8 +526,16 @@ export default function SheikhMonitoringPage() {
 
                 {/* ── Main Content ── */}
                 {view === 'day' && <DayTable sheikhs={sheikhs} getDayStats={getDayStats} dateStr={todayStr} groupSessions={groupSessions} selectedDate={selectedDate} students={students} dailySessions={dailySessions} />}
-                {(view === 'week' || view === 'month') && (
+                {view === 'week' && (
                     <MatrixTable sheikhs={sheikhs} groupSessions={groupSessions} interval={interval} getDayStats={getDayStats} />
+                )}
+                {view === 'month' && (
+                    <MonthTable
+                        sheikhs={sheikhs}
+                        getDayStats={getDayStats}
+                        selectedDate={selectedDate}
+                        monthlyStats={monthlyStats}
+                    />
                 )}
                 {view === 'stats' && (
                     <StatsView sortedStats={sortedStats} monthlyStats={monthlyStats} statsMonth={statsMonth} sortStat={sortStat} sortDir={sortDir} toggleSort={toggleSort} />
@@ -568,6 +578,41 @@ function DayTable({
     const [weeklyMode, setWeeklyMode] = useState(false);
     const tableRef = useRef<HTMLDivElement>(null);
 
+    // ── Absence reasons state + Firebase persistence ──────────────────────────
+    const [absenceReasons, setAbsenceReasons] = useState<Record<string, string>>({});
+    const [savingReasons, setSavingReasons] = useState<Set<string>>(new Set());
+
+    // Compute the week key for Firebase path
+    const weekKey = useMemo(() => {
+        const dow = getDay(selectedDate);
+        const sat = addDays(selectedDate, dow === 6 ? 0 : -(dow + 1));
+        return format(sat, 'yyyy-MM-dd');
+    }, [selectedDate]);
+
+    // Load absence reasons from Firebase
+    useEffect(() => {
+        if (!weeklyMode) return;
+        const reasonsRef = ref(db, `absence_reasons/${weekKey}`);
+        const handler = onValue(reasonsRef, (snapshot: any) => {
+            const data = snapshot.val() || {};
+            setAbsenceReasons(data);
+        });
+        return () => off(reasonsRef, 'value', handler);
+    }, [weekKey, weeklyMode]);
+
+    // Save an individual absence reason
+    const saveAbsenceReason = async (studentId: string, reason: string) => {
+        setSavingReasons(prev => new Set(prev).add(studentId));
+        try {
+            const reasonRef = ref(db, `absence_reasons/${weekKey}/${studentId}`);
+            await set(reasonRef, reason || null);
+        } catch (e) {
+            console.error('Error saving absence reason:', e);
+        } finally {
+            setSavingReasons(prev => { const n = new Set(prev); n.delete(studentId); return n; });
+        }
+    };
+
     useEffect(() => {
         setSelectedSheikhs(prev => {
             const next = new Set<string>();
@@ -585,7 +630,7 @@ function DayTable({
     const weekDays = useMemo(() => {
         const dow = getDay(selectedDate);
         const sat = addDays(selectedDate, dow === 6 ? 0 : -(dow + 1));
-        return [0, 1, 2, 3, 4].map(i => addDays(sat, i));
+        return [0, 1, 2, 3, 4, 5, 6].map(i => addDays(sat, i));
     }, [selectedDate]);
 
     // ── Helper ───────────────────────────────────────────────────────────────
@@ -699,7 +744,7 @@ function DayTable({
         else {
             const t = TYPE_CONFIG[stats.type]?.label || stats.type;
             typeCounts[t] = (typeCounts[t] || 0) + 1;
-            if (stats.attendance !== null) attendanceData.push({ name: sh.group.replace('فوج ', ''), attendance: stats.attendance, fill: stats.attendance >= 90 ? '#10b981' : stats.attendance >= 70 ? '#f59e0b' : '#ef4444' });
+            if (stats.attendance !== null) attendanceData.push({ name: sh.displayName.split(' ').slice(0, 2).join(' '), attendance: stats.attendance, fill: stats.attendance >= 90 ? '#10b981' : stats.attendance >= 70 ? '#f59e0b' : '#ef4444' });
         }
     });
     const pieData = Object.entries(typeCounts).filter(([, v]) => v > 0).map(([k, v]) => ({ name: k, value: v }));
@@ -742,7 +787,7 @@ function DayTable({
     // ── Export to PDF via printWindow (Arabic-safe) ───────────────────────────
     const handleExportPDF = () => {
         const weekLabel = weeklyMode
-            ? `${format(weekDays[0], 'EEEE d MMMM', { locale: ar })} — ${format(weekDays[4], 'EEEE d MMMM yyyy', { locale: ar })}`
+            ? `${format(weekDays[0], 'EEEE d MMMM', { locale: ar })} — ${format(weekDays[6], 'EEEE d MMMM yyyy', { locale: ar })}`
             : format(new Date(dateStr), 'EEEE، d MMMM yyyy', { locale: ar });
 
         // ── Build stats table rows HTML ────────────────────────────────────────
@@ -848,7 +893,8 @@ function DayTable({
                 const rowBg = idx % 2 === 0 ? '#ffffff' : '#fff7ed';
                 const cntClr = rec.count >= 3 ? '#dc2626' : rec.count === 2 ? '#d97706' : '#ea580c';
                 const dayTags = rec.absentDays.map(d => `<span style="display:inline-block;background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:3px;padding:0 4px;font-size:8px;margin:1px">${d}</span>`).join(' ');
-                return `<tr><td style="padding:4px 6px;border:1px solid #fed7aa;background:${rowBg};font-weight:700;font-size:9px">${rec.name}</td><td style="padding:4px 6px;border:1px solid #fed7aa;background:${rowBg};text-align:center;font-size:8px"><span style="background:#f1f5f9;padding:1px 5px;border-radius:3px">${rec.group}</span></td><td style="padding:4px 6px;border:1px solid #fed7aa;background:${rowBg};text-align:center;font-weight:700;color:${cntClr}">${rec.count}</td><td style="padding:4px 6px;border:1px solid #fed7aa;background:${rowBg}">${dayTags}</td></tr>`;
+                const reason = absenceReasons[rec.id] || '—';
+                return `<tr><td style="padding:4px 6px;border:1px solid #fed7aa;background:${rowBg};font-weight:700;font-size:9px">${rec.name}</td><td style="padding:4px 6px;border:1px solid #fed7aa;background:${rowBg};text-align:center;font-size:8px"><span style="background:#f1f5f9;padding:1px 5px;border-radius:3px">${rec.group}</span></td><td style="padding:4px 6px;border:1px solid #fed7aa;background:${rowBg};text-align:center;font-weight:700;color:${cntClr}">${rec.count}</td><td style="padding:4px 6px;border:1px solid #fed7aa;background:${rowBg}">${dayTags}</td><td style="padding:4px 6px;border:1px solid #fed7aa;background:${rowBg};font-size:8px;color:#1e40af">${reason}</td></tr>`;
             }).join('');
 
             const byGroup: Record<string, number> = {};
@@ -868,12 +914,13 @@ function DayTable({
                             <th style="background:#fff7ed;padding:4px 6px;border:1px solid #fed7aa;font-size:8.5px;text-align:center">الفوج</th>
                             <th style="background:#fff7ed;padding:4px 6px;border:1px solid #fed7aa;font-size:8.5px;text-align:center;color:#dc2626">أيام الغياب</th>
                             <th style="background:#fff7ed;padding:4px 6px;border:1px solid #fed7aa;font-size:8.5px">تواريخ الغياب</th>
+                            <th style="background:#fff7ed;padding:4px 6px;border:1px solid #fed7aa;font-size:8.5px;color:#1e40af">سبب الغياب</th>
                         </tr></thead>
                         <tbody>${abRows}</tbody>
                         <tfoot><tr>
                             <td colspan="2" style="padding:4px 6px;border:1px solid #fed7aa;background:#fff7ed;font-weight:700;color:#ea580c;font-size:9px">الإجمالي</td>
                             <td style="padding:4px 6px;border:1px solid #fed7aa;background:#fff7ed;text-align:center;font-weight:700;color:#dc2626">${weekAbsentData.reduce((s, r) => s + r.count, 0)}</td>
-                            <td style="padding:4px 6px;border:1px solid #fed7aa;background:#fff7ed;font-size:8px">${weekAbsentData.length} طالب مُلاحَظ</td>
+                            <td colspan="2" style="padding:4px 6px;border:1px solid #fed7aa;background:#fff7ed;font-size:8px">${weekAbsentData.length} طالب مُلاحَظ</td>
                         </tr></tfoot>
                     </table>
                     <div style="padding:8px 12px;border-top:1px solid #fed7aa;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
@@ -1001,10 +1048,10 @@ function DayTable({
 
             // ── Sheet 2: Absent Students ───────────────────────────────────────
             if (weeklyMode && weekAbsentData.length > 0) {
-                const abHeaders = ['اسم الطالب', 'الفوج', 'عدد أيام الغياب', 'تواريخ الغياب'];
-                const abRows = weekAbsentData.map(r => [r.name, r.group, r.count, r.absentDays.join(' | ')]);
+                const abHeaders = ['اسم الطالب', 'الفوج', 'عدد أيام الغياب', 'تواريخ الغياب', 'سبب الغياب'];
+                const abRows = weekAbsentData.map(r => [r.name, r.group, r.count, r.absentDays.join(' | '), absenceReasons[r.id] || '']);
                 const ws2 = XLSX.utils.aoa_to_sheet([abHeaders, ...abRows]);
-                ws2['!cols'] = [{ wch: 25 }, { wch: 12 }, { wch: 15 }, { wch: 40 }];
+                ws2['!cols'] = [{ wch: 25 }, { wch: 12 }, { wch: 15 }, { wch: 40 }, { wch: 25 }];
                 XLSX.utils.book_append_sheet(wb, ws2, 'الطلاب الغائبون');
             }
 
@@ -1093,40 +1140,381 @@ function DayTable({
                 }
             `}</style>
 
-            {/* ── Charts (day mode only, screen only) ── */}
-            {!weeklyMode && (
-                <div className="grid md:grid-cols-2 gap-4 no-print print:hidden">
-                    <div className="border rounded-xl p-4 bg-white shadow-sm">
-                        <h3 className="text-sm font-bold mb-4 text-center">توزيع الحصص</h3>
-                        <div className="h-48 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                                        {pieData.map((entry, index) => <Cell key={index} fill={pieColors[entry.name] || '#94a3b8'} />)}
-                                    </Pie>
-                                    <RechartsTooltip formatter={(v: number) => [v, 'عدد الأفواج']} />
-                                </PieChart>
-                            </ResponsiveContainer>
+            {/* ── Charts + Stats (day mode only, screen only) ── */}
+            {!weeklyMode && (() => {
+                // Compute day absent students
+                const dayAbsentStudents: { id: string; name: string; group: string; sheikhName: string }[] = [];
+                const dayPresentCount = { total: 0, present: 0, absent: 0, late: 0 };
+                filteredSheikhs.forEach(sh => {
+                    const sessions = groupSessions.get(sh.group)?.get(dateStr) || [];
+                    const session = sessions.find((s: any) => s.sessionNumber === 1) || sessions[0];
+                    if (!session || !isRealType(session.sessionType)) return;
+                    const records: any[] = session.records || [];
+                    const recordedIds = new Set(records.map((r: any) => r.studentId).filter(Boolean));
+                    const groupStudents = (students || []).filter((s: any) => s.status === 'نشط' && ((s as any).group === sh.group || s.groupName === sh.group));
+                    dayPresentCount.total += groupStudents.length;
+                    records.forEach((r: any) => {
+                        if (r.attendance === 'حاضر' || r.attendance === 'تعويض') dayPresentCount.present++;
+                        else if (r.attendance === 'متأخر') { dayPresentCount.present++; dayPresentCount.late++; }
+                        else if (r.attendance === 'غائب' || r.attendance === 'غياب') {
+                            dayPresentCount.absent++;
+                            const st = groupStudents.find((s: any) => s.id === r.studentId);
+                            if (st) dayAbsentStudents.push({ id: st.id, name: st.fullName, group: sh.group, sheikhName: sh.displayName });
+                        }
+                    });
+                    // Students in group but not in records → absent
+                    groupStudents.forEach((s: any) => {
+                        if (!recordedIds.has(s.id)) {
+                            dayPresentCount.absent++;
+                            dayAbsentStudents.push({ id: s.id, name: s.fullName, group: sh.group, sheikhName: sh.displayName });
+                        }
+                    });
+                });
+                const dayAttRate = dayPresentCount.total > 0 ? Math.round((dayPresentCount.present / dayPresentCount.total) * 100) : null;
+
+                return (
+                    <div className="space-y-4 no-print print:hidden">
+                        {/* ── Day Summary Cards ── */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div className="border rounded-xl p-3 bg-gradient-to-br from-emerald-50 to-white shadow-sm">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="p-1.5 bg-emerald-100 rounded-lg"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /></div>
+                                    <span className="text-[10px] text-muted-foreground font-medium">الحاضرون</span>
+                                </div>
+                                <div className="text-xl font-black text-emerald-700">{dayPresentCount.present}<span className="text-[10px] text-muted-foreground font-normal">/{dayPresentCount.total}</span></div>
+                            </div>
+                            <div className="border rounded-xl p-3 bg-gradient-to-br from-rose-50 to-white shadow-sm">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="p-1.5 bg-rose-100 rounded-lg"><UserX className="h-3.5 w-3.5 text-rose-600" /></div>
+                                    <span className="text-[10px] text-muted-foreground font-medium">الغائبون</span>
+                                </div>
+                                <div className="text-xl font-black text-rose-700">{dayPresentCount.absent}</div>
+                            </div>
+                            <div className="border rounded-xl p-3 bg-gradient-to-br from-blue-50 to-white shadow-sm">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="p-1.5 bg-blue-100 rounded-lg"><Users className="h-3.5 w-3.5 text-blue-600" /></div>
+                                    <span className="text-[10px] text-muted-foreground font-medium">نسبة الحضور</span>
+                                </div>
+                                <div className={cn("text-xl font-black", dayAttRate !== null ? (dayAttRate >= 90 ? 'text-emerald-700' : dayAttRate >= 70 ? 'text-amber-600' : 'text-rose-600') : 'text-muted-foreground')}>
+                                    {dayAttRate !== null ? `${dayAttRate}%` : '—'}
+                                </div>
+                            </div>
+                            <div className="border rounded-xl p-3 bg-gradient-to-br from-amber-50 to-white shadow-sm">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="p-1.5 bg-amber-100 rounded-lg"><Clock className="h-3.5 w-3.5 text-amber-600" /></div>
+                                    <span className="text-[10px] text-muted-foreground font-medium">المتأخرون</span>
+                                </div>
+                                <div className="text-xl font-black text-amber-700">{dayPresentCount.late}</div>
+                            </div>
                         </div>
-                    </div>
-                    <div className="border rounded-xl p-4 bg-white shadow-sm">
-                        <h3 className="text-sm font-bold mb-4 text-center">نسبة الحضور للأفواج</h3>
-                        <div className="h-48 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={attendanceData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" />
-                                    <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                                    <RechartsTooltip cursor={{ fill: '#f1f5f9' }} formatter={(v: number) => [`${v}%`, 'الحضور']} />
-                                    <Bar dataKey="attendance" radius={[4, 4, 0, 0]}>
-                                        {attendanceData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
+
+                        {/* ── Charts ── */}
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div className="border rounded-xl p-4 bg-white shadow-sm">
+                                <h3 className="text-sm font-bold mb-4 text-center">توزيع الحصص</h3>
+                                <div className="h-48 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                                                {pieData.map((entry, index) => <Cell key={index} fill={pieColors[entry.name] || '#94a3b8'} />)}
+                                            </Pie>
+                                            <RechartsTooltip formatter={(v: number) => [v, 'عدد الأفواج']} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                            <div className="border rounded-xl p-4 bg-white shadow-sm">
+                                <h3 className="text-sm font-bold mb-4 text-center">نسبة الحضور — حسب الشيخ</h3>
+                                <div className="h-48 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={attendanceData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0} angle={-30} textAnchor="end" />
+                                            <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}%`} />
+                                            <RechartsTooltip cursor={{ fill: '#f1f5f9' }} formatter={(v: number) => [`${v}%`, 'الحضور']} contentStyle={{ direction: 'rtl', borderRadius: '12px' }} />
+                                            <Bar dataKey="attendance" radius={[4, 4, 0, 0]}>
+                                                {attendanceData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
                         </div>
+
+                        {/* ── Day Absent Students Table ── */}
+                        {dayAbsentStudents.length > 0 && (
+                            <div className="border rounded-xl overflow-hidden bg-white shadow-sm">
+                                <div className="px-3 py-2 border-b flex items-center gap-2" style={{ backgroundColor: '#fff7ed' }}>
+                                    <span className="text-sm font-bold text-orange-800">📋 الطلاب الغائبون اليوم</span>
+                                    <span className="text-[10px] bg-orange-100 text-orange-600 border border-orange-200 rounded-full px-2 py-0.5 font-bold">{dayAbsentStudents.length} طالب</span>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full border-collapse text-xs">
+                                        <thead>
+                                            <tr style={{ backgroundColor: '#fff7ed' }} className="border-b">
+                                                <th className="text-right p-2 font-bold border-l w-8">#</th>
+                                                <th className="text-right p-2 font-bold border-l min-w-[150px]">الطالب</th>
+                                                <th className="p-2 text-center font-bold border-l min-w-[80px]">الفوج</th>
+                                                <th className="p-2 text-center font-bold min-w-[120px]">الشيخ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {dayAbsentStudents.map((rec, idx) => (
+                                                <tr key={rec.id} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#fff7ed' }} className="border-b">
+                                                    <td className="p-2 border-l text-center text-muted-foreground">{idx + 1}</td>
+                                                    <td className="p-2 border-l font-bold">{rec.name}</td>
+                                                    <td className="p-2 border-l text-center">
+                                                        <span className="text-[10px] bg-muted/40 px-1.5 py-0.5 rounded font-medium">{rec.group}</span>
+                                                    </td>
+                                                    <td className="p-2 text-center text-muted-foreground">{rec.sheikhName}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr style={{ backgroundColor: '#fff7ed', borderTop: '2px solid #fed7aa' }}>
+                                                <td className="p-2 border-l font-bold text-orange-800" colSpan={2}>الإجمالي</td>
+                                                <td className="p-2 border-l text-center font-bold text-rose-700">{dayAbsentStudents.length} غائب</td>
+                                                <td className="p-2 text-center text-[10px] text-muted-foreground">{format(new Date(dateStr), 'EEEE d MMM', { locale: ar })}</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                </div>
-            )}
+                );
+            })()}
+
+            {/* ── Weekly Charts (week mode only, screen only) ── */}
+            {weeklyMode && (() => {
+                // ── Compute weekly chart data ──
+                // 1) Daily attendance trend (line chart)
+                const dailyAttTrend = weekDays.map(day => {
+                    const dStr = format(day, 'yyyy-MM-dd');
+                    const dayAvg = schoolDayAvg.find(x => x.dStr === dStr);
+                    const dayName = format(day, 'EEE', { locale: ar });
+                    return {
+                        day: dayName,
+                        attendance: dayAvg?.avg?.attendance ?? null,
+                        excellent: dayAvg?.avg?.excellent ?? null,
+                        notMemorized: dayAvg?.avg?.notMemorized ?? null,
+                    };
+                }).filter(d => d.attendance !== null);
+
+                // 2) Session type distribution across the week
+                const weekTypeCounts: Record<string, number> = { 'لم يسجل': 0 };
+                weekDays.forEach(day => {
+                    const dStr = format(day, 'yyyy-MM-dd');
+                    filteredSheikhs.forEach(sh => {
+                        const stats = getDayStats(sh.group, dStr);
+                        if (!stats) { weekTypeCounts['لم يسجل']++; }
+                        else {
+                            const t = TYPE_CONFIG[stats.type]?.label || stats.type;
+                            weekTypeCounts[t] = (weekTypeCounts[t] || 0) + 1;
+                        }
+                    });
+                });
+                const weekPieData = Object.entries(weekTypeCounts).filter(([, v]) => v > 0).map(([k, v]) => ({ name: k, value: v }));
+
+                // 3) Group attendance comparison (bar chart)
+                const groupAttData = filteredSheikhs.map(sh => {
+                    const wa = groupWeekAvg[sh.group] || {};
+                    return {
+                        name: sh.displayName.split(' ').slice(0, 2).join(' '),
+                        attendance: wa.attendance ?? 0,
+                        fill: (wa.attendance ?? 0) >= 90 ? '#10b981' : (wa.attendance ?? 0) >= 70 ? '#f59e0b' : '#ef4444'
+                    };
+                }).filter(d => d.attendance > 0);
+
+                // 4) Memorization levels comparison across the week (bar chart)
+                const memLevelsData = weekDays.map(day => {
+                    const dStr = format(day, 'yyyy-MM-dd');
+                    const dayAvg = schoolDayAvg.find(x => x.dStr === dStr);
+                    if (!dayAvg) return null;
+                    const a = dayAvg.avg;
+                    if (a.attendance === null) return null;
+                    return {
+                        day: format(day, 'EEE', { locale: ar }),
+                        'ممتاز': a.excellent ?? 0,
+                        'ج.جداً': a.goodPlus ?? 0,
+                        'جيد': a.good ?? 0,
+                        'مقبول': a.acceptable ?? 0,
+                        'ضعيف': a.weak ?? 0,
+                        'لم يحفظ': a.notMemorized ?? 0,
+                    };
+                }).filter(Boolean) as any[];
+
+                // 5) Top absent students
+                const topAbsent = weekAbsentData.slice(0, 10);
+
+                // 6) Summary stats
+                const totalSessions = weekDays.reduce((sum, day) => {
+                    const dStr = format(day, 'yyyy-MM-dd');
+                    let count = 0;
+                    filteredSheikhs.forEach(sh => {
+                        const st = getDayStats(sh.group, dStr);
+                        if (st && isRealType(st.type)) count++;
+                    });
+                    return sum + count;
+                }, 0);
+                const totalPossible = filteredSheikhs.length * weekDays.length;
+                const avgWeekAtt = schoolWeekAvg.attendance;
+                const avgWeekExc = schoolWeekAvg.excellent;
+                const avgWeekNotMem = schoolWeekAvg.notMemorized;
+
+                return (
+                    <div className="space-y-4 no-print print:hidden">
+                        {/* ── Summary Cards ── */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div className="border rounded-xl p-3 bg-gradient-to-br from-emerald-50 to-white shadow-sm">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="p-1.5 bg-emerald-100 rounded-lg"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /></div>
+                                    <span className="text-[10px] text-muted-foreground font-medium">حصص مسجلة</span>
+                                </div>
+                                <div className="text-xl font-black text-emerald-700">{totalSessions}<span className="text-[10px] text-muted-foreground font-normal">/{totalPossible}</span></div>
+                            </div>
+                            <div className="border rounded-xl p-3 bg-gradient-to-br from-blue-50 to-white shadow-sm">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="p-1.5 bg-blue-100 rounded-lg"><Users className="h-3.5 w-3.5 text-blue-600" /></div>
+                                    <span className="text-[10px] text-muted-foreground font-medium">متوسط الحضور</span>
+                                </div>
+                                <div className={cn("text-xl font-black", avgWeekAtt !== null ? (avgWeekAtt >= 90 ? 'text-emerald-700' : avgWeekAtt >= 70 ? 'text-amber-600' : 'text-rose-600') : 'text-muted-foreground')}>
+                                    {avgWeekAtt !== null ? `${avgWeekAtt}%` : '—'}
+                                </div>
+                            </div>
+                            <div className="border rounded-xl p-3 bg-gradient-to-br from-purple-50 to-white shadow-sm">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="p-1.5 bg-purple-100 rounded-lg"><Star className="h-3.5 w-3.5 text-purple-600" /></div>
+                                    <span className="text-[10px] text-muted-foreground font-medium">متوسط الممتاز</span>
+                                </div>
+                                <div className="text-xl font-black text-purple-700">{avgWeekExc !== null ? `${avgWeekExc}%` : '—'}</div>
+                            </div>
+                            <div className="border rounded-xl p-3 bg-gradient-to-br from-rose-50 to-white shadow-sm">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="p-1.5 bg-rose-100 rounded-lg"><UserX className="h-3.5 w-3.5 text-rose-600" /></div>
+                                    <span className="text-[10px] text-muted-foreground font-medium">طلاب غائبون</span>
+                                </div>
+                                <div className="text-xl font-black text-rose-700">{weekAbsentData.length}</div>
+                            </div>
+                        </div>
+
+                        {/* ── Row 1: Attendance Trend + Session Types ── */}
+                        <div className="grid md:grid-cols-2 gap-4">
+                            {/* Daily Attendance Trend */}
+                            {dailyAttTrend.length > 0 && (
+                                <div className="border rounded-xl p-4 bg-white shadow-sm">
+                                    <h3 className="text-sm font-bold mb-1 text-center">📈 تطور الحضور خلال الأسبوع</h3>
+                                    <p className="text-[10px] text-center text-muted-foreground mb-3">متوسط المدرسة يوميًا</p>
+                                    <div className="h-64 w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart data={dailyAttTrend} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                                                <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}%`} />
+                                                <RechartsTooltip formatter={(v: number, name: string) => [`${v}%`, name]} contentStyle={{ direction: 'rtl', textAlign: 'right', borderRadius: '12px', border: '1px solid #e2e8f0' }} />
+                                                <Legend verticalAlign="top" height={30} iconType="line" wrapperStyle={{ fontSize: '11px', direction: 'rtl' }} />
+                                                <Line type="monotone" dataKey="attendance" stroke="#10b981" strokeWidth={3} dot={{ r: 5, fill: '#10b981' }} name="نسبة الحضور" />
+                                                <Line type="monotone" dataKey="excellent" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 4, fill: '#8b5cf6' }} strokeDasharray="5 5" name="نسبة الممتاز" />
+                                                <Line type="monotone" dataKey="notMemorized" stroke="#ef4444" strokeWidth={2} dot={{ r: 4, fill: '#ef4444' }} strokeDasharray="3 3" name="نسبة لم يحفظ" />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Session Type Distribution */}
+                            <div className="border rounded-xl p-4 bg-white shadow-sm">
+                                <h3 className="text-sm font-bold mb-1 text-center">📊 توزيع الحصص خلال الأسبوع</h3>
+                                <p className="text-[10px] text-center text-muted-foreground mb-3">عدد الحصص حسب النوع</p>
+                                <div className="h-52 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={weekPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                                                {weekPieData.map((entry, index) => <Cell key={index} fill={pieColors[entry.name] || '#94a3b8'} />)}
+                                            </Pie>
+                                            <RechartsTooltip formatter={(v: number) => [v, 'عدد الحصص']} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── Row 2: Group Comparison + Memorization Levels ── */}
+                        <div className="grid md:grid-cols-2 gap-4">
+                            {/* Group Attendance Comparison */}
+                            {groupAttData.length > 0 && (
+                                <div className="border rounded-xl p-4 bg-white shadow-sm">
+                                    <h3 className="text-sm font-bold mb-1 text-center">🏆 متوسط حضور الأفواج — الأسبوع</h3>
+                                    <p className="text-[10px] text-center text-muted-foreground mb-3">مقارنة بين الأفواج</p>
+                                    <div className="h-52 w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={groupAttData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0} angle={-45} textAnchor="end" />
+                                                <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                                                <RechartsTooltip cursor={{ fill: '#f1f5f9' }} formatter={(v: number) => [`${v}%`, 'متوسط الحضور']} />
+                                                <Bar dataKey="attendance" radius={[4, 4, 0, 0]}>
+                                                    {groupAttData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Memorization Levels by Day */}
+                            {memLevelsData.length > 0 && (
+                                <div className="border rounded-xl p-4 bg-white shadow-sm">
+                                    <h3 className="text-sm font-bold mb-1 text-center">📚 مستويات الحفظ يوميًا</h3>
+                                    <p className="text-[10px] text-center text-muted-foreground mb-3">توزيع مستويات الحفظ لكل يوم</p>
+                                    <div className="h-52 w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={memLevelsData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                                                <YAxis tick={{ fontSize: 10 }} />
+                                                <RechartsTooltip formatter={(v: number) => [`${v}%`, '']} />
+                                                <Bar dataKey="ممتاز" stackId="mem" fill="#10b981" radius={[0, 0, 0, 0]} />
+                                                <Bar dataKey="ج.جداً" stackId="mem" fill="#22c55e" />
+                                                <Bar dataKey="جيد" stackId="mem" fill="#3b82f6" />
+                                                <Bar dataKey="مقبول" stackId="mem" fill="#f59e0b" />
+                                                <Bar dataKey="ضعيف" stackId="mem" fill="#ef4444" />
+                                                <Bar dataKey="لم يحفظ" stackId="mem" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="flex flex-wrap justify-center gap-2 mt-2 text-[9px]">
+                                        {[{ l: 'ممتاز', c: '#10b981' }, { l: 'ج.جداً', c: '#22c55e' }, { l: 'جيد', c: '#3b82f6' }, { l: 'مقبول', c: '#f59e0b' }, { l: 'ضعيف', c: '#ef4444' }, { l: 'لم يحفظ', c: '#94a3b8' }].map(x => (
+                                            <span key={x.l} className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: x.c }} />{x.l}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── Row 3: Top Absent Students ── */}
+                        {topAbsent.length > 0 && (
+                            <div className="border rounded-xl p-4 bg-white shadow-sm">
+                                <h3 className="text-sm font-bold mb-1 text-center">⚠️ أكثر الطلاب غيابًا خلال الأسبوع</h3>
+                                <p className="text-[10px] text-center text-muted-foreground mb-3">أعلى {topAbsent.length} طالب من حيث عدد أيام الغياب</p>
+                                <div className="h-52 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={topAbsent.map(r => ({ name: r.name.split(' ').slice(0, 2).join(' '), count: r.count, group: r.group, fill: r.count >= 4 ? '#dc2626' : r.count >= 3 ? '#ea580c' : r.count >= 2 ? '#f59e0b' : '#fb923c' }))} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                            <XAxis type="number" tick={{ fontSize: 10 }} domain={[0, 'dataMax + 1']} />
+                                            <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={80} />
+                                            <RechartsTooltip formatter={(v: number, _: any, payload: any) => [`${v} أيام — ${payload?.payload?.group || ''}`, 'الغياب']} />
+                                            <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                                                {topAbsent.map((_, i) => <Cell key={i} fill={topAbsent[i].count >= 4 ? '#dc2626' : topAbsent[i].count >= 3 ? '#ea580c' : topAbsent[i].count >= 2 ? '#f59e0b' : '#fb923c'} />)}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
 
             {/* ── Toolbar ── */}
             <div className="no-print print:hidden flex flex-wrap items-center justify-between gap-2 bg-card border rounded-xl px-3 py-2">
@@ -1190,7 +1578,7 @@ function DayTable({
                         <h1 className="text-base font-bold">جدول مراقبة المشايخ — {weeklyMode ? 'الأسبوع الدراسي' : 'اليوم'}</h1>
                         <p className="text-[11px] text-gray-600">
                             {weeklyMode
-                                ? `${format(weekDays[0], 'EEEE d MMMM', { locale: ar })} — ${format(weekDays[4], 'EEEE d MMMM yyyy', { locale: ar })}`
+                                ? `${format(weekDays[0], 'EEEE d MMMM', { locale: ar })} — ${format(weekDays[6], 'EEEE d MMMM yyyy', { locale: ar })}`
                                 : format(new Date(dateStr), 'EEEE، d MMMM yyyy', { locale: ar })
                             }
                         </p>
@@ -1350,7 +1738,8 @@ function DayTable({
                                         <th className="text-right p-2 font-bold border-l min-w-[150px]">الطالب</th>
                                         <th className="p-2 text-center font-bold border-l min-w-[100px]">الفوج</th>
                                         <th className="p-2 text-center font-bold border-l min-w-[60px] text-rose-700">أيام الغياب</th>
-                                        <th className="p-2 font-bold text-muted-foreground">تواريخ الغياب</th>
+                                        <th className="p-2 font-bold text-muted-foreground border-l">تواريخ الغياب</th>
+                                        <th className="p-2 font-bold text-blue-700 min-w-[180px]">سبب الغياب</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1365,12 +1754,46 @@ function DayTable({
                                                     {rec.count}
                                                 </span>
                                             </td>
-                                            <td className="p-2">
+                                            <td className="p-2 border-l">
                                                 <div className="flex flex-wrap gap-1">
                                                     {rec.absentDays.map(d => (
                                                         <span key={d} className="text-[9px] bg-rose-50 text-rose-600 border border-rose-100 px-1.5 py-0.5 rounded">{d}</span>
                                                     ))}
                                                 </div>
+                                            </td>
+                                            <td className="p-2">
+                                                <div className="flex items-center gap-1 no-print">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="سبب الغياب..."
+                                                        defaultValue={absenceReasons[rec.id] || ''}
+                                                        onBlur={(e) => {
+                                                            const val = e.target.value.trim();
+                                                            if (val !== (absenceReasons[rec.id] || '')) saveAbsenceReason(rec.id, val);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                const val = (e.target as HTMLInputElement).value.trim();
+                                                                saveAbsenceReason(rec.id, val);
+                                                                (e.target as HTMLInputElement).blur();
+                                                            }
+                                                        }}
+                                                        className="flex-1 text-[10px] border rounded-md px-2 py-1 bg-white focus:ring-1 focus:ring-blue-400 outline-none min-w-[100px]"
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            const input = document.querySelector(`input[data-student-id="${rec.id}"]`) as HTMLInputElement;
+                                                            if (input) saveAbsenceReason(rec.id, input.value.trim());
+                                                        }}
+                                                        disabled={savingReasons.has(rec.id)}
+                                                        className="p-1 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 transition-colors disabled:opacity-50"
+                                                        title="حفظ السبب"
+                                                    >
+                                                        <Save className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                                {/* Print-only display */}
+                                                <span className="hidden print:inline text-[10px]">{absenceReasons[rec.id] || '—'}</span>
                                             </td>
                                         </tr>
                                     ))}
@@ -1379,13 +1802,316 @@ function DayTable({
                                     <tr style={{ backgroundColor: '#fff7ed', borderTop: '2px solid #fed7aa' }}>
                                         <td className="p-2 border-l font-bold text-orange-800" colSpan={2}>الإجمالي</td>
                                         <td className="p-2 border-l text-center font-bold text-rose-700">{weekAbsentData.reduce((s, r) => s + r.count, 0)} غياب</td>
-                                        <td className="p-2 text-[10px] text-muted-foreground">{weekAbsentData.length} طالب مُلاحَظ خلال الأسبوع</td>
+                                        <td className="p-2 text-[10px] text-muted-foreground" colSpan={2}>{weekAbsentData.length} طالب مُلاحَظ خلال الأسبوع</td>
                                     </tr>
                                 </tfoot>
                             </table>
                         </div>
                     </div>
                 )}
+            </div>
+        </div>
+    );
+}
+
+// ─── MonthTable Component ────────────────────────────────────────────────────
+function MonthTable({
+    sheikhs, getDayStats, selectedDate, monthlyStats
+}: {
+    sheikhs: GroupSheikhInfo[];
+    getDayStats: (g: string, d: string) => DayStats | null;
+    selectedDate: Date;
+    monthlyStats: MonthlySheikhStats[];
+}) {
+    const tableRef = useRef<HTMLDivElement>(null);
+
+    // Map group -> stats for quick lookup
+    const statsMap = useMemo(() => {
+        const m = new Map<string, MonthlySheikhStats>();
+        monthlyStats.forEach(s => m.set(s.group, s));
+        return m;
+    }, [monthlyStats]);
+
+    // All unique weeks from the monthly stats (use first sheikh's breakdown as reference)
+    const weeks = monthlyStats[0]?.weeklyBreakdown || [];
+
+    // School-wide averages per week
+    const schoolWeekAvgs = useMemo(() => weeks.map((_, wi) => ({
+        sessionDays: Math.round((monthlyStats.reduce((s, sh) => s + (sh.weeklyBreakdown[wi]?.sessionDays ?? 0), 0)) / (monthlyStats.length || 1)),
+        avgAttendance: avg(monthlyStats.map(sh => sh.weeklyBreakdown[wi]?.avgAttendance ?? null)),
+        avgExcellent: avg(monthlyStats.map(sh => sh.weeklyBreakdown[wi]?.avgExcellent ?? null)),
+    })), [monthlyStats, weeks]);
+
+    const monthLabel = format(selectedDate, 'MMMM yyyy', { locale: ar });
+
+    // ── pctStyle helper for PDF ──────────────────────────────────────────────
+    function pdfPctStyle(v: number | null, thresholds = [90, 70]): string {
+        if (v === null) return 'color:#94a3b8';
+        if (v >= thresholds[0]) return 'color:#059669;font-weight:700';
+        if (v >= thresholds[1]) return 'color:#d97706;font-weight:700';
+        return 'color:#e11d48;font-weight:700';
+    }
+
+    // ── Save image ───────────────────────────────────────────────────────────
+    const handleSaveImage = async () => {
+        if (!tableRef.current) return;
+        try {
+            const html2canvas = (await import('html2canvas')).default;
+            const canvas = await html2canvas(tableRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+            const link = document.createElement('a');
+            link.download = `تقرير_شهر_${format(selectedDate, 'yyyy-MM')}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        } catch (e) { console.error(e); }
+    };
+
+    // ── Export PDF ───────────────────────────────────────────────────────────
+    const handleExportPDF = () => {
+        const thStyle = 'background:#1e3a5f;color:white;padding:5px 7px;font-size:8.5px;border:1px solid #1e40af;text-align:center;white-space:nowrap';
+        const tdStyle = 'padding:4px 7px;border:1px solid #e2e8f0;vertical-align:top;text-align:center';
+        const tdGroupStyle = 'padding:4px 7px;border:1px solid #e2e8f0;vertical-align:top;text-align:right;font-weight:700;font-size:9px;min-width:115px';
+
+        const statsHead = `<tr>
+            <th style="${thStyle};text-align:right">الفوج / الشيخ</th>
+            <th style="${thStyle}">انتظام%</th>
+            <th style="${thStyle}">جلسات</th>
+            <th style="${thStyle}">غياب شيخ</th>
+            <th style="${thStyle}">حضور%</th>
+            <th style="${thStyle}">ممتاز%</th>
+            <th style="${thStyle}">ج.جداً%</th>
+            <th style="${thStyle}">جيد%</th>
+            ${weeks.map((w, wi) => `<th style="${thStyle};background:#172554;min-width:90px">
+                <div style="font-weight:700">${w.label}</div>
+                <div style="font-weight:400;font-size:7.5px;opacity:.75;white-space:nowrap">${w.dateRange}</div>
+                <div style="font-size:7px;opacity:.5">جلسات / حضور / ممتاز</div>
+            </th>`).join('')}
+        </tr>`;
+
+        const bodyRows = sheikhs.map((sh, idx) => {
+            const ms = statsMap.get(sh.group);
+            const rowBg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+            if (!ms) return '';
+            const weekCells = weeks.map((_, wi) => {
+                const w = ms.weeklyBreakdown[wi];
+                if (!w) return `<td style="${tdStyle};background:${rowBg}">—</td>`;
+                const clrAtt = pdfPctStyle(w.avgAttendance);
+                const clrExc = pdfPctStyle(w.avgExcellent, [50, 30]);
+                return `<td style="${tdStyle};background:${rowBg}">
+                    <div style="font-size:8px">${w.sessionDays}ج</div>
+                    <div style="font-size:8px;${clrAtt}">${w.avgAttendance !== null ? w.avgAttendance + '%' : '—'}</div>
+                    <div style="font-size:8px;${clrExc}">${w.avgExcellent !== null ? '★' + w.avgExcellent + '%' : '—'}</div>
+                </td>`;
+            }).join('');
+            return `<tr>
+                <td style="${tdGroupStyle};background:${rowBg}">${sh.group}<br/><span style="font-weight:400;font-size:8px;color:#6b7280">${sh.displayName}</span></td>
+                <td style="${tdStyle};background:${rowBg}"><span style="${pdfPctStyle(ms.commitmentRate)}">${ms.commitmentRate}%</span></td>
+                <td style="${tdStyle};background:${rowBg};font-size:8px">${ms.sessionDays}</td>
+                <td style="${tdStyle};background:${rowBg};font-size:8px;${ms.sheikhabsences > 3 ? 'color:#dc2626;font-weight:700' : ms.sheikhabsences > 1 ? 'color:#d97706' : 'color:#94a3b8'}">${ms.sheikhabsences}</td>
+                <td style="${tdStyle};background:${rowBg}"><span style="${pdfPctStyle(ms.avgAttendance)}">${ms.avgAttendance !== null ? ms.avgAttendance + '%' : '—'}</span></td>
+                <td style="${tdStyle};background:${rowBg}"><span style="${pdfPctStyle(ms.avgExcellent, [50, 30])}">${ms.avgExcellent !== null ? ms.avgExcellent + '%' : '—'}</span></td>
+                <td style="${tdStyle};background:${rowBg}"><span style="${pdfPctStyle(ms.avgGoodPlus, [40, 20])}">${ms.avgGoodPlus !== null ? ms.avgGoodPlus + '%' : '—'}</span></td>
+                <td style="${tdStyle};background:${rowBg}"><span style="${pdfPctStyle(ms.avgGood, [40, 20])}">${ms.avgGood !== null ? ms.avgGood + '%' : '—'}</span></td>
+                ${weekCells}
+            </tr>`;
+        }).join('');
+
+        const avgCommit = avg(monthlyStats.map(s => s.commitmentRate));
+        const avgSessions = monthlyStats.length ? Math.round(monthlyStats.reduce((a, s) => a + s.sessionDays, 0) / monthlyStats.length) : null;
+        const avgAbs = monthlyStats.length ? Math.round(monthlyStats.reduce((a, s) => a + s.sheikhabsences, 0) / monthlyStats.length) : null;
+        const avgAtt = avg(monthlyStats.map(s => s.avgAttendance));
+        const avgExc = avg(monthlyStats.map(s => s.avgExcellent));
+        const avgGp = avg(monthlyStats.map(s => s.avgGoodPlus));
+        const avgGd = avg(monthlyStats.map(s => s.avgGood));
+        const footCells = weeks.map((_, wi) => {
+            const wa = schoolWeekAvgs[wi];
+            return `<td style="padding:4px 7px;border:1px solid #1e40af;background:#172554;text-align:center;color:white">
+                <div style="font-size:8px">${wa.sessionDays}ج</div>
+                <div style="font-size:8px;color:${(wa.avgAttendance ?? 0) >= 90 ? '#34d399' : (wa.avgAttendance ?? 0) >= 70 ? '#fbbf24' : '#f87171'}">${wa.avgAttendance !== null ? wa.avgAttendance + '%' : '—'}</div>
+                <div style="font-size:8px;color:#c7d2fe">${wa.avgExcellent !== null ? '★' + wa.avgExcellent + '%' : '—'}</div>
+            </td>`;
+        }).join('');
+        const footRow = `<tfoot><tr>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;color:white;font-weight:700;font-size:9px;text-align:right">متوسط الكل</td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgCommit)}">${avgCommit !== null ? avgCommit + '%' : '—'}</span></td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;color:white;text-align:center;font-size:8px">${avgSessions ?? '—'}</td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;color:white;text-align:center;font-size:8px">${avgAbs ?? '—'}</td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgAtt)}">${avgAtt !== null ? avgAtt + '%' : '—'}</span></td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgExc, [50, 30])}">${avgExc !== null ? avgExc + '%' : '—'}</span></td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgGp, [40, 20])}">${avgGp !== null ? avgGp + '%' : '—'}</span></td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgGd, [40, 20])}">${avgGd !== null ? avgGd + '%' : '—'}</span></td>
+            ${footCells}
+        </tr></tfoot>`;
+
+        const html = `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8"/>
+    <title>تقرير شهر ${monthLabel}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Cairo', Arial, sans-serif; direction: rtl; background: white; color: #1e293b; font-size: 9px; }
+        @media print {
+            @page { size: A4 landscape; margin: 8mm; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            body { font-size: 8px; }
+        }
+        table { border-collapse: collapse; width: 100%; }
+    </style>
+</head>
+<body style="padding:10px">
+    <div style="border-bottom:2px solid #1e3a5f;padding-bottom:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+            <h1 style="color:#1e3a5f;font-size:14px;font-weight:900">تقرير مراقبة المشايخ — الشهري</h1>
+            <p style="margin-top:3px;font-size:9px;color:#475569">شهر ${monthLabel}</p>
+            <p style="margin-top:2px;font-size:8px;color:#64748b">عدد الأفواج: ${sheikhs.length}</p>
+        </div>
+        <div style="text-align:left;font-size:8px;color:#64748b">
+            <div style="font-weight:700">المدرسة القرآنية للشافعي</div>
+            <div>${format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
+        </div>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+        <div style="background:#1e3a5f;color:white;padding:5px 10px;font-weight:700;font-size:9px">ملخص شهر ${monthLabel}</div>
+        <table>
+            <thead>${statsHead}</thead>
+            <tbody>${bodyRows}</tbody>
+            ${footRow}
+        </table>
+    </div>
+    <p style="margin-top:8px;font-size:8px;color:#94a3b8">* الانتظام = الجلسات ÷ أيام العمل الفعلية · تاريخ الطباعة: ${format(new Date(), 'EEEE d MMMM yyyy', { locale: ar })}</p>
+</body>
+</html>`;
+
+        const pw = window.open('', '_blank', 'width=1400,height=900');
+        if (!pw) { alert('يرجى السماح بالنوافذ المنبثقة لهذا الموقع'); return; }
+        pw.document.write(html);
+        pw.document.close();
+        pw.focus();
+        setTimeout(() => { pw.print(); }, 800);
+    };
+
+    // ── Render ───────────────────────────────────────────────────────────────
+    if (monthlyStats.length === 0) {
+        return <div className="text-center text-muted-foreground py-12 text-sm">لا توجد بيانات لهذا الشهر</div>;
+    }
+
+    return (
+        <div className="space-y-3">
+            {/* Toolbar */}
+            <div className="flex flex-wrap items-center gap-2 justify-end">
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => window.print()}>
+                    <Printer className="h-3.5 w-3.5" /> طباعة
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleSaveImage}>
+                    <ImageDown className="h-3.5 w-3.5" /> حفظ صورة PNG
+                </Button>
+                <Button size="sm" className="h-8 gap-1.5 text-xs bg-rose-600 hover:bg-rose-700 text-white" onClick={handleExportPDF}>
+                    <FileDown className="h-3.5 w-3.5" /> تصدير PDF
+                </Button>
+            </div>
+
+            {/* Table */}
+            <div ref={tableRef} className="border rounded-xl overflow-hidden shadow-sm bg-white">
+                <div className="bg-gradient-to-l from-slate-800 to-slate-700 text-white px-4 py-2.5 flex items-center justify-between">
+                    <span className="font-bold text-sm">ملخص شهر {monthLabel}</span>
+                    <span className="text-[11px] text-slate-300">{sheikhs.length} أفواج</span>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="border-collapse text-xs w-full">
+                        <thead>
+                            <tr className="bg-muted/30 border-b">
+                                <th className="sticky right-0 z-20 bg-muted/30 text-right p-2 text-xs font-bold border-l min-w-[130px]">الفوج / الشيخ</th>
+                                <th className="p-2 text-center border-l min-w-[55px] whitespace-nowrap">انتظام%</th>
+                                <th className="p-2 text-center border-l min-w-[45px] whitespace-nowrap">جلسات</th>
+                                <th className="p-2 text-center border-l min-w-[50px] whitespace-nowrap">غ.شيخ</th>
+                                <th className="p-2 text-center border-l min-w-[55px] whitespace-nowrap">حضور%</th>
+                                <th className="p-2 text-center border-l min-w-[50px] whitespace-nowrap">ممتاز%</th>
+                                <th className="p-2 text-center border-l min-w-[50px] whitespace-nowrap">ج.جداً%</th>
+                                <th className="p-2 text-center border-l min-w-[45px] whitespace-nowrap">جيد%</th>
+                                {weeks.map((w, wi) => (
+                                    <th key={wi} className="p-1.5 text-center border-l min-w-[90px] bg-blue-50/50 text-blue-800">
+                                        <div className="font-bold text-[10px]">{w.label}</div>
+                                        <div className="text-[8.5px] opacity-60 whitespace-nowrap">{w.dateRange}</div>
+                                        <div className="text-[8px] text-muted-foreground">جلسات · حضور · ممتاز</div>
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sheikhs.map((sh, idx) => {
+                                const ms = statsMap.get(sh.group);
+                                if (!ms) return null;
+                                const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-muted/10';
+                                return (
+                                    <tr key={sh.group} className={cn('border-b hover:bg-primary/5 transition-colors', rowBg)}>
+                                        {/* Group info */}
+                                        <td className={cn('sticky right-0 z-10 p-2 border-l shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]', idx % 2 === 0 ? 'bg-white' : 'bg-slate-50')}>
+                                            <div className="font-bold text-[11px] leading-tight">{sh.group}</div>
+                                            <div className="text-[9px] text-muted-foreground truncate max-w-[120px]">{sh.displayName}</div>
+                                        </td>
+                                        {/* Commitment */}
+                                        <td className="p-2 text-center border-l">
+                                            <span className={cn('text-xs font-bold', pctColor(ms.commitmentRate))}>{ms.commitmentRate}%</span>
+                                        </td>
+                                        {/* Session days */}
+                                        <td className="p-2 text-center border-l">
+                                            <span className="text-xs font-medium">{ms.sessionDays}</span>
+                                        </td>
+                                        {/* Sheikh absences */}
+                                        <td className="p-2 text-center border-l">
+                                            <span className={cn('text-xs', ms.sheikhabsences > 3 ? 'text-rose-600 font-bold' : ms.sheikhabsences > 1 ? 'text-amber-600' : 'text-muted-foreground')}>
+                                                {ms.sheikhabsences}
+                                            </span>
+                                        </td>
+                                        {/* Avg attendance */}
+                                        <td className="p-2 text-center border-l"><PctCell v={ms.avgAttendance} /></td>
+                                        {/* Avg excellent */}
+                                        <td className="p-2 text-center border-l"><PctCell v={ms.avgExcellent} thresholds={[50, 30]} /></td>
+                                        {/* Avg goodPlus */}
+                                        <td className="p-2 text-center border-l"><PctCell v={ms.avgGoodPlus} thresholds={[40, 20]} /></td>
+                                        {/* Avg good */}
+                                        <td className="p-2 text-center border-l"><PctCell v={ms.avgGood} thresholds={[40, 20]} /></td>
+                                        {/* Weekly breakdown */}
+                                        {weeks.map((_, wi) => {
+                                            const w = ms.weeklyBreakdown[wi];
+                                            if (!w) return <td key={wi} className="p-1 text-center border-l bg-blue-50/20"><span className="text-muted-foreground/40 text-xs">—</span></td>;
+                                            return (
+                                                <td key={wi} className="p-1 text-center border-l bg-blue-50/20">
+                                                    <div className="text-[10px] font-bold text-blue-700">{w.sessionDays}ج</div>
+                                                    <PctCell v={w.avgAttendance} />
+                                                    <div className="text-[9px] text-emerald-600">{w.avgExcellent !== null ? `★${w.avgExcellent}%` : '—'}</div>
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                        <tfoot>
+                            <tr className="bg-muted/20 border-t-2 font-bold">
+                                <td className="sticky right-0 z-10 bg-muted/20 p-2 border-l text-xs font-bold">متوسط الكل</td>
+                                <td className="p-2 text-center border-l"><PctCell v={avg(monthlyStats.map(s => s.commitmentRate))} /></td>
+                                <td className="p-2 text-center border-l text-xs">{monthlyStats.length ? Math.round(monthlyStats.reduce((a, s) => a + s.sessionDays, 0) / monthlyStats.length) : '—'}</td>
+                                <td className="p-2 text-center border-l text-xs">{monthlyStats.length ? Math.round(monthlyStats.reduce((a, s) => a + s.sheikhabsences, 0) / monthlyStats.length) : '—'}</td>
+                                <td className="p-2 text-center border-l"><PctCell v={avg(monthlyStats.map(s => s.avgAttendance))} /></td>
+                                <td className="p-2 text-center border-l"><PctCell v={avg(monthlyStats.map(s => s.avgExcellent))} thresholds={[50, 30]} /></td>
+                                <td className="p-2 text-center border-l"><PctCell v={avg(monthlyStats.map(s => s.avgGoodPlus))} thresholds={[40, 20]} /></td>
+                                <td className="p-2 text-center border-l"><PctCell v={avg(monthlyStats.map(s => s.avgGood))} thresholds={[40, 20]} /></td>
+                                {schoolWeekAvgs.map((wa, wi) => (
+                                    <td key={wi} className="p-1 text-center border-l bg-blue-100/40">
+                                        <div className="text-[10px] font-bold text-blue-700">{wa.sessionDays}ج</div>
+                                        <PctCell v={wa.avgAttendance} />
+                                        <div className="text-[9px] text-emerald-600">{wa.avgExcellent !== null ? `★${wa.avgExcellent}%` : '—'}</div>
+                                    </td>
+                                ))}
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <p className="text-[10px] text-muted-foreground p-2 text-center border-t">
+                    * الانتظام = عدد الجلسات ÷ أيام العمل الفعلية (مطروحاً منها العطل وغياب الشيخ)
+                </p>
             </div>
         </div>
     );

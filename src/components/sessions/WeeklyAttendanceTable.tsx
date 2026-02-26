@@ -52,13 +52,13 @@ export const WeeklyAttendanceTable = ({
         }
     }, [initialDate?.toISOString().slice(0, 10)]);
 
-    const weekDays = useMemo(() => {
+    const weekDaysBase = useMemo(() => {
         return Array.from({ length: 7 }, (_, i) => {
             const date = addDays(weekStart, i);
             const dateStr = format(date, 'yyyy-MM-dd');
             const dayOfWeek = getDay(date);
-            // Thursday (4) and Friday (5) are always holidays
-            const isWeekend = dayOfWeek === 4 || dayOfWeek === 5;
+            // Thursday (4) and Friday (5) are potential holidays
+            const isThurFri = dayOfWeek === 4 || dayOfWeek === 5;
 
             return {
                 date,
@@ -68,20 +68,32 @@ export const WeeklyAttendanceTable = ({
                 dayNum: format(date, 'd'),
                 monthNum: format(date, 'MM'),
                 isToday: isTodayFn(date),
-                isWeekend,
+                isThurFri,
+                isWeekend: false, // will be computed below
             };
         });
     }, [weekStart]);
 
     const weekSessionData = useMemo(() => {
         const data: Record<string, any> = {};
-        weekDays.forEach(day => {
+        weekDaysBase.forEach(day => {
             const sessions = getSessionsForDay(day.dateStr);
             const primary = sessions.find((s: any) => s.sessionNumber === 1);
             data[day.dateStr] = primary || sessions[0] || null;
         });
         return data;
-    }, [weekDays, getSessionsForDay]);
+    }, [weekDaysBase, getSessionsForDay]);
+
+    // Compute effective isWeekend: Thu/Fri are only holidays if no real session exists
+    const weekDays = useMemo(() => {
+        return weekDaysBase.map(day => {
+            if (!day.isThurFri) return { ...day, isWeekend: false };
+            const session = weekSessionData[day.dateStr];
+            // If a session exists and it's not marked as holiday, treat as working day
+            const hasRealSession = session && session.sessionType !== 'يوم عطلة';
+            return { ...day, isWeekend: !hasRealSession };
+        });
+    }, [weekDaysBase, weekSessionData]);
 
     const getColumnStyle = (day: typeof weekDays[0], session: any) => {
         if (day.isWeekend) return "bg-sky-50/70 border-sky-100"; // Weekend always blue-ish

@@ -71,26 +71,37 @@ export const WeeklyStatsRow = ({
             const date = addDays(weekStart, i);
             const dateStr = format(date, 'yyyy-MM-dd');
             const dayOfWeek = getDay(date);
-            const isWeekend = dayOfWeek === 4 || dayOfWeek === 5;
+            // Thu/Fri are potential holidays, determined dynamically below
+            const isThurFri = dayOfWeek === 4 || dayOfWeek === 5;
             return {
                 date,
                 dateStr,
                 dayName: format(date, 'EEEE', { locale: ar }),
                 dayNameShort: format(date, 'EEE', { locale: ar }),
                 dayNum: format(date, 'd'),
-                isWeekend,
+                isThurFri,
+                isWeekend: false, // computed below
             };
         });
     }, [weekStart]);
 
     const dayStats = useMemo((): DayStat[] => {
         return weekDays.map(day => {
-            const base: DayStat = { day, sessionType: null, attendance: null, excellent: null, goodPlus: null, good: null, acceptable: null, weak: null, notMemorized: null };
-
+            // For Thu/Fri, check if a real session exists
             const sessions = getSessionsForDay(day.dateStr);
             const session = sessions.find((s: any) => s.sessionNumber === 1) || sessions[0] || null;
 
-            if (!session || day.isWeekend) return base;
+            // Compute effective isWeekend for this day
+            let effectiveIsWeekend = false;
+            if (day.isThurFri) {
+                const hasRealSession = session && session.sessionType !== 'يوم عطلة';
+                effectiveIsWeekend = !hasRealSession;
+            }
+            const effectiveDay = { ...day, isWeekend: effectiveIsWeekend };
+
+            const base: DayStat = { day: effectiveDay, sessionType: null, attendance: null, excellent: null, goodPlus: null, good: null, acceptable: null, weak: null, notMemorized: null };
+
+            if (!session || effectiveIsWeekend) return base;
 
             const sessionType = session.sessionType as string;
             if (sessionType === 'يوم عطلة' || sessionType === 'غياب الشيخ' || sessionType === 'حصة أنشطة') {
@@ -190,13 +201,13 @@ export const WeeklyStatsRow = ({
                             <th className="sticky right-0 z-10 bg-muted/20 text-right p-1.5 sm:p-2 text-[10px] sm:text-xs font-bold text-muted-foreground border-b border-l min-w-[80px] sm:min-w-[100px]">
                                 المؤشر
                             </th>
-                            {weekDays.map(day => (
-                                <th key={day.dateStr} className={cn(
+                            {dayStats.map(stat => (
+                                <th key={stat.day.dateStr} className={cn(
                                     "border-b border-l p-1 sm:p-2 text-center text-[10px] sm:text-[11px] font-bold min-w-[45px]",
-                                    day.isWeekend ? "text-sky-600 bg-sky-50/50" : "text-foreground"
+                                    stat.day.isWeekend ? "text-sky-600 bg-sky-50/50" : "text-foreground"
                                 )}>
-                                    <div>{day.dayNameShort}</div>
-                                    <div className="text-[9px] sm:text-[10px] font-normal text-muted-foreground">{day.dayNum}</div>
+                                    <div>{stat.day.dayNameShort}</div>
+                                    <div className="text-[9px] sm:text-[10px] font-normal text-muted-foreground">{stat.day.dayNum}</div>
                                 </th>
                             ))}
                             <th className="border-b border-l p-1 sm:p-2 text-center text-[10px] sm:text-[11px] font-bold text-purple-700 bg-purple-50/50 min-w-[55px]">
