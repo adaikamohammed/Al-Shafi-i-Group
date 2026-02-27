@@ -11,7 +11,7 @@ import {
     ChevronLeft, ChevronRight, Users, Activity, RotateCcw,
     TrendingUp, TrendingDown, Minus, BarChart2, Star, Award, AlertTriangle,
     UserX, XOctagon, Filter, Printer, ImageDown, CalendarDays, CalendarRange,
-    ChevronDown, ChevronUp, FileDown, FileSpreadsheet, Save
+    ChevronDown, ChevronUp, FileDown, FileSpreadsheet, Save, Trophy, Crown, Medal, Sparkles, Target, Flame
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -26,6 +26,16 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell,
     PieChart, Pie, LineChart, Line, Legend
 } from 'recharts';
+import { KPIDashboard } from '@/components/management/KPIDashboard';
+import { EarlyWarningView, computeAtRiskStudents } from '@/components/management/EarlyWarning';
+import { AdvancedCharts } from '@/components/management/AdvancedCharts';
+import { StudentProfileDialog } from '@/components/management/StudentProfileDialog';
+import { SchoolCalendar } from '@/components/management/SchoolCalendar';
+import { SheikhBadges } from '@/components/management/SheikhBadges';
+import { PeriodComparison } from '@/components/management/PeriodComparison';
+import { SmartSearch } from '@/components/management/SmartSearch';
+import { QuickShare } from '@/components/management/QuickShare';
+import { AIAnalytics } from '@/components/management/AIAnalytics';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface GroupSheikhInfo {
@@ -136,7 +146,7 @@ export default function SheikhMonitoringPage() {
     const { dailySessions, allUsers, loading, students } = useStudentContext();
     const { isManagement } = useAuth();
 
-    type ViewMode = 'day' | 'week' | 'month' | 'stats' | 'students';
+    type ViewMode = 'day' | 'week' | 'month' | 'stats' | 'students' | 'topStudents' | 'earlyWarning' | 'calendar' | 'badges';
     const [view, setView] = useState<ViewMode>('day');
     const [studentPeriod, setStudentPeriod] = useState<'day' | 'week' | 'month'>('month');
     const [studentGroupFilter, setStudentGroupFilter] = useState<string>('all');
@@ -146,6 +156,8 @@ export default function SheikhMonitoringPage() {
     const [statsMonth, setStatsMonth] = useState(new Date());
     const [sortStat, setSortStat] = useState<'group' | 'att' | 'commit' | 'excellent'>('group');
     const [sortDir, setSortDir] = useState<1 | -1>(1);
+    const [topStudentsGroupFilter, setTopStudentsGroupFilter] = useState<string>('all');
+    const [selectedStudentProfile, setSelectedStudentProfile] = useState<{ id: string; name: string; group: string } | null>(null);
 
     // ── Sheikhs ────────────────────────────────────────────────────────────
     const sheikhs = useMemo<GroupSheikhInfo[]>(() => {
@@ -397,21 +409,11 @@ export default function SheikhMonitoringPage() {
                         }
                     });
 
-                    // Cross-reference: find which group this session belongs to
-                    // by checking the ownerId against sheikhs
-                    const shOwner = sheikhs.find(sh => sh.uids.has(session.ownerId));
-                    if (shOwner) {
-                        // Students in this group NOT in records → absent
-                        (groupStudentIds.get(shOwner.group) || new Set()).forEach(sid => {
-                            if (!recordedIds.has(sid) && studentMap.has(sid)) {
-                                const st = studentMap.get(sid)!;
-                                if (!st.absentDates.includes(dateStr)) {
-                                    st.absences++;
-                                    st.absentDates.push(dateStr);
-                                }
-                            }
-                        });
-                    }
+                    // Note: We only count students who are explicitly marked as
+                    // 'غائب' or 'غياب' in the session records. Students missing
+                    // from the records are NOT automatically counted as absent
+                    // (matches the Day tab behavior).
+
                 });
             });
         }
@@ -421,31 +423,153 @@ export default function SheikhMonitoringPage() {
             .sort((a, b) => b.absences - a.absences);
     }, [students, dailySessions, sheikhs, studentPeriod, studentSelectedDate]);
 
+    // ── Weekly student stats (top performers) ─────────────────────────────
+    const weeklyStudentStats = useMemo(() => {
+        // Compute week boundaries (Sat-Fri) based on selectedDate
+        const dow = getDay(selectedDate);
+        const wSat = addDays(selectedDate, dow === 6 ? 0 : -(dow + 1));
+        const weekDays = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(wSat, i));
+        const weekDateStrs = weekDays.map(d => format(d, 'yyyy-MM-dd'));
+
+        // Build group → session dates (only real sessions)
+        const groupSessionDates = new Map<string, Set<string>>();
+        sheikhs.forEach(sh => groupSessionDates.set(sh.group, new Set()));
+
+        // Per-student accumulator
+        type StudentStat = {
+            id: string; name: string; group: string;
+            attendanceDays: number; totalSessionDays: number;
+            excellent: number; goodPlus: number; good: number;
+            acceptable: number; weak: number; notMem: number;
+            evalScore: number; totalEvals: number;
+        };
+        const studentMap = new Map<string, StudentStat>();
+        (students || []).filter(s => s.status === 'نشط').forEach(s => {
+            const grp = (s as any).group || s.groupName || '—';
+            studentMap.set(s.id, {
+                id: s.id, name: s.fullName, group: grp,
+                attendanceDays: 0, totalSessionDays: 0,
+                excellent: 0, goodPlus: 0, good: 0,
+                acceptable: 0, weak: 0, notMem: 0,
+                evalScore: 0, totalEvals: 0,
+            });
+        });
+
+        // Build group→studentIds
+        const groupStudentIds = new Map<string, Set<string>>();
+        sheikhs.forEach(sh => groupStudentIds.set(sh.group, new Set()));
+        (students || []).filter(s => s.status === 'نشط').forEach(s => {
+            const grp = (s as any).group || s.groupName || '';
+            groupStudentIds.get(grp)?.add(s.id);
+        });
+
+        // Track which dates each group had a real session (to avoid duplicates)
+        const groupDateProcessed = new Map<string, Set<string>>();
+        sheikhs.forEach(sh => groupDateProcessed.set(sh.group, new Set()));
+
+        if (dailySessions) {
+            weekDateStrs.forEach(dateStr => {
+                const daySess = (dailySessions as any)[dateStr];
+                if (!daySess) return;
+                Object.values(daySess as Record<string, any>).forEach((session: any) => {
+                    if (!session) return;
+                    const sType = session.sessionType;
+                    const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
+                    if (!isReal) return;
+                    const shOwner = sheikhs.find(sh => sh.uids.has(session.ownerId));
+                    if (!shOwner) return;
+                    // Avoid double-counting same group+date
+                    if (groupDateProcessed.get(shOwner.group)?.has(dateStr)) return;
+                    groupDateProcessed.get(shOwner.group)?.add(dateStr);
+                    groupSessionDates.get(shOwner.group)?.add(dateStr);
+
+                    const records: any[] = Array.isArray(session.records)
+                        ? session.records
+                        : session.records ? Object.values(session.records) : [];
+                    const recordedIds = new Set<string>(records.map((r: any) => r.studentId).filter(Boolean));
+
+                    // Mark attendance for recorded students
+                    records.forEach((r: any) => {
+                        const sid = r.studentId;
+                        if (!sid || !studentMap.has(sid)) return;
+                        const st = studentMap.get(sid)!;
+                        if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') {
+                            st.attendanceDays++;
+                        }
+                        // Memorization eval (not review)
+                        if (!r.review && r.memorization) {
+                            st.totalEvals++;
+                            if (r.memorization === 'ممتاز') { st.excellent++; st.evalScore += 6; }
+                            else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') { st.goodPlus++; st.evalScore += 5; }
+                            else if (r.memorization === 'جيد') { st.good++; st.evalScore += 4; }
+                            else if (r.memorization === 'مقبول' || r.memorization === 'حسن') { st.acceptable++; st.evalScore += 3; }
+                            else if (r.memorization === 'ضعيف' || r.memorization === 'متوسط') { st.weak++; st.evalScore += 2; }
+                            else if (r.memorization === 'لم يحفظ') { st.notMem++; st.evalScore += 1; }
+                        }
+                    });
+                });
+            });
+        }
+
+        // Set totalSessionDays for each student based on their group
+        studentMap.forEach(st => {
+            st.totalSessionDays = groupSessionDates.get(st.group)?.size || 0;
+        });
+
+        // Compute and return all students
+        const all = Array.from(studentMap.values()).map(st => ({
+            ...st,
+            attendanceRate: st.totalSessionDays > 0 ? Math.round((st.attendanceDays / st.totalSessionDays) * 100) : 0,
+            avgEvalScore: st.totalEvals > 0 ? Math.round((st.evalScore / st.totalEvals) * 100) / 100 : 0,
+            bestEval: st.excellent > 0 ? 'ممتاز' : st.goodPlus > 0 ? 'جيد جداً' : st.good > 0 ? 'جيد' : st.acceptable > 0 ? 'مقبول' : st.weak > 0 ? 'ضعيف' : st.notMem > 0 ? 'لم يحفظ' : '—',
+        }));
+
+        // Week label
+        const weekLabel = `سبت ${format(wSat, 'd MMM', { locale: ar })} — جمعة ${format(addDays(wSat, 6), 'd MMM yyyy', { locale: ar })}`;
+
+        return { all, weekLabel, weekStart: wSat, weekEnd: addDays(wSat, 6) };
+    }, [students, dailySessions, sheikhs, selectedDate]);
+
+    // ── At-Risk Students (Early Warning) ──────────────────────────────────
+    const atRiskStudents = useMemo(() => {
+        return computeAtRiskStudents(students || [], dailySessions, sheikhs, selectedDate);
+    }, [students, dailySessions, sheikhs, selectedDate]);
+
     // ── Navigation ──────────────────────────────────────────────────────────
     const navigate = (dir: -1 | 1) => {
         if (view === 'students') {
             if (studentPeriod === 'day') setStudentSelectedDate(d => addDays(d, dir));
             else if (studentPeriod === 'week') setStudentSelectedDate(d => addDays(d, dir * 7));
             else setStudentSelectedDate(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
-        } else if (view === 'day') setSelectedDate(d => addDays(d, dir));
+        } else if (view === 'topStudents' || view === 'earlyWarning') setSelectedDate(d => addDays(d, dir * 7));
+        else if (view === 'day') setSelectedDate(d => addDays(d, dir));
         else if (view === 'week') setSelectedDate(d => addDays(d, dir * 7));
-        else if (view === 'month') setSelectedDate(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
+        else if (view === 'month' || view === 'calendar') setSelectedDate(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
+        else if (view === 'badges') setStatsMonth(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
         else setStatsMonth(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
     };
 
-    const navLabel = view === 'students'
-        ? (studentPeriod === 'day'
-            ? format(studentSelectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
-            : studentPeriod === 'week'
-                ? `سبت ${format(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 'd MMM', { locale: ar })} — أرب ${format(addDays(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 4), 'd MMM yyyy', { locale: ar })}`
-                : format(studentSelectedDate, 'MMMM yyyy', { locale: ar }))
-        : view === 'day'
-            ? format(selectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
-            : view === 'week'
-                ? `${format(startOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM', { locale: ar })} — ${format(endOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM yyyy', { locale: ar })}`
-                : view === 'month'
-                    ? format(selectedDate, 'MMMM yyyy', { locale: ar })
-                    : format(statsMonth, 'MMMM yyyy', { locale: ar });
+    const navLabel = view === 'calendar'
+        ? format(selectedDate, 'MMMM yyyy', { locale: ar })
+        : view === 'badges'
+            ? `نقاط المشايخ — ${format(statsMonth, 'MMMM yyyy', { locale: ar })}`
+            : view === 'earlyWarning'
+                ? `آخر أسبوعين حتى ${format(selectedDate, 'd MMMM yyyy', { locale: ar })}`
+                : view === 'topStudents'
+                    ? weeklyStudentStats.weekLabel
+                    : view === 'students'
+                        ? (studentPeriod === 'day'
+                            ? format(studentSelectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
+                            : studentPeriod === 'week'
+                                ? `سبت ${format(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 'd MMM', { locale: ar })} — أرب ${format(addDays(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 4), 'd MMM yyyy', { locale: ar })}`
+                                : format(studentSelectedDate, 'MMMM yyyy', { locale: ar }))
+                        : view === 'day'
+                            ? format(selectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
+                            : view === 'week'
+                                ? `${format(startOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM', { locale: ar })} — ${format(endOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM yyyy', { locale: ar })}`
+                                : view === 'month'
+                                    ? format(selectedDate, 'MMMM yyyy', { locale: ar })
+                                    : format(statsMonth, 'MMMM yyyy', { locale: ar });
 
     const interval = useMemo(() => {
         if (view === 'week') return eachDayOfInterval({ start: startOfWeek(selectedDate, { weekStartsOn: 6 }), end: endOfWeek(selectedDate, { weekStartsOn: 6 }) });
@@ -477,13 +601,17 @@ export default function SheikhMonitoringPage() {
                             <p className="text-[11px] text-muted-foreground">{sheikhs.length} فوج مسجل</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 border">
-                        {(['day', 'week', 'month', 'stats', 'students'] as const).map(v => (
-                            <button key={v} onClick={() => setView(v)} className={cn("px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all", view === v ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-muted")}>
-                                {v === 'day' ? '📅 اليوم' : v === 'week' ? '📆 الأسبوع' : v === 'month' ? '🗓 الشهر' : v === 'stats' ? '📊 إحصائيات' : '📋 متابعة الطلاب'}
-                            </button>
-                        ))}
+                    <div className="flex items-center gap-2">
+                        <SmartSearch students={students || []} sheikhs={sheikhs} onStudentClick={(id, name, group) => setSelectedStudentProfile({ id, name, group })} />
+                        <QuickShare sheikhs={sheikhs} getDayStats={getDayStats} selectedDate={selectedDate} />
                     </div>
+                </div>
+                <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 border flex-wrap">
+                    {(['day', 'week', 'month', 'stats', 'students', 'topStudents', 'earlyWarning', 'calendar', 'badges'] as const).map(v => (
+                        <button key={v} onClick={() => setView(v)} className={cn("px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all", view === v ? (v === 'earlyWarning' ? 'bg-rose-500 text-white shadow-sm' : 'bg-primary text-white shadow-sm') : "text-muted-foreground hover:bg-muted", v === 'earlyWarning' && atRiskStudents.length > 0 && view !== v && 'text-rose-500')}>
+                            {v === 'day' ? '📅 اليوم' : v === 'week' ? '📆 الأسبوع' : v === 'month' ? '🗓 الشهر' : v === 'stats' ? '📊 إحصائيات' : v === 'students' ? '📋 متابعة' : v === 'topStudents' ? '🌟 نجوم' : v === 'earlyWarning' ? `🔔 إنذارات${atRiskStudents.length > 0 ? ` (${atRiskStudents.length})` : ''}` : v === 'calendar' ? '🗓 تقويم' : '🏆 شارات'}
+                        </button>
+                    ))}
                 </div>
 
                 {/* ── Date Navigation ── */}
@@ -499,6 +627,16 @@ export default function SheikhMonitoringPage() {
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => navigate(1)} className="h-8 px-2"><ChevronLeft className="h-4 w-4" /></Button>
                 </div>
+
+                {/* ── KPI Dashboard (always visible) ── */}
+                <KPIDashboard
+                    sheikhs={sheikhs}
+                    getDayStats={getDayStats}
+                    dailySessions={dailySessions}
+                    groupSessions={groupSessions}
+                    selectedDate={selectedDate}
+                    students={students || []}
+                />
 
                 {/* ── Summary Row (Day view only) ── */}
                 {view === 'day' && (
@@ -538,7 +676,12 @@ export default function SheikhMonitoringPage() {
                     />
                 )}
                 {view === 'stats' && (
-                    <StatsView sortedStats={sortedStats} monthlyStats={monthlyStats} statsMonth={statsMonth} sortStat={sortStat} sortDir={sortDir} toggleSort={toggleSort} />
+                    <>
+                        <StatsView sortedStats={sortedStats} monthlyStats={monthlyStats} statsMonth={statsMonth} sortStat={sortStat} sortDir={sortDir} toggleSort={toggleSort} />
+                        <AdvancedCharts sheikhs={sheikhs} getDayStats={getDayStats} selectedDate={statsMonth} dailySessions={dailySessions} />
+                        <PeriodComparison sheikhs={sheikhs} getDayStats={getDayStats} selectedDate={statsMonth} />
+                        <AIAnalytics sheikhs={sheikhs} getDayStats={getDayStats} selectedDate={statsMonth} students={students || []} />
+                    </>
                 )}
                 {view === 'students' && (
                     <StudentTrackingView
@@ -553,7 +696,40 @@ export default function SheikhMonitoringPage() {
                         sheikhs={sheikhs}
                     />
                 )}
+                {view === 'topStudents' && (
+                    <TopStudentsView
+                        stats={weeklyStudentStats}
+                        groupFilter={topStudentsGroupFilter}
+                        setGroupFilter={setTopStudentsGroupFilter}
+                        sheikhs={sheikhs}
+                    />
+                )}
+                {view === 'earlyWarning' && (
+                    <EarlyWarningView
+                        atRiskStudents={atRiskStudents}
+                        sheikhs={sheikhs}
+                        onStudentClick={(id, name, group) => setSelectedStudentProfile({ id, name, group })}
+                    />
+                )}
+                {view === 'calendar' && (
+                    <SchoolCalendar sheikhs={sheikhs} getDayStats={getDayStats} />
+                )}
+                {view === 'badges' && (
+                    <SheikhBadges sheikhs={sheikhs} getDayStats={getDayStats} selectedDate={statsMonth} />
+                )}
             </div>
+
+            {/* Student profile dialog */}
+            {selectedStudentProfile && (
+                <StudentProfileDialog
+                    studentId={selectedStudentProfile.id}
+                    studentName={selectedStudentProfile.name}
+                    studentGroup={selectedStudentProfile.group}
+                    dailySessions={dailySessions}
+                    sheikhs={sheikhs}
+                    onClose={() => setSelectedStudentProfile(null)}
+                />
+            )}
         </TooltipProvider>
     );
 }
@@ -2834,6 +3010,441 @@ function StudentTrackingView({
             )}
             <p className="text-[10px] text-muted-foreground text-center print:hidden">
                 * الغياب = مسجّل غائب + طلاب لم تظهر أسماؤهم في سجلات الحصة &nbsp;|&nbsp; أحمر ≥ 4 / برتقالي 2–3
+            </p>
+        </div>
+    );
+}
+
+// ─── TopStudentsView Component ────────────────────────────────────────────────
+type TopStudentEntry = {
+    id: string; name: string; group: string;
+    attendanceDays: number; totalSessionDays: number; attendanceRate: number;
+    excellent: number; goodPlus: number; good: number;
+    acceptable: number; weak: number; notMem: number;
+    evalScore: number; totalEvals: number; avgEvalScore: number; bestEval: string;
+};
+
+function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs }: {
+    stats: { all: TopStudentEntry[]; weekLabel: string; weekStart: Date; weekEnd: Date };
+    groupFilter: string;
+    setGroupFilter: (g: string) => void;
+    sheikhs: GroupSheikhInfo[];
+}) {
+    const filtered = groupFilter === 'all' ? stats.all : stats.all.filter(s => s.group === groupFilter);
+
+    // Only consider students who had sessions this week
+    const active = filtered.filter(s => s.totalSessionDays > 0);
+
+    // Top performers
+    const topAttendance = [...active].filter(s => s.attendanceRate > 0).sort((a, b) => b.attendanceRate - a.attendanceRate || b.attendanceDays - a.attendanceDays);
+    const topExcellent = [...active].filter(s => s.excellent > 0).sort((a, b) => b.excellent - a.excellent || b.evalScore - a.evalScore);
+    const topEvalScore = [...active].filter(s => s.totalEvals > 0).sort((a, b) => b.avgEvalScore - a.avgEvalScore || b.excellent - a.excellent);
+
+    // Overall ranking (combined score: 50% attendance + 50% eval)
+    const overallRanked = [...active]
+        .filter(s => s.totalEvals > 0 || s.attendanceDays > 0)
+        .map(s => ({
+            ...s,
+            overallScore: Math.round((s.attendanceRate * 0.5) + ((s.avgEvalScore / 6) * 100 * 0.5)),
+        }))
+        .sort((a, b) => b.overallScore - a.overallScore);
+
+    // Group champions: best student per group
+    const groupChampions = sheikhs.map(sh => {
+        const groupStudents = stats.all.filter(s => s.group === sh.group && s.totalSessionDays > 0 && (s.totalEvals > 0 || s.attendanceDays > 0));
+        if (!groupStudents.length) return { group: sh.group, displayName: sh.displayName, champion: null };
+        const best = groupStudents.sort((a, b) => {
+            const scoreA = (a.attendanceRate * 0.5) + ((a.avgEvalScore / 6) * 100 * 0.5);
+            const scoreB = (b.attendanceRate * 0.5) + ((b.avgEvalScore / 6) * 100 * 0.5);
+            return scoreB - scoreA;
+        })[0];
+        return { group: sh.group, displayName: sh.displayName, champion: best };
+    });
+
+    // Eval distribution for pie chart
+    const evalDistribution = [
+        { name: 'ممتاز', value: active.reduce((s, st) => s + st.excellent, 0), color: '#10b981' },
+        { name: 'جيد جداً', value: active.reduce((s, st) => s + st.goodPlus, 0), color: '#22c55e' },
+        { name: 'جيد', value: active.reduce((s, st) => s + st.good, 0), color: '#3b82f6' },
+        { name: 'مقبول', value: active.reduce((s, st) => s + st.acceptable, 0), color: '#f59e0b' },
+        { name: 'ضعيف', value: active.reduce((s, st) => s + st.weak, 0), color: '#ef4444' },
+        { name: 'لم يحفظ', value: active.reduce((s, st) => s + st.notMem, 0), color: '#94a3b8' },
+    ].filter(e => e.value > 0);
+
+    // Bar chart data: top 8 students by overall score
+    const barData = overallRanked.slice(0, 8).map(s => ({
+        name: s.name.split(' ').slice(0, 2).join(' '),
+        score: s.overallScore,
+        attendance: s.attendanceRate,
+        eval: Math.round((s.avgEvalScore / 6) * 100),
+    }));
+
+    const EVAL_BADGE: Record<string, { bg: string; text: string }> = {
+        'ممتاز': { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+        'جيد جداً': { bg: 'bg-green-100', text: 'text-green-700' },
+        'جيد': { bg: 'bg-blue-100', text: 'text-blue-700' },
+        'مقبول': { bg: 'bg-amber-100', text: 'text-amber-700' },
+        'ضعيف': { bg: 'bg-rose-100', text: 'text-rose-700' },
+        'لم يحفظ': { bg: 'bg-gray-100', text: 'text-gray-500' },
+        '—': { bg: 'bg-gray-50', text: 'text-gray-400' },
+    };
+
+    const medalEmoji = (rank: number) => rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `${rank + 1}`;
+
+    if (active.length === 0) {
+        return (
+            <div className="text-center py-20 text-muted-foreground space-y-3">
+                <Sparkles className="h-12 w-12 text-amber-300 mx-auto animate-pulse" />
+                <div className="font-bold text-lg">لا توجد بيانات لهذا الأسبوع</div>
+                <p className="text-sm">جرّب التنقل إلى أسبوع آخر يحتوي على حصص مسجلة</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-5">
+
+            {/* ── Group filter ── */}
+            <div className="flex items-center gap-2 bg-card border rounded-xl px-3 py-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <select
+                    aria-label="تصفية حسب الفوج"
+                    value={groupFilter}
+                    onChange={e => setGroupFilter(e.target.value)}
+                    className="text-xs border rounded-lg px-3 py-1.5 bg-background font-bold"
+                    dir="rtl"
+                >
+                    <option value="all">🏫 جميع الأفواج</option>
+                    {sheikhs.map(sh => <option key={sh.group} value={sh.group}>{sh.group} — {sh.displayName}</option>)}
+                </select>
+                <span className="text-[10px] text-muted-foreground mr-auto">{active.length} طالب نشط</span>
+            </div>
+
+            {/* ── Hero Cards (top 3 categories) ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* 🏆 Champion of Attendance */}
+                <div className="relative overflow-hidden rounded-2xl border-2 border-amber-200 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-4 shadow-lg shadow-amber-100/50 group hover:scale-[1.02] transition-all duration-300">
+                    <div className="absolute top-2 left-2 text-4xl opacity-10 group-hover:opacity-20 transition-opacity">🏆</div>
+                    <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-xl bg-amber-100 border border-amber-200">
+                            <Trophy className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                            <div className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">بطل الحضور</div>
+                            <div className="text-[9px] text-muted-foreground">أعلى نسبة حضور</div>
+                        </div>
+                    </div>
+                    {topAttendance[0] ? (
+                        <div className="space-y-1">
+                            <div className="font-black text-base text-amber-900 leading-tight truncate">{topAttendance[0].name}</div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs bg-amber-200/60 text-amber-800 px-2 py-0.5 rounded-lg font-bold">{topAttendance[0].attendanceRate}%</span>
+                                <span className="text-[10px] text-muted-foreground">{topAttendance[0].attendanceDays}/{topAttendance[0].totalSessionDays} أيام</span>
+                            </div>
+                            <div className="text-[10px] text-amber-700/60">{topAttendance[0].group}</div>
+                        </div>
+                    ) : <div className="text-xs text-muted-foreground">لا بيانات</div>}
+                </div>
+
+                {/* ⭐ Champion of Memorization */}
+                <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 p-4 shadow-lg shadow-emerald-100/50 group hover:scale-[1.02] transition-all duration-300">
+                    <div className="absolute top-2 left-2 text-4xl opacity-10 group-hover:opacity-20 transition-opacity">⭐</div>
+                    <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-xl bg-emerald-100 border border-emerald-200">
+                            <Star className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        <div>
+                            <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">بطل الحفظ</div>
+                            <div className="text-[9px] text-muted-foreground">أكثر تقييم ممتاز</div>
+                        </div>
+                    </div>
+                    {topExcellent[0] ? (
+                        <div className="space-y-1">
+                            <div className="font-black text-base text-emerald-900 leading-tight truncate">{topExcellent[0].name}</div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs bg-emerald-200/60 text-emerald-800 px-2 py-0.5 rounded-lg font-bold">{topExcellent[0].excellent} ممتاز</span>
+                                {topExcellent[0].goodPlus > 0 && <span className="text-[10px] text-green-600">+{topExcellent[0].goodPlus} ج.جداً</span>}
+                            </div>
+                            <div className="text-[10px] text-emerald-700/60">{topExcellent[0].group}</div>
+                        </div>
+                    ) : <div className="text-xs text-muted-foreground">لا بيانات</div>}
+                </div>
+
+                {/* 🎯 Top Overall */}
+                <div className="relative overflow-hidden rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 via-violet-50 to-indigo-50 p-4 shadow-lg shadow-purple-100/50 group hover:scale-[1.02] transition-all duration-300">
+                    <div className="absolute top-2 left-2 text-4xl opacity-10 group-hover:opacity-20 transition-opacity">🎯</div>
+                    <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-xl bg-purple-100 border border-purple-200">
+                            <Crown className="h-5 w-5 text-purple-600" />
+                        </div>
+                        <div>
+                            <div className="text-[10px] text-purple-600 font-bold uppercase tracking-wider">المتفوق الشامل</div>
+                            <div className="text-[9px] text-muted-foreground">أعلى نقاط (حضور + حفظ)</div>
+                        </div>
+                    </div>
+                    {overallRanked[0] ? (
+                        <div className="space-y-1">
+                            <div className="font-black text-base text-purple-900 leading-tight truncate">{overallRanked[0].name}</div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs bg-purple-200/60 text-purple-800 px-2 py-0.5 rounded-lg font-bold">{overallRanked[0].overallScore} نقطة</span>
+                                <span className="text-[10px] text-muted-foreground">{overallRanked[0].attendanceRate}% حضور</span>
+                            </div>
+                            <div className="text-[10px] text-purple-700/60">{overallRanked[0].group}</div>
+                        </div>
+                    ) : <div className="text-xs text-muted-foreground">لا بيانات</div>}
+                </div>
+            </div>
+
+            {/* ── Charts Row ── */}
+            <div className="grid md:grid-cols-2 gap-4 print:hidden">
+                {/* Bar chart: Top 8 overall */}
+                <div className="border rounded-xl p-4 bg-white shadow-sm">
+                    <h3 className="text-sm font-bold mb-3 text-center flex items-center justify-center gap-2">
+                        <Flame className="h-4 w-4 text-orange-500" />
+                        أفضل 8 طلاب — النقاط الإجمالية
+                    </h3>
+                    <div className="h-56 w-full">
+                        {barData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={barData} margin={{ top: 15, right: 0, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0} angle={-30} textAnchor="end" />
+                                    <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} />
+                                    <RechartsTooltip
+                                        formatter={(value: number, name: string) => [`${value}%`, name === 'attendance' ? 'حضور' : name === 'eval' ? 'تقييم' : 'إجمالي']}
+                                        contentStyle={{ direction: 'rtl', borderRadius: '12px', fontSize: '11px' }}
+                                    />
+                                    <Bar dataKey="score" name="إجمالي" fill="#8b5cf6" radius={[6, 6, 0, 0]} barSize={24}>
+                                        {barData.map((_, i) => (
+                                            <Cell key={i} fill={i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#cd7f32' : '#8b5cf6'} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-muted-foreground text-xs">لا بيانات كافية</div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Pie chart: Eval distribution */}
+                <div className="border rounded-xl p-4 bg-white shadow-sm">
+                    <h3 className="text-sm font-bold mb-3 text-center flex items-center justify-center gap-2">
+                        <Target className="h-4 w-4 text-blue-500" />
+                        توزيع التقييمات — {groupFilter === 'all' ? 'كل الأفواج' : groupFilter}
+                    </h3>
+                    <div className="h-56 w-full">
+                        {evalDistribution.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={evalDistribution}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        cx="50%"
+                                        cy="50%"
+                                        outerRadius={75}
+                                        label={({ name, value }) => `${name} (${value})`}
+                                    >
+                                        {evalDistribution.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <RechartsTooltip
+                                        formatter={(value: number, name: string) => [value, name]}
+                                        contentStyle={{ direction: 'rtl', borderRadius: '12px', fontSize: '11px' }}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-muted-foreground text-xs">لا تقييمات مسجلة</div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Top 10 Students Ranking Table ── */}
+            <div className="border rounded-2xl overflow-hidden shadow-lg bg-white">
+                <div className="bg-gradient-to-l from-amber-50 via-yellow-50 to-orange-50 border-b p-3 flex items-center justify-between">
+                    <h2 className="text-sm font-black flex items-center gap-2">
+                        <Award className="h-5 w-5 text-amber-500" />
+                        ترتيب نجوم الأسبوع
+                    </h2>
+                    <span className="text-[10px] text-muted-foreground bg-white/70 px-2 py-0.5 rounded-full border">{groupFilter === 'all' ? 'كل الأفواج' : groupFilter}</span>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-xs">
+                        <thead>
+                            <tr className="bg-slate-50 border-b text-[10px]">
+                                <th className="sticky right-0 z-20 bg-slate-50 p-2 border-l text-right min-w-[40px] font-bold">#</th>
+                                <th className="p-2 border-l text-right min-w-[130px] font-bold">الطالب</th>
+                                <th className="p-2 border-l text-center min-w-[70px] font-bold">الفوج</th>
+                                <th className="p-2 border-l text-center min-w-[55px] font-bold text-amber-700">حضور%</th>
+                                <th className="p-2 border-l text-center min-w-[45px] font-bold text-emerald-700">ممتاز</th>
+                                <th className="p-2 border-l text-center min-w-[45px] font-bold text-green-600">ج.جداً</th>
+                                <th className="p-2 border-l text-center min-w-[40px] font-bold text-blue-600">جيد</th>
+                                <th className="p-2 border-l text-center min-w-[40px] font-bold text-orange-600">مقبول</th>
+                                <th className="p-2 border-l text-center min-w-[40px] font-bold text-rose-600">ضعيف</th>
+                                <th className="p-2 border-l text-center min-w-[55px] font-bold">أفضل تقييم</th>
+                                <th className="p-2 text-center min-w-[55px] font-bold text-purple-700">النقاط</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {overallRanked.slice(0, 10).map((s, idx) => {
+                                const badge = EVAL_BADGE[s.bestEval] || EVAL_BADGE['—'];
+                                return (
+                                    <tr key={s.id} className={cn(
+                                        "border-b hover:bg-amber-50/30 transition-colors",
+                                        idx === 0 ? "bg-amber-50/40" : idx === 1 ? "bg-slate-50/40" : idx === 2 ? "bg-orange-50/30" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/20"
+                                    )}>
+                                        <td className={cn("sticky right-0 z-10 p-2 border-l text-center font-black text-sm",
+                                            idx === 0 ? "bg-amber-50/40" : idx === 1 ? "bg-slate-50/40" : idx === 2 ? "bg-orange-50/30" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/20"
+                                        )}>
+                                            {medalEmoji(idx)}
+                                        </td>
+                                        <td className="p-2 border-l">
+                                            <div className="font-bold text-[11px] leading-tight">{s.name}</div>
+                                        </td>
+                                        <td className="p-2 border-l text-center">
+                                            <span className="text-[10px] bg-muted/40 px-1.5 py-0.5 rounded-md font-medium">{s.group}</span>
+                                        </td>
+                                        <td className="p-2 border-l text-center">
+                                            <span className={cn("font-bold", s.attendanceRate >= 90 ? "text-emerald-700" : s.attendanceRate >= 70 ? "text-amber-600" : "text-rose-600")}>
+                                                {s.attendanceRate}%
+                                            </span>
+                                        </td>
+                                        <td className="p-2 border-l text-center">
+                                            {s.excellent > 0 ? <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">{s.excellent}</span> : <span className="text-muted-foreground/30">—</span>}
+                                        </td>
+                                        <td className="p-2 border-l text-center">
+                                            {s.goodPlus > 0 ? <span className="font-bold text-green-600">{s.goodPlus}</span> : <span className="text-muted-foreground/30">—</span>}
+                                        </td>
+                                        <td className="p-2 border-l text-center">
+                                            {s.good > 0 ? <span className="text-blue-600 font-medium">{s.good}</span> : <span className="text-muted-foreground/30">—</span>}
+                                        </td>
+                                        <td className="p-2 border-l text-center">
+                                            {s.acceptable > 0 ? <span className="text-orange-600">{s.acceptable}</span> : <span className="text-muted-foreground/30">—</span>}
+                                        </td>
+                                        <td className="p-2 border-l text-center">
+                                            {s.weak > 0 ? <span className="text-rose-600">{s.weak}</span> : <span className="text-muted-foreground/30">—</span>}
+                                        </td>
+                                        <td className="p-2 border-l text-center">
+                                            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", badge.bg, badge.text)}>{s.bestEval}</span>
+                                        </td>
+                                        <td className="p-2 text-center">
+                                            <span className="font-black text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg">{s.overallScore}</span>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {overallRanked.length === 0 && (
+                                <tr><td colSpan={11} className="p-8 text-center text-muted-foreground">لا توجد بيانات كافية لهذا الأسبوع</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* ── Group Champions Table ── */}
+            <div className="border rounded-2xl overflow-hidden shadow-lg bg-white">
+                <div className="bg-gradient-to-l from-indigo-50 via-blue-50 to-cyan-50 border-b p-3 flex items-center gap-2">
+                    <Medal className="h-5 w-5 text-indigo-500" />
+                    <h2 className="text-sm font-black">أبطال الأفواج</h2>
+                    <span className="text-[10px] text-muted-foreground mr-auto">أفضل طالب في كل فوج</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+                    {groupChampions.map(gc => (
+                        <div key={gc.group} className={cn(
+                            "rounded-xl border p-3 space-y-1.5 transition-all hover:shadow-md",
+                            gc.champion ? "bg-gradient-to-br from-white to-indigo-50/30 border-indigo-100" : "bg-muted/20 border-dashed"
+                        )}>
+                            <div className="flex items-center justify-between">
+                                <div className="font-bold text-xs text-indigo-700">{gc.group}</div>
+                                <div className="text-[9px] text-muted-foreground truncate max-w-[100px]">{gc.displayName}</div>
+                            </div>
+                            {gc.champion ? (
+                                <>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg">🌟</span>
+                                        <div className="font-bold text-sm leading-tight truncate">{gc.champion.name}</div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-bold">{gc.champion.attendanceRate}% حضور</span>
+                                        {gc.champion.excellent > 0 && <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-bold">{gc.champion.excellent} ممتاز</span>}
+                                        {gc.champion.goodPlus > 0 && <span className="text-[10px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded-md">{gc.champion.goodPlus} ج.جداً</span>}
+                                        <span className={cn(
+                                            "text-[10px] px-1.5 py-0.5 rounded-md font-bold",
+                                            (EVAL_BADGE[gc.champion.bestEval] || EVAL_BADGE['—']).bg,
+                                            (EVAL_BADGE[gc.champion.bestEval] || EVAL_BADGE['—']).text
+                                        )}>
+                                            {gc.champion.bestEval}
+                                        </span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-xs text-muted-foreground py-2 text-center">لا بيانات</div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* ── Attendance Top 5 & Memorization Top 5 side-by-side ── */}
+            <div className="grid md:grid-cols-2 gap-4">
+                {/* Top 5 Attendance */}
+                <div className="border rounded-xl overflow-hidden shadow-sm bg-white">
+                    <div className="bg-gradient-to-l from-amber-50 to-yellow-50 border-b p-2.5 flex items-center gap-2">
+                        <Trophy className="h-4 w-4 text-amber-500" />
+                        <span className="text-xs font-bold">أعلى 5 طلاب حضوراً</span>
+                    </div>
+                    <div className="divide-y">
+                        {topAttendance.slice(0, 5).map((s, i) => (
+                            <div key={s.id} className="flex items-center gap-2 px-3 py-2 hover:bg-amber-50/20 transition-colors">
+                                <span className="font-black text-sm w-6 text-center">{medalEmoji(i)}</span>
+                                <div className="flex-1 min-w-0">
+                                    <div className="font-bold text-[11px] truncate">{s.name}</div>
+                                    <div className="text-[9px] text-muted-foreground">{s.group}</div>
+                                </div>
+                                <div className="text-left">
+                                    <span className={cn("text-xs font-bold px-2 py-0.5 rounded-lg", s.attendanceRate >= 90 ? "bg-emerald-100 text-emerald-700" : s.attendanceRate >= 70 ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700")}>
+                                        {s.attendanceRate}%
+                                    </span>
+                                    <div className="text-[9px] text-muted-foreground text-center mt-0.5">{s.attendanceDays}/{s.totalSessionDays}</div>
+                                </div>
+                            </div>
+                        ))}
+                        {topAttendance.length === 0 && <div className="p-4 text-center text-muted-foreground text-xs">لا بيانات</div>}
+                    </div>
+                </div>
+
+                {/* Top 5 Memorization */}
+                <div className="border rounded-xl overflow-hidden shadow-sm bg-white">
+                    <div className="bg-gradient-to-l from-emerald-50 to-green-50 border-b p-2.5 flex items-center gap-2">
+                        <Star className="h-4 w-4 text-emerald-500" />
+                        <span className="text-xs font-bold">أعلى 5 طلاب حفظاً (ممتاز)</span>
+                    </div>
+                    <div className="divide-y">
+                        {topExcellent.slice(0, 5).map((s, i) => (
+                            <div key={s.id} className="flex items-center gap-2 px-3 py-2 hover:bg-emerald-50/20 transition-colors">
+                                <span className="font-black text-sm w-6 text-center">{medalEmoji(i)}</span>
+                                <div className="flex-1 min-w-0">
+                                    <div className="font-bold text-[11px] truncate">{s.name}</div>
+                                    <div className="text-[9px] text-muted-foreground">{s.group}</div>
+                                </div>
+                                <div className="text-left">
+                                    <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg">{s.excellent} ممتاز</span>
+                                    {s.goodPlus > 0 && <div className="text-[9px] text-green-600 text-center mt-0.5">+{s.goodPlus} ج.جداً</div>}
+                                </div>
+                            </div>
+                        ))}
+                        {topExcellent.length === 0 && <div className="p-4 text-center text-muted-foreground text-xs">لا بيانات</div>}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Note ── */}
+            <p className="text-[10px] text-muted-foreground text-center">
+                * النقاط الإجمالية = 50% نسبة الحضور + 50% نسبة التقييم &nbsp;|&nbsp; التقييم: ممتاز=6 · ج.جداً=5 · جيد=4 · مقبول=3 · ضعيف=2 · لم يحفظ=1
             </p>
         </div>
     );
