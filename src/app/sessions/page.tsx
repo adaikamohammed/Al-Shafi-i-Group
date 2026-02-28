@@ -187,7 +187,8 @@ export default function DailySessionsPage() {
     const groupToMatch = selectedGroupName || user?.group || '';
     if (!groupToMatch) return [];
     // Students may have `group` or `groupName` depending on data source
-    return students.filter(s => s.status === 'نشط' && ((s as any).group === groupToMatch || s.groupName === groupToMatch));
+    return students.filter(s => s.status === 'نشط' && ((s as any).group === groupToMatch || s.groupName === groupToMatch))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
   }, [students, selectedGroupName, user?.group]);
 
   const activeStudentsForWeeklyOutcome = useMemo(() => {

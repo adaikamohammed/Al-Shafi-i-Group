@@ -58,6 +58,11 @@ export const Admin5MessagesPanel = ({
     weekDates,
     weeklyOutcomes,
 }: Admin5MessagesPanelProps) => {
+    // Sort students alphabetically (Arabic)
+    const sortedStudents = useMemo(() =>
+        [...students].sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')),
+        [students]
+    );
     // Days in the week that have registered sessions
     const availableDays = useMemo(() => {
         if (!dailySessions || !weekDates) return [];
@@ -132,7 +137,7 @@ export const Admin5MessagesPanel = ({
         const isTasmieCompletion = tasmieToVerse === tasmieSurah?.verses;
 
         // Build recited list (present + has memorization)
-        const presentStudents = students.filter(s => {
+        const presentStudents = sortedStudents.filter(s => {
             const rec = getStudentRecord(s.id);
             return rec && (rec.attendance === 'حاضر' || rec.attendance === 'متأخر');
         });
@@ -142,12 +147,12 @@ export const Admin5MessagesPanel = ({
             return rec?.memorization && rec.memorization !== 'لا يوجد';
         });
 
-        const lateStudents = students.filter(s => {
+        const lateStudents = sortedStudents.filter(s => {
             const rec = getStudentRecord(s.id);
             return rec?.attendance === 'متأخر';
         });
 
-        const absentStudents = students.filter(s => {
+        const absentStudents = sortedStudents.filter(s => {
             const rec = getStudentRecord(s.id);
             return rec?.attendance === 'غياب' || rec?.attendance === 'غائب';
         });
@@ -185,7 +190,7 @@ export const Admin5MessagesPanel = ({
 
         // Catch-up wirds
         const catchUpGroups: Record<string, string[]> = {};
-        students.forEach(s => {
+        sortedStudents.forEach(s => {
             const rec = getStudentRecord(s.id);
             if (rec?.catchUpRecords && rec.catchUpRecords.length > 0) {
                 rec.catchUpRecords.forEach((c: any) => {
@@ -227,7 +232,7 @@ export const Admin5MessagesPanel = ({
         const studentEvaluationsCount = Object.keys(weeklyOutcomes).filter(k => k.endsWith(`_${weekStartStr}`)).length;
         if (studentEvaluationsCount === 0) return ''; // No evaluations yet
 
-        students.forEach(student => {
+        sortedStudents.forEach(student => {
             const outcomeId = `${student.id}_${weekStartStr}`;
             const outcome = weeklyOutcomes[outcomeId];
             if (outcome && outcome.evaluation && evaluatedGroups[outcome.evaluation]) {
@@ -287,7 +292,7 @@ export const Admin5MessagesPanel = ({
                     const dayName = format(parse(session.date, 'yyyy-MM-dd', new Date()), 'EEEE', { locale: ar });
                     const wirdKey = `${dayName} (سورة ${surahName} ${pad(tFrom)}-${pad(tTo)})`;
 
-                    students.forEach(student => {
+                    sortedStudents.forEach(student => {
                         const records: any[] = session.records || [];
                         const rec = records.find(r => r.studentId === student.id);
 

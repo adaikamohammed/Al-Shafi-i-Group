@@ -157,6 +157,7 @@ export default function SheikhMonitoringPage() {
     const [sortStat, setSortStat] = useState<'group' | 'att' | 'commit' | 'excellent'>('group');
     const [sortDir, setSortDir] = useState<1 | -1>(1);
     const [topStudentsGroupFilter, setTopStudentsGroupFilter] = useState<string>('all');
+    const [starsMode, setStarsMode] = useState<'week' | 'month'>('week');
     const [selectedStudentProfile, setSelectedStudentProfile] = useState<{ id: string; name: string; group: string } | null>(null);
 
     // ── Sheikhs ────────────────────────────────────────────────────────────
@@ -442,6 +443,9 @@ export default function SheikhMonitoringPage() {
             excellent: number; goodPlus: number; good: number;
             acceptable: number; weak: number; notMem: number;
             evalScore: number; totalEvals: number;
+            lateDays: number;
+            behaviorCalm: number; behaviorOk: number; behaviorBad: number;
+            behaviorScore: number; totalBehaviorEvals: number;
         };
         const studentMap = new Map<string, StudentStat>();
         (students || []).filter(s => s.status === 'نشط').forEach(s => {
@@ -452,6 +456,9 @@ export default function SheikhMonitoringPage() {
                 excellent: 0, goodPlus: 0, good: 0,
                 acceptable: 0, weak: 0, notMem: 0,
                 evalScore: 0, totalEvals: 0,
+                lateDays: 0,
+                behaviorCalm: 0, behaviorOk: 0, behaviorBad: 0,
+                behaviorScore: 0, totalBehaviorEvals: 0,
             });
         });
 
@@ -496,15 +503,25 @@ export default function SheikhMonitoringPage() {
                         if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') {
                             st.attendanceDays++;
                         }
+                        if (r.attendance === 'متأخر') {
+                            st.lateDays++;
+                        }
+                        // Behavior eval
+                        if (r.behavior) {
+                            st.totalBehaviorEvals++;
+                            if (r.behavior === 'هادئ') { st.behaviorCalm++; st.behaviorScore += 2; }
+                            else if (r.behavior === 'مقبول') { st.behaviorOk++; st.behaviorScore += 1; }
+                            else if (r.behavior === 'مشاغب' || r.behavior === 'غير منضبط') { st.behaviorBad++; st.behaviorScore += -1; }
+                        }
                         // Memorization eval (not review)
                         if (!r.review && r.memorization) {
                             st.totalEvals++;
-                            if (r.memorization === 'ممتاز') { st.excellent++; st.evalScore += 6; }
-                            else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') { st.goodPlus++; st.evalScore += 5; }
-                            else if (r.memorization === 'جيد') { st.good++; st.evalScore += 4; }
-                            else if (r.memorization === 'مقبول' || r.memorization === 'حسن') { st.acceptable++; st.evalScore += 3; }
-                            else if (r.memorization === 'ضعيف' || r.memorization === 'متوسط') { st.weak++; st.evalScore += 2; }
-                            else if (r.memorization === 'لم يحفظ') { st.notMem++; st.evalScore += 1; }
+                            if (r.memorization === 'ممتاز') { st.excellent++; st.evalScore += 5; }
+                            else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') { st.goodPlus++; st.evalScore += 6; }
+                            else if (r.memorization === 'جيد') { st.good++; st.evalScore += 3; }
+                            else if (r.memorization === 'مقبول' || r.memorization === 'حسن') { st.acceptable++; st.evalScore += 2; }
+                            else if (r.memorization === 'ضعيف' || r.memorization === 'متوسط') { st.weak++; st.evalScore += 1; }
+                            else if (r.memorization === 'لم يحفظ') { st.notMem++; st.evalScore += 0; }
                         }
                     });
                 });
@@ -517,12 +534,25 @@ export default function SheikhMonitoringPage() {
         });
 
         // Compute and return all students
-        const all = Array.from(studentMap.values()).map(st => ({
-            ...st,
-            attendanceRate: st.totalSessionDays > 0 ? Math.round((st.attendanceDays / st.totalSessionDays) * 100) : 0,
-            avgEvalScore: st.totalEvals > 0 ? Math.round((st.evalScore / st.totalEvals) * 100) / 100 : 0,
-            bestEval: st.excellent > 0 ? 'ممتاز' : st.goodPlus > 0 ? 'جيد جداً' : st.good > 0 ? 'جيد' : st.acceptable > 0 ? 'مقبول' : st.weak > 0 ? 'ضعيف' : st.notMem > 0 ? 'لم يحفظ' : '—',
-        }));
+        const all = Array.from(studentMap.values()).map(st => {
+            const attendanceRate = st.totalSessionDays > 0 ? Math.round((st.attendanceDays / st.totalSessionDays) * 100) : 0;
+            const avgEvalScore = st.totalEvals > 0 ? Math.round((st.evalScore / st.totalEvals) * 100) / 100 : 0;
+            const avgBehaviorScore = st.totalBehaviorEvals > 0 ? Math.round((st.behaviorScore / st.totalBehaviorEvals) * 100) / 100 : 0;
+            // Scoring: attendance 40 + eval 40 + behavior×5 - late×2
+            const attPoints = st.totalSessionDays > 0 ? (st.attendanceDays / st.totalSessionDays) * 40 : 0;
+            const evalPoints = st.totalEvals > 0 ? (avgEvalScore / 6) * 40 : 0;
+            const behPoints = avgBehaviorScore * 5;
+            const latePenalty = st.lateDays * 2;
+            const overallScore = Math.max(0, Math.round(attPoints + evalPoints + behPoints - latePenalty));
+            return {
+                ...st,
+                attendanceRate,
+                avgEvalScore,
+                avgBehaviorScore,
+                overallScore,
+                bestEval: st.excellent > 0 ? 'ممتاز' : st.goodPlus > 0 ? 'جيد جداً' : st.good > 0 ? 'جيد' : st.acceptable > 0 ? 'مقبول' : st.weak > 0 ? 'ضعيف' : st.notMem > 0 ? 'لم يحفظ' : '—',
+            };
+        });
 
         // Week label
         const weekLabel = `سبت ${format(wSat, 'd MMM', { locale: ar })} — جمعة ${format(addDays(wSat, 6), 'd MMM yyyy', { locale: ar })}`;
@@ -541,7 +571,10 @@ export default function SheikhMonitoringPage() {
             if (studentPeriod === 'day') setStudentSelectedDate(d => addDays(d, dir));
             else if (studentPeriod === 'week') setStudentSelectedDate(d => addDays(d, dir * 7));
             else setStudentSelectedDate(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
-        } else if (view === 'topStudents' || view === 'earlyWarning') setSelectedDate(d => addDays(d, dir * 7));
+        } else if (view === 'topStudents' || view === 'earlyWarning') {
+            if (view === 'topStudents' && starsMode === 'month') setSelectedDate(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
+            else setSelectedDate(d => addDays(d, dir * 7));
+        }
         else if (view === 'day') setSelectedDate(d => addDays(d, dir));
         else if (view === 'week') setSelectedDate(d => addDays(d, dir * 7));
         else if (view === 'month' || view === 'calendar') setSelectedDate(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
@@ -556,7 +589,7 @@ export default function SheikhMonitoringPage() {
             : view === 'earlyWarning'
                 ? `آخر أسبوعين حتى ${format(selectedDate, 'd MMMM yyyy', { locale: ar })}`
                 : view === 'topStudents'
-                    ? weeklyStudentStats.weekLabel
+                    ? (starsMode === 'month' ? format(selectedDate, 'MMMM yyyy', { locale: ar }) : weeklyStudentStats.weekLabel)
                     : view === 'students'
                         ? (studentPeriod === 'day'
                             ? format(studentSelectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
@@ -702,6 +735,11 @@ export default function SheikhMonitoringPage() {
                         groupFilter={topStudentsGroupFilter}
                         setGroupFilter={setTopStudentsGroupFilter}
                         sheikhs={sheikhs}
+                        starsMode={starsMode}
+                        setStarsMode={setStarsMode}
+                        selectedDate={selectedDate}
+                        dailySessions={dailySessions}
+                        students={students}
                     />
                 )}
                 {view === 'earlyWarning' && (
@@ -3022,43 +3060,127 @@ type TopStudentEntry = {
     excellent: number; goodPlus: number; good: number;
     acceptable: number; weak: number; notMem: number;
     evalScore: number; totalEvals: number; avgEvalScore: number; bestEval: string;
+    lateDays: number;
+    behaviorCalm: number; behaviorOk: number; behaviorBad: number;
+    behaviorScore: number; totalBehaviorEvals: number; avgBehaviorScore: number;
+    overallScore: number;
 };
 
-function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs }: {
+function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMode, setStarsMode, selectedDate, dailySessions, students }: {
     stats: { all: TopStudentEntry[]; weekLabel: string; weekStart: Date; weekEnd: Date };
     groupFilter: string;
     setGroupFilter: (g: string) => void;
     sheikhs: GroupSheikhInfo[];
+    starsMode: 'week' | 'month';
+    setStarsMode: (m: 'week' | 'month') => void;
+    selectedDate: Date;
+    dailySessions: any;
+    students: any;
 }) {
-    const filtered = groupFilter === 'all' ? stats.all : stats.all.filter(s => s.group === groupFilter);
+    // Monthly stats computation
+    const monthlyData = useMemo(() => {
+        if (starsMode !== 'month') return null;
+        const mStart = startOfMonth(selectedDate);
+        const mEnd = endOfMonth(selectedDate);
+        const monthDays = eachDayOfInterval({ start: mStart, end: mEnd }).map(d => format(d, 'yyyy-MM-dd'));
 
-    // Only consider students who had sessions this week
+        const groupSessionDates = new Map<string, Set<string>>();
+        sheikhs.forEach(sh => groupSessionDates.set(sh.group, new Set()));
+
+        type MStat = TopStudentEntry & {};
+        const studentMap = new Map<string, any>();
+        (students || []).filter((s: any) => s.status === 'نشط').forEach((s: any) => {
+            const grp = (s as any).group || s.groupName || '—';
+            studentMap.set(s.id, {
+                id: s.id, name: s.fullName, group: grp,
+                attendanceDays: 0, totalSessionDays: 0, excellent: 0, goodPlus: 0, good: 0,
+                acceptable: 0, weak: 0, notMem: 0, evalScore: 0, totalEvals: 0,
+                lateDays: 0, behaviorCalm: 0, behaviorOk: 0, behaviorBad: 0,
+                behaviorScore: 0, totalBehaviorEvals: 0,
+            });
+        });
+        const groupStudentIds = new Map<string, Set<string>>();
+        sheikhs.forEach(sh => groupStudentIds.set(sh.group, new Set()));
+        (students || []).filter((s: any) => s.status === 'نشط').forEach((s: any) => {
+            const grp = (s as any).group || s.groupName || '';
+            groupStudentIds.get(grp)?.add(s.id);
+        });
+        const groupDateProcessed = new Map<string, Set<string>>();
+        sheikhs.forEach(sh => groupDateProcessed.set(sh.group, new Set()));
+
+        if (dailySessions) {
+            monthDays.forEach(dateStr => {
+                const daySess = (dailySessions as any)[dateStr];
+                if (!daySess) return;
+                Object.values(daySess as Record<string, any>).forEach((session: any) => {
+                    if (!session) return;
+                    const sType = session.sessionType;
+                    const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
+                    if (!isReal) return;
+                    const shOwner = sheikhs.find(sh => sh.uids.has(session.ownerId));
+                    if (!shOwner) return;
+                    if (groupDateProcessed.get(shOwner.group)?.has(dateStr)) return;
+                    groupDateProcessed.get(shOwner.group)?.add(dateStr);
+                    groupSessionDates.get(shOwner.group)?.add(dateStr);
+                    const records: any[] = Array.isArray(session.records) ? session.records : session.records ? Object.values(session.records) : [];
+                    records.forEach((r: any) => {
+                        const sid = r.studentId;
+                        if (!sid || !studentMap.has(sid)) return;
+                        const st = studentMap.get(sid)!;
+                        if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') st.attendanceDays++;
+                        if (r.attendance === 'متأخر') st.lateDays++;
+                        if (r.behavior) {
+                            st.totalBehaviorEvals++;
+                            if (r.behavior === 'هادئ') { st.behaviorCalm++; st.behaviorScore += 2; }
+                            else if (r.behavior === 'مقبول') { st.behaviorOk++; st.behaviorScore += 1; }
+                            else { st.behaviorBad++; st.behaviorScore += -1; }
+                        }
+                        if (!r.review && r.memorization) {
+                            st.totalEvals++;
+                            if (r.memorization === 'ممتاز') { st.excellent++; st.evalScore += 5; }
+                            else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') { st.goodPlus++; st.evalScore += 6; }
+                            else if (r.memorization === 'جيد') { st.good++; st.evalScore += 3; }
+                            else if (r.memorization === 'مقبول' || r.memorization === 'حسن') { st.acceptable++; st.evalScore += 2; }
+                            else if (r.memorization === 'ضعيف' || r.memorization === 'متوسط') { st.weak++; st.evalScore += 1; }
+                            else if (r.memorization === 'لم يحفظ') { st.notMem++; st.evalScore += 0; }
+                        }
+                    });
+                });
+            });
+        }
+        studentMap.forEach(st => { st.totalSessionDays = groupSessionDates.get(st.group)?.size || 0; });
+        const all: TopStudentEntry[] = Array.from(studentMap.values()).map((st: any) => {
+            const attendanceRate = st.totalSessionDays > 0 ? Math.round((st.attendanceDays / st.totalSessionDays) * 100) : 0;
+            const avgEvalScore = st.totalEvals > 0 ? Math.round((st.evalScore / st.totalEvals) * 100) / 100 : 0;
+            const avgBehaviorScore = st.totalBehaviorEvals > 0 ? Math.round((st.behaviorScore / st.totalBehaviorEvals) * 100) / 100 : 0;
+            const attPts = st.totalSessionDays > 0 ? (st.attendanceDays / st.totalSessionDays) * 40 : 0;
+            const evalPts = st.totalEvals > 0 ? (avgEvalScore / 6) * 40 : 0;
+            const behPts = avgBehaviorScore * 5;
+            const latePenalty = st.lateDays * 2;
+            return { ...st, attendanceRate, avgEvalScore, avgBehaviorScore, overallScore: Math.max(0, Math.round(attPts + evalPts + behPts - latePenalty)), bestEval: st.excellent > 0 ? 'ممتاز' : st.goodPlus > 0 ? 'جيد جداً' : st.good > 0 ? 'جيد' : st.acceptable > 0 ? 'مقبول' : st.weak > 0 ? 'ضعيف' : st.notMem > 0 ? 'لم يحفظ' : '—' };
+        });
+        return { all, weekLabel: format(selectedDate, 'MMMM yyyy', { locale: ar }), weekStart: mStart, weekEnd: mEnd };
+    }, [starsMode, selectedDate, dailySessions, students, sheikhs]);
+
+    const dataSource = starsMode === 'month' && monthlyData ? monthlyData : stats;
+    const filtered = groupFilter === 'all' ? dataSource.all : dataSource.all.filter(s => s.group === groupFilter);
     const active = filtered.filter(s => s.totalSessionDays > 0);
 
     // Top performers
     const topAttendance = [...active].filter(s => s.attendanceRate > 0).sort((a, b) => b.attendanceRate - a.attendanceRate || b.attendanceDays - a.attendanceDays);
     const topExcellent = [...active].filter(s => s.excellent > 0).sort((a, b) => b.excellent - a.excellent || b.evalScore - a.evalScore);
-    const topEvalScore = [...active].filter(s => s.totalEvals > 0).sort((a, b) => b.avgEvalScore - a.avgEvalScore || b.excellent - a.excellent);
 
-    // Overall ranking (combined score: 50% attendance + 50% eval)
+    // Overall ranking using comprehensive score
     const overallRanked = [...active]
         .filter(s => s.totalEvals > 0 || s.attendanceDays > 0)
-        .map(s => ({
-            ...s,
-            overallScore: Math.round((s.attendanceRate * 0.5) + ((s.avgEvalScore / 6) * 100 * 0.5)),
-        }))
         .sort((a, b) => b.overallScore - a.overallScore);
 
-    // Group champions: best student per group
+    // Group champions: top 3 per group
     const groupChampions = sheikhs.map(sh => {
-        const groupStudents = stats.all.filter(s => s.group === sh.group && s.totalSessionDays > 0 && (s.totalEvals > 0 || s.attendanceDays > 0));
-        if (!groupStudents.length) return { group: sh.group, displayName: sh.displayName, champion: null };
-        const best = groupStudents.sort((a, b) => {
-            const scoreA = (a.attendanceRate * 0.5) + ((a.avgEvalScore / 6) * 100 * 0.5);
-            const scoreB = (b.attendanceRate * 0.5) + ((b.avgEvalScore / 6) * 100 * 0.5);
-            return scoreB - scoreA;
-        })[0];
-        return { group: sh.group, displayName: sh.displayName, champion: best };
+        const groupStudents = [...dataSource.all]
+            .filter(s => s.group === sh.group && s.totalSessionDays > 0 && (s.totalEvals > 0 || s.attendanceDays > 0))
+            .sort((a, b) => b.overallScore - a.overallScore);
+        return { group: sh.group, displayName: sh.displayName, top3: groupStudents.slice(0, 3) };
     });
 
     // Eval distribution for pie chart
@@ -3093,10 +3215,19 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs }: {
 
     if (active.length === 0) {
         return (
-            <div className="text-center py-20 text-muted-foreground space-y-3">
-                <Sparkles className="h-12 w-12 text-amber-300 mx-auto animate-pulse" />
-                <div className="font-bold text-lg">لا توجد بيانات لهذا الأسبوع</div>
-                <p className="text-sm">جرّب التنقل إلى أسبوع آخر يحتوي على حصص مسجلة</p>
+            <div className="space-y-3">
+                <div className="flex items-center gap-1 bg-card border rounded-xl px-3 py-2">
+                    {(['week', 'month'] as const).map(m => (
+                        <button key={m} onClick={() => setStarsMode(m)} className={cn("px-3 py-1.5 rounded-lg text-xs font-bold transition-all", starsMode === m ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-muted")}>
+                            {m === 'week' ? '📆 الأسبوع' : '🗓 الشهر'}
+                        </button>
+                    ))}
+                </div>
+                <div className="text-center py-20 text-muted-foreground space-y-3">
+                    <Sparkles className="h-12 w-12 text-amber-300 mx-auto animate-pulse" />
+                    <div className="font-bold text-lg">لا توجد بيانات {starsMode === 'month' ? 'لهذا الشهر' : 'لهذا الأسبوع'}</div>
+                    <p className="text-sm">جرّب التنقل إلى {starsMode === 'month' ? 'شهر' : 'أسبوع'} آخر يحتوي على حصص مسجلة</p>
+                </div>
             </div>
         );
     }
@@ -3104,8 +3235,15 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs }: {
     return (
         <div className="space-y-5">
 
-            {/* ── Group filter ── */}
-            <div className="flex items-center gap-2 bg-card border rounded-xl px-3 py-2">
+            {/* ── Mode toggle + Group filter ── */}
+            <div className="flex flex-wrap items-center gap-2 bg-card border rounded-xl px-3 py-2">
+                <div className="flex items-center gap-1 border-l pl-3 ml-1">
+                    {(['week', 'month'] as const).map(m => (
+                        <button key={m} onClick={() => setStarsMode(m)} className={cn("px-3 py-1.5 rounded-lg text-xs font-bold transition-all", starsMode === m ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-muted")}>
+                            {m === 'week' ? '📆 الأسبوع' : '🗓 الشهر'}
+                        </button>
+                    ))}
+                </div>
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <select
                     aria-label="تصفية حسب الفوج"
@@ -3263,12 +3401,12 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs }: {
                 </div>
             </div>
 
-            {/* ── Top 10 Students Ranking Table ── */}
+            {/* ── Top Students Ranking Table ── */}
             <div className="border rounded-2xl overflow-hidden shadow-lg bg-white">
                 <div className="bg-gradient-to-l from-amber-50 via-yellow-50 to-orange-50 border-b p-3 flex items-center justify-between">
                     <h2 className="text-sm font-black flex items-center gap-2">
                         <Award className="h-5 w-5 text-amber-500" />
-                        ترتيب نجوم الأسبوع
+                        ترتيب نجوم {starsMode === 'month' ? 'الشهر' : 'الأسبوع'}
                     </h2>
                     <span className="text-[10px] text-muted-foreground bg-white/70 px-2 py-0.5 rounded-full border">{groupFilter === 'all' ? 'كل الأفواج' : groupFilter}</span>
                 </div>
@@ -3280,12 +3418,13 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs }: {
                                 <th className="p-2 border-l text-right min-w-[130px] font-bold">الطالب</th>
                                 <th className="p-2 border-l text-center min-w-[70px] font-bold">الفوج</th>
                                 <th className="p-2 border-l text-center min-w-[55px] font-bold text-amber-700">حضور%</th>
+                                <th className="p-2 border-l text-center min-w-[40px] font-bold text-orange-600">تأخر</th>
                                 <th className="p-2 border-l text-center min-w-[45px] font-bold text-emerald-700">ممتاز</th>
                                 <th className="p-2 border-l text-center min-w-[45px] font-bold text-green-600">ج.جداً</th>
                                 <th className="p-2 border-l text-center min-w-[40px] font-bold text-blue-600">جيد</th>
-                                <th className="p-2 border-l text-center min-w-[40px] font-bold text-orange-600">مقبول</th>
                                 <th className="p-2 border-l text-center min-w-[40px] font-bold text-rose-600">ضعيف</th>
-                                <th className="p-2 border-l text-center min-w-[55px] font-bold">أفضل تقييم</th>
+                                <th className="p-2 border-l text-center min-w-[50px] font-bold text-teal-700">السلوك</th>
+                                <th className="p-2 border-l text-center min-w-[55px] font-bold">متوسط التقييم</th>
                                 <th className="p-2 text-center min-w-[55px] font-bold text-purple-700">النقاط</th>
                             </tr>
                         </thead>
@@ -3314,6 +3453,9 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs }: {
                                             </span>
                                         </td>
                                         <td className="p-2 border-l text-center">
+                                            {s.lateDays > 0 ? <span className="text-orange-600 font-bold">{s.lateDays}</span> : <span className="text-muted-foreground/30">—</span>}
+                                        </td>
+                                        <td className="p-2 border-l text-center">
                                             {s.excellent > 0 ? <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">{s.excellent}</span> : <span className="text-muted-foreground/30">—</span>}
                                         </td>
                                         <td className="p-2 border-l text-center">
@@ -3323,13 +3465,26 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs }: {
                                             {s.good > 0 ? <span className="text-blue-600 font-medium">{s.good}</span> : <span className="text-muted-foreground/30">—</span>}
                                         </td>
                                         <td className="p-2 border-l text-center">
-                                            {s.acceptable > 0 ? <span className="text-orange-600">{s.acceptable}</span> : <span className="text-muted-foreground/30">—</span>}
-                                        </td>
-                                        <td className="p-2 border-l text-center">
                                             {s.weak > 0 ? <span className="text-rose-600">{s.weak}</span> : <span className="text-muted-foreground/30">—</span>}
                                         </td>
                                         <td className="p-2 border-l text-center">
-                                            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", badge.bg, badge.text)}>{s.bestEval}</span>
+                                            {s.totalBehaviorEvals > 0 ? (
+                                                <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded-md",
+                                                    s.behaviorCalm >= s.behaviorOk && s.behaviorCalm >= s.behaviorBad ? "bg-teal-50 text-teal-700" :
+                                                        s.behaviorBad > 0 ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600"
+                                                )}>
+                                                    {s.behaviorCalm > 0 && `${s.behaviorCalm}هـ`}
+                                                    {s.behaviorOk > 0 && ` ${s.behaviorOk}مق`}
+                                                    {s.behaviorBad > 0 && ` ${s.behaviorBad}مش`}
+                                                </span>
+                                            ) : <span className="text-muted-foreground/30">—</span>}
+                                        </td>
+                                        <td className="p-2 border-l text-center">
+                                            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full",
+                                                s.avgEvalScore >= 5 ? "bg-emerald-100 text-emerald-700" :
+                                                    s.avgEvalScore >= 3 ? "bg-blue-100 text-blue-700" :
+                                                        s.avgEvalScore >= 1 ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"
+                                            )}>{s.avgEvalScore.toFixed(1)}</span>
                                         </td>
                                         <td className="p-2 text-center">
                                             <span className="font-black text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg">{s.overallScore}</span>
@@ -3338,7 +3493,7 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs }: {
                                 );
                             })}
                             {overallRanked.length === 0 && (
-                                <tr><td colSpan={11} className="p-8 text-center text-muted-foreground">لا توجد بيانات كافية لهذا الأسبوع</td></tr>
+                                <tr><td colSpan={13} className="p-8 text-center text-muted-foreground">لا توجد بيانات كافية {starsMode === 'month' ? 'لهذا الشهر' : 'لهذا الأسبوع'}</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -3350,42 +3505,110 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs }: {
                 <div className="bg-gradient-to-l from-indigo-50 via-blue-50 to-cyan-50 border-b p-3 flex items-center gap-2">
                     <Medal className="h-5 w-5 text-indigo-500" />
                     <h2 className="text-sm font-black">أبطال الأفواج</h2>
-                    <span className="text-[10px] text-muted-foreground mr-auto">أفضل طالب في كل فوج</span>
+                    <span className="text-[10px] text-muted-foreground mr-auto">أفضل 3 طلاب في كل فوج</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
                     {groupChampions.map(gc => (
                         <div key={gc.group} className={cn(
-                            "rounded-xl border p-3 space-y-1.5 transition-all hover:shadow-md",
-                            gc.champion ? "bg-gradient-to-br from-white to-indigo-50/30 border-indigo-100" : "bg-muted/20 border-dashed"
+                            "rounded-xl border p-3 space-y-2 transition-all hover:shadow-md",
+                            gc.top3.length > 0 ? "bg-gradient-to-br from-white to-indigo-50/30 border-indigo-100" : "bg-muted/20 border-dashed"
                         )}>
                             <div className="flex items-center justify-between">
                                 <div className="font-bold text-xs text-indigo-700">{gc.group}</div>
                                 <div className="text-[9px] text-muted-foreground truncate max-w-[100px]">{gc.displayName}</div>
                             </div>
-                            {gc.champion ? (
-                                <>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-lg">🌟</span>
-                                        <div className="font-bold text-sm leading-tight truncate">{gc.champion.name}</div>
-                                    </div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-bold">{gc.champion.attendanceRate}% حضور</span>
-                                        {gc.champion.excellent > 0 && <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-bold">{gc.champion.excellent} ممتاز</span>}
-                                        {gc.champion.goodPlus > 0 && <span className="text-[10px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded-md">{gc.champion.goodPlus} ج.جداً</span>}
-                                        <span className={cn(
-                                            "text-[10px] px-1.5 py-0.5 rounded-md font-bold",
-                                            (EVAL_BADGE[gc.champion.bestEval] || EVAL_BADGE['—']).bg,
-                                            (EVAL_BADGE[gc.champion.bestEval] || EVAL_BADGE['—']).text
-                                        )}>
-                                            {gc.champion.bestEval}
-                                        </span>
-                                    </div>
-                                </>
+                            {gc.top3.length > 0 ? (
+                                <div className="space-y-1.5">
+                                    {gc.top3.map((ch, i) => (
+                                        <div key={ch.id} className={cn("flex items-start gap-2 rounded-lg p-1.5", i === 0 ? "bg-amber-50/50" : "bg-slate-50/50")}>
+                                            <span className="text-sm font-black mt-0.5">{medalEmoji(i)}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-bold text-[11px] leading-tight truncate">{ch.name}</div>
+                                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                                    <span className="text-[9px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-bold">{ch.attendanceRate}%</span>
+                                                    {ch.excellent > 0 && <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1 py-0.5 rounded">{ch.excellent}ممتاز</span>}
+                                                    {ch.lateDays > 0 && <span className="text-[9px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded">{ch.lateDays}تأخر</span>}
+                                                    {ch.behaviorBad > 0 && <span className="text-[9px] bg-rose-100 text-rose-600 px-1 py-0.5 rounded">{ch.behaviorBad}مش</span>}
+                                                    <span className="text-[9px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded font-black">{ch.overallScore}نقطة</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             ) : (
                                 <div className="text-xs text-muted-foreground py-2 text-center">لا بيانات</div>
                             )}
                         </div>
                     ))}
+                </div>
+            </div>
+
+            {/* ── Per-Group Detailed Breakdown ── */}
+            <div className="border rounded-2xl overflow-hidden shadow-lg bg-white">
+                <div className="bg-gradient-to-l from-violet-50 via-purple-50 to-indigo-50 border-b p-3 flex items-center gap-2">
+                    <Users className="h-5 w-5 text-violet-500" />
+                    <h2 className="text-sm font-black">تفصيل كل فوج</h2>
+                    <span className="text-[10px] text-muted-foreground mr-auto">أفضل 5 طلاب لكل فوج</span>
+                </div>
+                <div className="p-3 space-y-3">
+                    {sheikhs.map(sh => {
+                        const grpStudents = [...dataSource.all]
+                            .filter(s => s.group === sh.group && s.totalSessionDays > 0)
+                            .sort((a, b) => b.overallScore - a.overallScore)
+                            .slice(0, 5);
+                        return (
+                            <div key={sh.group} className="border rounded-xl overflow-hidden">
+                                <div className="bg-gradient-to-l from-slate-100 to-slate-50 px-3 py-2 flex items-center justify-between">
+                                    <span className="text-xs font-black text-slate-700">{sh.group}</span>
+                                    <span className="text-[9px] text-muted-foreground">{sh.displayName}</span>
+                                </div>
+                                {grpStudents.length > 0 ? (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-[10px] border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50/50 border-b">
+                                                    <th className="p-1.5 text-right font-bold min-w-[30px]">#</th>
+                                                    <th className="p-1.5 text-right font-bold min-w-[100px]">الطالب</th>
+                                                    <th className="p-1.5 text-center font-bold">حضور%</th>
+                                                    <th className="p-1.5 text-center font-bold">م.التقييم</th>
+                                                    <th className="p-1.5 text-center font-bold">السلوك</th>
+                                                    <th className="p-1.5 text-center font-bold">تأخر</th>
+                                                    <th className="p-1.5 text-center font-bold text-purple-700">النقاط</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {grpStudents.map((s, i) => (
+                                                    <tr key={s.id} className={cn("border-b", i === 0 ? "bg-amber-50/30" : i % 2 === 0 ? "bg-white" : "bg-slate-50/20")}>
+                                                        <td className="p-1.5 text-center font-black">{medalEmoji(i)}</td>
+                                                        <td className="p-1.5 font-bold truncate max-w-[120px]">{s.name}</td>
+                                                        <td className="p-1.5 text-center">
+                                                            <span className={cn("font-bold", s.attendanceRate >= 90 ? "text-emerald-700" : s.attendanceRate >= 70 ? "text-amber-600" : "text-rose-600")}>{s.attendanceRate}%</span>
+                                                        </td>
+                                                        <td className="p-1.5 text-center">
+                                                            <span className={cn("font-bold", s.avgEvalScore >= 5 ? "text-emerald-700" : s.avgEvalScore >= 3 ? "text-blue-600" : "text-amber-600")}>{s.avgEvalScore.toFixed(1)}</span>
+                                                        </td>
+                                                        <td className="p-1.5 text-center">
+                                                            {s.totalBehaviorEvals > 0 ? (
+                                                                <span className={cn("font-bold", s.avgBehaviorScore >= 1.5 ? "text-teal-700" : s.avgBehaviorScore >= 0 ? "text-amber-600" : "text-rose-600")}>{s.avgBehaviorScore.toFixed(1)}</span>
+                                                            ) : <span className="text-muted-foreground/30">—</span>}
+                                                        </td>
+                                                        <td className="p-1.5 text-center">
+                                                            {s.lateDays > 0 ? <span className="text-orange-600 font-bold">{s.lateDays}</span> : <span className="text-muted-foreground/30">—</span>}
+                                                        </td>
+                                                        <td className="p-1.5 text-center">
+                                                            <span className="font-black text-purple-700">{s.overallScore}</span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="p-3 text-center text-muted-foreground text-xs">لا بيانات</div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -3442,10 +3665,48 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs }: {
                 </div>
             </div>
 
-            {/* ── Note ── */}
-            <p className="text-[10px] text-muted-foreground text-center">
-                * النقاط الإجمالية = 50% نسبة الحضور + 50% نسبة التقييم &nbsp;|&nbsp; التقييم: ممتاز=6 · ج.جداً=5 · جيد=4 · مقبول=3 · ضعيف=2 · لم يحفظ=1
-            </p>
+            {/* ── Scoring Explanation ── */}
+            <div className="border rounded-xl p-4 bg-gradient-to-br from-slate-50 to-white shadow-sm space-y-2">
+                <h3 className="text-xs font-black flex items-center gap-2 text-slate-700">
+                    📊 آلية التنقيط (حد أقصى ≈ 90 نقطة)
+                </h3>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-[10px] border-collapse" dir="rtl">
+                        <thead>
+                            <tr className="border-b bg-slate-100/50">
+                                <th className="p-1.5 text-right font-bold">المعيار</th>
+                                <th className="p-1.5 text-center font-bold">النقاط</th>
+                                <th className="p-1.5 text-right font-bold">التفصيل</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr className="border-b">
+                                <td className="p-1.5 font-bold text-amber-700">🎯 الحضور</td>
+                                <td className="p-1.5 text-center font-black">40</td>
+                                <td className="p-1.5 text-muted-foreground">(أيام الحضور ÷ إجمالي الحصص) × 40 — عادل بين الأفواج (نسبة)</td>
+                            </tr>
+                            <tr className="border-b">
+                                <td className="p-1.5 font-bold text-emerald-700">📖 التقييم</td>
+                                <td className="p-1.5 text-center font-black">40</td>
+                                <td className="p-1.5 text-muted-foreground">ج.جداً=6 · ممتاز=5 · جيد=3 · مقبول=2 · ضعيف=1 · لم يحفظ=0 ← المتوسط÷6×40</td>
+                            </tr>
+                            <tr className="border-b">
+                                <td className="p-1.5 font-bold text-teal-700">🤝 السلوك</td>
+                                <td className="p-1.5 text-center font-black">×5</td>
+                                <td className="p-1.5 text-muted-foreground">هادئ=2 · مقبول=1 · مشاغب=-1 · لم يسجل=0 ← المتوسط × 5</td>
+                            </tr>
+                            <tr className="bg-rose-50/30">
+                                <td className="p-1.5 font-bold text-rose-600">⏰ خصم التأخر</td>
+                                <td className="p-1.5 text-center font-black text-rose-600">-2</td>
+                                <td className="p-1.5 text-muted-foreground">-2 نقطة لكل تأخر — الغياب يكلف أكثر (ينقص من نسبة الحضور + يفقد تقييمات)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p className="text-[9px] text-muted-foreground/70 text-center">
+                    هـ = هادئ &nbsp;|&nbsp; مق = مقبول &nbsp;|&nbsp; مش = مشاغب &nbsp;|&nbsp; الغياب يخصم من نسبة الحضور ويفقد الطالب فرصة التقييم
+                </p>
+            </div>
         </div>
     );
 }
