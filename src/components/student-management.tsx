@@ -17,6 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { useRouter } from 'next/navigation';
 import { Student, StudentStatus } from '@/lib/types';
+import { arabicCompare } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
@@ -139,6 +140,10 @@ export function StudentManagement() {
             const valB = b[sortConfig.key as keyof Student];
             if (valA === undefined || valA === null) return 1;
             if (valB === undefined || valB === null) return -1;
+            if (typeof valA === 'string' && typeof valB === 'string') {
+                const cmp = arabicCompare(valA, valB);
+                return sortConfig.direction === 'ascending' ? cmp : -cmp;
+            }
             if (valA < valB) return sortConfig.direction === 'ascending' ? -1 : 1;
             if (valA > valB) return sortConfig.direction === 'ascending' ? 1 : -1;
             return 0;

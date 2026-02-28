@@ -8,7 +8,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { format, parse, parseISO, subDays, addDays, isSameDay, getDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { cn, arabicCompare } from '@/lib/utils';
 import { AttendanceStatus, PerformanceLevel, BehaviorLevel } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -100,7 +100,7 @@ function RegisterSessionContent() {
             }
             const isGroupMatch = isSuperAdmin ? true : s.groupName === user?.group;
             return s.status === "نشط" && isGroupMatch;
-        }).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')),
+        }).sort((a, b) => arabicCompare(a.fullName, b.fullName)),
         [students, isSuperAdmin, user, effectiveOwnerId]);
 
     // Calculate Past Wirds for Catch-up (Admin5 only)

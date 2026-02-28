@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { InternalNotification } from '@/lib/types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { arabicCompare } from '@/lib/utils';
 
 export default function BroadcastCenterPage() {
     const { user, isSuperAdmin, isManagement } = useAuth();
@@ -51,7 +52,7 @@ export default function BroadcastCenterPage() {
                 u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 u.group.toLowerCase().includes(searchQuery.toLowerCase())
             )
-            .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+            .sort((a, b) => arabicCompare(a.name, b.name));
     }, [allUsers, searchQuery]);
 
     const handleSendBroadcast = async () => {
@@ -220,13 +221,13 @@ export default function BroadcastCenterPage() {
                                             key={sheikh.id}
                                             onClick={() => toggleRecipient(sheikh.id)}
                                             className={`flex items-center gap-4 p-4 cursor-pointer transition-colors ${selectedRecipients.includes(sheikh.id)
-                                                    ? 'bg-indigo-50/50 dark:bg-indigo-900/10'
-                                                    : 'hover:bg-gray-50 dark:hover:bg-gray-800/30'
+                                                ? 'bg-indigo-50/50 dark:bg-indigo-900/10'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-800/30'
                                                 }`}
                                         >
                                             <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${selectedRecipients.includes(sheikh.id)
-                                                    ? 'bg-indigo-600 border-indigo-600'
-                                                    : 'border-gray-300 dark:border-gray-700'
+                                                ? 'bg-indigo-600 border-indigo-600'
+                                                : 'border-gray-300 dark:border-gray-700'
                                                 }`}>
                                                 {selectedRecipients.includes(sheikh.id) && <CheckCircle2 className="h-4 w-4 text-white" />}
                                             </div>

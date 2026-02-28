@@ -17,7 +17,7 @@ import { SearchableSelect, SearchableSelectOption } from '@/components/ui/Search
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import dynamic from 'next/dynamic';
-import { cn } from '@/lib/utils';
+import { cn, arabicCompare } from '@/lib/utils';
 
 const ReportDisplay = dynamic(() => import('@/components/ui/ReportDisplay').then(mod => mod.ReportDisplay), {
     ssr: false,
@@ -43,7 +43,7 @@ export default function StudentReportPage() {
     const [messageTemplate, setMessageTemplate] = useState<MessageTemplate>('report');
     const [messageContent, setMessageContent] = useState('');
 
-    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط').sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
+    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط').sort((a, b) => arabicCompare(a.fullName, b.fullName)), [students]);
     const studentOptions: SearchableSelectOption[] = useMemo(() => activeStudents.map(s => ({ value: s.id, label: s.fullName })), [activeStudents]);
     const selectedStudent = useMemo(() => activeStudents.find(s => s.id === selectedStudentId), [activeStudents, selectedStudentId]);
 

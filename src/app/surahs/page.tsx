@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { surahs as allSurahs } from '@/lib/surahs';
-import { cn } from '@/lib/utils';
+import { cn, arabicCompare } from '@/lib/utils';
 import { Loader2, AlertTriangle, CheckCircle, Award, Check, Layers, Users, X, BookOpen, Trash2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -41,7 +41,7 @@ export default function SurahProgressPage() {
     const [selectedSurahForEvaluation, setSelectedSurahForEvaluation] = useState<number | null>(null);
     const [viewMode, setViewMode] = useState<'student' | 'surah'>('student');
 
-    const studentsToShow = useMemo(() => (students ?? []).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
+    const studentsToShow = useMemo(() => (students ?? []).sort((a, b) => arabicCompare(a.fullName, b.fullName)), [students]);
     const studentOptions: SearchableSelectOption[] = useMemo(() => studentsToShow.map(s => ({ value: s.id, label: s.fullName })), [studentsToShow]);
 
     const selectedStudent = useMemo(() => {

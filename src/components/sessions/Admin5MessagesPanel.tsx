@@ -6,7 +6,7 @@ import { ar } from 'date-fns/locale';
 import { MessageSquare, Trophy, Copy, CheckCircle, RefreshCw, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
+import { cn, arabicCompare } from '@/lib/utils';
 import { surahs } from '@/lib/surahs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -60,7 +60,7 @@ export const Admin5MessagesPanel = ({
 }: Admin5MessagesPanelProps) => {
     // Sort students alphabetically (Arabic)
     const sortedStudents = useMemo(() =>
-        [...students].sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')),
+        [...students].sort((a, b) => arabicCompare(a.fullName, b.fullName)),
         [students]
     );
     // Days in the week that have registered sessions

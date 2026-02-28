@@ -10,7 +10,7 @@ import { Loader2, ArrowLeft, ArrowRight, Calendar, CheckCircle, TrendingUp, User
 import { format, getYear, getDay, startOfYear, addDays, parseISO, getMonth, getDaysInMonth, startOfMonth, endOfMonth, getQuarter, setYear, setMonth, addMonths, subMonths, endOfYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+import { cn, arabicCompare } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
@@ -233,7 +233,7 @@ function StudentHistoryContent() {
         (students || []).find(s => s.id === selectedStudentId)
         , [students, selectedStudentId]);
 
-    const activeStudents = useMemo(() => (students || []).filter(s => s.status === 'نشط').sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')), [students]);
+    const activeStudents = useMemo(() => (students || []).filter(s => s.status === 'نشط').sort((a, b) => arabicCompare(a.fullName, b.fullName)), [students]);
     const studentOptions: SearchableSelectOption[] = useMemo(() => activeStudents.map(s => ({ value: s.id, label: s.fullName })), [activeStudents]);
 
     useEffect(() => {

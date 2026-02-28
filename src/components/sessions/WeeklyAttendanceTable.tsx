@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { format, addDays, startOfDay, isToday as isTodayFn, getDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, arabicCompare } from '@/lib/utils';
 import { Student } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, RotateCcw, Activity } from 'lucide-react';
@@ -190,7 +190,7 @@ export const WeeklyAttendanceTable = ({
     };
 
     const sortedStudents = useMemo(() =>
-        [...students].sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')),
+        [...students].sort((a, b) => arabicCompare(a.fullName, b.fullName)),
         [students]
     );
 

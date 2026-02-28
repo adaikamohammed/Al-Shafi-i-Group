@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getYear, getMonth, format, parse, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
-import { cn } from '@/lib/utils';
+import { cn, arabicCompare } from '@/lib/utils';
 import { surahs } from '@/lib/surahs';
 import { SessionType } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -188,7 +188,7 @@ export default function DailySessionsPage() {
     if (!groupToMatch) return [];
     // Students may have `group` or `groupName` depending on data source
     return students.filter(s => s.status === 'نشط' && ((s as any).group === groupToMatch || s.groupName === groupToMatch))
-      .sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
+      .sort((a, b) => arabicCompare(a.fullName, b.fullName));
   }, [students, selectedGroupName, user?.group]);
 
   const activeStudentsForWeeklyOutcome = useMemo(() => {

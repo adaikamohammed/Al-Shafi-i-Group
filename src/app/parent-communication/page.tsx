@@ -27,7 +27,7 @@ import { format, startOfDay, endOfDay, isWithinInterval, parseISO, startOfWeek, 
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/SearchableSelect';
-import { cn } from '@/lib/utils';
+import { cn, arabicCompare } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 
@@ -51,7 +51,7 @@ export default function ParentCommunicationPage() {
     const activeStudents = useMemo(() =>
         (students ?? [])
             .filter(s => s.status === 'نشط')
-            .sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar')),
+            .sort((a, b) => arabicCompare(a.fullName, b.fullName)),
         [students]);
 
     const studentOptions: SearchableSelectOption[] = useMemo(() =>

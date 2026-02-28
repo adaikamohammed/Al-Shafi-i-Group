@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, parseISO, isSameDay, isAfter, isBefore, addDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { cn, sanitizeData } from '@/lib/utils';
+import { cn, sanitizeData, arabicCompare } from '@/lib/utils';
 import { CalendarIcon, Search, Gavel, FileWarning, CheckCircle2, AlertTriangle, UserX, Calculator, Save, X, Trash2, ArrowRight, Users, Loader2, Printer, Download } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Covenant } from '@/lib/types';
@@ -150,7 +150,7 @@ export default function PenaltiesPage() {
             );
         }
 
-        return result.sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
+        return result.sort((a, b) => arabicCompare(a.fullName, b.fullName));
     }, [students, searchQuery, selectedGroup, user, isSuperAdmin, isManagement]);
 
     // Role Check - Allow if logged in and has role (basic check, relying on Layout for protection primarily)

@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Search, Filter, BookOpen, LayoutGrid, List, Users as UsersIcon } from 'lucide-react';
 import { surahs } from '@/lib/surahs';
 import { SurahEvaluation, SurahMasteryEntry } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, arabicCompare } from '@/lib/utils';
 
 interface SurahEvaluationViewProps {
     students: any[];
@@ -69,7 +69,7 @@ export const SurahEvaluationView: React.FC<SurahEvaluationViewProps> = ({
             result = result.filter(s => s.fullName.toLowerCase().includes(lowerTerm));
         }
 
-        return result.sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
+        return result.sort((a, b) => arabicCompare(a.fullName, b.fullName));
     }, [students, searchTerm, filterGroup, filterStatus, surahProgress, selectedSurahId]);
 
     const groups = useMemo(() => {
