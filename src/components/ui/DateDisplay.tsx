@@ -15,13 +15,15 @@ export const DateDisplay = ({ className, showIcons = true }: DateDisplayProps) =
     useEffect(() => {
         const today = new Date();
 
-        // Hijri Date
+        // Hijri Date - Offset by -1 day
+        const hijriDate = new Date(today);
+        hijriDate.setDate(hijriDate.getDate() - 1);
         const hijri = new Intl.DateTimeFormat('ar-SA-u-ca-islamic', {
             day: 'numeric',
             month: 'long',
             year: 'numeric',
             weekday: 'long'
-        }).format(today);
+        }).format(hijriDate);
 
         // Gregorian Date
         const gregorian = new Intl.DateTimeFormat('ar-EG', {

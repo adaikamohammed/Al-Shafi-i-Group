@@ -97,6 +97,7 @@ import { WeeklyAttendanceTable } from '@/components/sessions/WeeklyAttendanceTab
 import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
 import { Admin5MessagesPanel } from '@/components/sessions/Admin5MessagesPanel';
 import { WeeklyStatsRow } from '@/components/sessions/WeeklyStatsRow';
+import { ParentsSurahProgressView } from '@/components/sessions/ParentsSurahProgressView';
 
 export default function DailySessionsPage() {
   const { user, isSuperAdmin } = useAuth();
@@ -119,7 +120,7 @@ export default function DailySessionsPage() {
   const [sessionChoiceData, setSessionChoiceData] = useState<{ day: number, dateStr: string, sessions: any[] } | null>(null);
   const [moveSessionData, setMoveSessionData] = useState<{ sessionId: string, date: string, currentOwnerId: string } | null>(null);
   const [targetSheikhForMove, setTargetSheikhForMove] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
+  const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'parents'>('calendar');
   const [outcomeModalStudent, setOutcomeModalStudent] = useState<any | null>(null);
 
   // State for selected sheikh's sessions loaded directly from Firebase
@@ -538,12 +539,22 @@ export default function DailySessionsPage() {
                 <Table className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">جدول</span>
               </Button>
+              {isAdmin5 && (
+                <Button
+                  variant={viewMode === 'parents' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('parents')}
+                  className={cn("h-8 gap-1.5 text-xs rounded-lg text-emerald-700", viewMode === 'parents' && "bg-emerald-600 text-white shadow-sm hover:!bg-emerald-700 hover:!text-white")}>
+                  <BookOpen className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">متابعة السورة</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
         {/* Progress Widget - Only for admin5 */}
-        {isAdmin5 && selectedSheikhId && globalProgress && (
+        {isAdmin5 && selectedSheikhId && globalProgress && viewMode !== 'parents' && (
           <div className="bg-card p-6 rounded-2xl shadow-sm border space-y-4 animate-in fade-in slide-in-from-top-4 duration-1000">
             {/* ... existing progress code ... */}
             <div className="flex justify-between items-center">
@@ -573,53 +584,62 @@ export default function DailySessionsPage() {
           </div>
         )}
 
-        {viewMode === 'calendar' ? (
-          <SessionCalendar
-            currentDate={currentDate}
-            onDateChange={setCurrentDate}
-            onDayClick={handleDayClick}
-            getSessionsForDay={filteredGetSessionsForDay}
-            isSuperAdmin={isSuperAdmin}
-            onDeleteSession={handleDeleteSession}
-            onExportSession={handleExportSession}
-            onMoveSession={handleMoveSession}
-          />
-        ) : (
-          <WeeklyAttendanceTable
-            students={filteredStudentsForTable}
-            getSessionsForDay={filteredGetSessionsForDay}
-            onDayClick={handleTableDayClick}
-            isAdmin5={isAdmin5}
-            initialDate={currentDate}
+        {/* Tab Content Rendering */}
+        {viewMode === 'parents' && isAdmin5 && (
+          <ParentsSurahProgressView
+            dailySessions={isAdmin5 ? sheikhSessions : dailySessions}
+            students={activeStudentsForWeeklyOutcome}
+            globalProgress={globalProgress}
           />
         )}
 
-        {/* Weekly Attendance Table: shown always in calendar view when students are loaded */}
-        {viewMode === 'calendar' && filteredStudentsForTable.length > 0 && (
-          <div className="mt-2 space-y-3">
-            <WeeklyAttendanceTable
-              students={filteredStudentsForTable}
+        {viewMode === 'calendar' && (
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <SessionCalendar
+              currentDate={currentDate}
+              onDateChange={setCurrentDate}
+              onDayClick={handleDayClick}
               getSessionsForDay={filteredGetSessionsForDay}
-              onDayClick={handleTableDayClick}
-              isAdmin5={isAdmin5}
-              initialDate={currentDate}
+              isSuperAdmin={isSuperAdmin}
+              onDeleteSession={handleDeleteSession}
+              onExportSession={handleExportSession}
+              onMoveSession={handleMoveSession}
             />
+          </div>
+        )}
 
-            {/* Per-day stats row */}
-            <WeeklyStatsRow
-              students={filteredStudentsForTable}
-              getSessionsForDay={filteredGetSessionsForDay}
-              initialDate={currentDate}
-            />
+        {viewMode === 'table' && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            {filteredStudentsForTable.length > 0 ? (
+              <>
+                <WeeklyAttendanceTable
+                  students={filteredStudentsForTable}
+                  getSessionsForDay={filteredGetSessionsForDay}
+                  onDayClick={handleTableDayClick}
+                  isAdmin5={isAdmin5}
+                  initialDate={currentDate}
+                />
 
-            {/* Admin5 panel: WhatsApp messages + harvest */}
-            {isAdmin5 && (
-              <Admin5MessagesPanel
-                students={activeStudentsForWeeklyOutcome}
-                weekDates={weekDates}
-                dailySessions={isAdmin5 ? sheikhSessions : dailySessions}
-                weeklyOutcomes={weeklyOutcomes}
-              />
+                <WeeklyStatsRow
+                  students={filteredStudentsForTable}
+                  getSessionsForDay={filteredGetSessionsForDay}
+                  initialDate={currentDate}
+                />
+
+                {isAdmin5 && (
+                  <Admin5MessagesPanel
+                    students={activeStudentsForWeeklyOutcome}
+                    weekDates={weekDates}
+                    dailySessions={isAdmin5 ? sheikhSessions : dailySessions}
+                    weeklyOutcomes={weeklyOutcomes}
+                  />
+                )}
+              </>
+            ) : (
+              <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-2xl border-2 border-dashed font-bold">
+                <Table className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+                <p>لا يوجد طلاب לעرض الجدول، يرجى اختيار الفوج.</p>
+              </div>
             )}
           </div>
         )}

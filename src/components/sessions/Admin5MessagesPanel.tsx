@@ -24,6 +24,8 @@ const pad = (num: number) => num < 10 ? `0${num}` : num.toString();
 // Convert a Gregorian Date to a Hijri date string, e.g. "08 رمضان 1447"
 const toHijri = (date: Date): string => {
     try {
+        const hijriDate = new Date(date);
+        hijriDate.setDate(hijriDate.getDate() - 1);
         const fmt = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
             day: '2-digit',
             month: 'long',
@@ -31,7 +33,7 @@ const toHijri = (date: Date): string => {
         });
         // Intl returns something like "٠٨ رمضان ١٤٤٧ هـ"
         // We want to return pure Arabic text without the era suffix
-        const parts = fmt.formatToParts(date);
+        const parts = fmt.formatToParts(hijriDate);
         const day = parts.find(p => p.type === 'day')?.value || '';
         const month = parts.find(p => p.type === 'month')?.value || '';
         const year = parts.find(p => p.type === 'year')?.value || '';
@@ -163,9 +165,9 @@ export const Admin5MessagesPanel = ({
             dailyContent = `(العداد موقوف لهذا اليوم)\n`;
         } else if (tasmieSurah) {
             if (isTasmieCompletion) {
-                dailyContent = `قائمة الطلبة الذين إستظهروا ورد التسميع (سورة ${tasmieSurah.name}) :\n`;
+                dailyContent = `قائمة الطلبة الذين استظهروا ورد التسميع (سورة ${tasmieSurah.name}) :\n`;
             } else {
-                dailyContent = `قائمة الطلبة الذين إستظهروا ورد التسميع من الآية(${pad(tasmieFromVerse)}) إلى الآية(${pad(tasmieToVerse)}) من سورة ${tasmieSurah.name} :\n`;
+                dailyContent = `قائمة الطلبة الذين استظهروا ورد التسميع من الآية(${pad(tasmieFromVerse)}) إلى الآية(${pad(tasmieToVerse)}) من سورة ${tasmieSurah.name} :\n`;
             }
         } else {
             dailyContent = 'قائمة الطلبة الذين استظهروا الورد اليومي :\n';
