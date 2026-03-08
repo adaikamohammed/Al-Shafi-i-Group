@@ -30,7 +30,6 @@ import { KPIDashboard } from '@/components/management/KPIDashboard';
 import { EarlyWarningView, computeAtRiskStudents } from '@/components/management/EarlyWarning';
 import { AdvancedCharts } from '@/components/management/AdvancedCharts';
 import { StudentProfileDialog } from '@/components/management/StudentProfileDialog';
-import { SchoolCalendar } from '@/components/management/SchoolCalendar';
 import { SheikhBadges } from '@/components/management/SheikhBadges';
 import { PeriodComparison } from '@/components/management/PeriodComparison';
 import { SmartSearch } from '@/components/management/SmartSearch';
@@ -146,7 +145,7 @@ export default function SheikhMonitoringPage() {
     const { dailySessions, allUsers, loading, students } = useStudentContext();
     const { isManagement } = useAuth();
 
-    type ViewMode = 'day' | 'week' | 'month' | 'stats' | 'students' | 'topStudents' | 'earlyWarning' | 'calendar' | 'badges';
+    type ViewMode = 'day' | 'week' | 'month' | 'stats' | 'students' | 'topStudents' | 'earlyWarning' | 'badges';
     const [view, setView] = useState<ViewMode>('day');
     const [studentPeriod, setStudentPeriod] = useState<'day' | 'week' | 'month'>('month');
     const [studentGroupFilter, setStudentGroupFilter] = useState<string>('all');
@@ -577,32 +576,30 @@ export default function SheikhMonitoringPage() {
         }
         else if (view === 'day') setSelectedDate(d => addDays(d, dir));
         else if (view === 'week') setSelectedDate(d => addDays(d, dir * 7));
-        else if (view === 'month' || view === 'calendar') setSelectedDate(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
+        else if (view === 'month') setSelectedDate(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
         else if (view === 'badges') setStatsMonth(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
         else setStatsMonth(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
     };
 
-    const navLabel = view === 'calendar'
-        ? format(selectedDate, 'MMMM yyyy', { locale: ar })
-        : view === 'badges'
-            ? `نقاط المشايخ — ${format(statsMonth, 'MMMM yyyy', { locale: ar })}`
-            : view === 'earlyWarning'
-                ? `آخر أسبوعين حتى ${format(selectedDate, 'd MMMM yyyy', { locale: ar })}`
-                : view === 'topStudents'
-                    ? (starsMode === 'month' ? format(selectedDate, 'MMMM yyyy', { locale: ar }) : weeklyStudentStats.weekLabel)
-                    : view === 'students'
-                        ? (studentPeriod === 'day'
-                            ? format(studentSelectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
-                            : studentPeriod === 'week'
-                                ? `سبت ${format(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 'd MMM', { locale: ar })} — أرب ${format(addDays(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 4), 'd MMM yyyy', { locale: ar })}`
-                                : format(studentSelectedDate, 'MMMM yyyy', { locale: ar }))
-                        : view === 'day'
-                            ? format(selectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
-                            : view === 'week'
-                                ? `${format(startOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM', { locale: ar })} — ${format(endOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM yyyy', { locale: ar })}`
-                                : view === 'month'
-                                    ? format(selectedDate, 'MMMM yyyy', { locale: ar })
-                                    : format(statsMonth, 'MMMM yyyy', { locale: ar });
+    const navLabel = view === 'badges'
+        ? `نقاط المشايخ — ${format(statsMonth, 'MMMM yyyy', { locale: ar })}`
+        : view === 'earlyWarning'
+            ? `آخر أسبوعين حتى ${format(selectedDate, 'd MMMM yyyy', { locale: ar })}`
+            : view === 'topStudents'
+                ? (starsMode === 'month' ? format(selectedDate, 'MMMM yyyy', { locale: ar }) : weeklyStudentStats.weekLabel)
+                : view === 'students'
+                    ? (studentPeriod === 'day'
+                        ? format(studentSelectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
+                        : studentPeriod === 'week'
+                            ? `سبت ${format(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 'd MMM', { locale: ar })} — أرب ${format(addDays(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 4), 'd MMM yyyy', { locale: ar })}`
+                            : format(studentSelectedDate, 'MMMM yyyy', { locale: ar }))
+                    : view === 'day'
+                        ? format(selectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
+                        : view === 'week'
+                            ? `${format(startOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM', { locale: ar })} — ${format(endOfWeek(selectedDate, { weekStartsOn: 6 }), 'd MMM yyyy', { locale: ar })}`
+                            : view === 'month'
+                                ? format(selectedDate, 'MMMM yyyy', { locale: ar })
+                                : format(statsMonth, 'MMMM yyyy', { locale: ar });
 
     const interval = useMemo(() => {
         if (view === 'week') return eachDayOfInterval({ start: startOfWeek(selectedDate, { weekStartsOn: 6 }), end: endOfWeek(selectedDate, { weekStartsOn: 6 }) });
@@ -640,9 +637,9 @@ export default function SheikhMonitoringPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 border flex-wrap">
-                    {(['day', 'week', 'month', 'stats', 'students', 'topStudents', 'earlyWarning', 'calendar', 'badges'] as const).map(v => (
+                    {(['day', 'week', 'month', 'stats', 'students', 'topStudents', 'earlyWarning', 'badges'] as const).map(v => (
                         <button key={v} onClick={() => setView(v)} className={cn("px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all", view === v ? (v === 'earlyWarning' ? 'bg-rose-500 text-white shadow-sm' : 'bg-primary text-white shadow-sm') : "text-muted-foreground hover:bg-muted", v === 'earlyWarning' && atRiskStudents.length > 0 && view !== v && 'text-rose-500')}>
-                            {v === 'day' ? '📅 اليوم' : v === 'week' ? '📆 الأسبوع' : v === 'month' ? '🗓 الشهر' : v === 'stats' ? '📊 إحصائيات' : v === 'students' ? '📋 متابعة' : v === 'topStudents' ? '🌟 نجوم' : v === 'earlyWarning' ? `🔔 إنذارات${atRiskStudents.length > 0 ? ` (${atRiskStudents.length})` : ''}` : v === 'calendar' ? '🗓 تقويم' : '🏆 شارات'}
+                            {v === 'day' ? '📅 اليوم' : v === 'week' ? '📆 الأسبوع' : v === 'month' ? '🗓 الشهر' : v === 'stats' ? '📊 إحصائيات' : v === 'students' ? '📋 متابعة' : v === 'topStudents' ? '🌟 نجوم' : v === 'earlyWarning' ? `🔔 إنذارات${atRiskStudents.length > 0 ? ` (${atRiskStudents.length})` : ''}` : '🏆 شارات'}
                         </button>
                     ))}
                 </div>
@@ -748,9 +745,6 @@ export default function SheikhMonitoringPage() {
                         sheikhs={sheikhs}
                         onStudentClick={(id, name, group) => setSelectedStudentProfile({ id, name, group })}
                     />
-                )}
-                {view === 'calendar' && (
-                    <SchoolCalendar sheikhs={sheikhs} getDayStats={getDayStats} />
                 )}
                 {view === 'badges' && (
                     <SheikhBadges sheikhs={sheikhs} getDayStats={getDayStats} selectedDate={statsMonth} />

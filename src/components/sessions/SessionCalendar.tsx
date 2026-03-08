@@ -92,9 +92,6 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                 } else {
                     statusClass = 'bg-emerald-500 text-white border-2 border-emerald-600 shadow-emerald-200'; // Vibrant Green for Completed/Normal
                 }
-            } else if (isWeekendDay) {
-                // Thursday or Friday without session = automatic holiday color
-                statusClass = 'bg-sky-500 text-white border-2 border-sky-600 shadow-sky-200'; // Weekend day - Holiday
             } else if (isPast(dayDate) && !isTodayDate) {
                 statusClass = 'bg-muted/30 border-muted/20 opacity-80'; // Empty past day
             }

@@ -2,13 +2,15 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { ref as dbRef, onValue, off } from 'firebase/database';
+import { ref as dbRef, onValue, off, get, update } from 'firebase/database';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useStudentContext } from '@/context/StudentContext';
 import { useToast } from '@/hooks/use-toast';
-import { getYear, getMonth, format, parse, parseISO } from 'date-fns';
+import { getYear, getMonth, format, parse, parseISO, eachDayOfInterval, getDay, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { v4 as uuidv4 } from 'uuid';
+import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
 import { cn, arabicCompare } from '@/lib/utils';
 import { surahs } from '@/lib/surahs';
@@ -123,6 +125,15 @@ export default function DailySessionsPage() {
   const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'parents'>('calendar');
   const [outcomeModalStudent, setOutcomeModalStudent] = useState<any | null>(null);
 
+  // Bulk Holiday State
+  const [isBulkHolidayDialogOpen, setIsBulkHolidayDialogOpen] = useState(false);
+  const [bulkHolidayStartDate, setBulkHolidayStartDate] = useState('');
+  const [bulkHolidayEndDate, setBulkHolidayEndDate] = useState('');
+  const [bulkHolidayDays, setBulkHolidayDays] = useState<number[]>([]);
+  const [bulkHolidaySheikhs, setBulkHolidaySheikhs] = useState<string[]>([]);
+  const [isSubmittingBulk, setIsSubmittingBulk] = useState(false);
+  const [isCleaningDB, setIsCleaningDB] = useState(false);
+
   // State for selected sheikh's sessions loaded directly from Firebase
   const [sheikhSessions, setSheikhSessions] = useState<Record<string, Record<string, any>>>({});
   const [sheikhSessionsLoading, setSheikhSessionsLoading] = useState(false);
@@ -173,7 +184,146 @@ export default function DailySessionsPage() {
     }
   }, [currentDate]);
 
+  const handleOpenBulkHoliday = () => {
+    const today = currentDate || new Date();
+    setBulkHolidayStartDate(format(startOfMonth(today), 'yyyy-MM-dd'));
+    setBulkHolidayEndDate(format(endOfMonth(today), 'yyyy-MM-dd'));
+    setBulkHolidayDays([]);
+    setBulkHolidaySheikhs([]);
+    setIsBulkHolidayDialogOpen(true);
+  };
 
+  const handleBulkHolidaySubmit = async () => {
+    if (!bulkHolidayStartDate || !bulkHolidayEndDate) {
+      toast({ title: "خطأ", description: "يرجى تحديد فترة العطلة", variant: "destructive" });
+      return;
+    }
+    if (bulkHolidayDays.length === 0) {
+      toast({ title: "خطأ", description: "يرجى تحديد أيام العطلة", variant: "destructive" });
+      return;
+    }
+    if (bulkHolidaySheikhs.length === 0) {
+      toast({ title: "خطأ", description: "يرجى تحديد الأفواج/المشايخ", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmittingBulk(true);
+    try {
+      const start = parse(bulkHolidayStartDate, 'yyyy-MM-dd', new Date());
+      const end = parse(bulkHolidayEndDate, 'yyyy-MM-dd', new Date());
+
+      const allDays = eachDayOfInterval({ start, end });
+      const holidayDates = allDays.filter(d => bulkHolidayDays.includes(getDay(d))).map(d => format(d, 'yyyy-MM-dd'));
+
+      let addedCount = 0;
+      for (const targetOwnerId of bulkHolidaySheikhs) {
+        for (const dateStr of holidayDates) {
+          const sessionsForDate = getSessionsForDay(dateStr);
+          const existingSessions = sessionsForDate.filter((s: any) => s.ownerId === targetOwnerId);
+
+          if (existingSessions.some((s: any) => s.sessionType === 'يوم عطلة')) {
+            continue;
+          }
+
+          const sessionNumber = existingSessions.length > 0 ? (existingSessions.some((s: any) => s.sessionNumber === 1) ? 2 : 1) : 1;
+
+          if (existingSessions.length < 2) {
+            await addDailySession({
+              id: uuidv4(),
+              date: dateStr,
+              sessionType: 'يوم عطلة',
+              sessionNumber: sessionNumber as 1 | 2,
+              ownerId: targetOwnerId,
+              teacherAbsenceReason: '',
+              substituteTeacher: false,
+              records: []
+            }, targetOwnerId);
+            addedCount++;
+          }
+        }
+      }
+      toast({ title: "تم بنجاح", description: `تم تعيين ${addedCount} يوم عطلة للمشايخ المحددين بنجاح.` });
+      setIsBulkHolidayDialogOpen(false);
+    } catch (error) {
+      console.error(error);
+      toast({ title: "خطأ", description: "حدث خطأ أثناء تعيين العطل", variant: "destructive" });
+    } finally {
+      setIsSubmittingBulk(false);
+    }
+  };
+
+  const handleCleanAbsentRecords = async () => {
+    if (!confirm('هل أنت متأكد من تنظيف السجلات القديمة؟ هذا الإجراء سيقوم بحذف بيانات المراجعة والسلوك للطلاب الغائبين في جميع الحصص.')) return;
+    setIsCleaningDB(true);
+    try {
+      const usersRef = dbRef(db, 'users');
+      const snapshot = await get(usersRef);
+      if (!snapshot.exists()) {
+        toast({ title: "تنبيه", description: "لا توجد بيانات." });
+        return;
+      }
+
+      const updates: any = {};
+      let changedRecords = 0;
+
+      const usersData = snapshot.val();
+      Object.entries(usersData).forEach(([uid, userData]: [string, any]) => {
+        if (userData.dailySessions) {
+          Object.entries(userData.dailySessions).forEach(([date, dateSessions]: [string, any]) => {
+            Object.entries(dateSessions).forEach(([sessionId, session]: [string, any]) => {
+              // Handle records if it's an array
+              if (session.records && Array.isArray(session.records)) {
+                let sessionModified = false;
+                const newRecords = session.records.map((r: any) => {
+                  if (r.attendance === 'غائب' || r.attendance === 'غياب') {
+                    if (r.review !== false || r.behavior) {
+                      sessionModified = true;
+                      return { ...r, review: false, behavior: '' };
+                    }
+                  }
+                  return r;
+                });
+
+                if (sessionModified) {
+                  updates[`users/${uid}/dailySessions/${date}/${sessionId}/records`] = newRecords;
+                  changedRecords++;
+                }
+              }
+              // Handle records if it's an object instead of array (sometimes firebase converts arrays to objects if indices are missing)
+              else if (session.records && typeof session.records === 'object') {
+                let sessionModified = false;
+                const newRecords = { ...session.records };
+                Object.entries(newRecords).forEach(([idx, r]: [string, any]) => {
+                  if (r && (r.attendance === 'غائب' || r.attendance === 'غياب')) {
+                    if (r.review !== false || r.behavior) {
+                      sessionModified = true;
+                      newRecords[idx as keyof typeof newRecords] = { ...r, review: false, behavior: '' };
+                    }
+                  }
+                });
+                if (sessionModified) {
+                  updates[`users/${uid}/dailySessions/${date}/${sessionId}/records`] = Object.values(newRecords);
+                  changedRecords++;
+                }
+              }
+            });
+          });
+        }
+      });
+
+      if (Object.keys(updates).length > 0) {
+        await update(dbRef(db), updates);
+        toast({ title: "تم بنجاح", description: `تم تصحيح ${changedRecords} حصة.` });
+      } else {
+        toast({ title: "لا يوجد تغيير", description: "جميع السجلات السابقة صحيحة." });
+      }
+    } catch (error) {
+      console.error(error);
+      toast({ title: "خطأ", description: "حدث خطأ أثناء التنظيف", variant: "destructive" });
+    } finally {
+      setIsCleaningDB(false);
+    }
+  };
 
   // Get the selected sheikh's group name for filtering
   const selectedGroupName = useMemo(() => {
@@ -431,11 +581,12 @@ export default function DailySessionsPage() {
       dataForSheet = (session.records ?? []).map((record: any) => {
         const student = (students ?? []).find(s => s.id === record.studentId);
         const isActivity = session.sessionType === 'حصة أنشطة';
+        const isAbsent = record.attendance === 'غائب' || record.attendance === 'غياب';
         const baseInfo = {
           'التاريخ': readableDate, 'اليوم': dayName,
           'رقم الحصة': session.sessionNumber, 'نوع الحصة': session.sessionType,
           'اسم الطالب': student?.fullName || 'غير معروف', 'الحاضر': record.attendance || '',
-          'السلوك': record.behavior || '',
+          'السلوك': isAbsent ? '' : (record.behavior || ''),
           'ملاحظات': record.notes || '',
         };
 
@@ -448,7 +599,7 @@ export default function DailySessionsPage() {
           return {
             ...baseInfo,
             'التقييم': record.memorization || '',
-            'مراجعة': record.review ? 'نعم' : 'لا',
+            'مراجعة': (!isAbsent && record.review) ? 'نعم' : 'لا',
             'السورة': surah ? surah.name : '',
             'من آية': (session.fromVerse || record.fromVerse) || '',
             'إلى آية': (session.toVerse || record.toVerse) || ''
@@ -513,6 +664,33 @@ export default function DailySessionsPage() {
                       ))}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+
+            {isAdminUser && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpenBulkHoliday}
+                  className="h-9 gap-1.5 text-xs rounded-lg border-sky-200 hover:bg-sky-50 text-sky-700 font-bold"
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  <span className="hidden sm:inline">تعيين عطل جماعية</span>
+                </Button>
+
+                {isSuperAdmin && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCleanAbsentRecords}
+                    disabled={isCleaningDB}
+                    className="h-9 gap-1.5 text-xs rounded-lg border-emerald-200 hover:bg-emerald-50 text-emerald-700 font-bold"
+                  >
+                    {isCleaningDB ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    <span className="hidden sm:inline">تصحيح الغياب</span>
+                  </Button>
+                )}
               </div>
             )}
 
@@ -759,6 +937,98 @@ export default function DailySessionsPage() {
               <Button onClick={handleAddExtraSession} className="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600">
                 <Plus className="ml-2 h-4 w-4" />
                 إضافة الحصة
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Bulk Holiday Dialog */}
+        <Dialog open={isBulkHolidayDialogOpen} onOpenChange={setIsBulkHolidayDialogOpen}>
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-headline text-sky-700 flex items-center gap-2">
+                <CalendarDays className="h-6 w-6" />
+                تعيين عطل جماعية
+              </DialogTitle>
+              <DialogDescription className="font-body">
+                قم بتحديد المشايخ وأيام الأسبوع لتسجيلها كأيام عطلة بشكل تلقائي خلال الفترة المحددة.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>من تاريخ</Label>
+                  <Input type="date" value={bulkHolidayStartDate} onChange={e => setBulkHolidayStartDate(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>إلى تاريخ</Label>
+                  <Input type="date" value={bulkHolidayEndDate} onChange={e => setBulkHolidayEndDate(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label>أيام العطلة المستهدفة</Label>
+                <div className="flex flex-wrap gap-2">
+                  {[{ id: 6, label: 'السبت' }, { id: 0, label: 'الأحد' }, { id: 1, label: 'الاثنين' }, { id: 2, label: 'الثلاثاء' }, { id: 3, label: 'الأربعاء' }, { id: 4, label: 'الخميس' }, { id: 5, label: 'الجمعة' }].map(day => (
+                    <Button
+                      key={day.id}
+                      type="button"
+                      variant={bulkHolidayDays.includes(day.id) ? "default" : "outline"}
+                      className={cn("h-8 rounded-full px-4 text-xs font-bold", bulkHolidayDays.includes(day.id) && "bg-sky-600 text-white hover:bg-sky-700")}
+                      onClick={() => setBulkHolidayDays(prev => prev.includes(day.id) ? prev.filter(d => d !== day.id) : [...prev, day.id])}
+                    >
+                      {day.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <Label>المشايخ / الأفواج المعنية</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs text-sky-600 font-bold"
+                    onClick={() => {
+                      const sheikhIds = allUsers?.filter(u => u.role === 'sheikh').map(u => u.uid) || [];
+                      setBulkHolidaySheikhs(bulkHolidaySheikhs.length === sheikhIds.length ? [] : sheikhIds);
+                    }}
+                  >
+                    تحديد الكل / إلغاء
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 bg-slate-50 rounded-xl border p-2 max-h-[220px] overflow-y-auto">
+                  {allUsers?.filter(u => u.role === 'sheikh').sort((a, b) => arabicCompare(a.group || '', b.group || '')).map((sheikh: any) => (
+                    <div
+                      key={sheikh.uid}
+                      className={cn(
+                        "flex items-center space-x-2 space-x-reverse bg-white p-2 rounded-lg border shadow-sm cursor-pointer hover:border-sky-300 transition-colors",
+                        bulkHolidaySheikhs.includes(sheikh.uid) && "border-sky-500 bg-sky-50"
+                      )}
+                      onClick={() => setBulkHolidaySheikhs(prev => prev.includes(sheikh.uid) ? prev.filter(id => id !== sheikh.uid) : [...prev, sheikh.uid])}
+                    >
+                      <Checkbox
+                        id={`sh-${sheikh.uid}`}
+                        checked={bulkHolidaySheikhs.includes(sheikh.uid)}
+                        onCheckedChange={(checked) => {
+                          if (checked) setBulkHolidaySheikhs(prev => [...prev, sheikh.uid]);
+                          else setBulkHolidaySheikhs(prev => prev.filter(id => id !== sheikh.uid));
+                        }}
+                      />
+                      <label htmlFor={`sh-${sheikh.uid}`} className="text-xs font-bold cursor-pointer flex-1 truncate">{sheikh.displayName || 'بدون اسم'} ({sheikh.group || 'بدون فوج'})</label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsBulkHolidayDialogOpen(false)}>إلغاء</Button>
+              <Button onClick={handleBulkHolidaySubmit} disabled={isSubmittingBulk} className="bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-2">
+                {isSubmittingBulk ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {isSubmittingBulk ? "جاري التعيين..." : "تأكيد وتعيين العطل"}
               </Button>
             </DialogFooter>
           </DialogContent>

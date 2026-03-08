@@ -218,10 +218,11 @@ export const WeeklyAttendanceTable = ({
                 // Usually Late is a form of presence. But we also count it separately.
                 late++;
             }
-            if (info.attendance === 'غائب' || info.attendance === 'غياب') absent++;
+            const isAbsent = info.attendance === 'غائب' || info.attendance === 'غياب';
+            if (isAbsent) absent++;
 
             if (info.memorization === 'ممتاز') excellent++;
-            if (info.behavior === 'مشاغب' || info.behavior === 'غير منضبط') warnings++;
+            if (!isAbsent && (info.behavior === 'مشاغب' || info.behavior === 'غير منضبط')) warnings++;
         });
 
         return { present, absent, late, excellent, warnings };
@@ -498,9 +499,13 @@ export const WeeklyAttendanceTable = ({
 
                                                                     {/* 3. Behavior & Review */}
                                                                     <div className="flex items-center justify-center gap-2 h-[10px]">
-                                                                        {getBehaviorDot(info.behavior)}
-                                                                        {info.review && (
-                                                                            <span className="text-[8px] text-blue-500" title="تمت المراجعة">📖</span>
+                                                                        {info.attendance !== 'غائب' && info.attendance !== 'غياب' && (
+                                                                            <>
+                                                                                {getBehaviorDot(info.behavior)}
+                                                                                {info.review && (
+                                                                                    <span className="text-[8px] text-blue-500" title="تمت المراجعة">📖</span>
+                                                                                )}
+                                                                            </>
                                                                         )}
                                                                     </div>
                                                                 </>
