@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import { PORTAL_THEMES } from '@/lib/themes';
 import { GroupSelector } from './GroupSelector';
 import dynamic from 'next/dynamic';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 
 const MonitoringRadar = dynamic(() => import('./MonitoringRadar').then(mod => mod.MonitoringRadar), { ssr: false });
 const InteractiveGrowthChart = dynamic(() => import('./ManagementCharts').then(mod => mod.InteractiveGrowthChart), { ssr: false });
@@ -112,6 +113,8 @@ export const ManagementDashboard = () => {
     const { user, isManagement, isSuperAdmin } = useAuth();
     const [selectedGroup, setSelectedGroup] = React.useState<string>('all');
     const [timeframe, setTimeframe] = React.useState<string>('weekly');
+    const [aggregatedData, setAggregatedData] = React.useState<any[]>([]);
+    const [isStatsLoading, setIsStatsLoading] = React.useState(false);
 
     const isSheikh = user?.role === 'sheikh';
 
@@ -125,74 +128,29 @@ export const ManagementDashboard = () => {
     // FCM Integration
     const { permission, requestPermission } = useFCM();
 
-    const aggregatedData = useMemo(() => {
-        if (!dailySessions) return [];
+    // Use Web Worker for statistics calculation to prevent UI freezing
+    React.useEffect(() => {
+        if (!dailySessions || !allUsers) return;
 
-        let start: Date, end: Date;
-        const now = new Date();
+        setIsStatsLoading(true);
+        const worker = new Worker(new URL('../../workers/stats.worker.ts', import.meta.url));
+        
+        worker.onmessage = (event) => {
+            setAggregatedData(event.data);
+            setIsStatsLoading(false);
+            worker.terminate();
+        };
 
-        switch (timeframe) {
-            case 'monthly':
-                start = startOfMonth(now); end = endOfMonth(now); break;
-            case 'seasonal':
-                start = startOfQuarter(now); end = endOfQuarter(now); break;
-            case 'yearly':
-                start = startOfYear(now); end = endOfYear(now); break;
-            case 'weekly':
-            default:
-                start = startOfWeek(now, { weekStartsOn: 6 });
-                end = endOfWeek(now, { weekStartsOn: 6 }); break;
-        }
-
-        const sheikhUsers = allUsers.length > 0
-            ? allUsers.filter(u => u.role === 'sheikh' && u.group)
-            : (isSheikh && user ? [{ ...user }] : []);
-
-        const uniqueGroups = Array.from(new Set(sheikhUsers.map(u => u.group)));
-
-        return uniqueGroups.map(groupName => {
-            let totalSessions = 0;
-            let totalAttendance = 0;
-            let totalRecords = 0;
-            let totalReview = 0;
-            let totalEvaluationPoints = 0;
-            let totalBehaviorPoints = 0;
-
-            Object.entries(dailySessions).forEach(([date, sessionsOnDay]) => {
-                const sessionDate = parseISO(date);
-                if (isWithinInterval(sessionDate, { start, end })) {
-                    Object.values(sessionsOnDay).forEach((session: any) => {
-                        const sheikh = allUsers.find(u => u.uid === session.ownerId) || (isSheikh && session.ownerId === user?.uid ? user : null);
-                        if (sheikh?.group === groupName) {
-                            totalSessions++;
-                            (session.records || []).forEach(record => {
-                                totalRecords++;
-                                if (record.attendance === 'حاضر' || record.attendance === 'متأخر') totalAttendance++;
-                                if (record.review) totalReview++;
-                                const evalMap: Record<string, number> = { 'ممتاز': 100, 'جيد جداً': 80, 'جيد': 60, 'متوسط': 40, 'ضعيف': 20 };
-                                totalEvaluationPoints += evalMap[record.memorization || ''] || 0;
-                                const behavMap: Record<string, number> = { 'هادئ': 100, 'متوسط': 60, 'غير منضبط': 20 };
-                                totalBehaviorPoints += behavMap[record.behavior || ''] || 0;
-                            });
-                        }
-                    });
-                }
-            });
-
-            const countRecords = totalRecords || 1;
-            return {
-                groupName,
-                attendanceRate: Math.round((totalAttendance / countRecords) * 100),
-                reviewRate: Math.round((totalReview / countRecords) * 100),
-                evaluationScore: Math.round(totalEvaluationPoints / countRecords),
-                behaviorScore: Math.round(totalBehaviorPoints / countRecords)
-            };
-        }).sort((a, b) => {
-            const groupA = parseInt((a.groupName || '').replace(/[^0-9]/g, '')) || 999;
-            const groupB = parseInt((b.groupName || '').replace(/[^0-9]/g, '')) || 999;
-            return groupA - groupB;
+        worker.postMessage({
+            dailySessions,
+            allUsers,
+            timeframe,
+            isSheikh,
+            user
         });
-    }, [dailySessions, allUsers, timeframe]);
+
+        return () => worker.terminate();
+    }, [dailySessions, allUsers, timeframe, isSheikh, user]);
 
     React.useEffect(() => {
         const handleGenerate = () => generateDemoData(); // using the existing function name but new logic
@@ -386,7 +344,9 @@ export const ManagementDashboard = () => {
                             </div>
                         </CardHeader>
                         <CardContent className="flex-1 p-4 min-h-[400px]">
-                            <InteractiveGrowthChart data={stats.groupComparisonData} />
+                            <ErrorBoundary fallback={<div className="h-full flex items-center justify-center text-muted-foreground italic">حدث خطأ أثناء تحميل الرسم البياني للنمو</div>}>
+                                <InteractiveGrowthChart data={stats.groupComparisonData} />
+                            </ErrorBoundary>
                         </CardContent>
                     </Card>
                 )}
@@ -396,10 +356,12 @@ export const ManagementDashboard = () => {
                     <div className={cn("grid grid-cols-1 gap-6", isSheikh ? "md:grid-cols-2" : "")}>
                         {/* Radar Chart */}
                         <div className="bg-white dark:bg-white/5 rounded-xl shadow-xl overflow-hidden min-h-[300px] relative">
-                            <div className="absolute top-4 right-4 z-10">
+                             <div className="absolute top-4 right-4 z-10">
                                 <h3 className="font-bold text-sm bg-white/50 backdrop-blur px-2 py-1 rounded-lg">الأداء النوعي للفوج</h3>
                             </div>
-                            <MonitoringRadar data={aggregatedData} selectedGroup={selectedGroup} />
+                            <ErrorBoundary fallback={<div className="h-full flex items-center justify-center text-muted-foreground italic text-xs">خطأ في عرض رادار الأداء</div>}>
+                                <MonitoringRadar data={aggregatedData} selectedGroup={selectedGroup} />
+                            </ErrorBoundary>
                         </div>
 
                         {/* Quick KPI for selected Group or All */}
@@ -530,7 +492,9 @@ export const ManagementDashboard = () => {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="h-[400px] relative p-6">
-                        <LevelDistributionChart data={stats.levelDistributionData} />
+                        <ErrorBoundary fallback={<div className="h-full flex items-center justify-center text-muted-foreground italic">حدث خطأ أثناء تحميل توزيع المستويات</div>}>
+                            <LevelDistributionChart data={stats.levelDistributionData} />
+                        </ErrorBoundary>
                     </CardContent>
                 </Card>
             </div>

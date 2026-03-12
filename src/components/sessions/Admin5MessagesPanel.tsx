@@ -68,7 +68,10 @@ export const Admin5MessagesPanel = ({
     // Days in the week that have registered sessions
     const availableDays = useMemo(() => {
         if (!dailySessions || !weekDates) return [];
-        const workDays = weekDates.slice(0, 5); // Sat to Wed
+        // Force processing 7 days from Sat even if weekDates is shorter
+        const baseDate = weekDates[0];
+        const workDays = Array.from({ length: 7 }, (_, i) => addDays(baseDate, i));
+        
         return workDays
             .map(date => {
                 const dateStr = format(date, 'yyyy-MM-dd');
@@ -83,8 +86,7 @@ export const Admin5MessagesPanel = ({
                     hasRecords: !!hasRecords,
                     session: primarySession || null,
                 };
-            })
-            .filter(d => d.hasSession);
+            });
     }, [dailySessions, weekDates]);
 
     const [selectedDateStr, setSelectedDateStr] = useState<string>('');
@@ -93,14 +95,15 @@ export const Admin5MessagesPanel = ({
     const [copiedDaily, setCopiedDaily] = useState(false);
     const [copiedHarvest, setCopiedHarvest] = useState(false);
 
-    // Auto-select the most recent available day
+    // Auto-select the most recent available day with records (fallback to most recent day)
     useEffect(() => {
         if (availableDays.length > 0 && !selectedDateStr) {
-            // Prefer most recent day
-            const sorted = [...availableDays].sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+            const withRecords = availableDays.filter(d => d.hasRecords);
+            const sourceArray = withRecords.length > 0 ? withRecords : availableDays;
+            const sorted = [...sourceArray].sort((a, b) => b.dateStr.localeCompare(a.dateStr));
             setSelectedDateStr(sorted[0].dateStr);
         }
-    }, [availableDays]);
+    }, [availableDays, selectedDateStr]);
 
     // Generate the daily message whenever selectedDate or session data changes
     const generateDailyMessage = useMemo(() => {
@@ -243,11 +246,11 @@ export const Admin5MessagesPanel = ({
         });
 
         const header = 'السلام عليكم ورحمة الله وبركاته';
-        const dateLine = `الحصيلة الأسبوعية (${format(weekDates[0], 'd MMMM', { locale: ar })} - ${format(weekDates[4], 'd MMMM yyyy', { locale: ar })})`;
+        const dateLine = `الحصيلة الأسبوعية (${format(weekDates[0], 'd MMMM', { locale: ar })} - ${format(weekDates[6], 'd MMMM yyyy', { locale: ar })})`;
 
         // Get all basic sessions in this week to find missed TASMEE wirds and harvest range
         const weekStart = weekDates[0];
-        const weekEnd = weekDates[4];
+        const weekEnd = weekDates[6];
         const allSessions = Object.values(dailySessions).flatMap(day =>
             Object.values(day as Record<string, any>)
         );
@@ -491,7 +494,7 @@ export const Admin5MessagesPanel = ({
                             </div>
                         </div>
                         <p className="text-[11px] text-emerald-600/70 mt-1">
-                            ملخص أسبوع {weekDates?.[0] ? format(weekDates[0], 'dd/MM', { locale: ar }) : ''} — {weekDates?.[4] ? format(weekDates[4], 'dd/MM/yyyy', { locale: ar }) : ''}
+                            ملخص أسبوع {weekDates?.[0] ? format(weekDates[0], 'dd/MM', { locale: ar }) : ''} — {weekDates?.[6] ? format(weekDates[6], 'dd/MM/yyyy', { locale: ar }) : ''}
                         </p>
                     </CardHeader>
 

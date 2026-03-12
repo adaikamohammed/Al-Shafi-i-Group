@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { db } from '@/lib/firebase';
 import { ref, set, get, onValue, off } from 'firebase/database';
@@ -260,10 +260,10 @@ export default function SheikhMonitoringPage() {
             const commitmentRate = workingDays > 0 ? Math.round((sessionDays / workingDays) * 100) : 0;
 
             // weekly breakdown — school week = Saturday (6) → Friday (6+6)
-            // A week BELONGS TO a month if its Wednesday falls within that month.
-            // → collect all Saturdays where (Saturday + 4) is within [start, end]
-            const firstEligibleSat = addDays(start, -4); // earliest Sat whose Wed = start
-            const lastEligibleSat = addDays(end, -4); // latest  Sat whose Wed = end
+            // A week BELONGS TO a month if its Friday falls within that month.
+            // → collect all Saturdays where (Saturday + 6) is within [start, end]
+            const firstEligibleSat = addDays(start, -6); // earliest Sat whose Fri = start
+            const lastEligibleSat = addDays(end, -6); // latest  Sat whose Fri = end
             const weekStarts = eachDayOfInterval({ start: firstEligibleSat, end: lastEligibleSat })
                 .filter(d => getDay(d) === 6); // only Saturdays
 
@@ -286,7 +286,7 @@ export default function SheikhMonitoringPage() {
                 // Full date range e.g. "سبت 28 فبراير — أرب 04 مارس"
                 const startFmt = format(wStart, 'dd MMM', { locale: ar });
                 const endFmt = format(wEnd, 'dd MMM', { locale: ar });
-                const dateRange = `سبت ${startFmt} — أرب ${endFmt}`;
+                const dateRange = `سبت ${startFmt} — جمعة ${endFmt}`;
                 return {
                     label: `أ${i + 1}`,
                     dateRange,
@@ -591,7 +591,7 @@ export default function SheikhMonitoringPage() {
                     ? (studentPeriod === 'day'
                         ? format(studentSelectedDate, 'EEEE، d MMMM yyyy', { locale: ar })
                         : studentPeriod === 'week'
-                            ? `سبت ${format(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 'd MMM', { locale: ar })} — أرب ${format(addDays(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 4), 'd MMM yyyy', { locale: ar })}`
+                            ? `سبت ${format(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 'd MMM', { locale: ar })} — جمعة ${format(addDays(addDays(studentSelectedDate, getDay(studentSelectedDate) === 6 ? 0 : -(getDay(studentSelectedDate) + 1)), 6), 'd MMM yyyy', { locale: ar })}`
                             : format(studentSelectedDate, 'MMMM yyyy', { locale: ar }))
                     : view === 'day'
                         ? format(selectedDate, 'EEEE، d MMMM yyyy', { locale: ar })

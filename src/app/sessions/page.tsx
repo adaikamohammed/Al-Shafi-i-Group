@@ -100,6 +100,29 @@ import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
 import { Admin5MessagesPanel } from '@/components/sessions/Admin5MessagesPanel';
 import { WeeklyStatsRow } from '@/components/sessions/WeeklyStatsRow';
 import { ParentsSurahProgressView } from '@/components/sessions/ParentsSurahProgressView';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+
+const pad = (num: number) => num < 10 ? `0${num}` : num.toString();
+
+const toHijri = (date: Date): string => {
+  try {
+    const hijriDate = new Date(date);
+    hijriDate.setDate(hijriDate.getDate() - 1);
+    const fmt = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+    const parts = fmt.formatToParts(hijriDate);
+    const day = parts.find(p => p.type === 'day')?.value || '';
+    const month = parts.find(p => p.type === 'month')?.value || '';
+    const year = parts.find(p => p.type === 'year')?.value || '';
+    const toWestern = (s: string) => s.replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+    return `${toWestern(day)} ${month} ${toWestern(year)}`;
+  } catch {
+    return '';
+  }
+};
 
 export default function DailySessionsPage() {
   const { user, isSuperAdmin } = useAuth();
@@ -109,7 +132,8 @@ export default function DailySessionsPage() {
   const router = useRouter();
   const isAdmin5 = user?.email === 'admin5@gmail.com';
   const isManagement = user?.role === 'management';
-  const isAdminUser = isSuperAdmin || isAdmin5 || isManagement;
+  const isAdmin00 = user?.email === 'admin00@gmail.com' || user?.email === 'abdallah.shafii@gmail.com';
+  const isAdminUser = isSuperAdmin || isAdmin5 || isManagement || isAdmin00;
 
   // State
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -145,6 +169,16 @@ export default function DailySessionsPage() {
       return;
     }
 
+    // Try to load from cache first for better UX in offline/slow network
+    const cachedData = localStorage.getItem(`sessions_cache_${selectedSheikhId}`);
+    if (cachedData) {
+      try {
+        setSheikhSessions(JSON.parse(cachedData));
+      } catch (e) {
+        console.error("Failed to parse cached sessions", e);
+      }
+    }
+
     // If it's the current user, use context sessions directly (no re-fetch needed)
     if (selectedSheikhId === user?.uid && !isAdmin5) {
       setSheikhSessions(dailySessions || {});
@@ -163,14 +197,17 @@ export default function DailySessionsPage() {
           normalized[date][sessionId] = { ...session, ownerId: selectedSheikhId };
         });
       });
+      
       setSheikhSessions(normalized);
+      // Persist to local cache
+      localStorage.setItem(`sessions_cache_${selectedSheikhId}`, JSON.stringify(normalized));
       setSheikhSessionsLoading(false);
     }, () => {
       setSheikhSessionsLoading(false);
     });
 
     return () => off(sessionsRef, 'value', unsubscribe);
-  }, [selectedSheikhId, user?.uid]);
+  }, [selectedSheikhId, user?.uid, dailySessions, isAdmin5]);
 
   // Calculate week dates for Weekly Outcome (Sat-Wed) based on outcomeWeekStart
   const weekDates = useMemo(() => {
@@ -618,11 +655,76 @@ export default function DailySessionsPage() {
     XLSX.writeFile(wb, `سجل_حصة_${session.id}.xlsx`);
   }
 
-  // ...
+  const handleQuickWhatsApp = () => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const daySessions = filteredGetSessionsForDay(todayStr);
+    const session = daySessions.find(s => s.sessionNumber === 1) || daySessions[0];
+
+    if (!session || !session.records || session.records.length === 0) {
+      toast({ title: "لا يوجد تقرير", description: "لم يتم تسجيل بيانات لحصة اليوم بعد.", variant: "destructive" });
+      return;
+    }
+
+    const dayName = format(new Date(), 'EEEE', { locale: ar });
+    const gregorianStr = format(new Date(), 'dd-MM-yyyy');
+    const hijriStr = toHijri(new Date());
+
+    let message = `السلام عليكم ورحمة الله وبركاته\n`;
+    message += hijriStr ? `اليوم ${dayName} ${hijriStr} الموافق لـ : ${gregorianStr}\n` : `اليوم ${dayName} ${gregorianStr}\n`;
+
+    const isCounterStopped = session.isCounterStopped;
+    const tasmieSurah = surahs.find(s => s.id === session.tasmieSurahId);
+    
+    if (isCounterStopped) {
+      message += `(العداد موقوف لهذا اليوم)\n`;
+    } else if (tasmieSurah) {
+      message += `قائمة الطلبة الذين استظهروا ورد التسميع من الآية(${pad(session.tasmieFromVerse || 1)}) إلى الآية(${pad(session.tasmieToVerse || 1)}) من سورة ${tasmieSurah.name} :\n`;
+    } else {
+      message += 'قائمة الطلبة الذين استظهروا الورد اليومي :\n';
+    }
+
+    const sortedActiveStudents = [...students].sort((a, b) => arabicCompare(a.fullName, b.fullName));
+    const recited = sortedActiveStudents.filter(s => {
+      const rec = session.records.find((r: any) => r.studentId === s.id);
+      return rec && (rec.attendance === 'حاضر' || rec.attendance === 'متأخر') && rec.memorization && rec.memorization !== 'لا يوجد';
+    });
+
+    if (recited.length > 0) {
+      message += recited.map(s => {
+        const rec = session.records.find((r: any) => r.studentId === s.id);
+        return `*${s.fullName}* : ${rec.memorization}`;
+      }).join('\n');
+    } else {
+      message += 'لا يوجد';
+    }
+
+    const late = sortedActiveStudents.filter(s => session.records.find((r: any) => r.studentId === s.id)?.attendance === 'متأخر');
+    if (late.length > 0) {
+      message += `\n-------------\nقائمة الطلبة المتأخرين:\n${late.map(s => `*${s.fullName}*`).join('\n')}`;
+    }
+
+    const absent = sortedActiveStudents.filter(s => {
+      const rec = session.records.find((r: any) => r.studentId === s.id);
+      return rec?.attendance === 'غياب' || rec?.attendance === 'غائب';
+    });
+    if (absent.length > 0) {
+      message += `\n-------------\nقائمة الطلبة الغائبين:\n${absent.map(s => `*${s.fullName}*`).join('\n')}`;
+    }
+
+    navigator.clipboard.writeText(message);
+    toast({ title: "تم النسخ", description: "تم نسخ تقرير اليوم بصيغة WhatsApp بنجاح." });
+  };
+
 
   return (
     <ProtectedPage>
-      <div className="container mx-auto p-4 space-y-8 pb-32 max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <ErrorBoundary fallback={<div className="container mx-auto p-12 text-center h-screen flex flex-col items-center justify-center gap-4">
+        <AlertTriangle className="h-16 w-16 text-amber-500" />
+        <h2 className="text-2xl font-bold">حدث خطأ غير متوقع في صفحة السجلات</h2>
+        <p className="text-muted-foreground">يرجى المحاولة مرة أخرى أو التواصل مع الإدارة إذا استمرت المشكلة.</p>
+        <Button onClick={() => window.location.reload()}>تحديث الصفحة</Button>
+      </div>}>
+        <div className="container mx-auto p-4 space-y-8 pb-32 max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-700">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
@@ -631,6 +733,39 @@ export default function DailySessionsPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
+            {/* Quick Actions Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="h-9 gap-2 border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary font-bold transition-all shadow-sm">
+                  <Zap className="h-4 w-4 fill-primary" />
+                  <span className="hidden sm:inline">إجراءات سريعة</span>
+                  <span className="sm:hidden">إجراءات</span>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 p-1">
+                <DropdownMenuItem onClick={handleQuickWhatsApp} className="gap-2 cursor-pointer py-2.5">
+                  <MessageSquare className="h-4 w-4 text-green-600" />
+                  نسخ تقرير اليوم (WhatsApp)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  const todayStr = format(new Date(), 'yyyy-MM-dd');
+                  const daySessions = filteredGetSessionsForDay(todayStr);
+                  const session = daySessions.find(s => s.sessionNumber === 1) || daySessions[0];
+                  if (session) handleExportSession({ stopPropagation: () => { } } as any, session.id);
+                  else toast({ title: "لا يوجد تقرير", description: "لم يتم تسجيل بيانات لحصة اليوم بعد.", variant: "destructive" });
+                }} className="gap-2 cursor-pointer py-2.5">
+                  <Download className="h-4 w-4 text-blue-600" />
+                  تصدير تقرير اليوم (Excel)
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setViewMode(viewMode === 'calendar' ? 'table' : 'calendar')} className="gap-2 cursor-pointer py-2.5">
+                  {viewMode === 'calendar' ? <Table className="h-4 w-4 text-purple-600" /> : <LayoutGrid className="h-4 w-4 text-purple-600" />}
+                  تبديل طريقة العرض
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {isAdminUser && (
               <div className="w-full sm:w-56">
                 <Select value={selectedSheikhId} onValueChange={setSelectedSheikhId}>
@@ -667,7 +802,7 @@ export default function DailySessionsPage() {
               </div>
             )}
 
-            {isAdminUser && (
+            {isAdmin00 && (
               <div className="flex gap-2">
                 <Button
                   variant="outline"
@@ -678,7 +813,11 @@ export default function DailySessionsPage() {
                   <CalendarDays className="h-4 w-4" />
                   <span className="hidden sm:inline">تعيين عطل جماعية</span>
                 </Button>
+              </div>
+            )}
 
+            {isAdminUser && (
+              <div className="flex gap-2">
                 {isSuperAdmin && (
                   <Button
                     variant="outline"
@@ -992,34 +1131,57 @@ export default function DailySessionsPage() {
                     size="sm"
                     className="h-6 text-xs text-sky-600 font-bold"
                     onClick={() => {
-                      const sheikhIds = allUsers?.filter(u => u.role === 'sheikh').map(u => u.uid) || [];
-                      setBulkHolidaySheikhs(bulkHolidaySheikhs.length === sheikhIds.length ? [] : sheikhIds);
+                      const visibleSheikhIds = allUsers?.filter(u => u.role === 'sheikh')
+                        .reduce((acc: any[], sheikh) => {
+                          if (!acc.find(s => s.group === sheikh.group)) acc.push(sheikh);
+                          return acc;
+                        }, [])
+                        .map(u => u.uid) || [];
+                      setBulkHolidaySheikhs(bulkHolidaySheikhs.length === visibleSheikhIds.length ? [] : visibleSheikhIds);
                     }}
                   >
                     تحديد الكل / إلغاء
                   </Button>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 bg-slate-50 rounded-xl border p-2 max-h-[220px] overflow-y-auto">
-                  {allUsers?.filter(u => u.role === 'sheikh').sort((a, b) => arabicCompare(a.group || '', b.group || '')).map((sheikh: any) => (
-                    <div
-                      key={sheikh.uid}
-                      className={cn(
-                        "flex items-center space-x-2 space-x-reverse bg-white p-2 rounded-lg border shadow-sm cursor-pointer hover:border-sky-300 transition-colors",
-                        bulkHolidaySheikhs.includes(sheikh.uid) && "border-sky-500 bg-sky-50"
-                      )}
-                      onClick={() => setBulkHolidaySheikhs(prev => prev.includes(sheikh.uid) ? prev.filter(id => id !== sheikh.uid) : [...prev, sheikh.uid])}
-                    >
-                      <Checkbox
-                        id={`sh-${sheikh.uid}`}
-                        checked={bulkHolidaySheikhs.includes(sheikh.uid)}
-                        onCheckedChange={(checked) => {
-                          if (checked) setBulkHolidaySheikhs(prev => [...prev, sheikh.uid]);
-                          else setBulkHolidaySheikhs(prev => prev.filter(id => id !== sheikh.uid));
-                        }}
-                      />
-                      <label htmlFor={`sh-${sheikh.uid}`} className="text-xs font-bold cursor-pointer flex-1 truncate">{sheikh.displayName || 'بدون اسم'} ({sheikh.group || 'بدون فوج'})</label>
-                    </div>
-                  ))}
+                  {allUsers?.filter(u => u.role === 'sheikh')
+                    .reduce((acc: any[], sheikh) => {
+                      // Deduplicate by group - keep only one sheikh per group as requested
+                      const existingGroup = acc.find(s => s.group === sheikh.group);
+                      if (!existingGroup) {
+                        acc.push(sheikh);
+                      }
+                      return acc;
+                    }, [])
+                    .sort((a, b) => {
+                      // Extract group number from group name like "فوج 1", "فوج 2", etc.
+                      const getGroupNum = (group: string | undefined) => {
+                        if (!group) return 999;
+                        const match = group.match(/\d+/);
+                        return match ? parseInt(match[0], 10) : 999;
+                      };
+                      return getGroupNum(a.group) - getGroupNum(b.group);
+                    })
+                    .map((sheikh: any) => (
+                      <div
+                        key={sheikh.uid}
+                        className={cn(
+                          "flex items-center space-x-2 space-x-reverse bg-white p-2 rounded-lg border shadow-sm cursor-pointer hover:border-sky-300 transition-colors",
+                          bulkHolidaySheikhs.includes(sheikh.uid) && "border-sky-500 bg-sky-50"
+                        )}
+                        onClick={() => setBulkHolidaySheikhs(prev => prev.includes(sheikh.uid) ? prev.filter(id => id !== sheikh.uid) : [...prev, sheikh.uid])}
+                      >
+                        <Checkbox
+                          id={`sh-${sheikh.uid}`}
+                          checked={bulkHolidaySheikhs.includes(sheikh.uid)}
+                          onCheckedChange={(checked) => {
+                            if (checked) setBulkHolidaySheikhs(prev => [...prev, sheikh.uid]);
+                            else setBulkHolidaySheikhs(prev => prev.filter(id => id !== sheikh.uid));
+                          }}
+                        />
+                        <label htmlFor={`sh-${sheikh.uid}`} className="text-xs font-bold cursor-pointer flex-1 truncate">{sheikh.group || 'بدون فوج'}</label>
+                      </div>
+                    ))}
                 </div>
               </div>
             </div>
@@ -1084,7 +1246,7 @@ export default function DailySessionsPage() {
                   <ChevronRight className="h-4 w-4" />
                 </Button>
                 <div className="text-sm font-bold text-purple-900 bg-white px-3 py-1 rounded-md border min-w-[120px] text-center shadow-sm">
-                  {format(weekDates[0], 'dd MMM', { locale: ar })} - {format(weekDates[4], 'dd MMM', { locale: ar })}
+                  {format(weekDates[0], 'dd MMM', { locale: ar })} - {format(weekDates[6], 'dd MMM', { locale: ar })}
                 </div>
                 <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setOutcomeWeekStart(prev => addDays(prev, -7))}>
                   <ChevronLeft className="h-4 w-4" />
@@ -1097,7 +1259,7 @@ export default function DailySessionsPage() {
                   <thead className="bg-muted/50">
                     <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
                       <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[30%]">الطالب</th>
-                      <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[30%]">التفقد اليومي (السبت - الأربعاء)</th>
+                      <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[30%]">التفقد اليومي (السبت - الجمعة)</th>
                       <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[20%]">التقييم الأسبوعي</th>
                       <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[20%]">إجراءات</th>
                     </tr>
@@ -1109,7 +1271,7 @@ export default function DailySessionsPage() {
                       const outcome = weeklyOutcomes[outcomeId];
 
                       // Calculate daily status dots
-                      const days = weekDates.slice(0, 5); // Sat to Wed
+                      const days = weekDates.slice(0, 7); // Sat to Fri
 
                       return (
                         <tr key={student.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
@@ -1202,7 +1364,6 @@ export default function DailySessionsPage() {
                                       outcome.evaluation === 'حسن' ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
                                         "bg-red-100 text-red-700 border-red-200"
                               )}>
-                                {/* Symbol logic could be extracted but keeping inline for now */}
                                 <span className="text-lg">
                                   {outcome.evaluation === 'ممتاز' ? '🌟' :
                                     outcome.evaluation === 'جيد جداً' ? '⭐' :
@@ -1257,7 +1418,7 @@ export default function DailySessionsPage() {
           currentOutcome={weeklyOutcomes[`${outcomeModalStudent.id}_${format(weekDates[0], 'yyyy-MM-dd')}`]}
         />
       )}
-
-    </ProtectedPage >
+  </ErrorBoundary>
+</ProtectedPage >
   );
 }

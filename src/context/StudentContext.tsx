@@ -141,20 +141,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('🔄 StudentContext useEffect triggered');
-    console.log('Auth loading:', authLoading);
-    console.log('User:', authContextUser?.email);
-    console.log('Role:', role);
-    console.log('isSuperAdmin:', isSuperAdmin);
-    console.log('isManagement:', isManagement);
-
     if (authLoading) {
       setLoading(true);
       return;
     }
 
     if (!authContextUser) {
-      console.log('❌ No authenticated user - resetting data');
       setLoading(false);
       setStudents([]);
       setDailySessions({});
@@ -172,7 +164,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    console.log('✅ User authenticated, setting up listeners...');
     setLoading(true);
     let notificationsRef: any = null;
     let notificationsListener: any = null;
@@ -208,7 +199,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     });
 
     if (isSuperAdmin || isManagement) {
-      console.log('👑 Management/SuperAdmin mode activated');
       const mergeAndSetLogs = () => {
         const merged = { ...accumulatedUserLogs, ...accumulatedGlobalLogs };
         const logsArray = Object.values(merged).sort((a, b) => {
@@ -237,9 +227,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
         // If management/admin, aggregate data from all users
         if (isSuperAdmin || isManagement) {
-          console.log('🔍 Management/Admin view - Aggregating data from all users');
-          console.log('Total users found:', Object.keys(usersData).length);
-
           let allStudents: Student[] = [];
           let allSessions: Record<string, Record<string, DailySession>> = {};
           let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
@@ -258,34 +245,21 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
             // Log each user's data
             if (userData.students) {
-              const studentCount = Object.keys(userData.students).length;
-              console.log(`📚 User ${userData.profile?.displayName || uid}: ${studentCount} students`);
-
               const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) =>
                 processStudentData({ ...s, id }, uid, userData.profile?.group)
               );
               allStudents.push(...userStudents);
-            } else {
-              console.log(`📭 User ${userData.profile?.displayName || uid}: No students`);
             }
 
             if (userData.dailySessions) {
-              const userSessionCount = Object.keys(userData.dailySessions).length;
-              console.log(`  📅 User ${userData.profile?.displayName || uid} has ${userSessionCount} date(s) with sessions`);
-
               for (const date in userData.dailySessions) {
                 if (!allSessions[date]) allSessions[date] = {};
-                const sessionsOnDate = Object.keys(userData.dailySessions[date]).length;
-                console.log(`    - ${date}: ${sessionsOnDate} session(s)`);
-
                 Object.entries(userData.dailySessions[date]).forEach(([sessionId, session]: [string, any]) => {
                   // Use a unique key to prevent collisions between different sheikhs' sessions
                   const uniqueKey = `${uid}_${sessionId}`;
                   allSessions[date][uniqueKey] = { ...session, ownerId: uid };
                 });
               }
-            } else {
-              console.log(`  📅 User ${userData.profile?.displayName || uid} has NO sessions`);
             }
             if (userData.dailyReports) {
               for (const date in userData.dailyReports) {
@@ -311,17 +285,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
               });
             }
           }
-
-          console.log('✅ Total students aggregated:', allStudents.length);
-          console.log('✅ Total sessions aggregated:', Object.keys(allSessions).length);
-
-          // 🔍 DIAGNOSTIC: Log session details for debugging
-          console.log('📊 Session Details by Date:');
-          Object.entries(allSessions).forEach(([date, sessions]) => {
-            const sessionCount = Object.keys(sessions).length;
-            const owners = [...new Set(Object.values(sessions).map((s: any) => s.ownerId))];
-            console.log(`  ${date}: ${sessionCount} session(s), owners: ${owners.join(', ')}`);
-          });
 
           setStudents(allStudents);
           setDailySessions(allSessions);
@@ -483,55 +446,116 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const commitmentKing = useMemo(() => {
     if (allSortedSessions.length === 0 || activeStudents.length === 0) return { id: undefined, name: undefined, streak: 0, photoURL: undefined };
     const sortedBasicSessions = allSortedSessions.filter(s => s.sessionType === 'حصة أساسية');
-    if (sortedBasicSessions.length === 0) return { id: undefined, name: undefined, streak: 0, photoURL: undefined };
-    let maxStreak = 0; let king: any = undefined;
-    activeStudents.forEach(student => {
-      let currentStreak = 0; let studentMaxStreak = 0;
-      sortedBasicSessions.forEach(session => {
-        if (parseISO(session.date) < student.registrationDate) return;
-        const record = (session.records || []).find(r => r.studentId === student.id);
-        if (record && record.attendance === 'حاضر') currentStreak++;
-        else { studentMaxStreak = Math.max(studentMaxStreak, currentStreak); currentStreak = 0; }
+    
+    // Efficiency: O(Sessions * Students) instead of O(Students * Sessions * Records)
+    const stats: Record<string, { current: number; max: number }> = {};
+    activeStudents.forEach(s => stats[s.id] = { current: 0, max: 0 });
+
+    sortedBasicSessions.forEach(session => {
+      const records = session.records || [];
+      const presentIds = new Set(records.filter(r => r.attendance === 'حاضر').map(r => r.studentId));
+      
+      activeStudents.forEach(student => {
+        // Only count sessions after student joined
+        if (session.date && student.registrationDate && parseISO(session.date) < student.registrationDate) return;
+        
+        if (presentIds.has(student.id)) {
+          stats[student.id].current++;
+        } else {
+          stats[student.id].max = Math.max(stats[student.id].max, stats[student.id].current);
+          stats[student.id].current = 0;
+        }
       });
-      studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
-      if (studentMaxStreak > maxStreak) { maxStreak = studentMaxStreak; king = student; }
     });
+
+    let maxStreak = 0;
+    let winnerId: string | undefined;
+    
+    Object.entries(stats).forEach(([id, s]) => {
+      const finalMax = Math.max(s.max, s.current);
+      if (finalMax > maxStreak) {
+        maxStreak = finalMax;
+        winnerId = id;
+      }
+    });
+
+    const king = activeStudents.find(s => s.id === winnerId);
     return { id: king?.id, name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
   }, [activeStudents, allSortedSessions]);
 
   const academicKing = useMemo(() => {
     if (allSortedSessions.length === 0 || activeStudents.length === 0) return { id: undefined, name: undefined, streak: 0, photoURL: undefined };
     const sortedBasicSessions = allSortedSessions.filter(s => s.sessionType === 'حصة أساسية');
-    let maxStreak = 0; let king: any = undefined;
-    activeStudents.forEach(student => {
-      let currentStreak = 0; let studentMaxStreak = 0;
-      sortedBasicSessions.forEach(session => {
-        if (parseISO(session.date) < student.registrationDate) return;
-        const record = (session.records || []).find(r => r.studentId === student.id);
-        if (record && record.memorization === 'ممتاز') currentStreak++;
-        else { studentMaxStreak = Math.max(studentMaxStreak, currentStreak); currentStreak = 0; }
+    
+    const stats: Record<string, { current: number; max: number }> = {};
+    activeStudents.forEach(s => stats[s.id] = { current: 0, max: 0 });
+
+    sortedBasicSessions.forEach(session => {
+      const records = session.records || [];
+      const excellentIds = new Set(records.filter(r => r.memorization === 'ممتاز').map(r => r.studentId));
+      
+      activeStudents.forEach(student => {
+        if (session.date && student.registrationDate && parseISO(session.date) < student.registrationDate) return;
+        
+        if (excellentIds.has(student.id)) {
+          stats[student.id].current++;
+        } else {
+          stats[student.id].max = Math.max(stats[student.id].max, stats[student.id].current);
+          stats[student.id].current = 0;
+        }
       });
-      studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
-      if (studentMaxStreak > maxStreak) { maxStreak = studentMaxStreak; king = student; }
     });
+
+    let maxStreak = 0;
+    let winnerId: string | undefined;
+    
+    Object.entries(stats).forEach(([id, s]) => {
+      const finalMax = Math.max(s.max, s.current);
+      if (finalMax > maxStreak) {
+        maxStreak = finalMax;
+        winnerId = id;
+      }
+    });
+
+    const king = activeStudents.find(s => s.id === winnerId);
     return { id: king?.id, name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
   }, [activeStudents, allSortedSessions]);
 
   const behaviorKing = useMemo(() => {
     if (allSortedSessions.length === 0 || activeStudents.length === 0) return { id: undefined, name: undefined, streak: 0, photoURL: undefined };
     const sortedBasicSessions = allSortedSessions.filter(s => s.sessionType === 'حصة أساسية');
-    let maxStreak = 0; let king: any = undefined;
-    activeStudents.forEach(student => {
-      let currentStreak = 0; let studentMaxStreak = 0;
-      sortedBasicSessions.forEach(session => {
-        if (parseISO(session.date) < student.registrationDate) return;
-        const record = (session.records || []).find(r => r.studentId === student.id);
-        if (record && record.behavior === 'هادئ') currentStreak++;
-        else { studentMaxStreak = Math.max(studentMaxStreak, currentStreak); currentStreak = 0; }
+    
+    const stats: Record<string, { current: number; max: number }> = {};
+    activeStudents.forEach(s => stats[s.id] = { current: 0, max: 0 });
+
+    sortedBasicSessions.forEach(session => {
+      const records = session.records || [];
+      const calmIds = new Set(records.filter(r => r.behavior === 'هادئ').map(r => r.studentId));
+      
+      activeStudents.forEach(student => {
+        if (session.date && student.registrationDate && parseISO(session.date) < student.registrationDate) return;
+        
+        if (calmIds.has(student.id)) {
+          stats[student.id].current++;
+        } else {
+          stats[student.id].max = Math.max(stats[student.id].max, stats[student.id].current);
+          stats[student.id].current = 0;
+        }
       });
-      studentMaxStreak = Math.max(studentMaxStreak, currentStreak);
-      if (studentMaxStreak > maxStreak) { maxStreak = studentMaxStreak; king = student; }
     });
+
+    let maxStreak = 0;
+    let winnerId: string | undefined;
+    
+    Object.entries(stats).forEach(([id, s]) => {
+      const finalMax = Math.max(s.max, s.current);
+      if (finalMax > maxStreak) {
+        maxStreak = finalMax;
+        winnerId = id;
+      }
+    });
+
+    const king = activeStudents.find(s => s.id === winnerId);
     return { id: king?.id, name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
   }, [activeStudents, allSortedSessions]);
 

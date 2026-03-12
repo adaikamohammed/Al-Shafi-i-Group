@@ -7,9 +7,16 @@ export function cn(...inputs: ClassValue[]) {
 
 export function sanitizeData(obj: any): any {
   if (obj === undefined) return null;
-  if (obj === null || typeof obj !== 'object') return obj;
-  if (obj instanceof Date) return obj;
-
+  if (obj === null) return null;
+  
+  // Handle numbers: convert NaN/Infinity to null as they are not JSON-safe
+  if (typeof obj === 'number') {
+    return isFinite(obj) ? obj : null;
+  }
+  
+  // Handle basic types and Dates
+  if (typeof obj !== 'object') return obj;
+  if (obj instanceof Date) return obj.toISOString(); // Better for Firebase consistency
 
   if (Array.isArray(obj)) {
     return obj.map(item => sanitizeData(item));
@@ -18,7 +25,10 @@ export function sanitizeData(obj: any): any {
   const sanitized: any = {};
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      sanitized[key] = sanitizeData(obj[key]);
+      const value = obj[key];
+      // Skip functions and non-serializable items
+      if (typeof value === 'function') continue;
+      sanitized[key] = sanitizeData(value);
     }
   }
   return sanitized;
