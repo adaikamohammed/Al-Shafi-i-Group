@@ -5,14 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Check, X, Clock, Star, MessageSquare, BookOpen } from 'lucide-react';
+import { Check, X, Clock, Star, MessageSquare, BookOpen, Plus, Trash2, Rewind, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Student, AttendanceStatus, PerformanceLevel, BehaviorLevel } from '@/lib/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/AuthContext';
 import { surahs } from '@/lib/surahs';
 import { CatchUpEntry } from '@/lib/types';
-import { Plus, Trash2, Rewind } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -58,41 +57,6 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
 
     return (
         <div className="space-y-4" dir="rtl">
-            {/* Bulk Actions */}
-            {(viewMode === 'full' || viewMode === 'attendance') && (
-                <div className="flex flex-wrap gap-2 items-center bg-muted/30 p-2 rounded-xl border border-dashed border-muted-foreground/20">
-                    <span className="text-[10px] md:text-xs font-bold text-muted-foreground ml-2">تحديد سريع:</span>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-7 md:h-8 text-[10px] md:text-xs gap-1 border-emerald-200 hover:bg-emerald-50 text-emerald-700 font-bold"
-                        onClick={() => students.forEach(s => onUpdateRecord(s.id, 'attendance', 'حاضر'))}
-                    >
-                        <CheckCircle2 className="h-3 w-3" />
-                        الكل حاضر
-                    </Button>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-7 md:h-8 text-[10px] md:text-xs gap-1 border-red-200 hover:bg-red-50 text-red-700 font-bold"
-                        onClick={() => students.forEach(s => onUpdateRecord(s.id, 'attendance', 'غياب'))}
-                    >
-                        <XCircle className="h-3 w-3" />
-                        الكل غائب
-                    </Button>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 md:h-8 text-[10px] md:text-xs gap-1 text-muted-foreground"
-                        onClick={() => students.forEach(s => onUpdateRecord(s.id, 'attendance', ''))}
-                    >
-                        مسح الكل
-                    </Button>
-                </div>
-            )}
             {students.map((student) => {
                 const record = records[student.id] || { attendance: '', memorization: '', behavior: '', notes: '', review: false };
                 const selectedSurah = surahs.find(s => s.id === record.surahId);

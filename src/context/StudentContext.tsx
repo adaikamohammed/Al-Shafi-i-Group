@@ -123,6 +123,9 @@ const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const { user: authContextUser, loading: authLoading, isSuperAdmin, isManagement, role } = useAuth();
+  const isAdmin5 = authContextUser?.email === 'admin5@gmail.com';
+  const isAdmin00 = authContextUser?.email === 'admin00@gmail.com' || authContextUser?.email === 'abdallah.shafii@gmail.com';
+  const isPrivileged = isSuperAdmin || isManagement || isAdmin5 || isAdmin00;
   const { toast } = useToast();
 
   const [students, setStudents] = useState<Student[]>([]);
@@ -198,7 +201,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       birthDate: preReg.birthDate && isValid(parseISO(preReg.birthDate)) ? parseISO(preReg.birthDate) : preReg.birthDate,
     });
 
-    if (isSuperAdmin || isManagement) {
+    if (isPrivileged) {
       const mergeAndSetLogs = () => {
         const merged = { ...accumulatedUserLogs, ...accumulatedGlobalLogs };
         const logsArray = Object.values(merged).sort((a, b) => {
@@ -226,7 +229,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         }
 
         // If management/admin, aggregate data from all users
-        if (isSuperAdmin || isManagement) {
+        if (isPrivileged) {
           let allStudents: Student[] = [];
           let allSessions: Record<string, Record<string, DailySession>> = {};
           let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
@@ -311,7 +314,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           });
         }
 
-        if (isSuperAdmin || isManagement) setLoading(false);
+        if (isPrivileged) setLoading(false);
       });
 
       // 2. Pre-registrations
@@ -1300,8 +1303,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const student = students.find(s => s.id === payment.studentId);
     if (!student) throw new Error("Student not found");
 
-    // Allow if user is the owner, or if user is management/super_admin
-    if (!isSuperAdmin && !isManagement && authContextUser.uid !== student.ownerId) {
+    // Allow if user is the owner, or if user is privileged
+    if (!isPrivileged && authContextUser.uid !== student.ownerId) {
       throw new Error("Not authorized to update this payment");
     }
 
@@ -1316,7 +1319,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const generateDemoData = async () => {
-    if (!isManagement && !isSuperAdmin) return;
+    if (!isPrivileged) return;
 
     setLoading(true);
     try {
@@ -1423,7 +1426,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       timestamp: new Date().toISOString()
     };
 
-    const ownerId = (isSuperAdmin || isManagement) ? logData.details.ownerId || authContextUser.uid : authContextUser.uid;
+    const ownerId = isPrivileged ? logData.details.ownerId || authContextUser.uid : authContextUser.uid;
     const logRef = ref(db, `users/${ownerId}/admin_logs/${logId}`);
 
     await set(logRef, log);
@@ -1924,7 +1927,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       getNextTicketNumber,
       transferStudent,
       saveMeeting: async (meetingData, meetingId) => {
-        if (!authContextUser || (!isSuperAdmin && !isManagement)) return;
+        if (!authContextUser || !isPrivileged) return;
         const id = meetingId || uuidv4();
         const meetingRef = ref(db, `meetings/${id}`);
         const dataToSave = {
@@ -1948,13 +1951,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: '✅ تم إرسال المقترح' });
       },
       deleteMeeting: async (meetingId) => {
-        if (!authContextUser || (!isSuperAdmin && !isManagement)) return;
+        if (!authContextUser || !isPrivileged) return;
         const meetingRef = ref(db, `meetings/${meetingId}`);
         await remove(meetingRef);
         toast({ title: '🗑️ تم حذف الاجتماع' });
       },
       deleteMeetingSuggestion: async (meetingId, suggestionId) => {
-        if (!authContextUser || (!isSuperAdmin && !isManagement)) return;
+        if (!authContextUser || !isPrivileged) return;
         const suggestionRef = ref(db, `meetings/${meetingId}/suggestions/${suggestionId}`);
         await remove(suggestionRef);
         toast({ title: '🗑️ تم حذف المقترح' });

@@ -103,6 +103,25 @@ function RegisterSessionContent() {
         }).sort((a, b) => arabicCompare(a.fullName, b.fullName)),
         [students, isSuperAdmin, user, effectiveOwnerId]);
 
+    // Combined list: Active Students + Students who have a record in this specific session
+    // This solves the "Empty Sessions" issue for students who became inactive.
+    const sessionStudents = useMemo(() => {
+        const studentIdsWithRecords = new Set(Object.keys(attendanceRecords));
+        if (studentIdsWithRecords.size === 0) return activeStudents;
+
+        const studentsWithRecords = (students ?? []).filter(s => studentIdsWithRecords.has(s.id));
+        
+        // Merge and deduplicate
+        const merged = [...activeStudents];
+        studentsWithRecords.forEach(s => {
+            if (!merged.find(m => m.id === s.id)) {
+                merged.push(s);
+            }
+        });
+
+        return merged.sort((a, b) => arabicCompare(a.fullName, b.fullName));
+    }, [activeStudents, attendanceRecords, students]);
+
     // Calculate Past Wirds for Catch-up (Admin5 only)
     const pastWirds = useMemo(() => {
         if (!isAdmin5 || !dailySessions) return [];
@@ -340,7 +359,7 @@ function RegisterSessionContent() {
         setIsDirty(true);
         setAttendanceRecords(prev => {
             const newRecords = { ...prev };
-            activeStudents.forEach(student => {
+            sessionStudents.forEach(student => {
                 const currentRecord = newRecords[student.id] || {
                     memorization: '' as PerformanceLevel,
                     behavior: '' as BehaviorLevel,
@@ -367,7 +386,7 @@ function RegisterSessionContent() {
         setIsDirty(true);
         setAttendanceRecords(prev => {
             const newRecords = { ...prev };
-            activeStudents.forEach(student => {
+            sessionStudents.forEach(student => {
                 const existing = newRecords[student.id] || { studentId: student.id, attendance: 'حاضر' as AttendanceStatus, memorization: '' as PerformanceLevel, behavior: '' as BehaviorLevel, notes: '', review: false };
                 if (existing.attendance === 'حاضر' || existing.attendance === 'متأخر') {
                     newRecords[student.id] = { ...existing, behavior: 'هادئ' };
@@ -382,7 +401,7 @@ function RegisterSessionContent() {
         setIsDirty(true);
         setAttendanceRecords(prev => {
             const newRecords = { ...prev };
-            activeStudents.forEach(student => {
+            sessionStudents.forEach(student => {
                 const existing = newRecords[student.id] || { studentId: student.id, attendance: 'حاضر' as AttendanceStatus, memorization: '' as PerformanceLevel, behavior: '' as BehaviorLevel, notes: '', review: false };
                 if (existing.attendance === 'حاضر' || existing.attendance === 'متأخر') {
                     newRecords[student.id] = { ...existing, review: true };
@@ -397,7 +416,7 @@ function RegisterSessionContent() {
         setIsDirty(true);
         setAttendanceRecords(prev => {
             const newRecords = { ...prev };
-            activeStudents.forEach(student => {
+            sessionStudents.forEach(student => {
                 const existing = newRecords[student.id] || { studentId: student.id, attendance: 'حاضر' as AttendanceStatus, memorization: '' as PerformanceLevel, behavior: '' as BehaviorLevel, notes: '', review: false };
                 if (existing.attendance === 'حاضر' || existing.attendance === 'متأخر') {
                     newRecords[student.id] = { ...existing, memorization: 'جيد' };
@@ -878,7 +897,7 @@ function RegisterSessionContent() {
 
             <section className="bg-card p-4 rounded-2xl shadow-sm border space-y-4">
                 {(sessionType === 'حصة أساسية' || sessionType === 'حصة تعويضية' || sessionType === 'حصة إضافية') && (
-                    <SessionStatsWidget students={activeStudents} records={attendanceRecords} />
+                    <SessionStatsWidget students={sessionStudents} records={attendanceRecords} />
                 )}
 
                 <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
@@ -1096,7 +1115,7 @@ function RegisterSessionContent() {
                 ) : (
                     <div className="p-4">
                         <AttendanceList
-                            students={activeStudents}
+                            students={sessionStudents}
                             records={attendanceRecords}
                             onUpdateRecord={handleUpdateRecord}
                             sessionType={sessionType}
