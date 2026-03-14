@@ -49,11 +49,11 @@ function RegisterSessionContent() {
 
     // Determine the effective owner ID (either specified in URL for admins, or current user)
     const effectiveOwnerId = useMemo(() => {
-        if ((isSuperAdmin || isAdmin5 || isManagement) && ownerIdParam) {
+        if ((isSuperAdmin || isManagement) && ownerIdParam) {
             return ownerIdParam;
         }
         return user?.uid;
-    }, [isSuperAdmin, isAdmin5, isManagement, ownerIdParam, user]);
+    }, [isSuperAdmin, isManagement, ownerIdParam, user]);
 
     const [sessionType, setSessionType] = useState<'حصة أساسية' | 'حصة تعويضية' | 'يوم عطلة' | 'غياب الشيخ' | 'حصة أنشطة' | 'حصة إضافية'>('حصة أساسية');
     const [teacherAbsenceReason, setTeacherAbsenceReason] = useState('');
@@ -132,31 +132,49 @@ function RegisterSessionContent() {
 
         return allSessions
             .filter(s => {
-                const sDate = parse(s.date, 'yyyy-MM-dd', new Date());
-                // Only past sessions, basic/extra type, and has surah info
-                return sDate < currentSessionDate &&
-                    (s.sessionType === 'حصة أساسية' || s.sessionType === 'حصة إضافية') &&
-                    s.surahId;
+                // EXTREMELY SAFE GUARD: Ensure s.date exists and is a valid format
+                if (!s || typeof s.date !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(s.date)) return false;
+
+                try {
+                    const sDate = parse(s.date, 'yyyy-MM-dd', new Date());
+                    // Only past sessions, basic/extra type, and has surah info
+                    return sDate < currentSessionDate &&
+                        (s.sessionType === 'حصة أساسية' || s.sessionType === 'حصة إضافية') &&
+                        s.surahId;
+                } catch (e) {
+                    return false;
+                }
             })
-            .sort((a, b) => b.date.localeCompare(a.date)) // Newest first
+            .sort((a, b) => {
+                try {
+                    return b.date.localeCompare(a.date);
+                } catch (e) {
+                    return 0;
+                }
+            }) // Newest first
             .map(s => {
-                const surah = surahs.find(su => su.id === s.surahId);
-                const sDate = parse(s.date, 'yyyy-MM-dd', new Date());
-                // Get IDs of students who were present (attended & memorized)
-                const presentStudentIds: string[] = (s.records || [])
-                    .filter((r: any) => r.attendance === 'حاضر' || r.attendance === 'متأخر')
-                    .map((r: any) => r.studentId);
-                return {
-                    date: s.date,
-                    dayName: format(sDate, 'EEEE', { locale: ar }),
-                    sessionNumber: s.sessionNumber,
-                    surahId: s.surahId,
-                    surahName: surah?.name || 'سورة مجهولة',
-                    fromVerse: s.fromVerse,
-                    toVerse: s.toVerse,
-                    presentStudentIds,
-                };
-            });
+                try {
+                    const surah = surahs.find(su => su.id === s.surahId);
+                    const sDate = parse(s.date, 'yyyy-MM-dd', new Date());
+                    // Get IDs of students who were present (attended & memorized)
+                    const presentStudentIds: string[] = (s.records || [])
+                        .filter((r: any) => r.attendance === 'حاضر' || r.attendance === 'متأخر')
+                        .map((r: any) => r.studentId);
+                    return {
+                        date: s.date,
+                        dayName: format(sDate, 'EEEE', { locale: ar }),
+                        sessionNumber: s.sessionNumber,
+                        surahId: s.surahId,
+                        surahName: surah?.name || 'سورة مجهولة',
+                        fromVerse: s.fromVerse,
+                        toVerse: s.toVerse,
+                        presentStudentIds,
+                    };
+                } catch (e) {
+                    return null;
+                }
+            })
+            .filter(item => item !== null);
     }, [isAdmin5, dailySessions, selectedDay]);
 
     const DRAFT_KEY = useMemo(() => {

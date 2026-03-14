@@ -766,7 +766,7 @@ export default function DailySessionsPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {isAdminUser && (
+            {(isSuperAdmin || isManagement || isAdmin00) && (
               <div className="w-full sm:w-56">
                 <Select value={selectedSheikhId} onValueChange={setSelectedSheikhId}>
                   <SelectTrigger className="h-9 text-sm">

@@ -1,0 +1,150 @@
+﻿"use client";
+
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { db } from '@/lib/firebase';
+import { ref as dbRef, onValue, off, get, update } from 'firebase/database';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useStudentContext } from '@/context/StudentContext';
+import { useToast } from '@/hooks/use-toast';
+import { getYear, getMonth, format, parse, parseISO, eachDayOfInterval, getDay, startOfMonth, endOfMonth } from 'date-fns';
+import { ar } from 'date-fns/locale';
+import { v4 as uuidv4 } from 'uuid';
+import { Checkbox } from '@/components/ui/checkbox';
+import * as XLSX from 'xlsx';
+import { cn, arabicCompare } from '@/lib/utils';
+import { surahs } from '@/lib/surahs';
+import { SessionType } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Star,
+  Plus,
+  ArrowRight,
+  ArrowLeft,
+  Filter,
+  Search,
+  CheckCircle2,
+  AlertCircle,
+  ThumbsUp,
+  Clock,
+  Printer,
+  ChevronRight,
+  ChevronLeft,
+  Calendar,
+  Calendar as CalendarIcon,
+  CalendarDays,
+  Settings,
+  RefreshCw,
+  MoreVertical,
+  Edit,
+  Trash2,
+  FileText,
+  Share2,
+  UserPlus,
+  Circle,
+  TrendingUp,
+  Award,
+  BookOpen,
+  LayoutGrid,
+  List,
+  History,
+  Info,
+  ChevronDown,
+  Layout,
+  Table,
+  Table as TableIcon,
+  Download,
+  Share,
+  Users,
+  MessageSquare,
+  X,
+  PlusCircle,
+  CheckCircle,
+  UserMinus,
+  AlertTriangle,
+  MoveHorizontal,
+  ThumbsDown,
+  Zap,
+  Smile,
+  XCircle,
+  Minus,
+  Trophy,
+  Loader2,
+  Save,
+  Dot,
+  Sparkles,
+  UserCheck,
+  Copy
+} from "lucide-react";
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { ProtectedPage } from '@/components/ui/ProtectedPage';
+import { WeeklyOutcomeModal } from '@/components/admin/WeeklyOutcomeModal';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { startOfWeek, addDays, isSameDay } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+
+import { SessionCalendar } from '@/components/sessions/SessionCalendar';
+import { AttendanceList, AttendanceRecord } from '@/components/sessions/AttendanceList';
+import { WeeklyAttendanceTable } from '@/components/sessions/WeeklyAttendanceTable';
+import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
+import { Admin5MessagesPanel } from '@/components/sessions/Admin5MessagesPanel';
+import { WeeklyStatsRow } from '@/components/sessions/WeeklyStatsRow';
+import { ParentsSurahProgressView } from '@/components/sessions/ParentsSurahProgressView';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+
+const pad = (num: number) => num < 10 ? `0${num}` : num.toString();
+
+const toHijri = (date: Date): string => {
+  try {
+    const hijriDate = new Date(date);
+    hijriDate.setDate(hijriDate.getDate() - 1);
+    const fmt = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+    const parts = fmt.formatToParts(hijriDate);
+    const day = parts.find(p => p.type === 'day')?.value || '';
+    const month = parts.find(p => p.type === 'month')?.value || '';
+    const year = parts.find(p => p.type === 'year')?.value || '';
+    const toWestern = (s: string) => s.replace(/[ظ -ظ©]/g, d => String('ظ ظ،ظ¢ظ£ظ¤ظ¥ظ¦ظ§ظ¨ظ©'.indexOf(d)));
+    return `${toWestern(day)} ${month} ${toWestern(year)}`;
+  } catch {
+    return '';
+  }
+};
+
+export default function DailySessionsPage() {
+  const { user, isSuperAdmin } = useAuth();
+  const { allUsers, students, dailySessions, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById, moveDailySession, weeklyOutcomes } = useStudentContext();
+
+  const { toast } = useToast();
+  const router = useRouter();
+  const isAdmin5 = user?.email === 'admin5@gmail.com';
+  const isManagement = user?.role === 'management';
+  const isAdmin00 = user?.email === 'admin00@gmail.com' || user?.email === 'abdallah.shafii@gmail.com';
+  const isAdminUser = isSuperAdmin || isAdmin5 || isManagement || isAdmin00;
+
+  // State
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [outcomeWeekStart, setOutcomeWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 6 }));
+  const [isAddExtraDialogOpen, setIsAddExtraDialogOpen] = useState(false);
+  const [extraSessionDate, setExtraSessionDate] = useState('');
+  const [extraSessionType, setExtraSessionType] = useState<SessionType>('ط­طµط© ط£ط³ط§ط³ظٹط©');
+  const [extraSessionNumber, setExtraSessionNumber] = useState<1 | 2>(1);
+  const [selectedSheikhId, setSelectedSheikhId] = useState<string>('');
+  const [sessionChoiceData, setSessionChoiceData] = useState<{ day: number, dateStr: string, sessions: any[] } | null>(null);
+  const [moveSessionData, setMoveSessionData] = useState<{ sessionId: string, date: string, currentOwnerId: string } | null>(null);
+  const [targetSheikhForMove, setTargetSheikhForMove] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'parents'>('calendar');
+  const [outcomeModalStudent, setOutcomeModalStudent] = useState<any | null>(null);
