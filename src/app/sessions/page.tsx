@@ -1320,32 +1320,6 @@ export default function DailySessionsPage() {
                             </div>
                           </td>
                           <td className="p-4 align-middle">
-                            <div className="flex items-center justify-center gap-2" dir="rtl">
-                              {days.map((day) => {
-                                const dateStr = format(day, 'yyyy-MM-dd');
-                                const sessions = sheikhSessions[dateStr] ? Object.values(sheikhSessions[dateStr]) : [];
-                                const studentSession = sessions.find((s: any) => s.records?.some((r: any) => r.studentId === student.id)) as any;
-                                const record = studentSession?.records?.find((r: any) => r.studentId === student.id);
-
-                                let statusText = "غير مسجل";
-                                if (record) {
-                                  statusText = record.memorization || (record.attendanceStatus === 'absent' ? "غائب" : "حاضر");
-                                }
-
-                                const isVeryGood = record?.memorization === 'جيد جداً' || record?.memorization === 'جيد جدا';
-
-                                return (
-                                  <TooltipProvider key={day.toISOString()}>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className={cn(
-                                          "flex flex-col items-center justify-center p-1 rounded-lg transition-all hover:scale-105 border shadow-sm min-w-[34px] h-[36px] bg-white gap-0.5",
-                                          record?.memorization === 'ممتاز' ? "border-green-200 bg-green-50/30" :
-                                            isVeryGood ? "border-blue-200 bg-blue-50/30" :
-                                              record?.memorization === 'جيد' ? "border-cyan-200 bg-cyan-50/30" :
-                                                record?.memorization === 'حسن' ? "border-yellow-200 bg-yellow-50/30" :
-                                                  record?.memorization === 'متوسط' ? "border-amber-200 bg-amber-50/30" :
-                                                    record?.memorization === 'لم يحفظ' ? "border-red-200 bg-red-50/30" :
                                                       "border-gray-100 bg-gray-50/10"
                                         )}>
                                           <div className="flex flex-col items-center leading-tight">
