@@ -118,11 +118,7 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
         });
     }, [weekDays, dailySessions, student.id]);
 
-    const [evaluation, setEvaluation] = useState<PerformanceLevel | 'clear'>(() => {
-        if (currentOutcome?.evaluation) return currentOutcome.evaluation;
-        // Pre-populate with derived evaluation if no saved outcome exists
-        return getDerivedWeeklyEvaluation(dayStatuses.map(d => d.memorization || undefined));
-    });
+    const [evaluation, setEvaluation] = useState<PerformanceLevel | 'clear'>(currentOutcome?.evaluation || '' as PerformanceLevel);
     const [isSaving, setIsSaving] = useState(false);
     const [dailyEvaluations, setDailyEvaluations] = useState<Record<string, PerformanceLevel | 'clear'>>({});
     const [savingDay, setSavingDay] = useState<string | null>(null);

@@ -125,16 +125,13 @@ const REVERSE_MAPPING: PerformanceLevel[] = [
 ];
 
 const getDerivedWeeklyEvaluation = (records: any[]): PerformanceLevel => {
+  // Keeping this helper as it might be useful, but normalization is key
   const validMemos = records
     .map(r => r?.memorization)
-    .filter(m => m && PERFORMANCE_MAPPING[m] !== undefined);
+    .filter(m => m && (m === 'ممتاز' || m === 'جيد جداً' || m === 'جيد جدا' || m === 'جيد' || m === 'حسن' || m === 'مقبول' || m === 'متوسط' || m === 'ضعيف' || m === 'لم يحفظ'));
   
   if (validMemos.length === 0) return '';
-
-  const sum = validMemos.reduce((s, m) => s + PERFORMANCE_MAPPING[m], 0);
-  const avg = Math.round(sum / validMemos.length);
-  
-  return REVERSE_MAPPING[avg] || '';
+  return '' as PerformanceLevel; // Logic moved to rendering or removed as per user request
 };
 
 const pad = (num: number) => num < 10 ? `0${num}` : num.toString();
@@ -1361,22 +1358,27 @@ export default function DailySessionsPage() {
                                     <Tooltip>
                                       <TooltipTrigger asChild>
                                         <div className={cn(
-                                          "flex items-center justify-center p-1 rounded-md transition-all hover:scale-110 border",
+                                          "flex items-center justify-center p-1 rounded-md transition-all hover:scale-110 border gap-1 px-1.5 min-w-[28px] h-[28px]",
                                           record?.memorization === 'ممتاز' ? "bg-green-50 border-green-200 text-green-600" :
-                                            record?.memorization === 'جيد جداً' ? "bg-blue-50 border-blue-200 text-blue-600" :
+                                            (record?.memorization === 'جيد جداً' || record?.memorization === 'جيد جدا') ? "bg-blue-50 border-blue-200 text-blue-600" :
                                               record?.memorization === 'جيد' ? "bg-cyan-50 border-cyan-200 text-cyan-600" :
                                                 record?.memorization === 'حسن' ? "bg-yellow-50 border-yellow-200 text-yellow-600" :
                                                   record?.memorization === 'متوسط' ? "bg-amber-50 border-amber-200 text-amber-600" :
                                                     record?.memorization === 'لم يحفظ' ? "bg-red-50 border-red-200 text-red-600" :
                                                       "bg-gray-50 border-gray-100 text-gray-300"
                                         )}>
-                                          {record?.memorization === 'ممتاز' && <Star className="h-3.5 w-3.5 fill-current" />}
-                                          {record?.memorization === 'جيد جداً' && <CheckCircle2 className="h-3.5 w-3.5" />}
-                                          {record?.memorization === 'جيد' && <ThumbsUp className="h-3.5 w-3.5" />}
-                                          {record?.memorization === 'حسن' && <Smile className="h-3.5 w-3.5" />}
-                                          {record?.memorization === 'متوسط' && <AlertCircle className="h-3.5 w-3.5" />}
-                                          {record?.memorization === 'لم يحفظ' && <XCircle className="h-3.5 w-3.5" />}
-                                          {(!record || !record.memorization) && <Minus className="h-3.5 w-3.5" />}
+                                          <div className="flex flex-col items-center leading-tight">
+                                            {record?.memorization && <span className="text-[7px] font-bold whitespace-nowrap">{record.memorization}</span>}
+                                            <div className="flex items-center justify-center">
+                                              {record?.memorization === 'ممتاز' && <Star className="h-3 w-3 fill-current" />}
+                                              {(record?.memorization === 'جيد جداً' || record?.memorization === 'جيد جدا') && <CheckCircle2 className="h-3 w-3" />}
+                                              {record?.memorization === 'جيد' && <ThumbsUp className="h-3 w-3" />}
+                                              {record?.memorization === 'حسن' && <Smile className="h-3 w-3" />}
+                                              {record?.memorization === 'متوسط' && <AlertCircle className="h-3 w-3" />}
+                                              {record?.memorization === 'لم يحفظ' && <XCircle className="h-3 w-3" />}
+                                              {(!record || !record.memorization) && <Minus className="h-3 w-3" />}
+                                            </div>
+                                          </div>
                                         </div>
                                       </TooltipTrigger>
                                       <TooltipContent>
@@ -1390,56 +1392,29 @@ export default function DailySessionsPage() {
                             </div>
                           </td>
                           <td className="p-4 align-middle text-center">
-                            {(() => {
-                              const weekStartStr = format(weekDates[0], 'yyyy-MM-dd');
-                              const outcomeId = `${student.id}_${weekStartStr}`;
-                              const outcome = weeklyOutcomes[outcomeId];
-                              
-                              // If no saved outcome, calculate derived one
-                              let displayEvaluation = outcome?.evaluation;
-                              let isDerived = false;
-
-                              if (!displayEvaluation) {
-                                const weekRecords = weekDates.slice(0, 7).map(day => {
-                                  const dateStr = format(day, 'yyyy-MM-dd');
-                                  const sessions = sheikhSessions[dateStr] ? Object.values(sheikhSessions[dateStr]) : [];
-                                  const studentSession = sessions.find((s: any) => s.records?.some((r: any) => r.studentId === student.id)) as any;
-                                  return studentSession?.records?.find((r: any) => r.studentId === student.id);
-                                }).filter(Boolean);
-                                
-                                displayEvaluation = getDerivedWeeklyEvaluation(weekRecords);
-                                if (displayEvaluation) isDerived = true;
-                              }
-
-                              if (displayEvaluation) {
-                                return (
-                                  <div className={cn(
-                                    "flex items-center justify-center gap-2 rounded-full py-1 px-3 w-fit mx-auto border shadow-sm transition-all",
-                                    isDerived ? "opacity-70 border-dashed border-purple-300 bg-purple-50/30" : (
-                                      displayEvaluation === 'ممتاز' ? "bg-green-100 text-green-700 border-green-200" :
-                                        displayEvaluation === 'جيد جداً' ? "bg-blue-100 text-blue-700 border-blue-200" :
-                                          displayEvaluation === 'جيد' ? "bg-cyan-100 text-cyan-700 border-cyan-200" :
-                                            displayEvaluation === 'حسن' ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
-                                              "bg-red-100 text-red-700 border-red-200"
-                                    )
-                                  )}>
-                                    <span className="text-lg">
-                                      {displayEvaluation === 'ممتاز' ? '🌟' :
-                                        displayEvaluation === 'جيد جداً' ? '⭐' :
-                                          displayEvaluation === 'جيد' ? '👍' :
-                                            displayEvaluation === 'حسن' ? '👌' :
-                                              displayEvaluation === 'متوسط' ? '⚠️' : '❌'}
-                                    </span>
-                                    <div className="flex flex-col items-start leading-none">
-                                      <span className="font-bold text-xs">{displayEvaluation}</span>
-                                      {isDerived && <span className="text-[8px] text-purple-500 font-medium">مقترح</span>}
-                                    </div>
-                                  </div>
-                                );
-                              }
-
-                              return <span className="text-muted-foreground text-xs italic">لم يقيم بعد</span>;
-                            })()}
+                            {outcome && outcome.evaluation ? (
+                              <div className={cn(
+                                "flex items-center justify-center gap-2 rounded-full py-1 px-3 w-fit mx-auto border shadow-sm transition-all",
+                                outcome.evaluation === 'ممتاز' ? "bg-green-100 text-green-700 border-green-200" :
+                                  (outcome.evaluation === 'جيد جداً' || outcome.evaluation === 'جيد جدا') ? "bg-blue-100 text-blue-700 border-blue-200" :
+                                    outcome.evaluation === 'جيد' ? "bg-cyan-100 text-cyan-700 border-cyan-200" :
+                                      outcome.evaluation === 'حسن' ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
+                                        "bg-red-100 text-red-700 border-red-200"
+                              )}>
+                                <span className="text-lg">
+                                  {outcome.evaluation === 'ممتاز' ? '🌟' :
+                                    (outcome.evaluation === 'جيد جداً' || outcome.evaluation === 'جيد جدا') ? '⭐' :
+                                      outcome.evaluation === 'جيد' ? '👍' :
+                                        outcome.evaluation === 'حسن' ? '👌' :
+                                          outcome.evaluation === 'متوسط' ? '⚠️' : '❌'}
+                                </span>
+                                <div className="flex flex-col items-start leading-none">
+                                  <span className="font-bold text-xs">{outcome.evaluation}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs italic">لم يقيم بعد</span>
+                            )}
                           </td>
                           <td className="p-4 align-middle text-center">
                             <Button
