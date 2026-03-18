@@ -56,6 +56,12 @@ const getDerivedWeeklyEvaluation = (memorizationLevels: (string | undefined)[]):
 
 const EVALUATION_OPTIONS: PerformanceLevel[] = ['ممتاز', 'جيد جداً', 'جيد', 'حسن', 'متوسط', 'لم يحفظ'];
 
+const normalizeLevel = (level: string | null | undefined): PerformanceLevel => {
+    if (!level) return '' as PerformanceLevel;
+    if (level === 'جيد جدا') return 'جيد جداً';
+    return level as PerformanceLevel;
+};
+
 const getEvaluationIcon = (level: string | undefined) => {
     switch (level) {
         case 'ممتاز': return <Star className="h-4 w-4 text-green-600 fill-green-600" />;
@@ -300,19 +306,20 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
                                                 </div>
 
                                                 {day.session ? (
-                                                    <div className="flex flex-col gap-2">
-                                                        <Select
-                                                            dir="rtl"
-                                                            value={dailyEvaluations[day.dateStr] || day.memorization || ''}
-                                                            onValueChange={(val) => setDailyEvaluations(prev => ({ ...prev, [day.dateStr]: val as PerformanceLevel }))}
-                                                        >
-                                                            <SelectTrigger className="h-9 w-full sm:w-[120px] text-xs font-bold border-purple-100 bg-purple-50/30">
-                                                                <SelectValue placeholder="لا يوجد تقييم" />
+                                                    <div className="flex flex-col gap-2 min-w-[140px]">
+                                                        <Select dir="rtl" value={dailyEvaluations[day.dateStr] || normalizeLevel(day.memorization)} onValueChange={(val) => setDailyEvaluations(prev => ({ ...prev, [day.dateStr]: val as PerformanceLevel | 'clear' }))}>
+                                                            <SelectTrigger className="h-9 text-xs font-bold border-2 border-purple-100 bg-purple-50/10 focus-ring-purple">
+                                                                <SelectValue placeholder="اختر تقييم جديد..." />
                                                             </SelectTrigger>
                                                             <SelectContent>
                                                                 <SelectItem value="clear" className="text-xs font-bold text-red-600">إلغاء التقييم</SelectItem>
-                                                                {EVALUATION_OPTIONS.map(opt => (
-                                                                    <SelectItem key={opt} value={opt} className="text-xs font-bold">{opt}</SelectItem>
+                                                                {EVALUATION_OPTIONS.map((opt) => (
+                                                                    <SelectItem key={opt} value={opt} className="text-xs font-bold">
+                                                                        <div className="flex items-center gap-2">
+                                                                            {getEvaluationIcon(opt)}
+                                                                            {opt}
+                                                                        </div>
+                                                                    </SelectItem>
                                                                 ))}
                                                             </SelectContent>
                                                         </Select>
