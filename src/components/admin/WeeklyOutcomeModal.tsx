@@ -21,6 +21,39 @@ interface WeeklyOutcomeModalProps {
     currentOutcome?: WeeklyOutcome;
 }
 
+const PERFORMANCE_MAPPING: Record<string, number> = {
+    'ممتاز': 5,
+    'جيد جداً': 4,
+    'جيد جدا': 4,
+    'جيد': 3,
+    'حسن': 2,
+    'مقبول': 2,
+    'متوسط': 1,
+    'ضعيف': 1,
+    'لم يحفظ': 0,
+};
+
+const REVERSE_MAPPING: PerformanceLevel[] = [
+    'لم يحفظ', // 0
+    'متوسط',   // 1
+    'حسن',     // 2
+    'جيد',     // 3
+    'جيد جداً', // 4
+    'ممتاز',   // 5
+];
+
+const getDerivedWeeklyEvaluation = (memorizationLevels: (string | undefined)[]): PerformanceLevel => {
+    const validLevels = memorizationLevels
+        .filter((m): m is string => !!m && PERFORMANCE_MAPPING[m] !== undefined);
+
+    if (validLevels.length === 0) return '' as PerformanceLevel;
+
+    const sum = validLevels.reduce((s, m) => s + PERFORMANCE_MAPPING[m], 0);
+    const avg = Math.round(sum / validLevels.length);
+
+    return REVERSE_MAPPING[avg] || '' as PerformanceLevel;
+};
+
 const EVALUATION_OPTIONS: PerformanceLevel[] = ['ممتاز', 'جيد جداً', 'جيد', 'حسن', 'متوسط', 'لم يحفظ'];
 
 const getEvaluationIcon = (level: string | undefined) => {
@@ -52,12 +85,7 @@ const getEvaluationColor = (level: string | undefined) => {
 export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, currentOutcome }: WeeklyOutcomeModalProps) {
     const { dailySessions, saveWeeklyOutcome, addDailySession } = useStudentContext();
     const { user } = useAuth();
-    const [evaluation, setEvaluation] = useState<PerformanceLevel>(currentOutcome?.evaluation || '' as PerformanceLevel);
-    const [isSaving, setIsSaving] = useState(false);
-    const [dailyEvaluations, setDailyEvaluations] = useState<Record<string, PerformanceLevel>>({});
-    const [savingDay, setSavingDay] = useState<string | null>(null);
-    const scrollRef = React.useRef<HTMLDivElement>(null);
-
+    
     // Generate days from Saturday to Wednesday (5 days)
     const weekDays = useMemo(() => {
         return Array.from({ length: 5 }).map((_, i) => addDays(weekStartDate, i));
@@ -89,6 +117,16 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
             };
         });
     }, [weekDays, dailySessions, student.id]);
+
+    const [evaluation, setEvaluation] = useState<PerformanceLevel | 'clear'>(() => {
+        if (currentOutcome?.evaluation) return currentOutcome.evaluation;
+        // Pre-populate with derived evaluation if no saved outcome exists
+        return getDerivedWeeklyEvaluation(dayStatuses.map(d => d.memorization || undefined));
+    });
+    const [isSaving, setIsSaving] = useState(false);
+    const [dailyEvaluations, setDailyEvaluations] = useState<Record<string, PerformanceLevel | 'clear'>>({});
+    const [savingDay, setSavingDay] = useState<string | null>(null);
+    const scrollRef = React.useRef<HTMLDivElement>(null);
 
     const handleSave = async () => {
         if (!evaluation && evaluation !== 'clear') return;
@@ -134,7 +172,7 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
 
                 if (sessionToUpdate && recordToUpdate) {
                     // Update existing record
-                    const updatedRecords = sessionToUpdate.records.map(r => {
+                    const updatedRecords = sessionToUpdate.records.map((r: any) => {
                         if (r.studentId === student.id) {
                             return { ...r, memorization: newMemo };
                         }
@@ -144,10 +182,12 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
                 } else if (sessionToUpdate && !recordToUpdate) {
                     // Session exists but student not in it (or wasn't registered). Add student as present.
                     const newRecord: DailyRecord = {
+                        sessionId: sessionToUpdate.id,
                         studentId: student.id,
                         attendance: 'غائب',
+                        review: false,
                         behavior: 'هادئ',
-                        memorization: newMemo,
+                        memorization: newMemo as PerformanceLevel,
                         talqinSurahId: sessionToUpdate.talqinSurahId,
                         talqinFromVerse: sessionToUpdate.talqinFromVerse,
                         talqinToVerse: sessionToUpdate.talqinToVerse,
@@ -171,11 +211,17 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
     };
 
     const handleSaveDay = async (dayStatus: any) => {
-        let newMemo = dailyEvaluations[dayStatus.dateStr];
+        let newMemo: PerformanceLevel | 'clear' | undefined = dailyEvaluations[dayStatus.dateStr];
         if (!newMemo) return;
-        if (newMemo === 'clear') newMemo = undefined;
+        
+        let finalMemo: PerformanceLevel | undefined;
+        if (newMemo === 'clear') {
+            finalMemo = undefined;
+        } else {
+            finalMemo = newMemo;
+        }
 
-        if (newMemo === dayStatus.memorization) return;
+        if (finalMemo === dayStatus.memorization) return;
         setSavingDay(dayStatus.dateStr);
         try {
             let sessionToUpdate = dayStatus.session;
@@ -186,17 +232,19 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
             if (sessionToUpdate && recordToUpdate) {
                 const updatedRecords = sessionToUpdate.records.map((r: any) => {
                     if (r.studentId === student.id) {
-                        return { ...r, memorization: newMemo };
+                        return { ...r, memorization: finalMemo };
                     }
                     return r;
                 });
                 await addDailySession({ ...sessionToUpdate, records: updatedRecords });
             } else if (sessionToUpdate && !recordToUpdate) {
                 const newRecord: DailyRecord = {
+                    sessionId: sessionToUpdate.id,
                     studentId: student.id,
                     attendance: 'غائب',
+                    review: false,
                     behavior: 'هادئ',
-                    memorization: newMemo,
+                    memorization: finalMemo || '' as PerformanceLevel,
                     talqinSurahId: sessionToUpdate.talqinSurahId,
                     talqinFromVerse: sessionToUpdate.talqinFromVerse,
                     talqinToVerse: sessionToUpdate.talqinToVerse,
@@ -352,7 +400,7 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
 
                 <DialogFooter className="p-4 sm:p-6 sm:pt-4 border-t bg-muted/5 flex flex-col sm:flex-row gap-2 sticky bottom-0 z-20">
                     <Button variant="outline" className="w-full sm:w-auto" onClick={onClose}>إلغاء</Button>
-                    <Button onClick={handleSave} disabled={(!evaluation && evaluation !== 'clear') || isSaving} className="w-full sm:w-auto gap-2 bg-purple-600 hover:bg-purple-700 text-white shadow-lg">
+                    <Button onClick={handleSave} disabled={(!evaluation && (evaluation as string) !== 'clear') || isSaving} className="w-full sm:w-auto gap-2 bg-purple-600 hover:bg-purple-700 text-white shadow-lg">
                         {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
                         <Save className="h-4 w-4" />
                         حفظ الحصيلة

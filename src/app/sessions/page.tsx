@@ -101,6 +101,41 @@ import { Admin5MessagesPanel } from '@/components/sessions/Admin5MessagesPanel';
 import { WeeklyStatsRow } from '@/components/sessions/WeeklyStatsRow';
 import { ParentsSurahProgressView } from '@/components/sessions/ParentsSurahProgressView';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { PerformanceLevel, WeeklyOutcome } from '@/lib/types';
+
+const PERFORMANCE_MAPPING: Record<string, number> = {
+  'ممتاز': 5,
+  'جيد جداً': 4,
+  'جيد جدا': 4,
+  'جيد': 3,
+  'حسن': 2,
+  'مقبول': 2,
+  'متوسط': 1,
+  'ضعيف': 1,
+  'لم يحفظ': 0,
+};
+
+const REVERSE_MAPPING: PerformanceLevel[] = [
+  'لم يحفظ', // 0
+  'متوسط',   // 1
+  'حسن',     // 2
+  'جيد',     // 3
+  'جيد جداً', // 4
+  'ممتاز',   // 5
+];
+
+const getDerivedWeeklyEvaluation = (records: any[]): PerformanceLevel => {
+  const validMemos = records
+    .map(r => r?.memorization)
+    .filter(m => m && PERFORMANCE_MAPPING[m] !== undefined);
+  
+  if (validMemos.length === 0) return '';
+
+  const sum = validMemos.reduce((s, m) => s + PERFORMANCE_MAPPING[m], 0);
+  const avg = Math.round(sum / validMemos.length);
+  
+  return REVERSE_MAPPING[avg] || '';
+};
 
 const pad = (num: number) => num < 10 ? `0${num}` : num.toString();
 
@@ -1355,27 +1390,56 @@ export default function DailySessionsPage() {
                             </div>
                           </td>
                           <td className="p-4 align-middle text-center">
-                            {outcome && outcome.evaluation ? (
-                              <div className={cn(
-                                "flex items-center justify-center gap-2 rounded-full py-1 px-3 w-fit mx-auto border shadow-sm",
-                                outcome.evaluation === 'ممتاز' ? "bg-green-100 text-green-700 border-green-200" :
-                                  outcome.evaluation === 'جيد جداً' ? "bg-blue-100 text-blue-700 border-blue-200" :
-                                    outcome.evaluation === 'جيد' ? "bg-cyan-100 text-cyan-700 border-cyan-200" :
-                                      outcome.evaluation === 'حسن' ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
-                                        "bg-red-100 text-red-700 border-red-200"
-                              )}>
-                                <span className="text-lg">
-                                  {outcome.evaluation === 'ممتاز' ? '🌟' :
-                                    outcome.evaluation === 'جيد جداً' ? '⭐' :
-                                      outcome.evaluation === 'جيد' ? '👍' :
-                                        outcome.evaluation === 'حسن' ? '👌' :
-                                          outcome.evaluation === 'متوسط' ? '⚠️' : '❌'}
-                                </span>
-                                <span className="font-bold text-xs">{outcome.evaluation}</span>
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-xs italic">لم يقيم بعد</span>
-                            )}
+                            {(() => {
+                              const weekStartStr = format(weekDates[0], 'yyyy-MM-dd');
+                              const outcomeId = `${student.id}_${weekStartStr}`;
+                              const outcome = weeklyOutcomes[outcomeId];
+                              
+                              // If no saved outcome, calculate derived one
+                              let displayEvaluation = outcome?.evaluation;
+                              let isDerived = false;
+
+                              if (!displayEvaluation) {
+                                const weekRecords = weekDates.slice(0, 7).map(day => {
+                                  const dateStr = format(day, 'yyyy-MM-dd');
+                                  const sessions = sheikhSessions[dateStr] ? Object.values(sheikhSessions[dateStr]) : [];
+                                  const studentSession = sessions.find((s: any) => s.records?.some((r: any) => r.studentId === student.id)) as any;
+                                  return studentSession?.records?.find((r: any) => r.studentId === student.id);
+                                }).filter(Boolean);
+                                
+                                displayEvaluation = getDerivedWeeklyEvaluation(weekRecords);
+                                if (displayEvaluation) isDerived = true;
+                              }
+
+                              if (displayEvaluation) {
+                                return (
+                                  <div className={cn(
+                                    "flex items-center justify-center gap-2 rounded-full py-1 px-3 w-fit mx-auto border shadow-sm transition-all",
+                                    isDerived ? "opacity-70 border-dashed border-purple-300 bg-purple-50/30" : (
+                                      displayEvaluation === 'ممتاز' ? "bg-green-100 text-green-700 border-green-200" :
+                                        displayEvaluation === 'جيد جداً' ? "bg-blue-100 text-blue-700 border-blue-200" :
+                                          displayEvaluation === 'جيد' ? "bg-cyan-100 text-cyan-700 border-cyan-200" :
+                                            displayEvaluation === 'حسن' ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
+                                              "bg-red-100 text-red-700 border-red-200"
+                                    )
+                                  )}>
+                                    <span className="text-lg">
+                                      {displayEvaluation === 'ممتاز' ? '🌟' :
+                                        displayEvaluation === 'جيد جداً' ? '⭐' :
+                                          displayEvaluation === 'جيد' ? '👍' :
+                                            displayEvaluation === 'حسن' ? '👌' :
+                                              displayEvaluation === 'متوسط' ? '⚠️' : '❌'}
+                                    </span>
+                                    <div className="flex flex-col items-start leading-none">
+                                      <span className="font-bold text-xs">{displayEvaluation}</span>
+                                      {isDerived && <span className="text-[8px] text-purple-500 font-medium">مقترح</span>}
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              return <span className="text-muted-foreground text-xs italic">لم يقيم بعد</span>;
+                            })()}
                           </td>
                           <td className="p-4 align-middle text-center">
                             <Button
