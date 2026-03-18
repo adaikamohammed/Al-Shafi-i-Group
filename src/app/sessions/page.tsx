@@ -1320,52 +1320,33 @@ export default function DailySessionsPage() {
                             </div>
                           </td>
                           <td className="p-4 align-middle">
-                            <div className="flex items-center justify-center gap-2">
+                            <div className="flex items-center justify-center gap-2" dir="rtl">
                               {days.map((day) => {
                                 const dateStr = format(day, 'yyyy-MM-dd');
                                 const sessions = sheikhSessions[dateStr] ? Object.values(sheikhSessions[dateStr]) : [];
-                                // Fix: Define types properly or use any for now
                                 const studentSession = sessions.find((s: any) => s.records?.some((r: any) => r.studentId === student.id)) as any;
                                 const record = studentSession?.records?.find((r: any) => r.studentId === student.id);
 
-                                let colorClass = "bg-gray-200";
                                 let statusText = "غير مسجل";
-
                                 if (record) {
-                                  if (record.memorization === 'ممتاز' || record.memorization === 'جيد جداً' || record.memorization === 'جيد' || record.memorization === 'حسن') {
-                                    colorClass = "bg-green-500 shadow-sm shadow-green-200";
-                                    statusText = record.memorization;
-                                  } else if (record.memorization === 'متوسط' || record.memorization === 'لم يحفظ') {
-                                    colorClass = "bg-red-500 shadow-sm shadow-red-200";
-                                    statusText = record.memorization;
-                                  } else if (record.attendanceStatus === 'absent') {
-                                    colorClass = "bg-red-500";
-                                    statusText = "غائب";
-                                  } else if (record.attendanceStatus === 'authorized') {
-                                    colorClass = "bg-yellow-500";
-                                    statusText = "إجازة";
-                                  } else if (record.memorization) {
-                                    // Catch all for other memo types
-                                    colorClass = "bg-blue-400";
-                                    statusText = record.memorization;
-                                  } else {
-                                    statusText = "لا يوجد تقييم";
-                                  }
+                                  statusText = record.memorization || (record.attendanceStatus === 'absent' ? "غائب" : "حاضر");
                                 }
+
+                                const isVeryGood = record?.memorization === 'جيد جداً' || record?.memorization === 'جيد جدا';
 
                                 return (
                                   <TooltipProvider key={day.toISOString()}>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
                                         <div className={cn(
-                                          "flex items-center justify-center p-1 rounded-md transition-all hover:scale-110 border gap-1 px-1.5 min-w-[28px] h-[28px]",
-                                          record?.memorization === 'ممتاز' ? "bg-green-50 border-green-200 text-green-600" :
-                                            (record?.memorization === 'جيد جداً' || record?.memorization === 'جيد جدا') ? "bg-blue-50 border-blue-200 text-blue-600" :
-                                              record?.memorization === 'جيد' ? "bg-cyan-50 border-cyan-200 text-cyan-600" :
-                                                record?.memorization === 'حسن' ? "bg-yellow-50 border-yellow-200 text-yellow-600" :
-                                                  record?.memorization === 'متوسط' ? "bg-amber-50 border-amber-200 text-amber-600" :
-                                                    record?.memorization === 'لم يحفظ' ? "bg-red-50 border-red-200 text-red-600" :
-                                                      "bg-gray-50 border-gray-100 text-gray-300"
+                                          "flex flex-col items-center justify-center p-1 rounded-lg transition-all hover:scale-105 border shadow-sm min-w-[34px] h-[36px] bg-white gap-0.5",
+                                          record?.memorization === 'ممتاز' ? "border-green-200 bg-green-50/30" :
+                                            isVeryGood ? "border-blue-200 bg-blue-50/30" :
+                                              record?.memorization === 'جيد' ? "border-cyan-200 bg-cyan-50/30" :
+                                                record?.memorization === 'حسن' ? "border-yellow-200 bg-yellow-50/30" :
+                                                  record?.memorization === 'متوسط' ? "border-amber-200 bg-amber-50/30" :
+                                                    record?.memorization === 'لم يحفظ' ? "border-red-200 bg-red-50/30" :
+                                                      "border-gray-100 bg-gray-50/10"
                                         )}>
                                           <div className="flex flex-col items-center leading-tight">
                                             {record?.memorization && <span className="text-[7px] font-bold whitespace-nowrap">{record.memorization}</span>}
