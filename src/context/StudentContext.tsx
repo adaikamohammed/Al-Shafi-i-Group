@@ -123,9 +123,9 @@ const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const { user: authContextUser, loading: authLoading, isSuperAdmin, isManagement, role } = useAuth();
-  const isAdmin5 = authContextUser?.email === 'admin5@gmail.com';
   const isAdmin00 = authContextUser?.email === 'admin00@gmail.com' || authContextUser?.email === 'abdallah.shafii@gmail.com';
-  const isPrivileged = isSuperAdmin || isManagement || isAdmin5 || isAdmin00;
+  // isPrivileged = يجلب بيانات كل المستخدمين — admin5 شيخ عادي يرى طلابه فقط
+  const isPrivileged = isSuperAdmin || isManagement || isAdmin00;
   const { toast } = useToast();
 
   const [students, setStudents] = useState<Student[]>([]);
