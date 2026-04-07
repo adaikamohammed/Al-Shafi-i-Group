@@ -1320,25 +1320,23 @@ export default function DailySessionsPage() {
                             </div>
                           </td>
                           <td className="p-4 align-middle">
-                                                      "border-gray-100 bg-gray-50/10"
-                                        )}>
-                                          <div className="flex flex-col items-center leading-tight">
-                                            {record?.memorization && <span className="text-[7px] font-bold whitespace-nowrap">{record.memorization}</span>}
-                                            <div className="flex items-center justify-center">
-                                              {record?.memorization === 'ممتاز' && <Star className="h-3 w-3 fill-current" />}
-                                              {(record?.memorization === 'جيد جداً' || record?.memorization === 'جيد جدا') && <CheckCircle2 className="h-3 w-3" />}
-                                              {record?.memorization === 'جيد' && <ThumbsUp className="h-3 w-3" />}
-                                              {record?.memorization === 'حسن' && <Smile className="h-3 w-3" />}
-                                              {record?.memorization === 'متوسط' && <AlertCircle className="h-3 w-3" />}
-                                              {record?.memorization === 'لم يحفظ' && <XCircle className="h-3 w-3" />}
-                                              {(!record || !record.memorization) && <Minus className="h-3 w-3" />}
-                                            </div>
-                                          </div>
-                                        </div>
+                            <div className="flex gap-1 justify-center flex-wrap">
+                              {days.map((day) => {
+                                const dateStr = format(day, 'yyyy-MM-dd');
+                                const daySessions = isAdmin5 ? (sheikhSessions[dateStr] ? Object.values(sheikhSessions[dateStr]) : []) : (dailySessions[dateStr] ? Object.values(dailySessions[dateStr] as Record<string, any>) : []);
+                                const session1 = (daySessions as any[]).find((s: any) => s.sessionNumber === 1);
+                                const record = session1?.records?.find((r: any) => r.studentId === student.id);
+                                const attendance = record?.attendance;
+                                const dotColor = attendance === 'حاضر' ? 'bg-emerald-500' : attendance === 'غائب' || attendance === 'غياب' ? 'bg-red-400' : attendance === 'متأخر' ? 'bg-amber-400' : session1?.sessionType === 'يوم عطلة' ? 'bg-sky-300' : 'bg-gray-200';
+                                return (
+                                  <TooltipProvider key={dateStr}>
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <div className={`h-3 w-3 rounded-full ${dotColor}`} />
                                       </TooltipTrigger>
                                       <TooltipContent>
-                                        <p className="text-xs font-bold">{format(day, 'EEEE', { locale: ar })}</p>
-                                        <p className="text-[10px]">{statusText}</p>
+                                        <p className="text-xs font-bold">{format(day, 'EEE dd/MM', { locale: ar })}</p>
+                                        <p className="text-[10px]">{attendance || (session1?.sessionType === 'يوم عطلة' ? 'عطلة' : 'لم يسجل')}</p>
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
