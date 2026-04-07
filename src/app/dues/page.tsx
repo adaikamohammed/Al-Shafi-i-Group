@@ -47,6 +47,9 @@ export default function DuesPage() {
     const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
     const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
+    // الفصل الحالي تلقائياً: 1=جانفي-مارس، 2=أفريل-جوان، 3=جويلية-سبتمبر، 4=أكتوبر-ديسمبر
+    const currentQuarter = useMemo(() => getQuarter(new Date()), []);
+
     const [registrationFees, setRegistrationFees] = useState<Record<number, number>>({});
     const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -201,16 +204,30 @@ export default function DuesPage() {
         return Object.values(totalsByQuarter).reduce((sum, q) => sum + q.revenue, 0);
     }, [totalsByQuarter]);
 
+    // --- التحقق إذا كان الطالب دفع أو معفى بالفعل في الفصل الحالي ---
+    const isStudentPaidInCurrentQuarter = React.useCallback((studentId: string): boolean => {
+        return !!(payments ?? []).find(p =>
+            p.studentId === studentId &&
+            p.date &&
+            getQuarter(parseISO(p.date)) === currentQuarter &&
+            getYear(parseISO(p.date)) === currentYear &&
+            (p.status === 'paid' || p.status === 'exempted')
+        );
+    }, [payments, currentQuarter, currentYear]);
+
     // --- Bulk Usage Handlers ---
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
-            setSelectedStudents(filteredStudents.map(s => s.id));
+            // يحدد فقط الطلاب الذين لم يُسجّل دفعهم في الفصل الحالي
+            setSelectedStudents(filteredStudents.filter(s => !isStudentPaidInCurrentQuarter(s.id)).map(s => s.id));
         } else {
             setSelectedStudents([]);
         }
     };
 
     const handleSelectStudent = (studentId: string, checked: boolean) => {
+        // لا يُسمح بتحديد طالب دفع بالفعل في الفصل الحالي
+        if (checked && isStudentPaidInCurrentQuarter(studentId)) return;
         if (checked) {
             setSelectedStudents(prev => [...prev, studentId]);
         } else {
@@ -519,6 +536,8 @@ export default function DuesPage() {
                                         onPaymentAction={handlePaymentAction}
                                         isSelected={selectedStudents.includes(student.id)}
                                         onSelect={(checked) => handleSelectStudent(student.id, checked)}
+                                        isPaidInCurrentQuarter={isStudentPaidInCurrentQuarter(student.id)}
+                                        currentQuarter={currentQuarter}
                                     />
                                 )) : (
                                     <TableRow>
@@ -569,7 +588,9 @@ const PaymentRow = React.memo(({
     prices,
     onPaymentAction,
     isSelected,
-    onSelect
+    onSelect,
+    isPaidInCurrentQuarter,
+    currentQuarter,
 }: {
     student: any,
     isSuperAdmin: boolean,
@@ -577,14 +598,45 @@ const PaymentRow = React.memo(({
     prices: any,
     onPaymentAction: (s: any, q: number, st: PaymentStatus) => void,
     isSelected: boolean,
-    onSelect: (checked: boolean) => void
+    onSelect: (checked: boolean) => void,
+    isPaidInCurrentQuarter: boolean,
+    currentQuarter: number,
 }) => {
+    const quarterMonthNames: Record<number, string> = {
+        1: 'جانفي - مارس',
+        2: 'أفريل - جوان',
+        3: 'جويلية - سبتمبر',
+        4: 'أكتوبر - ديسمبر',
+    };
     return (
-        <TableRow className={cn(student.status === 'مطرود' && 'opacity-50 hover:opacity-70 transition-opacity', isSelected && 'bg-blue-50 dark:bg-blue-900/10')}>
+        <TableRow className={cn(
+            student.status === 'مطرود' && 'opacity-50 hover:opacity-70 transition-opacity',
+            isSelected && 'bg-blue-50 dark:bg-blue-900/10',
+            isPaidInCurrentQuarter && !isSelected && 'bg-emerald-50/50 dark:bg-emerald-900/10'
+        )}>
             <TableCell>
-                <Checkbox checked={isSelected} onCheckedChange={(c) => onSelect(c as boolean)} className="translate-y-[2px]" />
+                <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={(c) => onSelect(c as boolean)}
+                    className="translate-y-[2px]"
+                    disabled={isPaidInCurrentQuarter}
+                    title={isPaidInCurrentQuarter
+                        ? `تم تسجيل دفع هذا الطالب في الفصل ${currentQuarter} (${quarterMonthNames[currentQuarter]})`
+                        : undefined
+                    }
+                />
             </TableCell>
-            <TableCell className="font-bold text-slate-700 dark:text-slate-200 py-4">{student.fullName}</TableCell>
+            <TableCell className="font-bold text-slate-700 dark:text-slate-200 py-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                    {student.fullName}
+                    {isPaidInCurrentQuarter && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 rounded-full px-2 py-0.5 whitespace-nowrap">
+                            <CheckCircle className="h-2.5 w-2.5" />
+                            دفع ف{currentQuarter}
+                        </span>
+                    )}
+                </div>
+            </TableCell>
             {isSuperAdmin && <TableCell><Badge variant="outline" className="font-medium">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
             <TableCell>
                 <Badge variant={statusVariant[student.status as 'نشط' | 'مطرود'] || 'secondary'} className="font-bold">
