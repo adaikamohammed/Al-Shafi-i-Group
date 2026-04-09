@@ -51,6 +51,14 @@
         "absence_reasons": {
             ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')",
             ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')"
+        },
+        "summer_camp_items": {
+            ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')",
+            ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')"
+        },
+        "admin_documents": {
+            ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')",
+            ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')"
         }
     }
 }
