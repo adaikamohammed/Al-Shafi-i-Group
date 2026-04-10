@@ -218,16 +218,18 @@ export default function YearlyPerformancePage() {
     // Filter students and sessions based on selected sheikh
     const students = useMemo(() => {
         if (!isAdmin || selectedSheikhId === 'all') return allContextStudents;
-        return allContextStudents.filter(s => s.ownerId === selectedSheikhId);
+        const selectedIds = selectedSheikhId.split(',');
+        return allContextStudents.filter(s => selectedIds.includes(s.ownerId));
     }, [allContextStudents, isAdmin, selectedSheikhId]);
 
     const dailySessions = useMemo(() => {
         if (!isAdmin || selectedSheikhId === 'all') return allContextSessions;
+        const selectedIds = selectedSheikhId.split(',');
 
         const filtered: Record<string, Record<string, DailySession>> = {};
         Object.entries(allContextSessions).forEach(([date, sessions]) => {
             const sessionsForSheikh = Object.entries(sessions)
-                .filter(([_, session]) => session.ownerId === selectedSheikhId)
+                .filter(([_, session]) => session.ownerId && selectedIds.includes(session.ownerId))
                 .reduce((acc, [id, s]) => ({ ...acc, [id]: s }), {});
 
             if (Object.keys(sessionsForSheikh).length > 0) {
@@ -242,9 +244,52 @@ export default function YearlyPerformancePage() {
         if (!allUsers) return options;
 
         const sheikhs = allUsers.filter(u => u.role === 'sheikh' || u.role === 'management' || u.role === 'super_admin');
+        
+        const groupsMap = new Map<string, typeof sheikhs>();
+        const others: typeof sheikhs = [];
+
         sheikhs.forEach(s => {
+            const nameToTest = s.group || s.displayName || '';
+            const match = nameToTest.match(/فوج\s*(\d+)/i);
+            
+            if (match) {
+                const foujName = `فوج ${match[1]}`;
+                if (!groupsMap.has(foujName)) groupsMap.set(foujName, []);
+                groupsMap.get(foujName)!.push(s);
+            } else {
+                others.push(s);
+            }
+        });
+
+        // Sort from Fouj 1 to Fouj X
+        const sortedFoujs = Array.from(groupsMap.keys()).sort((a, b) => {
+            const numA = parseInt(a.replace(/[^\d]/g, '')) || 0;
+            const numB = parseInt(b.replace(/[^\d]/g, '')) || 0;
+            return numA - numB;
+        });
+
+        sortedFoujs.forEach(fouj => {
+            const grpSheikhs = groupsMap.get(fouj)!;
+            const teacherNames = grpSheikhs
+                .map(s => {
+                    let name = s.displayName?.trim() || s.email || '';
+                    return name.replace(/فوج\s*\d+/ig, '').replace(/[-_\|]/g, '').trim();
+                })
+                .filter(name => name.length > 0)
+                .filter((v, i, a) => a.indexOf(v) === i)
+                .join(' و ');
+
+            const label = teacherNames ? `${fouj} - ${teacherNames}` : fouj;
+            const combinedUids = grpSheikhs.map(s => s.uid).filter((v, i, a) => a.indexOf(v) === i).join(',');
+            options.push({ value: combinedUids, label });
+        });
+
+        // Append remaining teachers who don't have "Fouj" in their name
+        others.forEach(s => {
+            if (s.displayName?.match(/Super Admin/i)) return; 
             options.push({ value: s.uid, label: s.displayName || s.email || s.uid });
         });
+
         return options;
     }, [allUsers]);
 

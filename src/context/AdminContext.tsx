@@ -14,9 +14,12 @@ interface AdminContextType {
     adminDocuments: AdminDocument[];
     loading: boolean;
     addSummerCampItem: (item: Omit<SummerCampItem, 'id'>) => Promise<void>;
+    addMultipleSummerCampItems: (items: Omit<SummerCampItem, 'id'>[]) => Promise<void>;
     updateSummerCampItem: (id: string, updates: Partial<SummerCampItem>) => Promise<void>;
     deleteSummerCampItem: (id: string) => Promise<void>;
     toggleItemProvided: (id: string, currentStatus: boolean) => Promise<void>;
+    toggleItemReturned: (id: string, currentStatus: boolean) => Promise<void>;
+    bulkUpdateItems: (ids: string[], updates: Partial<SummerCampItem>) => Promise<void>;
     uploadAdminDocument: (file: File, title: string, notes: string, type: string) => Promise<void>;
     deleteAdminDocument: (doc: AdminDocument) => Promise<void>;
 }
@@ -79,6 +82,24 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    const addMultipleSummerCampItems = async (items: Omit<SummerCampItem, 'id'>[]) => {
+        try {
+            const updates: Record<string, any> = {};
+            items.forEach(item => {
+                const newItemRef = push(ref(db, 'summer_camp_items'));
+                updates[`summer_camp_items/${newItemRef.key}`] = {
+                    ...item,
+                    addedBy: user?.uid || 'unknown'
+                };
+            });
+            await update(ref(db), updates);
+            toast({ title: "✅ تم الإضافة", description: `تمت إضافة ${items.length} عناصر بنجاح` });
+        } catch (error) {
+            console.error(error);
+            toast({ title: "❌ خطأ", description: "حدث خطأ أثناء إضافة مجموعة العناصر", variant: "destructive" });
+        }
+    };
+
     const updateSummerCampItem = async (id: string, updates: Partial<SummerCampItem>) => {
         try {
             await update(ref(db, `summer_camp_items/${id}`), updates);
@@ -108,6 +129,37 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         } catch (error) {
             console.error(error);
             toast({ title: "❌ خطأ", description: "تعذر تغيير الحالة", variant: "destructive" });
+        }
+    };
+
+    const toggleItemReturned = async (id: string, currentStatus: boolean) => {
+        try {
+            await update(ref(db, `summer_camp_items/${id}`), {
+                isReturned: !currentStatus,
+                returnedAt: !currentStatus ? new Date().toISOString() : null
+            });
+        } catch (error) {
+            console.error(error);
+            toast({ title: "❌ خطأ", description: "تعذر تغيير حالة الإرجاع", variant: "destructive" });
+        }
+    };
+
+    const bulkUpdateItems = async (ids: string[], updates: Partial<SummerCampItem>) => {
+        try {
+            const dbUpdates: Record<string, any> = {};
+            ids.forEach(id => {
+                // Fetch the existing item to only update specified fields
+                // Firebase generic update at root works magically like this:
+                // path: `summer_camp_items/123/isProvided` : true
+                Object.entries(updates).forEach(([key, value]) => {
+                    dbUpdates[`summer_camp_items/${id}/${key}`] = value;
+                });
+            });
+            await update(ref(db), dbUpdates);
+            toast({ title: "✅ تم التحديث الجماعي", description: `تم تحديث ${ids.length} عناصر بنجاح` });
+        } catch (error) {
+            console.error(error);
+            toast({ title: "❌ خطأ", description: "حدث خطأ أثناء التحديث الجماعي", variant: "destructive" });
         }
     };
 
@@ -163,9 +215,12 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
             adminDocuments,
             loading,
             addSummerCampItem,
+            addMultipleSummerCampItems,
             updateSummerCampItem,
             deleteSummerCampItem,
             toggleItemProvided,
+            toggleItemReturned,
+            bulkUpdateItems,
             uploadAdminDocument,
             deleteAdminDocument
         }}>

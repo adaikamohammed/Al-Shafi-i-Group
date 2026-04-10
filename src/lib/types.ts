@@ -428,6 +428,8 @@ export interface SummerCampItem {
   provider: string; // The person responsible
   isProvided: boolean;
   providedAt?: string; // ISO String
+  isReturned?: boolean; // Indicates if the item was returned from the camp
+  returnedAt?: string; // ISO String
   notes?: string;
   addedBy?: string;
 }
