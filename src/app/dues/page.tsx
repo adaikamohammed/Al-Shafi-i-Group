@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle, Undo2, Download, Search, FileX, PlusCircle, MinusCircle, MoreHorizontal, Save } from 'lucide-react';
+import { Loader2, AlertTriangle, DollarSign, CheckCircle, XCircle, Undo2, Download, Search, FileX, PlusCircle, MinusCircle, MoreHorizontal, Save, Printer } from 'lucide-react';
 import { format, parseISO, getYear, getQuarter, formatDistanceToNowStrict } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -347,6 +347,226 @@ export default function DuesPage() {
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, `مستحقات_${currentYear}`);
         XLSX.writeFile(wb, `تقرير_المستحقات_${currentYear}.xlsx`);
+    };
+
+    const handlePrintPDF = () => {
+        // تحديد الفصل المطلوب
+        const selectedQ = quarterFilter === 'all' ? null : parseInt(quarterFilter);
+        const quarterLabel = selectedQ
+            ? { 1: 'الفصل الأول (جانفي - مارس)', 2: 'الفصل الثاني (أفريل - جوان)', 3: 'الفصل الثالث (جويلية - سبتمبر)', 4: 'الفصل الرابع (أكتوبر - ديسمبر)' }[selectedQ]
+            : 'جميع الفصول';
+
+        // تجميع الطلاب حسب الفوج
+        const groupMap: Record<string, typeof filteredStudents> = {};
+        filteredStudents.forEach(s => {
+            const g = (s as any).groupName || 'غير محدد';
+            if (!groupMap[g]) groupMap[g] = [];
+            groupMap[g].push(s);
+        });
+
+        // الإحصائيات العامة
+        const quarters = selectedQ ? [selectedQ] : [1, 2, 3, 4];
+        const totalStudents = filteredStudents.length;
+        const paidCount = filteredStudents.filter(s => quarters.some(q => s.paymentStatus[q]?.status === 'paid')).length;
+        const exemptedCount = filteredStudents.filter(s => quarters.some(q => s.paymentStatus[q]?.status === 'exempted')).length;
+        const unpaidCount = filteredStudents.filter(s => quarters.every(q => s.paymentStatus[q]?.status === 'unpaid' || !s.paymentStatus[q])).length;
+        const totalRevenue = filteredStudents.reduce((sum, s) => {
+            return sum + quarters.reduce((qSum, q) => {
+                if (s.paymentStatus[q]?.status === 'paid') {
+                    const tier = s.subscriptionTier || 'فئة الأصاغر';
+                    return qSum + (prices[tier] || 0);
+                }
+                return qSum;
+            }, 0);
+        }, 0);
+        const paidPct = totalStudents > 0 ? Math.round((paidCount / totalStudents) * 100) : 0;
+        const today = new Date().toLocaleDateString('ar-DZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        // بناء صفوف جدول كل فوج
+        const buildGroupTable = (groupName: string, students: typeof filteredStudents) => {
+            const getStatus = (s: typeof filteredStudents[0]) => {
+                if (selectedQ) return s.paymentStatus[selectedQ]?.status || 'unpaid';
+                const statuses = quarters.map(q => s.paymentStatus[q]?.status || 'unpaid');
+                if (statuses.every(st => st === 'paid')) return 'paid';
+                if (statuses.every(st => st === 'exempted')) return 'exempted';
+                if (statuses.some(st => st === 'paid' || st === 'exempted')) return 'partial';
+                return 'unpaid';
+            };
+
+            const paid = students.filter(s => getStatus(s) === 'paid');
+            const exempted = students.filter(s => getStatus(s) === 'exempted');
+            const partial = students.filter(s => getStatus(s) === 'partial');
+            const unpaid = students.filter(s => getStatus(s) === 'unpaid');
+
+            const gPaidPct = students.length > 0 ? Math.round((paid.length / students.length) * 100) : 0;
+            const gRevenue = paid.reduce((sum, s) => {
+                return sum + quarters.reduce((qSum, q) => {
+                    if (s.paymentStatus[q]?.status === 'paid') {
+                        const tier = s.subscriptionTier || 'فئة الأصاغر';
+                        return qSum + (prices[tier] || 0);
+                    }
+                    return qSum;
+                }, 0);
+            }, 0);
+
+            const buildRows = (list: typeof filteredStudents, cssClass: string, icon: string, statusLabel: string) => {
+                if (list.length === 0) return '';
+                return list.map(s => {
+                    const qCells = selectedQ
+                        ? `<td class="qcell ${s.paymentStatus[selectedQ]?.status || 'unpaid'}">${cellIcon(s.paymentStatus[selectedQ]?.status || 'unpaid')}</td>`
+                        : [1,2,3,4].map(q => `<td class="qcell ${s.paymentStatus[q]?.status || 'unpaid'}">${cellIcon(s.paymentStatus[q]?.status || 'unpaid')}</td>`).join('');
+                    return `<tr class="row ${cssClass}">
+                        <td>${s.fullName}</td>
+                        <td class="tier">${s.subscriptionTier || 'فئة الأصاغر'}</td>
+                        ${qCells}
+                        <td class="total">${s.totalPaid.toLocaleString('ar-DZ')} د.ج</td>
+                    </tr>`;
+                }).join('');
+            };
+
+            const quarterHeaders = selectedQ
+                ? `<th>ف${selectedQ}</th>`
+                : `<th>ف1</th><th>ف2</th><th>ف3</th><th>ف4</th>`;
+
+            return `
+            <div class="group-section">
+                <div class="group-header">
+                    <span class="group-name">🎓 فوج: ${groupName}</span>
+                    <div class="group-stats">
+                        <span class="stat paid">✅ مدفوع: ${paid.length}</span>
+                        ${partial.length > 0 ? `<span class="stat partial">⚡ جزئي: ${partial.length}</span>` : ''}
+                        <span class="stat exempted">🔵 معفى: ${exempted.length}</span>
+                        <span class="stat unpaid">❌ غير مدفوع: ${unpaid.length}</span>
+                        <span class="stat revenue">💰 المحصل: ${gRevenue.toLocaleString('ar-DZ')} د.ج</span>
+                        <span class="stat pct">📊 نسبة الدفع: ${gPaidPct}%</span>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>الطالب</th><th>الفئة</th>${quarterHeaders}<th>الإجمالي</th></tr>
+                    </thead>
+                    <tbody>
+                        ${buildRows(paid, 'paid', '✅', 'مدفوع')}
+                        ${buildRows(partial, 'partial', '⚡', 'جزئي')}
+                        ${buildRows(exempted, 'exempted', '🔵', 'معفى')}
+                        ${buildRows(unpaid, 'unpaid', '❌', 'غير مدفوع')}
+                        ${students.length === 0 ? '<tr><td colspan="7" style="text-align:center;color:#aaa">لا يوجد طلاب</td></tr>' : ''}
+                    </tbody>
+                </table>
+            </div>`;
+        };
+
+        const cellIcon = (status: string) => {
+            if (status === 'paid') return '✅';
+            if (status === 'exempted') return '🔵';
+            return '❌';
+        };
+
+        const groupSections = Object.entries(groupMap)
+            .sort(([a], [b]) => a.localeCompare(b, 'ar'))
+            .map(([gName, gStudents]) => buildGroupTable(gName, gStudents))
+            .join('');
+
+        const html = `
+        <!DOCTYPE html>
+        <html dir="rtl" lang="ar">
+        <head>
+            <meta charset="UTF-8">
+            <title>تقرير المستحقات - ${currentYear}</title>
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { font-family: 'Tajawal', 'Arial', sans-serif; direction: rtl; color: #1a1a1a; background: #fff; padding: 20px; }
+
+                /* الرأس */
+                .report-header { background: linear-gradient(135deg, #1a5276, #2980b9); color: white; border-radius: 12px; padding: 24px 28px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+                .report-title { font-size: 22px; font-weight: 800; }
+                .report-subtitle { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+                .report-meta { text-align: left; font-size: 12px; opacity: 0.85; }
+
+                /* بطاقات الإحصائيات */
+                .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+                .stat-card { border-radius: 10px; padding: 14px 10px; text-align: center; }
+                .stat-card .num { font-size: 26px; font-weight: 800; }
+                .stat-card .lbl { font-size: 11px; font-weight: 500; margin-top: 3px; }
+                .stat-card.total { background: #f0f4f8; color: #2c3e50; }
+                .stat-card.paid-c { background: #eafaf1; color: #1a7a46; }
+                .stat-card.exempt-c { background: #ebf5fb; color: #1a6ea8; }
+                .stat-card.unpaid-c { background: #fdedec; color: #a93226; }
+                .stat-card.revenue-c { background: #fef9e7; color: #9a7d0a; }
+
+                /* فوج */
+                .group-section { border: 1px solid #dde1e7; border-radius: 10px; margin-bottom: 18px; overflow: hidden; break-inside: avoid; }
+                .group-header { background: #f4f6f9; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+                .group-name { font-size: 15px; font-weight: 800; color: #1a3a5c; }
+                .group-stats { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; }
+                .group-stats .stat { border-radius: 20px; padding: 3px 10px; font-weight: 700; }
+                .group-stats .stat.paid { background: #eafaf1; color: #1a7a46; }
+                .group-stats .stat.partial { background: #fef6e4; color: #b7770d; }
+                .group-stats .stat.exempted { background: #ebf5fb; color: #1a6ea8; }
+                .group-stats .stat.unpaid { background: #fdedec; color: #a93226; }
+                .group-stats .stat.revenue { background: #fef9e7; color: #9a7d0a; }
+                .group-stats .stat.pct { background: #f0eef9; color: #5b3fa6; }
+
+                /* جدول */
+                table { width: 100%; border-collapse: collapse; font-size: 13px; }
+                thead tr { background: #2c3e50; color: white; }
+                thead th { padding: 9px 10px; text-align: right; font-weight: 700; }
+                tbody tr:nth-child(even) { background: #f9fafb; }
+                tbody td { padding: 8px 10px; border-bottom: 1px solid #eaecef; }
+                td.qcell { text-align: center; font-size: 16px; }
+                td.tier { font-size: 11px; color: #666; }
+                td.total { font-weight: 700; color: #2c3e50; }
+                tr.row.paid { background: #f2fff7 !important; }
+                tr.row.exempted { background: #f0f8ff !important; }
+                tr.row.partial { background: #fffbf0 !important; }
+                tr.row.unpaid { background: #fff5f5 !important; }
+
+                /* الذيل */
+                .footer { margin-top: 24px; text-align: center; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 12px; }
+
+                @media print {
+                    body { padding: 10px; }
+                    button { display: none !important; }
+                    .group-section { break-inside: avoid; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="report-header">
+                <div>
+                    <div class="report-title">📊 تقرير المستحقات المالية الفصلية</div>
+                    <div class="report-subtitle">${quarterLabel} — سنة ${currentYear} | ${filteredStudents.length} طالب</div>
+                </div>
+                <div class="report-meta">
+                    <div>تاريخ الإصدار:</div>
+                    <div>${today}</div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card total"><div class="num">${totalStudents}</div><div class="lbl">إجمالي الطلاب</div></div>
+                <div class="stat-card paid-c"><div class="num">${paidCount}</div><div class="lbl">✅ مدفوع (${paidPct}%)</div></div>
+                <div class="stat-card exempt-c"><div class="num">${exemptedCount}</div><div class="lbl">🔵 معفى</div></div>
+                <div class="stat-card unpaid-c"><div class="num">${totalStudents - paidCount - exemptedCount}</div><div class="lbl">❌ غير مدفوع</div></div>
+                <div class="stat-card revenue-c"><div class="num">${totalRevenue.toLocaleString('ar-DZ')}</div><div class="lbl">💰 المحصل (د.ج)</div></div>
+            </div>
+
+            ${groupSections}
+
+            <div class="footer">تم إنشاء هذا التقرير تلقائياً بواسطة منصة الشافعية القرآنية — ${today}</div>
+
+            <script>window.onload = () => setTimeout(() => window.print(), 400);<\/script>
+        </body>
+        </html>`;
+
+        const win = window.open('', '_blank', 'width=1000,height=750');
+        if (!win) {
+            alert('يرجى السماح للمتصفح بفتح نوافذ جديدة لتتمكن من طباعة التقرير.');
+            return;
+        }
+        win.document.write(html);
+        win.document.close();
     }
 
 
@@ -495,6 +715,9 @@ export default function DuesPage() {
                         <Button variant={statusFilter === 'مطرود' ? 'secondary' : 'ghost'} onClick={() => setStatusFilter('مطرود')} className="h-8 px-3">المطرودون</Button>
                     </div>
                     <Button onClick={handleExport}><Download className="ml-2 h-4 w-4" /> تصدير (Excel)</Button>
+                    <Button variant="outline" onClick={handlePrintPDF} className="border-primary text-primary hover:bg-primary hover:text-white">
+                        <Printer className="ml-2 h-4 w-4" /> طباعة تقرير (PDF)
+                    </Button>
                 </CardContent>
             </Card>
 
