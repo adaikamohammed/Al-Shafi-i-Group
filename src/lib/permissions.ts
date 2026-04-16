@@ -20,6 +20,7 @@ export const PAGE_PERMISSIONS: PagePermission[] = [
     { path: '/league', label: 'الدوري', icon: 'Trophy', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/comparison', label: 'المقارنة', icon: 'BarChart3', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/dues', label: 'الاشتراكات', icon: 'DollarSign', allowedRoles: ['sheikh', 'super_admin', 'management'] },
+    { path: '/dues/report', label: 'تقارير المستحقات', icon: 'BarChart3', allowedRoles: ['super_admin', 'management'] },
     { path: '/reports', label: 'التقارير', icon: 'FileText', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/stats', label: 'الإحصائيات', icon: 'PieChart', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/yearly-performance', label: 'الأداء السنوي', icon: 'TrendingUp', allowedRoles: ['sheikh', 'super_admin', 'management'] },

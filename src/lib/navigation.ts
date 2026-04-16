@@ -89,6 +89,7 @@ export const NAV_GROUPS: NavGroup[] = [
             { href: '/updates', label: 'تحديثات الموقع', icon: Sparkles },
             { href: '/data', label: 'إدارة البيانات', icon: ArrowRightLeft },
             { href: '/dues', label: 'المستحقات (فصلي)', icon: DollarSign },
+            { href: '/dues/report', label: 'تقارير المستحقات', icon: BarChart3 },
             { href: '/sessions', label: 'أرشيف الحصص & النسخ', icon: Database },
             { href: '/guide', label: 'دليل المستخدم', icon: HelpCircle },
 

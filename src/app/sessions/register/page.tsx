@@ -60,19 +60,19 @@ function RegisterSessionContent() {
     const [substituteTeacher, setSubstituteTeacher] = useState('');
     const [activityType, setActivityType] = useState('');
     const [activityDescription, setActivityDescription] = useState('');
-    const [surahId, setSurahId] = useState<number>(26); // Default Search (الشعراء)
+    const [surahId, setSurahId] = useState<number>(0); // يُحدَّث ديناميكياً من آخر حصة
     const [fromVerse, setFromVerse] = useState<number>(1);
     const [toVerse, setToVerse] = useState<number>(1);
     const [isReview, setIsReview] = useState(false);
     const [isCounterStopped, setIsCounterStopped] = useState(false);
 
     // Admin5 Talqin Wird
-    const [talqinSurahId, setTalqinSurahId] = useState<number>(26);
+    const [talqinSurahId, setTalqinSurahId] = useState<number>(0); // يُحدَّث ديناميكياً
     const [talqinFromVerse, setTalqinFromVerse] = useState<number>(1);
     const [talqinToVerse, setTalqinToVerse] = useState<number>(1);
 
     // Admin5 Tasmie Wird
-    const [tasmieSurahId, setTasmieSurahId] = useState<number>(26);
+    const [tasmieSurahId, setTasmieSurahId] = useState<number>(0); // يُحدَّث ديناميكياً
     const [tasmieFromVerse, setTasmieFromVerse] = useState<number>(1);
     const [tasmieToVerse, setTasmieToVerse] = useState<number>(1);
     const [attendanceRecords, setAttendanceRecords] = useState<Record<string, AttendanceRecord>>({});
@@ -181,6 +181,74 @@ function RegisterSessionContent() {
         return selectedDay ? `session_draft_${format(selectedDay, 'yyyy-MM-dd')}_s${sessionToOpen}` : null;
     }, [selectedDay, sessionToOpen]);
 
+    /**
+     * computeNextSurahData — دالة ذكية لحساب بيانات الأوراد للحصة الجديدة
+     * تقرأ آخر حصة أساسية مسجلة وتحسب:
+     * - ورد التلقين: السورة التي يجب تصحيحها اليوم
+     *   • إذا انتهت السورة → السورة التالية من آية 1
+     *   • إذا لم تنتهِ → نفس السورة من آخر آية وصلنا إليها
+     * - ورد التسميع: آخر ورد تلقين (أي ما صُحِّح بالأمس)
+     */
+    const computeNextSurahData = React.useCallback((sessions: Record<string, Record<string, any>>) => {
+        // 1. استخرج كل الحصص وافلترها
+        const allSessions = Object.values(sessions)
+            .flatMap(day => Object.values(day as Record<string, any>))
+            .filter(s => {
+                if (!s || typeof s.date !== 'string') return false;
+                return (s.sessionType === 'حصة أساسية' || s.sessionType === 'حصة إضافية') && s.talqinSurahId;
+            })
+            .sort((a, b) => b.date.localeCompare(a.date)); // تنازلي: الأحدث أولاً
+
+        if (allSessions.length === 0) {
+            // لا توجد حصص سابقة → ابدأ من الشعراء (النقطة الافتراضية الأولى)
+            return {
+                talqinSurahId: 26, talqinFromVerse: 1, talqinToVerse: 1,
+                tasmieSurahId: 26, tasmieFromVerse: 1, tasmieToVerse: 1,
+                surahId: 26
+            };
+        }
+
+        // آخر حصة = ورد التسميع (ما سيُسمَّع اليوم = ما تُلُقِّن بالأمس)
+        const lastSession = allSessions[0];
+        const lastTalqinSurahId: number = lastSession.talqinSurahId;
+        const lastTalqinToVerse: number = lastSession.talqinToVerse || lastSession.toVerse || 1;
+        const lastSurahData = surahs.find(s => s.id === lastTalqinSurahId);
+        const totalVerses = lastSurahData?.verses || 999;
+
+        // ورد التسميع = آخر ورد تلقين
+        const tasmieSurahId = lastTalqinSurahId;
+        const tasmieFromVerse = lastSession.talqinFromVerse || lastSession.fromVerse || 1;
+        const tasmieToVerse = lastTalqinToVerse;
+
+        // ورد التلقين = الاستمرار من حيث توقفنا
+        let newTalqinSurahId: number;
+        let newTalqinFromVerse: number;
+        let newTalqinToVerse: number;
+
+        if (lastTalqinToVerse >= totalVerses) {
+            // ✅ انتهت السورة! انتقل للسورة التالية
+            const nextSurahId = (lastTalqinSurahId % 114) + 1;
+            newTalqinSurahId = nextSurahId;
+            newTalqinFromVerse = 1;
+            newTalqinToVerse = 1;
+        } else {
+            // السورة لم تنتهِ بعد → ابقَ فيها
+            newTalqinSurahId = lastTalqinSurahId;
+            newTalqinFromVerse = lastTalqinToVerse;
+            newTalqinToVerse = lastTalqinToVerse;
+        }
+
+        return {
+            talqinSurahId: newTalqinSurahId,
+            talqinFromVerse: newTalqinFromVerse,
+            talqinToVerse: newTalqinToVerse,
+            tasmieSurahId,
+            tasmieFromVerse,
+            tasmieToVerse,
+            surahId: newTalqinSurahId
+        };
+    }, []);
+
     useEffect(() => {
         // Load initial data logic
         const loadFromFirebase = async () => {
@@ -286,34 +354,34 @@ function RegisterSessionContent() {
                     // FIX: Stopped defaulting to Holiday on Thu/Fri per user request
                     setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة إضافية');
 
-                    // Logic for admin5 auto-increment - DISABLED per user request for "Empty Sessions"
-                    /*
+                    // ✅ الذكاء التلقائي: حساب السورة الحالية من آخر حصة مسجلة
                     if (isAdmin5 && sessionToOpen === 1) {
-                        const allSessions = Object.values(dailySessions || {}).flatMap(day => Object.values(day as Record<string, any>));
-                        const sortedSessions = allSessions
-                            .filter(s => s.sessionType === 'حصة أساسية' && s.surahId && !s.isReview)
-                            .sort((a, b) => b.date.localeCompare(a.date));
+                        // نحاول أولاً من Firebase مباشرة لضمان أحدث البيانات
+                        let sessionsSource: Record<string, Record<string, any>> = dailySessions || {};
 
-                        const latestSession = sortedSessions[0];
-                        if (latestSession) {
-                            const currentSurah = surahs.find(s => s.id === latestSession.surahId);
-                            if (latestSession.toVerse && currentSurah && latestSession.toVerse < currentSurah.verses) {
-                                setSurahId(latestSession.surahId);
-                                setFromVerse(latestSession.toVerse + 1);
-                                setToVerse(latestSession.toVerse + 1);
-                            } else {
-                                setSurahId((latestSession.surahId % 114) + 1);
-                                setFromVerse(1);
-                                setToVerse(1);
+                        // إذا كانت context sessions فارغة، جرّب Firebase مباشرة
+                        const hasContextSessions = Object.keys(sessionsSource).length > 0;
+                        if (!hasContextSessions) {
+                            try {
+                                const allRef = dbRef(db, `users/${sessionOwnerId}/dailySessions`);
+                                const allSnap = await get(allRef);
+                                if (allSnap.exists()) {
+                                    sessionsSource = allSnap.val();
+                                }
+                            } catch (e) {
+                                console.warn('Could not fetch sessions from Firebase for surah auto-detect', e);
                             }
-                        } else {
-                            setSurahId(26);
-                            setFromVerse(1);
-                            setToVerse(1);
                         }
+
+                        const nextData = computeNextSurahData(sessionsSource);
+                        setSurahId(nextData.surahId);
+                        setTalqinSurahId(nextData.talqinSurahId);
+                        setTalqinFromVerse(nextData.talqinFromVerse);
+                        setTalqinToVerse(nextData.talqinToVerse);
+                        setTasmieSurahId(nextData.tasmieSurahId);
+                        setTasmieFromVerse(nextData.tasmieFromVerse);
+                        setTasmieToVerse(nextData.tasmieToVerse);
                     }
-                    */
-                    //}
                 }
             } catch (error) {
                 console.error("Error loading session from Firebase:", error);

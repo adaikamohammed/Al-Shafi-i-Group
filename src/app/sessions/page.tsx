@@ -219,7 +219,7 @@ export default function DailySessionsPage() {
 
     setSheikhSessionsLoading(true);
     const sessionsRef = dbRef(db, `users/${selectedSheikhId}/dailySessions`);
-    const unsubscribe = onValue(sessionsRef, (snapshot) => {
+    const unsubscribe = onValue(sessionsRef, (snapshot: any) => {
       const data = snapshot.val() || {};
       // Inject ownerId into each session so filters work correctly
       const normalized: Record<string, Record<string, any>> = {};
@@ -304,7 +304,7 @@ export default function DailySessionsPage() {
               sessionNumber: sessionNumber as 1 | 2,
               ownerId: targetOwnerId,
               teacherAbsenceReason: '',
-              substituteTeacher: false,
+              substituteTeacher: '',
               records: []
             }, targetOwnerId);
             addedCount++;
@@ -456,8 +456,7 @@ export default function DailySessionsPage() {
   const globalProgress = useMemo(() => {
     if (!isAdminUser || !dailySessions || !selectedSheikhId) return null;
 
-    // Filter sessions strictly by the selected sheikh
-    // List and normalize sessions with fallback ownerId
+    // جمع وتصفية الحصص حسب الشيخ المختار
     const allSessions = Object.values(dailySessions).flatMap(day => Object.values(day as Record<string, any>))
       .map(s => ({
         ...s,
@@ -465,21 +464,42 @@ export default function DailySessionsPage() {
       }));
 
     const sortedSessions = allSessions
-      .filter(s => s.ownerId === selectedSheikhId && s.sessionType === 'حصة أساسية' && s.surahId)
+      .filter(s => s.ownerId === selectedSheikhId && s.sessionType === 'حصة أساسية' && s.talqinSurahId)
       .sort((a, b) => b.date.localeCompare(a.date));
 
     const latest = sortedSessions[0];
-    if (!latest) return { surahId: 26, fromVerse: 1, toVerse: 1, surahName: 'الشعراء', totalVerses: 227 };
+    if (!latest) return null; // لا توجد بيانات بعد — لا يُعرض الويجت حتى تتوفر بيانات حقيقية
 
-    const surah = surahs.find(s => s.id === latest.surahId);
+    // استخدم talqinSurahId الذي هو السورة الحقيقية لحساب admin5
+    const activeSurahId: number = latest.talqinSurahId;
+    const activeToVerse: number = latest.talqinToVerse || latest.toVerse || 1;
+    const activeFromVerse: number = latest.talqinFromVerse || latest.fromVerse || 1;
+    const surah = surahs.find(s => s.id === activeSurahId);
+    const totalVerses = surah?.verses || 1;
+
+    // تحقق: هل انتهت السورة في آخر حصة و انتقلنا للتالية;
+    if (activeToVerse >= totalVerses) {
+      // السورة انتهت — نعرض السورة التالية
+      const nextSurahId = (activeSurahId % 114) + 1;
+      const nextSurah = surahs.find(s => s.id === nextSurahId);
+      return {
+        surahId: nextSurahId,
+        fromVerse: 1,
+        toVerse: 1,
+        surahName: nextSurah?.name || '',
+        totalVerses: nextSurah?.verses || 1,
+        completedPrevSurah: surah?.name // للعرض فقط
+      };
+    }
+
     return {
-      surahId: latest.surahId,
-      fromVerse: latest.fromVerse,
-      toVerse: latest.toVerse,
+      surahId: activeSurahId,
+      fromVerse: activeFromVerse,
+      toVerse: activeToVerse,
       surahName: surah?.name || '',
-      totalVerses: surah?.verses || 100
+      totalVerses
     };
-  }, [dailySessions, isAdminUser, selectedSheikhId]);
+  }, [dailySessions, isAdminUser, selectedSheikhId, user?.uid, isManagement, isSuperAdmin]);
 
   // Filter sessions based on selected Group (for Admins) - uses sheikhSessions for admin5
   const filteredGetSessionsForDay = (date: string) => {
@@ -905,7 +925,6 @@ export default function DailySessionsPage() {
         {/* Progress Widget - Only for admin5 */}
         {isAdmin5 && selectedSheikhId && globalProgress && viewMode !== 'parents' && (
           <div className="bg-card p-6 rounded-2xl shadow-sm border space-y-4 animate-in fade-in slide-in-from-top-4 duration-1000">
-            {/* ... existing progress code ... */}
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-emerald-100 rounded-xl text-emerald-700">
@@ -914,11 +933,22 @@ export default function DailySessionsPage() {
                 <div>
                   <h2 className="text-xl font-headline font-bold">التقدم الحالي في السورة</h2>
                   <p className="text-muted-foreground text-sm font-body">متابعة الحفظ الجماعي للفوج</p>
+                  {(globalProgress as any).completedPrevSurah && (
+                    <span className="inline-flex items-center gap-1 mt-1 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">
+                      <CheckCircle className="h-3 w-3" />
+                      أُنجزت سورة {(globalProgress as any).completedPrevSurah} ✓
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="text-left">
                 <span className="text-2xl font-bold text-emerald-600 font-headline">{globalProgress.surahName}</span>
-                <p className="text-xs text-muted-foreground">الآية {globalProgress.toVerse} من {globalProgress.totalVerses}</p>
+                <p className="text-xs text-muted-foreground">
+                  {(globalProgress as any).completedPrevSurah
+                    ? 'بداية السورة الجديدة'
+                    : `الآية ${globalProgress.toVerse} من ${globalProgress.totalVerses}`
+                  }
+                </p>
               </div>
             </div>
 
@@ -1310,7 +1340,7 @@ export default function DailySessionsPage() {
                           <td className="p-4 align-middle font-medium">
                             <div className="flex items-center gap-3">
                               <Avatar className="h-9 w-9 border">
-                                <AvatarImage src={student.photoUrl} alt={student.fullName} />
+                                <AvatarImage src={student.photoURL} alt={student.fullName} />
                                 <AvatarFallback>{student.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}</AvatarFallback>
                               </Avatar>
                               <div className="flex flex-col">
