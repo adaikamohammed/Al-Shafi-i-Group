@@ -679,9 +679,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const studentRef = ref(db, `users/${ownerId}/students/${studentId}`);
     const studentOp = set(studentRef, sanitizeData({
       ...newStudent,
-      birthDate: newStudent.birthDate ? newStudent.birthDate.toISOString() : null,
-      registrationDate: newStudent.registrationDate.toISOString(),
-      updatedAt: newStudent.updatedAt.toISOString(),
+      birthDate: newStudent.birthDate instanceof Date ? newStudent.birthDate.toISOString() : newStudent.birthDate || null,
+      registrationDate: newStudent.registrationDate instanceof Date ? newStudent.registrationDate.toISOString() : newStudent.registrationDate,
+      updatedAt: newStudent.updatedAt instanceof Date ? newStudent.updatedAt.toISOString() : newStudent.updatedAt,
       covenants: newStudent.covenants || null // Use null for empty array
     }));
 
@@ -829,9 +829,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
     await set(studentRef, {
       ...sanitizedData,
-      birthDate: sanitizedData.birthDate ? sanitizedData.birthDate.toISOString() : null,
-      registrationDate: sanitizedData.registrationDate.toISOString(),
-      updatedAt: sanitizedData.updatedAt.toISOString(),
+      birthDate: sanitizedData.birthDate instanceof Date ? sanitizedData.birthDate.toISOString() : sanitizedData.birthDate || null,
+      registrationDate: sanitizedData.registrationDate instanceof Date ? sanitizedData.registrationDate.toISOString() : sanitizedData.registrationDate,
+      updatedAt: sanitizedData.updatedAt instanceof Date ? sanitizedData.updatedAt.toISOString() : sanitizedData.updatedAt,
       covenants: Object.keys(covenantsObject).length > 0 ? covenantsObject : null
     });
 
