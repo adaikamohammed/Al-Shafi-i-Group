@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { format, subDays, parse, addDays, startOfWeek } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { MessageSquare, Trophy, Copy, CheckCircle, RefreshCw, Calendar } from 'lucide-react';
+import { MessageSquare, Trophy, Copy, CheckCircle, RefreshCw, Calendar, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn, arabicCompare } from '@/lib/utils';
@@ -16,7 +16,9 @@ interface Admin5MessagesPanelProps {
     dailySessions: Record<string, Record<string, any>> | null;
     students: any[];
     weekDates: Date[]; // Array of 7 dates (Sat–Fri) from the weekly table
-    weeklyOutcomes: Record<string, any>;
+    weeklyOutcomes?: Record<string, any>;
+    onNextWeek?: () => void;
+    onPrevWeek?: () => void;
 }
 
 const pad = (num: number) => num < 10 ? `0${num}` : num.toString();
@@ -59,6 +61,8 @@ export const Admin5MessagesPanel = ({
     students,
     weekDates,
     weeklyOutcomes,
+    onNextWeek,
+    onPrevWeek,
 }: Admin5MessagesPanelProps) => {
     // Sort students alphabetically (Arabic)
     const sortedStudents = useMemo(() =>
@@ -221,34 +225,11 @@ export const Admin5MessagesPanel = ({
 
     // Generate weekly harvest message (based on the full weekDates)
     const harvestMessageGenerated = useMemo(() => {
-        if (!weekDates || !dailySessions || !students || !weeklyOutcomes) return '';
-
-        const weekStartStr = format(weekDates[0], 'yyyy-MM-dd'); // Saturday
-
-        // Group students by evaluation from weeklyOutcomes
-        const evaluatedGroups: Record<string, string[]> = {
-            'ممتاز': [],
-            'جيد جداً': [],
-            'جيد': [],
-            'حسن': [],
-            'متوسط': [],
-            'لم يحفظ': []
-        };
-        const studentEvaluationsCount = Object.keys(weeklyOutcomes).filter(k => k.endsWith(`_${weekStartStr}`)).length;
-        if (studentEvaluationsCount === 0) return ''; // No evaluations yet
-
-        sortedStudents.forEach(student => {
-            const outcomeId = `${student.id}_${weekStartStr}`;
-            const outcome = weeklyOutcomes[outcomeId];
-            if (outcome && outcome.evaluation && evaluatedGroups[outcome.evaluation]) {
-                evaluatedGroups[outcome.evaluation].push(student.fullName);
-            }
-        });
+        if (!weekDates || !dailySessions || !students) return '';
 
         const header = 'السلام عليكم ورحمة الله وبركاته';
         const dateLine = `الحصيلة الأسبوعية (${format(weekDates[0], 'd MMMM', { locale: ar })} - ${format(weekDates[6], 'd MMMM yyyy', { locale: ar })})`;
 
-        // Get all basic sessions in this week to find missed TASMEE wirds and harvest range
         const weekStart = weekDates[0];
         const weekEnd = weekDates[6];
         const allSessions = Object.values(dailySessions).flatMap(day =>
@@ -262,83 +243,66 @@ export const Admin5MessagesPanel = ({
             })
             .sort((a, b) => a.date.localeCompare(b.date));
 
+        const validSessions = weekSessions.filter(s => s.tasmieSurahId || s.surahId);
+
+        if (validSessions.length === 0) {
+            return `${header}\n${dateLine}\n\nلا توجد أوراد مسجلة في هذا الأسبوع.`;
+        }
+
+        const firstSession = validSessions[0];
+        const lastSession = validSessions[validSessions.length - 1];
+
+        const firstSurah = surahs.find(s => s.id === (firstSession.tasmieSurahId || firstSession.surahId))?.name || '';
+        const lastSurah = surahs.find(s => s.id === (lastSession.tasmieSurahId || lastSession.surahId))?.name || '';
+
+        const firstFrom = firstSession.tasmieFromVerse || firstSession.fromVerse || 0;
+        const lastTo = lastSession.tasmieToVerse || lastSession.toVerse || 0;
+
         let harvestContent = '';
 
-        if (weekSessions.length > 0) {
-            const firstSession = weekSessions[0];
-            const lastSession = weekSessions[weekSessions.length - 1];
-            const harvestSurah = surahs.find(s => s.id === firstSession.surahId);
-            const harvestSurahName = harvestSurah?.name || '';
-            const harvestFrom = firstSession.fromVerse || 0;
-            const harvestTo = lastSession.toVerse || 0;
-
-            harvestContent += `سورة ${harvestSurahName} من الآية (${pad(harvestFrom)}) إلى (${pad(harvestTo)})\n`;
+        if (firstSurah === lastSurah) {
+            harvestContent += `سورة ${firstSurah} من الآية (${pad(firstFrom)}) إلى (${pad(lastTo)})\n\n`;
+        } else {
+            harvestContent += `من سورة ${firstSurah} الآية (${pad(firstFrom)}) إلى سورة ${lastSurah} الآية (${pad(lastTo)})\n\n`;
         }
 
-        Object.entries(evaluatedGroups).forEach(([evalLevel, names]) => {
-            if (names.length > 0) {
-                harvestContent += `\n*الطلاب الحاصلين على التقييم (${evalLevel}):*\n`;
-                names.forEach(name => {
-                    harvestContent += `- ${name}\n`;
-                });
-            }
-        });
+        const numWords = ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع'];
 
-        const missedWirdsGroups: Record<string, string[]> = {}; // wird string -> list of student names
+        validSessions.forEach((session, index) => {
+            const surahId = session.tasmieSurahId || session.surahId;
+            const surahName = surahs.find(s => s.id === surahId)?.name || '';
+            const fromV = session.tasmieFromVerse || session.fromVerse || 0;
+            const toV = session.tasmieToVerse || session.toVerse || 0;
 
-        weekSessions.forEach(session => {
-            const tSurahId = session.tasmieSurahId || session.surahId;
-            const tFrom = session.tasmieFromVerse || session.fromVerse;
-            const tTo = session.tasmieToVerse || session.toVerse;
+            const wirdLabel = `الورد ${numWords[index] || (index + 1)}: سورة ${surahName} من آية ${fromV} الى ${toV}`;
 
-            if (tSurahId) {
-                const surahName = surahs.find(s => s.id === tSurahId)?.name;
-                if (surahName) {
-                    const dayName = format(parse(session.date, 'yyyy-MM-dd', new Date()), 'EEEE', { locale: ar });
-                    const wirdKey = `${dayName} (سورة ${surahName} ${pad(tFrom)}-${pad(tTo)})`;
+            const memorized: string[] = [];
+            const notMemorized: string[] = [];
 
-                    sortedStudents.forEach(student => {
-                        const records: any[] = session.records || [];
-                        const rec = records.find(r => r.studentId === student.id);
+            sortedStudents.forEach(student => {
+                const records = session.records || [];
+                const rec = records.find((r: any) => r.studentId === student.id);
 
-                        const outcomeId = `${student.id}_${weekStartStr}`;
-                        const outcome = weeklyOutcomes[outcomeId];
+                const isAbsent = !rec || rec.attendance === 'غياب' || rec.attendance === 'غائب';
+                const isFail = rec?.memorization === 'لم يحفظ' || rec?.memorization === 'ضعيف'; // Including absent or fail as didn't memorize
 
-                        // User requirement: "الطالب اذا قام ب تسميع الحصيلة وتقييمها فلا تضع اوراد فائته"
-                        // So if outcome exists and has evaluation, skip this student for missed wirds
-                        if (outcome && outcome.evaluation) return;
+                const evaluation = isAbsent ? 'غائب' : (rec?.memorization && rec.memorization !== 'لا يوجد' ? rec.memorization : 'لم يحفظ');
+                const formattedEntry = `*${student.fullName}* : ${evaluation}`;
 
-                        const isAbsent = !rec || rec.attendance === 'غياب' || rec.attendance === 'غائب';
-                        const isFail = rec?.memorization === 'لم يحفظ';
-
-                        if (isAbsent || isFail) {
-                            if (!missedWirdsGroups[wirdKey]) missedWirdsGroups[wirdKey] = [];
-                            if (!missedWirdsGroups[wirdKey].includes(student.fullName)) {
-                                missedWirdsGroups[wirdKey].push(student.fullName);
-                            }
-                        }
-                    });
+                if (isAbsent || isFail || !rec.memorization || rec.memorization === 'لا يوجد') {
+                    notMemorized.push(formattedEntry);
+                } else {
+                    memorized.push(formattedEntry);
                 }
-            }
-        });
-
-        // Missed wirds section
-        if (Object.keys(missedWirdsGroups).length > 0) {
-            harvestContent += `\n-------------\n📋 أوراد التسميع الفائتة للطلبة للحفظ:\n`;
-            Object.entries(missedWirdsGroups).forEach(([wirdKey, names]) => {
-                harvestContent += `\n▪️ ${wirdKey}:\n`;
-                names.forEach(name => {
-                    harvestContent += `   - ${name}\n`;
-                });
             });
-        }
 
-        if (harvestContent === '') {
-            return `${header}\n${dateLine}\n\nلم يتم تقييم حصيلة أي طالب بعد.`;
-        }
+            harvestContent += `🔹 ${wirdLabel}\n`;
+            harvestContent += `الذين حفظوه:\n${memorized.length > 0 ? memorized.map(m => ` - ${m}`).join('\n') : ' - لا يوجد'}\n`;
+            harvestContent += `الذين لم يحفظوه:\n${notMemorized.length > 0 ? notMemorized.map(m => ` - ${m}`).join('\n') : ' - لا يوجد'}\n\n`;
+        });
 
         return `${header}\n${dateLine}\n${harvestContent}`;
-    }, [weekDates, dailySessions, students, weeklyOutcomes]);
+    }, [weekDates, dailySessions, students]);
 
     // Sync generated message into editable textarea (only when regenerated)
     useEffect(() => {
@@ -493,9 +457,23 @@ export const Admin5MessagesPanel = ({
                                 </Button>
                             </div>
                         </div>
-                        <p className="text-[11px] text-emerald-600/70 mt-1">
-                            ملخص أسبوع {weekDates?.[0] ? format(weekDates[0], 'dd/MM', { locale: ar }) : ''} — {weekDates?.[6] ? format(weekDates[6], 'dd/MM/yyyy', { locale: ar }) : ''}
-                        </p>
+                        <div className="flex items-center justify-between mt-2">
+                            <p className="text-[11px] text-emerald-600/70">
+                                ملخص أسبوع {weekDates?.[0] ? format(weekDates[0], 'dd/MM', { locale: ar }) : ''} — {weekDates?.[6] ? format(weekDates[6], 'dd/MM/yyyy', { locale: ar }) : ''}
+                            </p>
+                            <div className="flex items-center gap-1" dir="ltr">
+                                {onNextWeek && (
+                                    <Button variant="outline" size="icon" className="h-6 w-6 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={onNextWeek}>
+                                        <ChevronRight className="h-3 w-3" />
+                                    </Button>
+                                )}
+                                {onPrevWeek && (
+                                    <Button variant="outline" size="icon" className="h-6 w-6 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={onPrevWeek}>
+                                        <ChevronLeft className="h-3 w-3" />
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
                     </CardHeader>
 
                     <CardContent className="space-y-3 pt-2">

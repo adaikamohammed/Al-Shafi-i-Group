@@ -99,7 +99,6 @@ import { WeeklyAttendanceTable } from '@/components/sessions/WeeklyAttendanceTab
 import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
 import { Admin5MessagesPanel } from '@/components/sessions/Admin5MessagesPanel';
 import { WeeklyStatsRow } from '@/components/sessions/WeeklyStatsRow';
-import { ParentsSurahProgressView } from '@/components/sessions/ParentsSurahProgressView';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { PerformanceLevel, WeeklyOutcome } from '@/lib/types';
 
@@ -178,7 +177,7 @@ export default function DailySessionsPage() {
   const [sessionChoiceData, setSessionChoiceData] = useState<{ day: number, dateStr: string, sessions: any[] } | null>(null);
   const [moveSessionData, setMoveSessionData] = useState<{ sessionId: string, date: string, currentOwnerId: string } | null>(null);
   const [targetSheikhForMove, setTargetSheikhForMove] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'parents'>('calendar');
+  const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
   const [outcomeModalStudent, setOutcomeModalStudent] = useState<any | null>(null);
 
   // Bulk Holiday State
@@ -908,22 +907,12 @@ export default function DailySessionsPage() {
                 <Table className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">جدول</span>
               </Button>
-              {isAdmin5 && (
-                <Button
-                  variant={viewMode === 'parents' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('parents')}
-                  className={cn("h-8 gap-1.5 text-xs rounded-lg text-emerald-700", viewMode === 'parents' && "bg-emerald-600 text-white shadow-sm hover:!bg-emerald-700 hover:!text-white")}>
-                  <BookOpen className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">متابعة السورة</span>
-                </Button>
-              )}
             </div>
           </div>
         </div>
 
         {/* Progress Widget - Only for admin5 */}
-        {isAdmin5 && selectedSheikhId && globalProgress && viewMode !== 'parents' && (
+        {isAdmin5 && selectedSheikhId && globalProgress && (
           <div className="bg-card p-6 rounded-2xl shadow-sm border space-y-4 animate-in fade-in slide-in-from-top-4 duration-1000">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
@@ -964,14 +953,6 @@ export default function DailySessionsPage() {
         )}
 
         {/* Tab Content Rendering */}
-        {viewMode === 'parents' && isAdmin5 && (
-          <ParentsSurahProgressView
-            dailySessions={isAdmin5 ? sheikhSessions : dailySessions}
-            students={activeStudentsForWeeklyOutcome}
-            globalProgress={globalProgress}
-          />
-        )}
-
         {viewMode === 'calendar' && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             <SessionCalendar
@@ -1004,15 +985,6 @@ export default function DailySessionsPage() {
                   getSessionsForDay={filteredGetSessionsForDay}
                   initialDate={currentDate}
                 />
-
-                {isAdmin5 && (
-                  <Admin5MessagesPanel
-                    students={activeStudentsForWeeklyOutcome}
-                    weekDates={weekDates}
-                    dailySessions={isAdmin5 ? sheikhSessions : dailySessions}
-                    weeklyOutcomes={weeklyOutcomes}
-                  />
-                )}
               </>
             ) : (
               <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-2xl border-2 border-dashed font-bold">
@@ -1426,6 +1398,8 @@ export default function DailySessionsPage() {
               students={activeStudentsForWeeklyOutcome}
               weekDates={weekDates}
               weeklyOutcomes={weeklyOutcomes}
+              onNextWeek={() => setOutcomeWeekStart(prev => addDays(prev, 7))}
+              onPrevWeek={() => setOutcomeWeekStart(prev => addDays(prev, -7))}
             />
           )}
         </div>
