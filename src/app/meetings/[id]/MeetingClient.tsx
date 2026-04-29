@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -38,9 +38,9 @@ import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 
 export default function MeetingDetailsPage() {
-    const params = useParams();
+    const searchParams = useSearchParams();
     const router = useRouter();
-    const meetingId = params.id as string;
+    const meetingId = searchParams.get('id') as string;
     const { meetings, saveMeeting, allUsers } = useStudentContext();
     const { isSuperAdmin, isManagement } = useAuth();
     const { toast } = useToast();

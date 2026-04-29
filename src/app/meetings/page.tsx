@@ -492,7 +492,7 @@ function MeetingCard({ meeting, isAdmin, onEdit, onDelete }: { meeting: any, isA
                             </div>
                         </div>
 
-                        <h3 className="text-2xl font-black text-slate-800 dark:text-white group-hover:text-primary transition-colors cursor-pointer mb-6" onClick={() => window.location.href = `/meetings/${meeting.id}`}>
+                        <h3 className="text-2xl font-black text-slate-800 dark:text-white group-hover:text-primary transition-colors cursor-pointer mb-6" onClick={() => window.location.href = `/meetings/detail?id=${meeting.id}`}>
                             {meeting.title}
                         </h3>
 
@@ -523,7 +523,7 @@ function MeetingCard({ meeting, isAdmin, onEdit, onDelete }: { meeting: any, isA
                             className="flex-1 md:w-full rounded-2xl font-black gap-2 h-12 shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
                             asChild
                         >
-                            <a href={`/meetings/${meeting.id}`}>
+                            <a href={`/meetings/detail?id=${meeting.id}`}>
                                 <Eye className="h-5 w-5" />
                                 <span className="text-sm">التفاصيل</span>
                             </a>

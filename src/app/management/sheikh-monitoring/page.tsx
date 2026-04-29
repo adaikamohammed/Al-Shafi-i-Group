@@ -1973,6 +1973,7 @@ function DayTable({
                                                 <div className="flex items-center gap-1 no-print">
                                                     <input
                                                         type="text"
+                                                        data-student-id={rec.id}
                                                         placeholder="سبب الغياب..."
                                                         defaultValue={absenceReasons[rec.id] || ''}
                                                         onBlur={(e) => {
@@ -3207,6 +3208,42 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
 
     const medalEmoji = (rank: number) => rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `${rank + 1}`;
 
+    const [selectedStudentDetail, setSelectedStudentDetail] = useState<TopStudentEntry | null>(null);
+    const [rankingPage, setRankingPage] = useState(0);
+    const RANKING_PAGE_SIZE = 15;
+
+    // All-students rank (ignores groupFilter)
+    const allActiveRanked = useMemo(() => [
+        ...dataSource.all]
+        .filter(s => s.totalSessionDays > 0 && (s.totalEvals > 0 || s.attendanceDays > 0))
+        .sort((a, b) => b.overallScore - a.overallScore),
+    [dataSource]);
+
+    const overallRankMap = useMemo(() => {
+        const map = new Map<string, number>();
+        allActiveRanked.forEach((s, i) => map.set(s.id, i + 1));
+        return map;
+    }, [allActiveRanked]);
+
+    const groupRankMap = useMemo(() => {
+        const map = new Map<string, number>();
+        sheikhs.forEach(sh => {
+            [...dataSource.all]
+                .filter(s => s.group === sh.group && s.totalSessionDays > 0 && (s.totalEvals > 0 || s.attendanceDays > 0))
+                .sort((a, b) => b.overallScore - a.overallScore)
+                .forEach((s, i) => map.set(s.id, i + 1));
+        });
+        return map;
+    }, [dataSource, sheikhs]);
+
+    const groupTotalMap = useMemo(() => {
+        const map = new Map<string, number>();
+        sheikhs.forEach(sh => {
+            map.set(sh.group, dataSource.all.filter(s => s.group === sh.group && s.totalSessionDays > 0 && (s.totalEvals > 0 || s.attendanceDays > 0)).length);
+        });
+        return map;
+    }, [dataSource, sheikhs]);
+
     if (active.length === 0) {
         return (
             <div className="space-y-3">
@@ -3423,20 +3460,28 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                             </tr>
                         </thead>
                         <tbody>
-                            {overallRanked.slice(0, 10).map((s, idx) => {
-                                const badge = EVAL_BADGE[s.bestEval] || EVAL_BADGE['—'];
+                            {overallRanked.slice(rankingPage * RANKING_PAGE_SIZE, (rankingPage + 1) * RANKING_PAGE_SIZE).map((s, idx) => {
+                                const globalRank = rankingPage * RANKING_PAGE_SIZE + idx;
                                 return (
-                                    <tr key={s.id} className={cn(
-                                        "border-b hover:bg-amber-50/30 transition-colors",
-                                        idx === 0 ? "bg-amber-50/40" : idx === 1 ? "bg-slate-50/40" : idx === 2 ? "bg-orange-50/30" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/20"
-                                    )}>
+                                    <tr key={s.id}
+                                        className={cn(
+                                            "border-b hover:bg-amber-50/50 transition-colors cursor-pointer",
+                                            globalRank === 0 ? "bg-amber-50/40" : globalRank === 1 ? "bg-slate-50/40" : globalRank === 2 ? "bg-orange-50/30" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/20"
+                                        )}
+                                        onClick={() => setSelectedStudentDetail(s)}
+                                        title="انقر لرؤية تفصيل النقاط"
+                                    >
                                         <td className={cn("sticky right-0 z-10 p-2 border-l text-center font-black text-sm",
-                                            idx === 0 ? "bg-amber-50/40" : idx === 1 ? "bg-slate-50/40" : idx === 2 ? "bg-orange-50/30" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/20"
+                                            globalRank === 0 ? "bg-amber-50/40" : globalRank === 1 ? "bg-slate-50/40" : globalRank === 2 ? "bg-orange-50/30" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/20"
                                         )}>
-                                            {medalEmoji(idx)}
+                                            {medalEmoji(globalRank)}
                                         </td>
                                         <td className="p-2 border-l">
                                             <div className="font-bold text-[11px] leading-tight">{s.name}</div>
+                                            <div className="flex gap-2 mt-0.5">
+                                                <span className="text-[9px] text-indigo-600 font-bold">#{overallRankMap.get(s.id) ?? '—'} عاماً</span>
+                                                <span className="text-[9px] text-amber-600 font-bold">#{groupRankMap.get(s.id) ?? '—'} في فوجه</span>
+                                            </div>
                                         </td>
                                         <td className="p-2 border-l text-center">
                                             <span className="text-[10px] bg-muted/40 px-1.5 py-0.5 rounded-md font-medium">{s.group}</span>
@@ -3492,6 +3537,24 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                         </tbody>
                     </table>
                 </div>
+                {/* Pagination for ranking table */}
+                {overallRanked.length > RANKING_PAGE_SIZE && (
+                    <div className="flex items-center justify-between px-4 py-2.5 border-t bg-muted/20">
+                        <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
+                            onClick={() => setRankingPage(p => Math.max(0, p - 1))}
+                            disabled={rankingPage === 0}>
+                            <ChevronRight className="h-3.5 w-3.5" /> السابق
+                        </Button>
+                        <span className="text-xs text-muted-foreground font-medium">
+                            {rankingPage * RANKING_PAGE_SIZE + 1}–{Math.min((rankingPage + 1) * RANKING_PAGE_SIZE, overallRanked.length)} من {overallRanked.length} طالب
+                        </span>
+                        <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
+                            onClick={() => setRankingPage(p => p + 1)}
+                            disabled={(rankingPage + 1) * RANKING_PAGE_SIZE >= overallRanked.length}>
+                            التالي <ChevronLeft className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {/* ── Group Champions Table ── */}
@@ -3700,6 +3763,215 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                 <p className="text-[9px] text-muted-foreground/70 text-center">
                     هـ = هادئ &nbsp;|&nbsp; مق = مقبول &nbsp;|&nbsp; مش = مشاغب &nbsp;|&nbsp; الغياب يخصم من نسبة الحضور ويفقد الطالب فرصة التقييم
                 </p>
+            </div>
+
+            {/* ── Student Score Detail Modal ── */}
+            {selectedStudentDetail && (
+                <StudentScoreDetailModal
+                    student={selectedStudentDetail}
+                    dailySessions={dailySessions}
+                    sheikhs={sheikhs}
+                    groupRank={groupRankMap.get(selectedStudentDetail.id) ?? 0}
+                    overallRank={overallRankMap.get(selectedStudentDetail.id) ?? 0}
+                    groupTotal={groupTotalMap.get(selectedStudentDetail.group) ?? 0}
+                    overallTotal={allActiveRanked.length}
+                    periodStart={starsMode === 'month' && monthlyData ? startOfMonth(selectedDate) : stats.weekStart}
+                    periodEnd={starsMode === 'month' && monthlyData ? endOfMonth(selectedDate) : stats.weekEnd}
+                    periodLabel={dataSource.weekLabel}
+                    onClose={() => setSelectedStudentDetail(null)}
+                />
+            )}
+        </div>
+    );
+}
+
+
+// ─── StudentScoreDetailModal ──────────────────────────────────────────────────
+function StudentScoreDetailModal({
+    student, dailySessions, sheikhs, groupRank, overallRank, groupTotal, overallTotal,
+    periodStart, periodEnd, periodLabel, onClose
+}: {
+    student: TopStudentEntry;
+    dailySessions: any;
+    sheikhs: GroupSheikhInfo[];
+    groupRank: number;
+    overallRank: number;
+    groupTotal: number;
+    overallTotal: number;
+    periodStart: Date;
+    periodEnd: Date;
+    periodLabel: string;
+    onClose: () => void;
+}) {
+    type DayRec = {
+        date: string; label: string; sessionType: string;
+        attendance: string; memorization: string | null;
+        behavior: string | null; isReview: boolean;
+        evalGrade: number; behaviorGrade: number; isLate: boolean;
+    };
+
+    const dayRecords = useMemo<DayRec[]>(() => {
+        const days = eachDayOfInterval({ start: periodStart, end: periodEnd });
+        const recs: DayRec[] = [];
+        days.forEach(day => {
+            const dateStr = format(day, 'yyyy-MM-dd');
+            const daySess = (dailySessions as any)?.[dateStr];
+            if (!daySess) return;
+            let processed = false;
+            Object.values(daySess as Record<string, any>).forEach((session: any) => {
+                if (!session || processed) return;
+                const sType = session.sessionType;
+                const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
+                if (!isReal) return;
+                const shOwner = sheikhs.find(sh => sh.uids.has(session.ownerId));
+                if (!shOwner || shOwner.group !== student.group) return;
+                processed = true;
+                const sessionRecs: any[] = Array.isArray(session.records) ? session.records : session.records ? Object.values(session.records) : [];
+                const myRec = sessionRecs.find((r: any) => r.studentId === student.id);
+                const mem = myRec?.memorization || null;
+                const beh = myRec?.behavior || null;
+                const isReview = !!myRec?.review;
+                let evalGrade = 0;
+                if (myRec && !isReview && mem) {
+                    if (mem === 'ممتاز') evalGrade = 5;
+                    else if (mem === 'جيد جدا' || mem === 'جيد جداً') evalGrade = 6;
+                    else if (mem === 'جيد') evalGrade = 3;
+                    else if (mem === 'مقبول' || mem === 'حسن') evalGrade = 2;
+                    else if (mem === 'ضعيف' || mem === 'متوسط') evalGrade = 1;
+                }
+                let behaviorGrade = 0;
+                if (beh === 'هادئ') behaviorGrade = 2;
+                else if (beh === 'مقبول') behaviorGrade = 1;
+                else if (beh === 'مشاغب' || beh === 'غير منضبط') behaviorGrade = -1;
+                recs.push({
+                    date: dateStr,
+                    label: format(day, 'EEE d MMM', { locale: ar }),
+                    sessionType: sType,
+                    attendance: myRec?.attendance || 'غائب',
+                    memorization: isReview ? `مراجعة: ${mem || ''}` : mem,
+                    behavior: beh,
+                    isReview, evalGrade, behaviorGrade,
+                    isLate: myRec?.attendance === 'متأخر',
+                });
+            });
+        });
+        return recs.sort((a, b) => a.date.localeCompare(b.date));
+    }, [student, dailySessions, sheikhs, periodStart, periodEnd]);
+
+    const attended = dayRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض');
+    const totalSess = dayRecords.length;
+    const lateDays = dayRecords.filter(r => r.isLate).length;
+    const evalRecs = dayRecords.filter(r => !r.isReview && r.memorization && r.attendance !== 'غائب' && r.attendance !== 'غياب');
+    const avgEval = evalRecs.length > 0 ? evalRecs.reduce((s, r) => s + r.evalGrade, 0) / evalRecs.length : 0;
+    const behRecs = dayRecords.filter(r => r.behavior);
+    const avgBeh = behRecs.length > 0 ? behRecs.reduce((s, r) => s + r.behaviorGrade, 0) / behRecs.length : 0;
+    const attPts = totalSess > 0 ? (attended.length / totalSess) * 40 : 0;
+    const evalPts = evalRecs.length > 0 ? (avgEval / 6) * 40 : 0;
+    const behPts = avgBeh * 5;
+    const latePenalty = lateDays * 2;
+    const score = Math.max(0, Math.round(attPts + evalPts + behPts - latePenalty));
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4" onClick={onClose}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" dir="rtl" onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div className="bg-gradient-to-l from-purple-600 to-indigo-600 text-white p-4 flex items-start justify-between shrink-0">
+                    <div>
+                        <div className="font-black text-lg leading-tight">{student.name}</div>
+                        <div className="text-purple-200 text-sm mt-0.5">{student.group} · {periodLabel}</div>
+                        <div className="flex gap-2 mt-2 flex-wrap">
+                            <span className="bg-white/20 text-white px-2 py-0.5 rounded-lg text-xs font-bold">🏆 {groupRank}/{groupTotal} في فوجه</span>
+                            <span className="bg-white/20 text-white px-2 py-0.5 rounded-lg text-xs font-bold">🌍 {overallRank}/{overallTotal} عاماً</span>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="text-white/70 hover:text-white text-2xl font-bold leading-none mt-1">×</button>
+                </div>
+                {/* Score breakdown */}
+                <div className="grid grid-cols-4 gap-0 border-b shrink-0 divide-x divide-border">
+                    {[
+                        { label: 'الحضور', val: `${attended.length}/${totalSess}`, pts: Math.round(attPts), max: 40, color: 'text-amber-700' },
+                        { label: 'التقييم', val: avgEval.toFixed(1) + '/6', pts: Math.round(evalPts), max: 40, color: 'text-emerald-700' },
+                        { label: 'السلوك', val: avgBeh.toFixed(1), pts: Math.round(behPts), max: null, color: 'text-teal-700' },
+                        { label: 'الإجمالي', val: score.toString(), pts: latePenalty > 0 ? -latePenalty : null, max: null, color: 'text-purple-700' },
+                    ].map(c => (
+                        <div key={c.label} className="text-center py-2.5 px-1">
+                            <div className="text-[10px] text-muted-foreground mb-0.5">{c.label}</div>
+                            <div className={cn('font-black text-base leading-none', c.color)}>{c.val}</div>
+                            <div className="text-[9px] text-muted-foreground mt-0.5">
+                                {c.pts !== null ? (c.max ? `${c.pts}/${c.max} نقطة` : (c.pts < 0 ? `${c.pts} تأخر` : `${c.pts} نقطة`)) : ''}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                {/* Day table */}
+                <div className="overflow-y-auto flex-1 text-xs">
+                    <table className="w-full border-collapse">
+                        <thead className="sticky top-0 bg-slate-50 z-10 border-b">
+                            <tr>
+                                <th className="p-2 text-right font-bold">اليوم</th>
+                                <th className="p-2 text-center font-bold">الحصة</th>
+                                <th className="p-2 text-center font-bold">الحضور</th>
+                                <th className="p-2 text-center font-bold">التقييم</th>
+                                <th className="p-2 text-center font-bold">السلوك</th>
+                                <th className="p-2 text-center font-bold text-purple-700">نقاط</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {dayRecords.map((rec, i) => {
+                                const isAbsent = rec.attendance === 'غائب' || rec.attendance === 'غياب';
+                                const isPresent = rec.attendance === 'حاضر' || rec.attendance === 'تعويض' || rec.attendance === 'متأخر';
+                                // Approximate per-day contribution
+                                const dayAtt = isPresent ? (totalSess > 0 ? 40 / totalSess : 0) : 0;
+                                const dayEval = !rec.isReview && isPresent && evalRecs.length > 0 ? (rec.evalGrade / 6) * (40 / evalRecs.length) : 0;
+                                const dayBeh = rec.behavior && behRecs.length > 0 ? rec.behaviorGrade * (5 / behRecs.length) : 0;
+                                const dayLate = rec.isLate ? 2 : 0;
+                                const dayTotal = Math.round(dayAtt + dayEval + dayBeh - dayLate);
+                                return (
+                                    <tr key={rec.date + i} className={cn('border-b', isAbsent ? 'bg-rose-50/40' : rec.isLate ? 'bg-amber-50/30' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50/20')}>
+                                        <td className="p-1.5 font-medium whitespace-nowrap">{rec.label}</td>
+                                        <td className="p-1.5 text-center">
+                                            <span className={cn('text-[9px] px-1.5 py-0.5 rounded font-bold', TYPE_CONFIG[rec.sessionType]?.bg || 'bg-muted/30', TYPE_CONFIG[rec.sessionType]?.text || '')}>
+                                                {TYPE_CONFIG[rec.sessionType]?.label || rec.sessionType}
+                                            </span>
+                                        </td>
+                                        <td className="p-1.5 text-center">
+                                            <span className={cn('font-bold', isAbsent ? 'text-rose-600' : rec.isLate ? 'text-amber-600' : 'text-emerald-700')}>{rec.attendance}</span>
+                                        </td>
+                                        <td className="p-1.5 text-center">
+                                            {rec.memorization ? (
+                                                <span className={cn('font-bold', rec.evalGrade >= 5 ? 'text-emerald-700' : rec.evalGrade >= 3 ? 'text-blue-600' : rec.evalGrade >= 1 ? 'text-amber-600' : 'text-gray-400')}>
+                                                    {rec.memorization}{!rec.isReview && <span className="text-[9px] text-muted-foreground ml-0.5">({rec.evalGrade})</span>}
+                                                </span>
+                                            ) : <span className="text-muted-foreground/30">—</span>}
+                                        </td>
+                                        <td className="p-1.5 text-center">
+                                            {rec.behavior ? (
+                                                <span className={cn('font-bold', rec.behaviorGrade >= 2 ? 'text-teal-700' : rec.behaviorGrade > 0 ? 'text-blue-600' : rec.behaviorGrade < 0 ? 'text-rose-600' : 'text-gray-400')}>
+                                                    {rec.behavior}<span className="text-[9px] ml-0.5">({rec.behaviorGrade > 0 ? '+' : ''}{rec.behaviorGrade})</span>
+                                                </span>
+                                            ) : <span className="text-muted-foreground/30">—</span>}
+                                        </td>
+                                        <td className="p-1.5 text-center">
+                                            <span className={cn('font-black', dayTotal > 0 ? 'text-purple-700' : dayTotal < 0 ? 'text-rose-600' : 'text-gray-300')}>
+                                                {dayTotal > 0 ? `+${dayTotal}` : dayTotal || '—'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {dayRecords.length === 0 && (
+                                <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">لا توجد حصص مسجلة في هذه الفترة</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                {/* Footer */}
+                <div className="p-3 border-t bg-slate-50 flex items-center justify-between shrink-0 gap-2">
+                    <div className="text-[10px] text-muted-foreground flex-1">
+                        الإجمالي = حضور ({Math.round(attPts)}) + تقييم ({Math.round(evalPts)}) + سلوك ({Math.round(behPts)}) − تأخر ({latePenalty}) = <span className="font-black text-purple-700">{score} نقطة</span>
+                    </div>
+                    <button onClick={onClose} className="text-xs px-4 py-1.5 bg-primary text-white rounded-lg font-bold shrink-0">إغلاق</button>
+                </div>
             </div>
         </div>
     );
