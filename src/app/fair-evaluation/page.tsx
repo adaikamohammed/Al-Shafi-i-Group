@@ -52,6 +52,7 @@ interface StudentEvaluationRow {
     photoURL?: string;
     groupName: string;
     ownerId: string;
+    registrationDate?: Date;
     
     // Sessions Stats
     totalSessions: number; // Raw count
@@ -64,6 +65,11 @@ interface StudentEvaluationRow {
     makeupCount: number;
     lateCount: number;
     absentCount: number;
+
+    // Detailed counts
+    attendanceCounts: Record<string, number>;
+    memorizationCounts: Record<string, number>;
+    behaviorCounts: Record<string, number>;
 
     // Rates (0 - 100)
     attendanceRate: number;
@@ -84,6 +90,8 @@ export default function FairEvaluationPage() {
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [selectedSeason, setSelectedSeason] = useState<number>(Math.floor(new Date().getMonth() / 3) + 1);
     const [selectedGroup, setSelectedGroup] = useState<string>('all');
+    const [thresholdPercent, setThresholdPercent] = useState<number>(50); // Default to 50%
+    const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
     
     // Sort State
     const [sortBy, setSortBy] = useState<'comprehensiveScore' | 'academicScore' | 'attendanceRate' | 'memorizationRate' | 'behaviorRate'>('comprehensiveScore');
@@ -128,21 +136,9 @@ export default function FairEvaluationPage() {
         return { start, end, title };
     }, [periodType, selectedDate, selectedSeason]);
 
-    // Group-based Minimum Sessions Threshold for Leaderboard Entry
-    const minSessionsRequired = useMemo(() => {
-        switch (periodType) {
-            case 'week': return 2;
-            case 'season': return 10;
-            case 'year': return 35;
-            case 'month':
-            default:
-                return 5;
-        }
-    }, [periodType]);
-
     // Main logic for aggregating and calculating fair metrics
     const evaluationData = useMemo(() => {
-        if (!students || !dailySessions) return { ranked: [], pending: [] };
+        if (!students || !dailySessions) return { ranked: [], pending: [], maxSessionsInPeriod: 0, minSessionsRequired: 0 };
 
         const { start, end } = dateBoundaries;
 
@@ -194,6 +190,7 @@ export default function FairEvaluationPage() {
                 photoURL: s.photoURL,
                 groupName: s.groupName || 'غير محدد',
                 ownerId: s.ownerId,
+                registrationDate: s.registrationDate ? new Date(s.registrationDate) : undefined,
                 totalSessions: 0,
                 weightedSessions: 0,
                 assessedMemorization: 0,
@@ -202,6 +199,30 @@ export default function FairEvaluationPage() {
                 makeupCount: 0,
                 lateCount: 0,
                 absentCount: 0,
+                attendanceCounts: {
+                    'حاضر': 0,
+                    'تعويض': 0,
+                    'متأخر': 0,
+                    'غائب': 0
+                },
+                memorizationCounts: {
+                    'ممتاز': 0,
+                    'جيد جداً': 0,
+                    'جيد': 0,
+                    'حسن': 0,
+                    'متوسط': 0,
+                    'مقبول': 0,
+                    'ضعيف': 0,
+                    'لم يحفظ': 0,
+                    'أوراد مراجعة': 0
+                },
+                behaviorCounts: {
+                    'هادئ': 0,
+                    'متوسط': 0,
+                    'مقبول': 0,
+                    'غير منضبط': 0,
+                    'مشاغب': 0
+                },
                 attendanceRate: 0,
                 memorizationRate: 0,
                 behaviorRate: 0,
@@ -226,35 +247,59 @@ export default function FairEvaluationPage() {
                 // A. Attendance
                 if (record.attendance) {
                     const earned = getAttPoints(record.attendance) * weight;
-                    const maxPossible = maxAttendanceVal * weight;
-                    
                     score.attendanceRate += earned;
-                    // Increment raw metrics
+                    
                     if (record.attendance === 'حاضر') score.presentCount++;
                     else if (record.attendance === 'غياب' || record.attendance === 'غائب') score.absentCount++;
                     else if (record.attendance === 'متأخر') score.lateCount++;
                     else if (record.attendance === 'تعويض') score.makeupCount++;
+
+                    const attKey = (record.attendance === 'غياب' || record.attendance === 'غائب') ? 'غائب' : record.attendance;
+                    if (score.attendanceCounts[attKey] !== undefined) {
+                        score.attendanceCounts[attKey]++;
+                    }
                 }
 
-                // B. Memorization (Exclude review flags from regular memo evaluation denominator)
+                // B. Memorization
                 if (!record.review && record.memorization && record.memorization !== 'لا يوجد' && record.memorization !== '') {
                     score.assessedMemorization += weight;
                     score.memorizationRate += getMemoPoints(record.memorization) * weight;
+                    
+                    const memoKey = record.memorization === 'جيد جدا' ? 'جيد جداً' : record.memorization;
+                    if (score.memorizationCounts[memoKey] !== undefined) {
+                        score.memorizationCounts[memoKey]++;
+                    }
                 } else if (record.review && pointsConfig?.review?.completed) {
-                    // Count completed review wards under memorization rate
                     score.assessedMemorization += weight;
                     score.memorizationRate += pointsConfig.review.completed * weight;
+                    score.memorizationCounts['أوراد مراجعة']++;
                 }
 
                 // C. Behavior
                 if (record.behavior && record.behavior !== '') {
                     score.assessedBehavior += weight;
                     score.behaviorRate += getBehPoints(record.behavior) * weight;
+
+                    const behKey = record.behavior;
+                    if (score.behaviorCounts[behKey] !== undefined) {
+                        score.behaviorCounts[behKey]++;
+                    }
                 }
             });
         });
 
-        // 6. Calculate Final Percentage Scores
+        // 6. Find max sessions held by any student in this period to compute dynamic threshold
+        let maxSessionsInPeriod = 0;
+        Object.values(scores).forEach(s => {
+            if (s.totalSessions > maxSessionsInPeriod) {
+                maxSessionsInPeriod = s.totalSessions;
+            }
+        });
+
+        // Dynamic minimum sessions required based on threshold percent
+        const minSessionsRequired = Math.max(1, Math.round(maxSessionsInPeriod * (thresholdPercent / 100)));
+
+        // 7. Calculate Final Percentage Scores
         const results = Object.values(scores).map(score => {
             const maxAttPoints = score.weightedSessions * maxAttendanceVal;
             const maxMemoPoints = score.assessedMemorization * maxMemorizationVal;
@@ -277,12 +322,11 @@ export default function FairEvaluationPage() {
             };
         });
 
-        // 7. Split into Leaderboard (Ranked) and Pending (Insufficient Sessions)
+        // 8. Split into Leaderboard (Ranked) and Pending (Insufficient Sessions)
         const ranked: StudentEvaluationRow[] = [];
         const pending: StudentEvaluationRow[] = [];
 
         results.forEach(r => {
-            // Verify if student meets minimum sessions threshold
             if (r.totalSessions >= minSessionsRequired) {
                 ranked.push(r);
             } else {
@@ -293,17 +337,18 @@ export default function FairEvaluationPage() {
         // Sort both by selected sort criteria
         const sortFn = (a: any, b: any) => {
             if (b[sortBy] !== a[sortBy]) return b[sortBy] - a[sortBy];
-            // Tie breaker on sessions, then alphabetical
             if (b.totalSessions !== a.totalSessions) return b.totalSessions - a.totalSessions;
             return a.name.localeCompare(b.name);
         };
 
         return {
             ranked: ranked.sort(sortFn),
-            pending: pending.sort(sortFn)
+            pending: pending.sort(sortFn),
+            maxSessionsInPeriod,
+            minSessionsRequired
         };
 
-    }, [students, dailySessions, dateBoundaries, pointsConfig, sortBy, minSessionsRequired, selectedGroup, isManagement, isSuperAdmin, user]);
+    }, [students, dailySessions, dateBoundaries, pointsConfig, sortBy, selectedGroup, isManagement, isSuperAdmin, user, thresholdPercent]);
 
     // Top three for Podium display
     const podiumStudents = useMemo(() => {
@@ -389,18 +434,37 @@ export default function FairEvaluationPage() {
                             )}
                         </div>
 
-                        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-                            <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">الترتيب حسب:</span>
-                            <Select dir="rtl" value={sortBy} onValueChange={(val: any) => setSortBy(val)}>
-                                <SelectTrigger className="w-full sm:w-[200px] bg-background font-bold text-xs"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="comprehensiveScore">التقييم الشامل العادل</SelectItem>
-                                    <SelectItem value="academicScore">التقييم الأكاديمي (حضور+حفظ)</SelectItem>
-                                    <SelectItem value="attendanceRate">نسبة المواظبة (الحضور)</SelectItem>
-                                    <SelectItem value="memorizationRate">جودة الحفظ والتسميع</SelectItem>
-                                    <SelectItem value="behaviorRate">انضباط السلوك والأخلاق</SelectItem>
-                                </SelectContent>
-                            </Select>
+                        <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto justify-end">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">الحد الأدنى لحضور الحصص:</span>
+                                <Select dir="rtl" value={thresholdPercent.toString()} onValueChange={(val) => {
+                                    setThresholdPercent(parseInt(val));
+                                    setExpandedStudentId(null);
+                                }}>
+                                    <SelectTrigger className="w-[155px] bg-background font-bold text-xs"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="10">10% من حصص الفترة</SelectItem>
+                                        <SelectItem value="30">30% من حصص الفترة</SelectItem>
+                                        <SelectItem value="50">50% من حصص الفترة</SelectItem>
+                                        <SelectItem value="70">70% من حصص الفترة</SelectItem>
+                                        <SelectItem value="90">90% من حصص الفترة</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">الترتيب حسب:</span>
+                                <Select dir="rtl" value={sortBy} onValueChange={(val: any) => setSortBy(val)}>
+                                    <SelectTrigger className="w-full sm:w-[200px] bg-background font-bold text-xs"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="comprehensiveScore">التقييم الشامل العادل</SelectItem>
+                                        <SelectItem value="academicScore">التقييم الأكاديمي (حضور+حفظ)</SelectItem>
+                                        <SelectItem value="attendanceRate">نسبة المواظبة (الحضور)</SelectItem>
+                                        <SelectItem value="memorizationRate">جودة الحفظ والتسميع</SelectItem>
+                                        <SelectItem value="behaviorRate">انضباط السلوك والأخلاق</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -480,10 +544,10 @@ export default function FairEvaluationPage() {
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                             <div>
                                 <CardTitle className="text-xl font-headline font-bold text-slate-800">جدول الترتيب العام</CardTitle>
-                                <CardDescription className="text-xs font-medium">الترتيب يعتمد بشكل عادل ومباشر على معيار الفرز المختار.</CardDescription>
+                                <CardDescription className="text-xs font-medium">الترتيب يعتمد بشكل عادل ومباشر على معيار الفرز المختار. انقر على الطالب لعرض التفاصيل الكاملة والعدديّة.</CardDescription>
                             </div>
                             <Badge variant="outline" className="text-[10px] font-black border-primary/20 bg-primary/5 text-primary py-1 px-3">
-                                الحد الأدنى للتقييم: {minSessionsRequired} حصص
+                                الحد الأدنى للتقييم: {evaluationData.minSessionsRequired} حصص
                             </Badge>
                         </div>
                     </CardHeader>
@@ -504,22 +568,33 @@ export default function FairEvaluationPage() {
                                 </TableHeader>
                                 <TableBody>
                                     {evaluationData.ranked.length > 0 ? (
-                                        evaluationData.ranked.map((s, index) => {
+                                        evaluationData.ranked.flatMap((s, index) => {
                                             const rank = index + 1;
                                             let medal = '';
                                             if (rank === 1) medal = '🥇';
                                             else if (rank === 2) medal = '🥈';
                                             else if (rank === 3) medal = '🥉';
 
-                                            return (
-                                                <TableRow key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                                            const isBehaviorInsufficient = s.assessedBehavior < Math.max(3, s.totalSessions * 0.2);
+                                            const isMemorizationInsufficient = s.assessedMemorization < Math.max(3, s.totalSessions * 0.2);
+                                            const isExpanded = expandedStudentId === s.id;
+
+                                            return [
+                                                <TableRow 
+                                                    key={s.id} 
+                                                    onClick={() => setExpandedStudentId(isExpanded ? null : s.id)}
+                                                    className={cn(
+                                                        "cursor-pointer transition-colors duration-200 select-none",
+                                                        isExpanded ? "bg-slate-100/50 dark:bg-slate-900/40 hover:bg-slate-100/60" : "hover:bg-slate-50/50"
+                                                    )}
+                                                >
                                                     <TableCell className="text-center font-black text-lg">
                                                         {medal || rank}
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-3">
-                                                            <Avatar className="h-9 w-9 border shadow-sm">
-                                                                <AvatarImage src={s.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${s.name}`} />
+                                                            <Avatar className="h-9 w-9 border shadow-sm shrink-0">
+                                                                <AvatarImage src={s.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${s.name}`} alt="" />
                                                                 <AvatarFallback>{s.name.charAt(0)}</AvatarFallback>
                                                             </Avatar>
                                                             <div>
@@ -539,13 +614,37 @@ export default function FairEvaluationPage() {
                                                     </TableCell>
                                                     <TableCell className="text-center">
                                                         <div className="flex flex-col items-center gap-1">
-                                                            <span className="font-bold text-sm">{s.memorizationRate}%</span>
+                                                            <div className="flex items-center gap-1 justify-center">
+                                                                <span className="font-bold text-sm">{s.memorizationRate}%</span>
+                                                                {isMemorizationInsufficient && (
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 cursor-help" />
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent className="text-xs font-bold text-right" dir="rtl">
+                                                                            تقييمات حفظ غير كافية ({s.assessedMemorization} من أصل {s.totalSessions})
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                )}
+                                                            </div>
                                                             <Progress value={s.memorizationRate} className="h-1 w-12 bg-slate-100 [&>div]:bg-amber-400" />
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-center">
                                                         <div className="flex flex-col items-center gap-1">
-                                                            <span className="font-bold text-sm">{s.behaviorRate}%</span>
+                                                            <div className="flex items-center gap-1 justify-center">
+                                                                <span className="font-bold text-sm">{s.behaviorRate}%</span>
+                                                                {isBehaviorInsufficient && (
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 cursor-help" />
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent className="text-xs font-bold text-right" dir="rtl">
+                                                                            تقييمات سلوك غير كافية ({s.assessedBehavior} من أصل {s.totalSessions})
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                )}
+                                                            </div>
                                                             <Progress value={s.behaviorRate} className="h-1 w-12 bg-slate-100 [&>div]:bg-indigo-400" />
                                                         </div>
                                                     </TableCell>
@@ -555,8 +654,15 @@ export default function FairEvaluationPage() {
                                                     <TableCell className={cn("text-center font-black text-md bg-indigo-50/30", sortBy === 'comprehensiveScore' && "bg-indigo-100/50 text-indigo-700")}>
                                                         {s.comprehensiveScore}%
                                                     </TableCell>
-                                                </TableRow>
-                                            );
+                                                </TableRow>,
+                                                isExpanded && (
+                                                    <TableRow key={`${s.id}-expanded`} className="bg-slate-50/40 dark:bg-slate-900/10 border-t-0">
+                                                        <TableCell colSpan={8} className="p-4 sm:p-6 bg-slate-50/30 dark:bg-slate-900/20">
+                                                            <StudentDetailCard student={s} maxSessions={evaluationData.maxSessionsInPeriod} />
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )
+                                            ].filter(Boolean);
                                         })
                                     ) : (
                                         <TableRow>
@@ -579,7 +685,7 @@ export default function FairEvaluationPage() {
                                 <div className="p-2 bg-yellow-50 rounded-xl text-yellow-600"><ShieldAlert className="h-5 w-5" /></div>
                                 <div>
                                     <CardTitle className="text-lg font-headline font-bold text-slate-700">طلاب بحصص غير كافية لضمان العدالة</CardTitle>
-                                    <CardDescription className="text-xs font-medium">الطلاب الذين يقل عدد حصصهم المقيمة عن الحد الأدنى ({minSessionsRequired} حصص). يتم عرض أدائهم هنا دون مقارنتهم بجدول الترتيب لضمان التكافؤ.</CardDescription>
+                                    <CardDescription className="text-xs font-medium">الطلاب الذين يقل عدد حصصهم المقيمة عن الحد الأدنى ({evaluationData.minSessionsRequired} حصص). يتم عرض أدائهم هنا دون مقارنتهم بجدول الترتيب لضمان التكافؤ. انقر لعرض التفاصيل.</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
@@ -598,30 +704,79 @@ export default function FairEvaluationPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {evaluationData.pending.map((s) => (
-                                            <TableRow key={s.id} className="opacity-75 hover:opacity-100 transition-opacity">
-                                                <TableCell>
-                                                    <div className="flex items-center gap-3">
-                                                        <Avatar className="h-8 w-8">
-                                                            <AvatarImage src={s.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${s.name}`} />
-                                                            <AvatarFallback>{s.name.charAt(0)}</AvatarFallback>
-                                                        </Avatar>
-                                                        <div>
-                                                            <span className="font-bold text-sm text-foreground block leading-tight">{s.name}</span>
-                                                            <span className="text-[10px] text-muted-foreground font-bold">{s.groupName}</span>
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-center font-bold text-xs text-yellow-600">
-                                                    {s.totalSessions} / {minSessionsRequired} <span className="text-slate-400 font-normal">({s.weightedSessions.toFixed(1)})</span>
-                                                </TableCell>
-                                                <TableCell className="text-center font-semibold text-sm">{s.attendanceRate}%</TableCell>
-                                                <TableCell className="text-center font-semibold text-sm">{s.memorizationRate}%</TableCell>
-                                                <TableCell className="text-center font-semibold text-sm">{s.behaviorRate}%</TableCell>
-                                                <TableCell className="text-center font-bold text-sm bg-slate-50/50">{s.academicScore}%</TableCell>
-                                                <TableCell className="text-center font-bold text-sm bg-slate-50/50">{s.comprehensiveScore}%</TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {evaluationData.pending.map((s) => {
+                                            const isBehaviorInsufficient = s.assessedBehavior < Math.max(3, s.totalSessions * 0.2);
+                                            const isMemorizationInsufficient = s.assessedMemorization < Math.max(3, s.totalSessions * 0.2);
+                                            const isExpanded = expandedStudentId === s.id;
+
+                                            return (
+                                                <React.Fragment key={s.id}>
+                                                    <TableRow 
+                                                        onClick={() => setExpandedStudentId(isExpanded ? null : s.id)}
+                                                        className={cn(
+                                                            "opacity-85 hover:opacity-100 transition-opacity cursor-pointer select-none",
+                                                            isExpanded ? "bg-slate-100/50 dark:bg-slate-900/40" : "hover:bg-slate-50/50"
+                                                        )}
+                                                    >
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-3">
+                                                                <Avatar className="h-8 w-8 shrink-0">
+                                                                    <AvatarImage src={s.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${s.name}`} alt="" />
+                                                                    <AvatarFallback>{s.name.charAt(0)}</AvatarFallback>
+                                                                </Avatar>
+                                                                <div>
+                                                                    <span className="font-bold text-sm text-foreground block leading-tight">{s.name}</span>
+                                                                    <span className="text-[10px] text-muted-foreground font-bold">{s.groupName}</span>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-center font-bold text-xs text-yellow-600">
+                                                            {s.totalSessions} / {evaluationData.minSessionsRequired} <span className="text-slate-400 font-normal">({s.weightedSessions.toFixed(1)})</span>
+                                                        </TableCell>
+                                                        <TableCell className="text-center font-semibold text-sm">{s.attendanceRate}%</TableCell>
+                                                        <TableCell className="text-center font-semibold text-sm">
+                                                            <div className="flex items-center gap-1 justify-center">
+                                                                <span>{s.memorizationRate}%</span>
+                                                                {isMemorizationInsufficient && (
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <AlertTriangle className="h-3 w-3 text-amber-500 cursor-help" />
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent className="text-xs font-bold text-right" dir="rtl">
+                                                                            تقييمات حفظ غير كافية ({s.assessedMemorization} من أصل {s.totalSessions})
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-center font-semibold text-sm">
+                                                            <div className="flex items-center gap-1 justify-center">
+                                                                <span>{s.behaviorRate}%</span>
+                                                                {isBehaviorInsufficient && (
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <AlertTriangle className="h-3 w-3 text-amber-500 cursor-help" />
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent className="text-xs font-bold text-right" dir="rtl">
+                                                                            تقييمات سلوك غير كافية ({s.assessedBehavior} من أصل {s.totalSessions})
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-center font-bold text-sm bg-slate-50/50">{s.academicScore}%</TableCell>
+                                                        <TableCell className="text-center font-bold text-sm bg-slate-50/50">{s.comprehensiveScore}%</TableCell>
+                                                    </TableRow>
+                                                    {isExpanded && (
+                                                        <TableRow className="bg-slate-50/40 dark:bg-slate-900/10 border-t-0">
+                                                            <TableCell colSpan={7} className="p-4 sm:p-6 bg-slate-50/30 dark:bg-slate-900/20">
+                                                                <StudentDetailCard student={s} maxSessions={evaluationData.maxSessionsInPeriod} />
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        })}
                                     </TableBody>
                                 </Table>
                             </div>
@@ -630,5 +785,152 @@ export default function FairEvaluationPage() {
                 )}
             </div>
         </TooltipProvider>
+    );
+}
+
+// StudentDetailCard component to render the detailed stats
+function StudentDetailCard({ student, maxSessions }: { student: StudentEvaluationRow; maxSessions: number }) {
+    const isBehaviorInsufficient = student.assessedBehavior < Math.max(3, student.totalSessions * 0.2);
+    const isMemorizationInsufficient = student.assessedMemorization < Math.max(3, student.totalSessions * 0.2);
+
+    return (
+        <div className="p-5 rounded-3xl bg-white dark:bg-slate-950 border text-right space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+            {/* Header section */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4 border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12 border shadow-sm">
+                        <AvatarImage src={student.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${student.name}`} />
+                        <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <h4 className="font-headline font-black text-slate-800 dark:text-white text-md leading-tight">{student.name}</h4>
+                        <p className="text-[10px] text-muted-foreground font-bold mt-1">
+                            {student.groupName} | تاريخ انضمام الطالب: {student.registrationDate ? format(student.registrationDate, 'd MMMM yyyy', { locale: ar }) : 'غير محدد'}
+                        </p>
+                    </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="text-[10px] font-black py-1 px-3 border-emerald-500/20 bg-emerald-500/5 text-emerald-600">
+                        حضور الطالب: {student.totalSessions} حصة (وزن: {student.weightedSessions.toFixed(1)})
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px] font-black py-1 px-3 border-indigo-500/20 bg-indigo-500/5 text-indigo-600">
+                        أقصى حضور بالفوج: {maxSessions} حصة
+                    </Badge>
+                </div>
+            </div>
+
+            {/* Warnings Alert */}
+            {(isBehaviorInsufficient || isMemorizationInsufficient) && (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 text-amber-700 dark:text-amber-400 text-xs">
+                    <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                    <div className="space-y-1 font-bold">
+                        <p className="font-black text-sm">تنبيه لضمان الدقة والعدالة:</p>
+                        {isBehaviorInsufficient && (
+                            <p>⚠️ تم تقييم السلوك في ({student.assessedBehavior}) حصة فقط من أصل ({student.totalSessions}) حصة حضور. النسبة المئوية للسلوك ({student.behaviorRate}%) قد لا تكون دليلاً حاسماً على انضباط الطالب الفعلي.</p>
+                        )}
+                        {isMemorizationInsufficient && (
+                            <p>⚠️ تم تقييم الحفظ والتسميع في ({student.assessedMemorization}) حصة فقط من أصل ({student.totalSessions}) حصة حضور. النسبة المئوية للحفظ ({student.memorizationRate}%) قد تكون خادعة إحصائياً.</p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Metrics Breakdowns */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Attendance */}
+                <div className="p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 border shadow-sm space-y-3">
+                    <div className="flex items-center gap-2 text-emerald-600 border-b pb-2 border-slate-100 dark:border-slate-800">
+                        <UserCheck className="h-5 w-5" />
+                        <span className="font-headline font-bold text-sm">تفاصيل الحضور والمواظبة ({student.attendanceRate}%)</span>
+                    </div>
+                    <div className="space-y-2 text-xs font-bold font-body">
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">حاضر (أساسية/إضافية):</span>
+                            <span className="text-emerald-600">{student.attendanceCounts['حاضر'] || 0} يوم</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">تعويض (حضر فوج آخر):</span>
+                            <span className="text-teal-600">{student.attendanceCounts['تعويض'] || 0} يوم</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">متأخر:</span>
+                            <span className="text-amber-500">{student.attendanceCounts['متأخر'] || 0} يوم</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">غائب بعذر / غائب:</span>
+                            <span className="text-rose-500">{student.attendanceCounts['غائب'] || 0} يوم</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Memorization */}
+                <div className="p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 border shadow-sm space-y-3">
+                    <div className="flex items-center gap-2 text-amber-500 border-b pb-2 border-slate-100 dark:border-slate-800">
+                        <BookOpen className="h-5 w-5" />
+                        <span className="font-headline font-bold text-sm">تفاصيل جودة الحفظ ({student.memorizationRate}%)</span>
+                    </div>
+                    <div className="max-h-[150px] overflow-y-auto custom-scrollbar space-y-2 text-xs font-bold font-body">
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">ممتاز:</span>
+                            <span className="text-emerald-600">{student.memorizationCounts['ممتاز'] || 0} مرة</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">جيد جداً:</span>
+                            <span className="text-teal-600">{student.memorizationCounts['جيد جداً'] || 0} مرة</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">جيد:</span>
+                            <span className="text-blue-600">{student.memorizationCounts['جيد'] || 0} مرة</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">حسن / مقبول:</span>
+                            <span className="text-amber-500">{(student.memorizationCounts['حسن'] || 0) + (student.memorizationCounts['مقبول'] || 0)} مرة</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">متوسط / ضعيف:</span>
+                            <span className="text-orange-500">{(student.memorizationCounts['متوسط'] || 0) + (student.memorizationCounts['ضعيف'] || 0)} مرة</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">لم يحفظ:</span>
+                            <span className="text-rose-500">{student.memorizationCounts['لم يحفظ'] || 0} مرة</span>
+                        </div>
+                        <div className="flex justify-between items-center border-t pt-1.5 border-slate-200 dark:border-slate-800">
+                            <span className="text-muted-foreground">أوراد مراجعة منتهية:</span>
+                            <span className="text-indigo-600">{student.memorizationCounts['أوراد مراجعة'] || 0} ورد</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Behavior */}
+                <div className="p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 border shadow-sm space-y-3">
+                    <div className="flex items-center gap-2 text-indigo-500 border-b pb-2 border-slate-100 dark:border-slate-800">
+                        <Award className="h-5 w-5" />
+                        <span className="font-headline font-bold text-sm">تفاصيل السلوك والأخلاق ({student.behaviorRate}%)</span>
+                    </div>
+                    <div className="space-y-2 text-xs font-bold font-body">
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">هادئ ومنضبط:</span>
+                            <span className="text-emerald-600">{student.behaviorCounts['هادئ'] || 0} يوم</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">متوسط / مقبول:</span>
+                            <span className="text-amber-500">{(student.behaviorCounts['متوسط'] || 0) + (student.behaviorCounts['مقبول'] || 0)} يوم</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">غير منضبط:</span>
+                            <span className="text-orange-500">{student.behaviorCounts['غير منضبط'] || 0} يوم</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">مشاغب:</span>
+                            <span className="text-rose-500">{student.behaviorCounts['مشاغب'] || 0} يوم</span>
+                        </div>
+                        <div className="flex justify-between items-center border-t pt-1.5 border-slate-200 dark:border-slate-800">
+                            <span className="text-muted-foreground">إجمالي التقييمات:</span>
+                            <span className="text-primary">{student.assessedBehavior} مرات</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
