@@ -79,6 +79,16 @@ interface StudentEvaluationRow {
     // Final Scores
     academicScore: number;
     comprehensiveScore: number;
+
+    // Monthly crowning & history
+    monthlyHistory: { monthName: string; rank: number | null; score: number }[];
+    podiumCounts: {
+        first: number;
+        second: number;
+        third: number;
+        top5: number;
+        top10: number;
+    };
 }
 
 export default function FairEvaluationPage() {
@@ -233,7 +243,15 @@ export default function FairEvaluationPage() {
                 memorizationRate: 0,
                 behaviorRate: 0,
                 academicScore: 0,
-                comprehensiveScore: 0
+                comprehensiveScore: 0,
+                monthlyHistory: [],
+                podiumCounts: {
+                    first: 0,
+                    second: 0,
+                    third: 0,
+                    top5: 0,
+                    top10: 0
+                }
             };
         });
 
@@ -305,6 +323,168 @@ export default function FairEvaluationPage() {
         // Dynamic minimum sessions required based on threshold percent
         const minSessionsRequired = Math.max(1, Math.round(maxSessionsInPeriod * (thresholdPercent / 100)));
 
+        // 6.1 Calculate Monthly Ranks for the entire active year
+        const activeYear = getYear(selectedDate);
+        const startOfYearDate = new Date(activeYear, 0, 1);
+        const endOfYearDate = new Date(activeYear, 11, 31, 23, 59, 59);
+
+        // Fetch all active year sessions (excluding holidays & un-substituted sheikh absences)
+        const yearSessions = Object.values(dailySessions).flatMap(day => Object.values(day)).filter(session => {
+            if (!session?.date || session.sessionType === 'يوم عطلة' || (session.sessionType === 'غياب الشيخ' && !session.substituteTeacher)) return false;
+            try {
+                const sessionDate = parseISO(session.date);
+                return sessionDate >= startOfYearDate && sessionDate <= endOfYearDate;
+            } catch {
+                return false;
+            }
+        });
+
+        // Group year sessions by month index (0 - 11)
+        const sessionsByMonth: Record<number, any[]> = {};
+        for (let m = 0; m < 12; m++) {
+            sessionsByMonth[m] = [];
+        }
+        yearSessions.forEach(session => {
+            try {
+                const sessionDate = parseISO(session.date);
+                const m = getMonth(sessionDate);
+                sessionsByMonth[m].push(session);
+            } catch {}
+        });
+
+        // Helper function to calculate a single month's ranking dictionary for the target group
+        const computeMonthRankings = (monthSessions: any[]) => {
+            const mSessionsByDate: Record<string, any[]> = {};
+            monthSessions.forEach(session => {
+                if (!mSessionsByDate[session.date]) {
+                    mSessionsByDate[session.date] = [];
+                }
+                mSessionsByDate[session.date].push(session);
+            });
+
+            const mScores: Record<string, {
+                id: string;
+                totalSessions: number;
+                weightedSessions: number;
+                assessedMemorization: number;
+                assessedBehavior: number;
+                attendanceRate: number;
+                memorizationRate: number;
+                behaviorRate: number;
+                score: number;
+            }> = {};
+
+            targetStudents.forEach(s => {
+                mScores[s.id] = {
+                    id: s.id,
+                    totalSessions: 0,
+                    weightedSessions: 0,
+                    assessedMemorization: 0,
+                    assessedBehavior: 0,
+                    attendanceRate: 0,
+                    memorizationRate: 0,
+                    behaviorRate: 0,
+                    score: 0
+                };
+            });
+
+            monthSessions.forEach(session => {
+                const dateSessions = mSessionsByDate[session.date] || [];
+                const weight = dateSessions.length >= 2 ? 0.5 : 1.0;
+
+                (session.records ?? []).forEach((record: any) => {
+                    const sId = record.studentId;
+                    const mScore = mScores[sId];
+                    if (!mScore) return;
+
+                    mScore.totalSessions++;
+                    mScore.weightedSessions += weight;
+
+                    if (record.attendance) {
+                        mScore.attendanceRate += getAttPoints(record.attendance) * weight;
+                    }
+                    if (!record.review && record.memorization && record.memorization !== 'لا يوجد' && record.memorization !== '') {
+                        mScore.assessedMemorization += weight;
+                        mScore.memorizationRate += getMemoPoints(record.memorization) * weight;
+                    } else if (record.review && pointsConfig?.review?.completed) {
+                        mScore.assessedMemorization += weight;
+                        mScore.memorizationRate += pointsConfig.review.completed * weight;
+                    }
+                    if (record.behavior && record.behavior !== '') {
+                        mScore.assessedBehavior += weight;
+                        mScore.behaviorRate += getBehPoints(record.behavior) * weight;
+                    }
+                });
+            });
+
+            let mMaxSessions = 0;
+            Object.values(mScores).forEach(s => {
+                if (s.totalSessions > mMaxSessions) {
+                    mMaxSessions = s.totalSessions;
+                }
+            });
+
+            const mMinSessions = Math.max(1, Math.round(mMaxSessions * (thresholdPercent / 100)));
+
+            const mResults = Object.values(mScores).map(score => {
+                const maxAttPoints = score.weightedSessions * maxAttendanceVal;
+                const maxMemoPoints = score.assessedMemorization * maxMemorizationVal;
+                const maxBehPoints = score.assessedBehavior * maxBehaviorVal;
+
+                const attPct = maxAttPoints > 0 ? (score.attendanceRate / maxAttPoints) * 100 : 0;
+                const memoPct = maxMemoPoints > 0 ? (score.memorizationRate / maxMemoPoints) * 100 : 0;
+                const behPct = maxBehPoints > 0 ? (score.behaviorRate / maxBehPoints) * 100 : 0;
+
+                const academic = (attPct + memoPct) / 2;
+                const comprehensive = score.assessedBehavior > 0 ? (attPct + memoPct + behPct) / 3 : academic;
+
+                let finalScore = 0;
+                if (sortBy === 'comprehensiveScore') finalScore = comprehensive;
+                else if (sortBy === 'academicScore') finalScore = academic;
+                else if (sortBy === 'attendanceRate') finalScore = attPct;
+                else if (sortBy === 'memorizationRate') finalScore = memoPct;
+                else if (sortBy === 'behaviorRate') finalScore = behPct;
+
+                return {
+                    id: score.id,
+                    totalSessions: score.totalSessions,
+                    score: Math.max(0, Math.round(finalScore * 10) / 10)
+                };
+            });
+
+            const mRanked = mResults.filter(r => r.totalSessions >= mMinSessions);
+            mRanked.sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                if (b.totalSessions !== a.totalSessions) return b.totalSessions - a.totalSessions;
+                const nameA = targetStudents.find(s => s.id === a.id)?.fullName || '';
+                const nameB = targetStudents.find(s => s.id === b.id)?.fullName || '';
+                return nameA.localeCompare(nameB);
+            });
+
+            const studentRanks: Record<string, { rank: number | null; score: number }> = {};
+            mRanked.forEach((r, idx) => {
+                studentRanks[r.id] = { rank: idx + 1, score: r.score };
+            });
+            mResults.forEach(r => {
+                if (r.totalSessions < mMinSessions) {
+                    studentRanks[r.id] = { rank: null, score: r.score };
+                }
+            });
+
+            return studentRanks;
+        };
+
+        const monthlyRanksByMonth: Record<number, Record<string, { rank: number | null; score: number }>> = {};
+        const monthsWithSessions: number[] = [];
+
+        for (let m = 0; m < 12; m++) {
+            const mSessions = sessionsByMonth[m] || [];
+            if (mSessions.length > 0) {
+                monthlyRanksByMonth[m] = computeMonthRankings(mSessions);
+                monthsWithSessions.push(m);
+            }
+        }
+
         // 7. Calculate Final Percentage Scores
         const results = Object.values(scores).map(score => {
             const maxAttPoints = score.weightedSessions * maxAttendanceVal;
@@ -318,13 +498,44 @@ export default function FairEvaluationPage() {
             const academic = (attPct + memoPct) / 2;
             const comprehensive = score.assessedBehavior > 0 ? (attPct + memoPct + behPct) / 3 : academic;
 
+            // Monthly history compilation
+            const monthlyHistory = monthsWithSessions.map(m => {
+                const monthName = format(new Date(activeYear, m, 1), 'MMMM', { locale: ar });
+                const rankInfo = monthlyRanksByMonth[m]?.[score.id] || { rank: null, score: 0 };
+                return {
+                    monthName,
+                    rank: rankInfo.rank,
+                    score: rankInfo.score
+                };
+            });
+
+            const podiumCounts = {
+                first: 0,
+                second: 0,
+                third: 0,
+                top5: 0,
+                top10: 0
+            };
+
+            monthlyHistory.forEach(h => {
+                if (h.rank === 1) podiumCounts.first++;
+                else if (h.rank === 2) podiumCounts.second++;
+                else if (h.rank === 3) podiumCounts.third++;
+                else if (h.rank !== null) {
+                    if (h.rank >= 4 && h.rank <= 5) podiumCounts.top5++;
+                    else if (h.rank >= 6 && h.rank <= 10) podiumCounts.top10++;
+                }
+            });
+
             return {
                 ...score,
                 attendanceRate: Math.max(0, Math.round(attPct * 10) / 10),
                 memorizationRate: Math.max(0, Math.round(memoPct * 10) / 10),
                 behaviorRate: Math.max(0, Math.round(behPct * 10) / 10),
                 academicScore: Math.max(0, Math.round(academic * 10) / 10),
-                comprehensiveScore: Math.max(0, Math.round(comprehensive * 10) / 10)
+                comprehensiveScore: Math.max(0, Math.round(comprehensive * 10) / 10),
+                monthlyHistory,
+                podiumCounts
             };
         });
 
@@ -472,6 +683,19 @@ export default function FairEvaluationPage() {
                 }
             } else if (metricKey === 'comprehensiveScore') {
                 explanationText += `\n**💡 كيف رُجّحت الكفة؟**\nالمعدل الشامل يُحسب بمتوسط الحضور والحفظ والسلوك بالتساوي (ثلث لكل جانب). التفوق في الجوانب السلوكية أو الحفظ هو الذي أحدث هذا الفارق الإجمالي.`;
+            }
+
+            // Podium finish analysis
+            const podiumDiff = (std1.podiumCounts?.first || 0) - (std2.podiumCounts?.first || 0);
+            if (podiumDiff > 0) {
+                explanationText += `\n\n🏆 **الاستقرار والتتويج الشهري:**\nيتفوق **${std1.name}** في الاستقرار وعدد مرات تصدر الفوج، حيث حقق المركز الأول شهرياً **${std1.podiumCounts.first}** مرات هذا العام، مقابل **${std2.podiumCounts.first}** لـ **${std2.name}**.`;
+            } else if (podiumDiff < 0) {
+                explanationText += `\n\n🏆 **الاستقرار والتتويج الشهري:**\nيتفوق **${std2.name}** في الاستقرار وعدد مرات تصدر الفوج، حيث حقق المركز الأول شهرياً **${std2.podiumCounts.first}** مرات هذا العام، مقابل **${std1.podiumCounts.first}** لـ **${std1.name}**.`;
+            } else {
+                const firsts = std1.podiumCounts?.first || 0;
+                if (firsts > 0) {
+                    explanationText += `\n\n🏆 **الاستقرار والتتويج الشهري:**\nيتساوى الطالبان في عدد مرات تحقيق المركز الأول شهرياً برصيد **${firsts}** مرات لكل منهما هذا العام.`;
+                }
             }
         }
         
@@ -887,6 +1111,23 @@ export default function FairEvaluationPage() {
                                             </div>
                                             <Progress value={s1.comprehensiveScore} className="h-2 bg-indigo-50 [&>div]:bg-indigo-950" />
                                         </div>
+                                        <div className="space-y-1.5 border-t pt-2 mt-2 select-none font-bold">
+                                            <span className="text-[10px] text-muted-foreground block mb-1">الاستقرار والتتويج الشهري (السنة الحالية):</span>
+                                            <div className="flex flex-wrap gap-1">
+                                                <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px] font-black bg-amber-50 text-amber-600 border border-amber-200 shadow-sm shrink-0">
+                                                    🥇 {s1.podiumCounts?.first || 0} الأول
+                                                </Badge>
+                                                <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px] font-black bg-slate-50 text-slate-600 border border-slate-200 shadow-sm shrink-0">
+                                                    🥈 {s1.podiumCounts?.second || 0} الثاني
+                                                </Badge>
+                                                <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px] font-black bg-amber-50/50 text-amber-700/80 border border-amber-100 shadow-sm shrink-0">
+                                                    🥉 {s1.podiumCounts?.third || 0} الثالث
+                                                </Badge>
+                                                <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px] font-black bg-emerald-500/5 text-emerald-600 border border-emerald-500/10 shadow-sm shrink-0">
+                                                    🎖️ {s1.podiumCounts?.top5 || 0} (4-5)
+                                                </Badge>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -957,6 +1198,23 @@ export default function FairEvaluationPage() {
                                                 <span className="text-indigo-950 font-black">التقييم الشامل: {s2.comprehensiveScore}%</span>
                                             </div>
                                             <Progress value={s2.comprehensiveScore} className="h-2 bg-indigo-50 [&>div]:bg-indigo-950" />
+                                        </div>
+                                        <div className="space-y-1.5 border-t pt-2 mt-2 select-none font-bold">
+                                            <span className="text-[10px] text-muted-foreground block mb-1">الاستقرار والتتويج الشهري (السنة الحالية):</span>
+                                            <div className="flex flex-wrap gap-1">
+                                                <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px] font-black bg-amber-50 text-amber-600 border border-amber-200 shadow-sm shrink-0">
+                                                    🥇 {s2.podiumCounts?.first || 0} الأول
+                                                </Badge>
+                                                <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px] font-black bg-slate-50 text-slate-600 border border-slate-200 shadow-sm shrink-0">
+                                                    🥈 {s2.podiumCounts?.second || 0} الثاني
+                                                </Badge>
+                                                <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px] font-black bg-amber-50/50 text-amber-700/80 border border-amber-100 shadow-sm shrink-0">
+                                                    🥉 {s2.podiumCounts?.third || 0} الثالث
+                                                </Badge>
+                                                <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px] font-black bg-emerald-500/5 text-emerald-600 border border-emerald-500/10 shadow-sm shrink-0">
+                                                    🎖️ {s2.podiumCounts?.top5 || 0} (4-5)
+                                                </Badge>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1055,8 +1313,29 @@ export default function FairEvaluationPage() {
                                                                 <AvatarFallback>{s.name.charAt(0)}</AvatarFallback>
                                                             </Avatar>
                                                             <div>
-                                                                <span className="font-bold text-sm text-foreground block leading-tight">{s.name}</span>
-                                                                <span className="text-[10px] text-muted-foreground font-bold">{s.groupName}</span>
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <span className="font-bold text-sm text-foreground leading-tight">{s.name}</span>
+                                                                    {s.podiumCounts && (s.podiumCounts.first > 0 || s.podiumCounts.second > 0 || s.podiumCounts.third > 0) && (
+                                                                        <div className="flex items-center gap-0.5 select-none shrink-0 scale-90 origin-right">
+                                                                            {s.podiumCounts.first > 0 && (
+                                                                                <Badge variant="secondary" className="px-1 py-0 h-4 text-[9px] font-black bg-amber-50 text-amber-600 border border-amber-200 shadow-sm shrink-0">
+                                                                                    🥇 <span className="mr-0.5">{s.podiumCounts.first}</span>
+                                                                                </Badge>
+                                                                            )}
+                                                                            {s.podiumCounts.second > 0 && (
+                                                                                <Badge variant="secondary" className="px-1 py-0 h-4 text-[9px] font-black bg-slate-50 text-slate-600 border border-slate-200 shadow-sm shrink-0">
+                                                                                    🥈 <span className="mr-0.5">{s.podiumCounts.second}</span>
+                                                                                </Badge>
+                                                                            )}
+                                                                            {s.podiumCounts.third > 0 && (
+                                                                                <Badge variant="secondary" className="px-1 py-0 h-4 text-[9px] font-black bg-amber-50/50 text-amber-700/80 border border-amber-100 shadow-sm shrink-0">
+                                                                                    🥉 <span className="mr-0.5">{s.podiumCounts.third}</span>
+                                                                                </Badge>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-[10px] text-muted-foreground font-bold block mt-0.5">{s.groupName}</span>
                                                             </div>
                                                         </div>
                                                     </TableCell>
@@ -1214,8 +1493,29 @@ export default function FairEvaluationPage() {
                                                                     <AvatarFallback>{s.name.charAt(0)}</AvatarFallback>
                                                                 </Avatar>
                                                                 <div>
-                                                                    <span className="font-bold text-sm text-foreground block leading-tight">{s.name}</span>
-                                                                    <span className="text-[10px] text-muted-foreground font-bold">{s.groupName}</span>
+                                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                                        <span className="font-bold text-sm text-foreground leading-tight">{s.name}</span>
+                                                                        {s.podiumCounts && (s.podiumCounts.first > 0 || s.podiumCounts.second > 0 || s.podiumCounts.third > 0) && (
+                                                                            <div className="flex items-center gap-0.5 select-none shrink-0 scale-90 origin-right">
+                                                                                {s.podiumCounts.first > 0 && (
+                                                                                    <Badge variant="secondary" className="px-1 py-0 h-4 text-[9px] font-black bg-amber-50 text-amber-600 border border-amber-200 shadow-sm shrink-0">
+                                                                                        🥇 <span className="mr-0.5">{s.podiumCounts.first}</span>
+                                                                                    </Badge>
+                                                                                )}
+                                                                                {s.podiumCounts.second > 0 && (
+                                                                                    <Badge variant="secondary" className="px-1 py-0 h-4 text-[9px] font-black bg-slate-50 text-slate-600 border border-slate-200 shadow-sm shrink-0">
+                                                                                        🥈 <span className="mr-0.5">{s.podiumCounts.second}</span>
+                                                                                    </Badge>
+                                                                                )}
+                                                                                {s.podiumCounts.third > 0 && (
+                                                                                    <Badge variant="secondary" className="px-1 py-0 h-4 text-[9px] font-black bg-amber-50/50 text-amber-700/80 border border-amber-100 shadow-sm shrink-0">
+                                                                                        🥉 <span className="mr-0.5">{s.podiumCounts.third}</span>
+                                                                                    </Badge>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <span className="text-[10px] text-muted-foreground font-bold block mt-0.5">{s.groupName}</span>
                                                                 </div>
                                                             </div>
                                                         </TableCell>
@@ -1454,6 +1754,82 @@ function StudentDetailCard({ student, maxSessions }: { student: StudentEvaluatio
                     </div>
                 </div>
             </div>
+
+            {/* Monthly Crowning History Section */}
+            {student.monthlyHistory && student.monthlyHistory.length > 0 && (
+                <div className="border-t pt-5 border-slate-100 dark:border-slate-800 space-y-4">
+                    <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                        <Medal className="h-5 w-5 text-indigo-500 animate-bounce" />
+                        <span className="font-headline font-black text-sm">🏆 سجل التتويج والمراكز الشهرية (السنة الحالية)</span>
+                    </div>
+
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        <div className="p-3 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex flex-col items-center justify-center text-center">
+                            <span className="text-xl">🥇</span>
+                            <span className="text-[10px] font-bold text-amber-600 mt-1">المركز الأول</span>
+                            <span className="text-lg font-black text-amber-600 mt-0.5">{student.podiumCounts.first}</span>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-slate-500/5 border border-slate-500/10 flex flex-col items-center justify-center text-center">
+                            <span className="text-xl">🥈</span>
+                            <span className="text-[10px] font-bold text-slate-600 mt-1">المركز الثاني</span>
+                            <span className="text-lg font-black text-slate-600 mt-0.5">{student.podiumCounts.second}</span>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-amber-700/5 border border-amber-700/10 flex flex-col items-center justify-center text-center">
+                            <span className="text-xl">🥉</span>
+                            <span className="text-[10px] font-bold text-amber-700 mt-1">المركز الثالث</span>
+                            <span className="text-lg font-black text-amber-700 mt-0.5">{student.podiumCounts.third}</span>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex flex-col items-center justify-center text-center">
+                            <span className="text-xl">🎖️</span>
+                            <span className="text-[10px] font-bold text-emerald-600 mt-1">المراكز 4 - 5</span>
+                            <span className="text-lg font-black text-emerald-600 mt-0.5">{student.podiumCounts.top5}</span>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex flex-col items-center justify-center text-center col-span-2 sm:col-span-1">
+                            <span className="text-xl">⭐</span>
+                            <span className="text-[10px] font-bold text-indigo-600 mt-1">المراكز 6 - 10</span>
+                            <span className="text-lg font-black text-indigo-600 mt-0.5">{student.podiumCounts.top10}</span>
+                        </div>
+                    </div>
+
+                    {/* Timeline Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 pt-2">
+                        {student.monthlyHistory.map((history, idx) => {
+                            let badgeBg = "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-900/40 dark:border-slate-800 hover:bg-slate-100/50";
+                            let medalIcon = "";
+                            
+                            if (history.rank === 1) {
+                                badgeBg = "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/15";
+                                medalIcon = "🥇 ";
+                            } else if (history.rank === 2) {
+                                badgeBg = "bg-slate-500/10 text-slate-600 border-slate-500/20 hover:bg-slate-500/15";
+                                medalIcon = "🥈 ";
+                            } else if (history.rank === 3) {
+                                badgeBg = "bg-amber-700/10 text-amber-700 border-amber-700/20 hover:bg-amber-700/15";
+                                medalIcon = "🥉 ";
+                            } else if (history.rank !== null && history.rank <= 5) {
+                                badgeBg = "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/15";
+                                medalIcon = "🎖️ ";
+                            } else if (history.rank !== null && history.rank <= 10) {
+                                badgeBg = "bg-indigo-500/10 text-indigo-600 border-indigo-500/20 hover:bg-indigo-500/15";
+                                medalIcon = "⭐ ";
+                            }
+
+                            return (
+                                <div key={idx} className={cn("p-2.5 rounded-2xl border flex flex-col justify-between h-[68px] text-right transition-all", badgeBg)}>
+                                    <span className="text-[10px] text-muted-foreground font-black leading-none">{history.monthName}</span>
+                                    <div className="flex justify-between items-baseline mt-1.5">
+                                        <span className="text-xs font-black truncate max-w-[85px]">
+                                            {history.rank !== null ? `${medalIcon}المركز ${history.rank}` : "غير مصنف"}
+                                        </span>
+                                        <span className="text-[9px] font-medium opacity-80">({history.score}%)</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
