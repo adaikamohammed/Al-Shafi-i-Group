@@ -92,6 +92,7 @@ export default function FairEvaluationPage() {
     const [selectedGroup, setSelectedGroup] = useState<string>('all');
     const [thresholdPercent, setThresholdPercent] = useState<number>(50); // Default to 50%
     const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
+    const [showGuide, setShowGuide] = useState<boolean>(false);
     
     // Sort State
     const [sortBy, setSortBy] = useState<'comprehensiveScore' | 'academicScore' | 'attendanceRate' | 'memorizationRate' | 'behaviorRate'>('academicScore');
@@ -355,6 +356,23 @@ export default function FairEvaluationPage() {
         return evaluationData.ranked.slice(0, 3);
     }, [evaluationData.ranked]);
 
+    const activeMetric = useMemo(() => {
+        switch (sortBy) {
+            case 'comprehensiveScore':
+                return { label: 'التقييم الشامل', key: 'comprehensiveScore' as const };
+            case 'academicScore':
+                return { label: 'التقييم الأكاديمي', key: 'academicScore' as const };
+            case 'attendanceRate':
+                return { label: 'نسبة المواظبة', key: 'attendanceRate' as const };
+            case 'memorizationRate':
+                return { label: 'جودة الحفظ والتسميع', key: 'memorizationRate' as const };
+            case 'behaviorRate':
+                return { label: 'انضباط السلوك', key: 'behaviorRate' as const };
+            default:
+                return { label: 'التقييم الأكاديمي', key: 'academicScore' as const };
+        }
+    }, [sortBy]);
+
     // Handle date navigation
     const handleDateNavigation = (direction: 'prev' | 'next') => {
         const offset = direction === 'next' ? 1 : -1;
@@ -391,6 +409,74 @@ export default function FairEvaluationPage() {
                         </div>
                     </CardHeader>
                 </Card>
+
+                {/* Collapsible Quick Guide */}
+                <div className="transition-all duration-300">
+                    <Card className={cn(
+                        "border shadow-sm overflow-hidden transition-all duration-300 bg-emerald-500/5 border-emerald-500/10",
+                        showGuide ? "rounded-[2rem] p-6 space-y-4" : "rounded-2xl p-4 flex items-center justify-between"
+                    )}>
+                        {showGuide ? (
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center border-b pb-3 border-emerald-500/20">
+                                    <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300">
+                                        <Award className="h-6 w-6 text-emerald-600" />
+                                        <h3 className="font-headline font-black text-base md:text-lg">👑 كيف يعمل نظام "التقييم العادل والشامل الجديد"؟ (دليل المشايخ)</h3>
+                                    </div>
+                                    <Button variant="ghost" size="sm" onClick={() => setShowGuide(false)} className="h-8 text-emerald-850 font-bold hover:bg-emerald-500/10">إخفاء الدليل</Button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-right leading-relaxed">
+                                    <div className="space-y-3">
+                                        <div className="bg-white/80 dark:bg-slate-900/40 p-4 rounded-2xl border border-emerald-500/10">
+                                            <h4 className="font-bold text-xs text-emerald-900 dark:text-emerald-250 mb-1">1️⃣ التقييم الأكاديمي مقابل الشامل</h4>
+                                            <p className="text-xs text-muted-foreground font-bold leading-normal">
+                                                <strong>التقييم الأكاديمي (الأساسي والافتراضي للترتيب)</strong>: هو العمود الفقري للطالب ويجمع بين (المواظبة والحضور) و(جودة الحفظ والتسميع) فقط لضمان أقصى عدالة وتكافؤ.
+                                                <br />
+                                                <strong>التقييم الشامل</strong>: يضيف انضباط السلوك، وهو غير أساسي للترتيب لأن السلوك لا يقيم يومياً بانتظام وقد يقيم نادراً.
+                                            </p>
+                                        </div>
+                                        <div className="bg-white/80 dark:bg-slate-900/40 p-4 rounded-2xl border border-emerald-500/10">
+                                            <h4 className="font-bold text-xs text-emerald-900 dark:text-emerald-250 mb-1">2️⃣ آلية وزن الحصص اليومية (ص/م)</h4>
+                                            <p className="text-xs text-muted-foreground font-bold leading-normal">
+                                                عند وجود حصتين للطالب في يوم واحد (حصة صباحية ومسائية تعويضية)، يتم احتساب كل حصة بوزن نصف يوم (0.5) في معادلات الحضور والتقييم لضمان توازن التقييمات للفترة وتفادي انحياز التراكمي المفرط.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="bg-white/80 dark:bg-slate-900/40 p-4 rounded-2xl border border-emerald-500/10">
+                                            <h4 className="font-bold text-xs text-emerald-900 dark:text-emerald-250 mb-1">3️⃣ الحد الأدنى وتجنب تلاعب العينات</h4>
+                                            <p className="text-xs text-muted-foreground font-bold leading-normal">
+                                                لمنع تصدر طلاب جدد أو ذوي حضور قليل بنسب مئوية خادعة (100% من حصة واحدة)، يلزم النظام حضور الطالب حداً أدنى من الحصص للمنافسة بالجدول الرئيسي. الطلاب الأقل يوضعون بجدول منفصل بالأسفل لعرض نسبهم الحقيقية دون التأثير على الترتيب العام.
+                                            </p>
+                                        </div>
+                                        <div className="bg-white/80 dark:bg-slate-900/40 p-4 rounded-2xl border border-emerald-500/10">
+                                            <h4 className="font-bold text-xs text-emerald-900 dark:text-emerald-250 mb-1">4️⃣ تنبيه قلة البيانات (رمز التحذير ⚠️)</h4>
+                                            <p className="text-xs text-muted-foreground font-bold leading-normal">
+                                                يظهر رمز ⚠️ بجانب نسبة الحفظ أو السلوك إذا كان عدد التقييمات المسجلة قليلاً جداً مقارنة بإجمالي الحضور، للتنبيه بأن النسبة قد تكون خادعة إحصائياً ولا تعكس الواقع بدقة وتتطلب مزيداً من التقييمات.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-emerald-500/10 p-3 rounded-xl text-center text-xs text-emerald-800 dark:text-emerald-300 font-bold">
+                                    💡 <strong>معلومة إضافية</strong>: يمكنك النقر فوق اسم أي طالب في الجدول لعرض كشف تفصيلي بالأعداد الدقيقة لكافة أيامه ومراتب حفظه وسلوكه.
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-700 dark:text-emerald-400">
+                                        <Info className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-headline font-bold text-sm text-emerald-900 dark:text-emerald-200">👑 دليل المشايخ المبسط: كيف يتم حساب الترتيب والعدالة؟</h3>
+                                        <p className="text-xs text-muted-foreground font-bold mt-0.5">افتح الدليل للتعرف على الفرق بين التقييم الأكاديمي والشامل، ونسب الحضور، ورمز ⚠️.</p>
+                                    </div>
+                                </div>
+                                <Button variant="outline" size="sm" onClick={() => setShowGuide(true)} className="h-8 font-bold border-emerald-500/20 text-emerald-700 hover:bg-emerald-500/10">عرض الدليل المبسط</Button>
+                            </>
+                        )}
+                    </Card>
+                </div>
 
                 {/* 2. Advanced Filters */}
                 <div className="bg-card rounded-[2rem] border p-6 shadow-sm flex flex-col gap-4">
@@ -450,9 +536,20 @@ export default function FairEvaluationPage() {
                                         <SelectItem value="90">90% من حصص الفترة</SelectItem>
                                     </SelectContent>
                                 </Select>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground p-0">
+                                            <Info className="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="text-xs font-bold text-right max-w-xs leading-relaxed" dir="rtl">
+                                        <p className="font-black mb-1">الحد الأدنى للمنافسة:</p>
+                                        <p>يمنع الطلاب الجدد أو قليل الحضور من تصدر الترتيب بنسبة 100% وهمية من حصة واحدة. الطلاب الأقل يوضعون بالجدول السفلي.</p>
+                                    </TooltipContent>
+                                </Tooltip>
                             </div>
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">الترتيب حسب:</span>
                                 <Select dir="rtl" value={sortBy} onValueChange={(val: any) => setSortBy(val)}>
                                     <SelectTrigger className="w-full sm:w-[200px] bg-background font-bold text-xs"><SelectValue /></SelectTrigger>
@@ -464,6 +561,18 @@ export default function FairEvaluationPage() {
                                         <SelectItem value="behaviorRate">انضباط السلوك والأخلاق</SelectItem>
                                     </SelectContent>
                                 </Select>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground p-0">
+                                            <Info className="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="text-xs font-bold text-right max-w-xs leading-relaxed" dir="rtl">
+                                        <p className="font-black mb-1">معايير الترتيب:</p>
+                                        <p className="mb-1">• <strong>التقييم الأكاديمي (الأساسي)</strong>: يعتمد على الحضور والحفظ فقط لضمان العدالة وتفادي تباعد تقييمات السلوك.</p>
+                                        <p>• <strong>التقييم الشامل (الفرعي)</strong>: يضيف السلوك، ولكنه غير أساسي لأن السلوك لا يقيم يومياً بانتظام.</p>
+                                    </TooltipContent>
+                                </Tooltip>
                             </div>
                         </div>
                     </div>
@@ -486,8 +595,8 @@ export default function FairEvaluationPage() {
                                         <p className="text-[10px] text-muted-foreground font-bold">{podiumStudents[1].groupName}</p>
                                     </div>
                                     <div className="bg-white/80 p-2 rounded-xl text-center shadow-inner">
-                                        <p className="text-[10px] text-muted-foreground font-bold">التقييم الشامل</p>
-                                        <p className="text-xl font-black text-slate-700">{podiumStudents[1].comprehensiveScore}%</p>
+                                        <p className="text-[10px] text-muted-foreground font-bold">{activeMetric.label}</p>
+                                        <p className="text-xl font-black text-slate-700">{podiumStudents[1][activeMetric.key]}%</p>
                                     </div>
                                 </div>
                             </div>
@@ -508,8 +617,8 @@ export default function FairEvaluationPage() {
                                         <p className="text-[10px] text-amber-700 font-bold">{podiumStudents[0].groupName}</p>
                                     </div>
                                     <div className="bg-amber-100/50 p-2 rounded-2xl text-center shadow-inner">
-                                        <p className="text-[10px] text-amber-800 font-bold">التقييم الشامل</p>
-                                        <p className="text-2xl font-black text-amber-700">{podiumStudents[0].comprehensiveScore}%</p>
+                                        <p className="text-[10px] text-amber-800 font-bold">{activeMetric.label}</p>
+                                        <p className="text-2xl font-black text-amber-700">{podiumStudents[0][activeMetric.key]}%</p>
                                     </div>
                                 </div>
                             </div>
@@ -529,8 +638,8 @@ export default function FairEvaluationPage() {
                                         <p className="text-[10px] text-muted-foreground font-bold">{podiumStudents[2].groupName}</p>
                                     </div>
                                     <div className="bg-white/80 p-2 rounded-xl text-center shadow-inner">
-                                        <p className="text-[10px] text-muted-foreground font-bold">التقييم الشامل</p>
-                                        <p className="text-xl font-black text-amber-800/80">{podiumStudents[2].comprehensiveScore}%</p>
+                                        <p className="text-[10px] text-muted-foreground font-bold">{activeMetric.label}</p>
+                                        <p className="text-xl font-black text-amber-800/80">{podiumStudents[2][activeMetric.key]}%</p>
                                     </div>
                                 </div>
                             </div>
@@ -544,7 +653,7 @@ export default function FairEvaluationPage() {
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                             <div>
                                 <CardTitle className="text-xl font-headline font-bold text-slate-800">جدول الترتيب العام</CardTitle>
-                                <CardDescription className="text-xs font-medium">الترتيب يعتمد بشكل عادل ومباشر على معيار الفرز المختار. انقر على الطالب لعرض التفاصيل الكاملة والعدديّة.</CardDescription>
+                                <CardDescription className="text-xs font-medium">الترتيب يعتمد تلقائياً على <strong>التقييم الأكاديمي كمعيار أساسي</strong> (أو معيار الفرز المختار). انقر فوق الطالب لعرض التفاصيل الكاملة والعدديّة.</CardDescription>
                             </div>
                             <Badge variant="outline" className="text-[10px] font-black border-primary/20 bg-primary/5 text-primary py-1 px-3">
                                 الحد الأدنى للتقييم: {evaluationData.minSessionsRequired} حصص
@@ -558,7 +667,14 @@ export default function FairEvaluationPage() {
                                     <TableRow className="bg-slate-50/50">
                                         <TableHead className="w-[80px] text-center font-bold">#</TableHead>
                                         <TableHead className="font-bold">الطالب</TableHead>
-                                        <Tooltip><TooltipTrigger asChild><TableHead className="text-center cursor-pointer font-bold w-[100px]">الحصص (وزن)</TableHead></TooltipTrigger><TooltipContent><p>عدد الحصص المقيمة (ص/م تُحسب كـ 0.5)</p></TooltipContent></Tooltip>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <TableHead className="text-center cursor-pointer font-bold w-[100px]">الحصص (وزن)</TableHead>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="text-xs font-bold text-right" dir="rtl">
+                                                <p>إجمالي الحصص المسجلة للطالب، مع احتساب وزن 0.5 لكل حصة إذا عُقدت حصتان في يوم واحد (حصة صباحية ومسائية) لضمان التكافؤ وعدم انحياز التراكمي.</p>
+                                            </TooltipContent>
+                                        </Tooltip>
                                         <TableHead className="text-center font-bold">المواظبة %</TableHead>
                                         <TableHead className="text-center font-bold">جودة الحفظ %</TableHead>
                                         <TableHead className="text-center font-bold">السلوك %</TableHead>
