@@ -94,7 +94,7 @@ export default function FairEvaluationPage() {
     const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
     
     // Sort State
-    const [sortBy, setSortBy] = useState<'comprehensiveScore' | 'academicScore' | 'attendanceRate' | 'memorizationRate' | 'behaviorRate'>('comprehensiveScore');
+    const [sortBy, setSortBy] = useState<'comprehensiveScore' | 'academicScore' | 'attendanceRate' | 'memorizationRate' | 'behaviorRate'>('academicScore');
 
     const pointsConfig = settings?.points;
 
