@@ -94,6 +94,8 @@ export default function FairEvaluationPage() {
     const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
     const [showGuide, setShowGuide] = useState<boolean>(false);
     const [showCompare, setShowCompare] = useState<boolean>(false);
+    const [showTableCounts, setShowTableCounts] = useState<boolean>(false);
+    const [showCountsInCompare, setShowCountsInCompare] = useState<boolean>(false);
     const [compareStudent1Id, setCompareStudent1Id] = useState<string>('');
     const [compareStudent2Id, setCompareStudent2Id] = useState<string>('');
     
@@ -769,11 +771,24 @@ export default function FairEvaluationPage() {
 
                     {showCompare && s1 && s2 && (
                         <Card className="rounded-[2.5rem] border border-indigo-500/20 bg-gradient-to-b from-indigo-50/20 to-white shadow-lg p-6 max-w-4xl mx-auto space-y-6 animate-in slide-in-from-top-4 duration-350">
-                            <div className="border-b pb-3 border-indigo-500/10 text-center">
-                                <h3 className="font-headline font-black text-lg text-indigo-950 flex items-center justify-center gap-2">
-                                    ⚖️ ساحة التحليل والمقارنة التفصيلية
-                                </h3>
-                                <p className="text-xs text-muted-foreground font-bold mt-1">اختر أي طالبين من القائمة بالأسفل لمقارنة الأداء والنسب وتفاصيل التفوق البرمجي</p>
+                            <div className="border-b pb-3 border-indigo-500/10 flex flex-col sm:flex-row justify-between items-center gap-4">
+                                <div className="text-center sm:text-right">
+                                    <h3 className="font-headline font-black text-lg text-indigo-950 flex items-center justify-center sm:justify-start gap-2">
+                                        ⚖️ ساحة التحليل والمقارنة التفصيلية
+                                    </h3>
+                                    <p className="text-xs text-muted-foreground font-bold mt-1">اختر أي طالبين من القائمة بالأسفل لمقارنة الأداء والنسب وتفاصيل التفوق البرمجي</p>
+                                </div>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => setShowCountsInCompare(!showCountsInCompare)} 
+                                    className={cn(
+                                        "h-8 text-xs font-bold gap-2 rounded-xl border-indigo-500/20 shadow-sm",
+                                        showCountsInCompare ? "bg-indigo-600 text-white hover:bg-indigo-700" : "text-indigo-750 hover:bg-indigo-500/10"
+                                    )}
+                                >
+                                    {showCountsInCompare ? "👁️ عرض كنسب مئوية" : "🔢 تحويل المقارنة لأرقام وتكرارات"}
+                                </Button>
                             </div>
 
                             {/* Select Dropdowns */}
@@ -829,18 +844,42 @@ export default function FairEvaluationPage() {
                                                 <span className="text-emerald-600">المواظبة (الحضور): {s1.attendanceRate}%</span>
                                             </div>
                                             <Progress value={s1.attendanceRate} className="h-1.5 bg-slate-100 [&>div]:bg-emerald-500" />
+                                            {showCountsInCompare && (
+                                                <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-500/5 p-1.5 rounded-lg mt-1 flex justify-around select-none">
+                                                    <span>حاضر: {s1.presentCount}</span>
+                                                    <span>تعويض: {s1.makeupCount}</span>
+                                                    <span>متأخر: {s1.lateCount}</span>
+                                                    <span>غائب: {s1.absentCount}</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="space-y-1">
                                             <div className="flex justify-between text-xs font-bold">
                                                 <span className="text-amber-500">جودة الحفظ والتسميع: {s1.memorizationRate}%</span>
                                             </div>
                                             <Progress value={s1.memorizationRate} className="h-1.5 bg-slate-100 [&>div]:bg-amber-400" />
+                                            {showCountsInCompare && (
+                                                <div className="text-[10px] text-amber-800 dark:text-amber-300 font-bold bg-amber-500/5 p-1.5 rounded-lg mt-1 flex flex-wrap gap-2 justify-around select-none">
+                                                    <span>ممتاز: {s1.memorizationCounts['ممتاز'] || 0}</span>
+                                                    <span>ج.جداً: {s1.memorizationCounts['جيد جداً'] || 0}</span>
+                                                    <span>جيد: {s1.memorizationCounts['جيد'] || 0}</span>
+                                                    <span>لم يحفظ: {s1.memorizationCounts['لم يحفظ'] || 0}</span>
+                                                    <span>مراجعة: {s1.memorizationCounts['أوراد مراجعة'] || 0}</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="space-y-1">
                                             <div className="flex justify-between text-xs font-bold">
                                                 <span className="text-indigo-600">انضباط السلوك: {s1.behaviorRate}%</span>
                                             </div>
                                             <Progress value={s1.behaviorRate} className="h-1.5 bg-slate-100 [&>div]:bg-indigo-500" />
+                                            {showCountsInCompare && (
+                                                <div className="text-[10px] text-indigo-700 dark:text-indigo-300 font-bold bg-indigo-50/5 p-1.5 rounded-lg mt-1 flex justify-around select-none">
+                                                    <span>هادئ: {s1.behaviorCounts['هادئ'] || 0}</span>
+                                                    <span>متوسط/مقبول: {(s1.behaviorCounts['متوسط'] || 0) + (s1.behaviorCounts['مقبول'] || 0)}</span>
+                                                    <span>مشاغب: {(s1.behaviorCounts['مشاغب'] || 0) + (s1.behaviorCounts['غير منضبط'] || 0)}</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="space-y-1 border-t pt-2 mt-2">
                                             <div className="flex justify-between text-xs font-bold">
@@ -876,18 +915,42 @@ export default function FairEvaluationPage() {
                                                 <span className="text-emerald-600">المواظبة (الحضور): {s2.attendanceRate}%</span>
                                             </div>
                                             <Progress value={s2.attendanceRate} className="h-1.5 bg-slate-100 [&>div]:bg-emerald-500" />
+                                            {showCountsInCompare && (
+                                                <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-500/5 p-1.5 rounded-lg mt-1 flex justify-around select-none">
+                                                    <span>حاضر: {s2.presentCount}</span>
+                                                    <span>تعويض: {s2.makeupCount}</span>
+                                                    <span>متأخر: {s2.lateCount}</span>
+                                                    <span>غائب: {s2.absentCount}</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="space-y-1">
                                             <div className="flex justify-between text-xs font-bold">
                                                 <span className="text-amber-500">جودة الحفظ والتسميع: {s2.memorizationRate}%</span>
                                             </div>
                                             <Progress value={s2.memorizationRate} className="h-1.5 bg-slate-100 [&>div]:bg-amber-400" />
+                                            {showCountsInCompare && (
+                                                <div className="text-[10px] text-amber-800 dark:text-amber-300 font-bold bg-amber-500/5 p-1.5 rounded-lg mt-1 flex flex-wrap gap-2 justify-around select-none">
+                                                    <span>ممتاز: {s2.memorizationCounts['ممتاز'] || 0}</span>
+                                                    <span>ج.جداً: {s2.memorizationCounts['جيد جداً'] || 0}</span>
+                                                    <span>جيد: {s2.memorizationCounts['جيد'] || 0}</span>
+                                                    <span>لم يحفظ: {s2.memorizationCounts['لم يحفظ'] || 0}</span>
+                                                    <span>مراجعة: {s2.memorizationCounts['أوراد مراجعة'] || 0}</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="space-y-1">
                                             <div className="flex justify-between text-xs font-bold">
                                                 <span className="text-indigo-600">انضباط السلوك: {s2.behaviorRate}%</span>
                                             </div>
                                             <Progress value={s2.behaviorRate} className="h-1.5 bg-slate-100 [&>div]:bg-indigo-500" />
+                                            {showCountsInCompare && (
+                                                <div className="text-[10px] text-indigo-700 dark:text-indigo-300 font-bold bg-indigo-50/5 p-1.5 rounded-lg mt-1 flex justify-around select-none">
+                                                    <span>هادئ: {s2.behaviorCounts['هادئ'] || 0}</span>
+                                                    <span>متوسط/مقبول: {(s2.behaviorCounts['متوسط'] || 0) + (s2.behaviorCounts['مقبول'] || 0)}</span>
+                                                    <span>مشاغب: {(s2.behaviorCounts['مشاغب'] || 0) + (s2.behaviorCounts['غير منضبط'] || 0)}</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="space-y-1 border-t pt-2 mt-2">
                                             <div className="flex justify-between text-xs font-bold">
@@ -920,9 +983,22 @@ export default function FairEvaluationPage() {
                                 <CardTitle className="text-xl font-headline font-bold text-slate-800">جدول الترتيب العام</CardTitle>
                                 <CardDescription className="text-xs font-medium">الترتيب يعتمد تلقائياً على <strong>التقييم الأكاديمي كمعيار أساسي</strong> (أو معيار الفرز المختار). انقر فوق الطالب لعرض التفاصيل الكاملة والعدديّة.</CardDescription>
                             </div>
-                            <Badge variant="outline" className="text-[10px] font-black border-primary/20 bg-primary/5 text-primary py-1 px-3">
-                                الحد الأدنى للتقييم: {evaluationData.minSessionsRequired} حصص
-                            </Badge>
+                            <div className="flex flex-wrap items-center gap-3">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setShowTableCounts(!showTableCounts)}
+                                    className={cn(
+                                        "h-8 text-[10px] font-black rounded-lg border-primary/20 shadow-sm",
+                                        showTableCounts ? "bg-primary text-white hover:bg-primary/95" : "text-primary hover:bg-primary/5"
+                                    )}
+                                >
+                                    {showTableCounts ? "👁️ عرض بالدرجات المئوية" : "🔢 عرض بالأرقام والتكرارات"}
+                                </Button>
+                                <Badge variant="outline" className="text-[10px] font-black border-primary/20 bg-primary/5 text-primary py-1 px-3">
+                                    الحد الأدنى للتقييم: {evaluationData.minSessionsRequired} حصص
+                                </Badge>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -940,9 +1016,9 @@ export default function FairEvaluationPage() {
                                                 <p>إجمالي الحصص المسجلة للطالب، مع احتساب وزن 0.5 لكل حصة إذا عُقدت حصتان في يوم واحد (حصة صباحية ومسائية) لضمان التكافؤ وعدم انحياز التراكمي.</p>
                                             </TooltipContent>
                                         </Tooltip>
-                                        <TableHead className="text-center font-bold">المواظبة %</TableHead>
-                                        <TableHead className="text-center font-bold">جودة الحفظ %</TableHead>
-                                        <TableHead className="text-center font-bold">السلوك %</TableHead>
+                                        <TableHead className="text-center font-bold">{showTableCounts ? "المواظبة (حضور)" : "المواظبة %"}</TableHead>
+                                        <TableHead className="text-center font-bold">{showTableCounts ? "جودة الحفظ (تكرار)" : "جودة الحفظ %"}</TableHead>
+                                        <TableHead className="text-center font-bold">{showTableCounts ? "السلوك (تكرار)" : "السلوك %"}</TableHead>
                                         <TableHead className="text-center font-bold text-primary bg-primary/5">الأكاديمي %</TableHead>
                                         <TableHead className="text-center font-bold text-indigo-700 bg-indigo-50/50">الشامل %</TableHead>
                                     </TableRow>
@@ -987,47 +1063,79 @@ export default function FairEvaluationPage() {
                                                     <TableCell className="text-center font-bold text-xs">
                                                         {s.totalSessions} <span className="text-slate-400 font-normal">({s.weightedSessions.toFixed(1)})</span>
                                                     </TableCell>
-                                                    <TableCell className="text-center">
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <span className="font-bold text-sm">{s.attendanceRate}%</span>
-                                                            <Progress value={s.attendanceRate} className="h-1 w-12 bg-slate-100 [&>div]:bg-emerald-500" />
-                                                        </div>
+                                                    <TableCell className="text-center font-semibold text-sm">
+                                                        {showTableCounts ? (
+                                                            <div className="text-center font-bold text-xs text-emerald-750 dark:text-emerald-450 leading-relaxed select-none">
+                                                                <span className="text-emerald-600 font-extrabold">{s.presentCount + s.makeupCount}ح</span>
+                                                                <span className="mx-0.5 text-slate-300">/</span>
+                                                                <span className="text-rose-500 font-extrabold">{s.absentCount}غ</span>
+                                                                <span className="mx-0.5 text-slate-300">/</span>
+                                                                <span className="text-amber-500 font-extrabold">{s.lateCount}ت</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <span className="font-bold text-sm">{s.attendanceRate}%</span>
+                                                                <Progress value={s.attendanceRate} className="h-1 w-12 bg-slate-100 [&>div]:bg-emerald-500" />
+                                                            </div>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="text-center">
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <div className="flex items-center gap-1 justify-center">
-                                                                <span className="font-bold text-sm">{s.memorizationRate}%</span>
-                                                                {isMemorizationInsufficient && (
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger asChild>
-                                                                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 cursor-help" />
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent className="text-xs font-bold text-right" dir="rtl">
-                                                                            تقييمات حفظ غير كافية ({s.assessedMemorization} من أصل {s.totalSessions})
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                )}
+                                                        {showTableCounts ? (
+                                                            <div className="text-center font-bold text-xs text-amber-700 dark:text-amber-400 leading-relaxed select-none">
+                                                                <span className="text-emerald-655 font-extrabold">{s.memorizationCounts['ممتاز'] || 0}مم</span>
+                                                                <span className="mx-0.5 text-slate-300">/</span>
+                                                                <span className="text-teal-655 font-extrabold">{s.memorizationCounts['جيد جداً'] || 0}ج.ج</span>
+                                                                <span className="mx-0.5 text-slate-300">/</span>
+                                                                <span className="text-blue-500 font-extrabold">{s.memorizationCounts['جيد'] || 0}ج</span>
+                                                                <span className="mx-0.5 text-slate-300">/</span>
+                                                                <span className="text-rose-500 font-extrabold">{s.memorizationCounts['لم يحفظ'] || 0}غ.ح</span>
                                                             </div>
-                                                            <Progress value={s.memorizationRate} className="h-1 w-12 bg-slate-100 [&>div]:bg-amber-400" />
-                                                        </div>
+                                                        ) : (
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <div className="flex items-center gap-1 justify-center">
+                                                                    <span className="font-bold text-sm">{s.memorizationRate}%</span>
+                                                                    {isMemorizationInsufficient && (
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger asChild>
+                                                                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 cursor-help" />
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent className="text-xs font-bold text-right" dir="rtl">
+                                                                                تقييمات حفظ غير كافية ({s.assessedMemorization} من أصل {s.totalSessions})
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                    )}
+                                                                </div>
+                                                                <Progress value={s.memorizationRate} className="h-1 w-12 bg-slate-100 [&>div]:bg-amber-400" />
+                                                            </div>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="text-center">
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <div className="flex items-center gap-1 justify-center">
-                                                                <span className="font-bold text-sm">{s.behaviorRate}%</span>
-                                                                {isBehaviorInsufficient && (
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger asChild>
-                                                                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 cursor-help" />
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent className="text-xs font-bold text-right" dir="rtl">
-                                                                            تقييمات سلوك غير كافية ({s.assessedBehavior} من أصل {s.totalSessions})
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                )}
+                                                        {showTableCounts ? (
+                                                            <div className="text-center font-bold text-xs text-indigo-700 dark:text-indigo-400 leading-relaxed select-none">
+                                                                <span className="text-emerald-600 font-extrabold">{s.behaviorCounts['هادئ'] || 0}هـ</span>
+                                                                <span className="mx-0.5 text-slate-300">/</span>
+                                                                <span className="text-amber-550 font-extrabold">{(s.behaviorCounts['متوسط'] || 0) + (s.behaviorCounts['مقبول'] || 0)}م</span>
+                                                                <span className="mx-0.5 text-slate-300">/</span>
+                                                                <span className="text-rose-500 font-extrabold">{(s.behaviorCounts['مشاغب'] || 0) + (s.behaviorCounts['غير منضبط'] || 0)}ش</span>
                                                             </div>
-                                                            <Progress value={s.behaviorRate} className="h-1 w-12 bg-slate-100 [&>div]:bg-indigo-400" />
-                                                        </div>
+                                                        ) : (
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <div className="flex items-center gap-1 justify-center">
+                                                                    <span className="font-bold text-sm">{s.behaviorRate}%</span>
+                                                                    {isBehaviorInsufficient && (
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger asChild>
+                                                                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 cursor-help" />
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent className="text-xs font-bold text-right" dir="rtl">
+                                                                                تقييمات سلوك غير كافية ({s.assessedBehavior} من أصل {s.totalSessions})
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                    )}
+                                                                </div>
+                                                                <Progress value={s.behaviorRate} className="h-1 w-12 bg-slate-100 [&>div]:bg-indigo-400" />
+                                                            </div>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className={cn("text-center font-black text-sm bg-primary/5", sortBy === 'academicScore' && "bg-primary/10 text-primary")}>
                                                         {s.academicScore}%
@@ -1077,9 +1185,9 @@ export default function FairEvaluationPage() {
                                         <TableRow>
                                             <TableHead>الطالب</TableHead>
                                             <TableHead className="text-center font-bold w-[120px]">الحصص المسجلة</TableHead>
-                                            <TableHead className="text-center font-bold">المواظبة %</TableHead>
-                                            <TableHead className="text-center font-bold">جودة الحفظ %</TableHead>
-                                            <TableHead className="text-center font-bold">السلوك %</TableHead>
+                                            <TableHead className="text-center font-bold">{showTableCounts ? "المواظبة (حضور)" : "المواظبة %"}</TableHead>
+                                            <TableHead className="text-center font-bold">{showTableCounts ? "جودة الحفظ (تكرار)" : "جودة الحفظ %"}</TableHead>
+                                            <TableHead className="text-center font-bold">{showTableCounts ? "السلوك (تكرار)" : "السلوك %"}</TableHead>
                                             <TableHead className="text-center font-bold text-muted-foreground bg-slate-50/50">الأكاديمي %</TableHead>
                                             <TableHead className="text-center font-bold text-muted-foreground bg-slate-50/50">الشامل %</TableHead>
                                         </TableRow>
@@ -1114,36 +1222,70 @@ export default function FairEvaluationPage() {
                                                         <TableCell className="text-center font-bold text-xs text-yellow-600">
                                                             {s.totalSessions} / {evaluationData.minSessionsRequired} <span className="text-slate-400 font-normal">({s.weightedSessions.toFixed(1)})</span>
                                                         </TableCell>
-                                                        <TableCell className="text-center font-semibold text-sm">{s.attendanceRate}%</TableCell>
                                                         <TableCell className="text-center font-semibold text-sm">
-                                                            <div className="flex items-center gap-1 justify-center">
-                                                                <span>{s.memorizationRate}%</span>
-                                                                {isMemorizationInsufficient && (
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger asChild>
-                                                                            <AlertTriangle className="h-3 w-3 text-amber-500 cursor-help" />
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent className="text-xs font-bold text-right" dir="rtl">
-                                                                            تقييمات حفظ غير كافية ({s.assessedMemorization} من أصل {s.totalSessions})
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                )}
-                                                            </div>
+                                                            {showTableCounts ? (
+                                                                <div className="text-center font-bold text-xs text-emerald-750 dark:text-emerald-450 leading-relaxed select-none">
+                                                                    <span className="text-emerald-600 font-extrabold">{s.presentCount + s.makeupCount}ح</span>
+                                                                    <span className="mx-0.5 text-slate-300">/</span>
+                                                                    <span className="text-rose-500 font-extrabold">{s.absentCount}غ</span>
+                                                                    <span className="mx-0.5 text-slate-300">/</span>
+                                                                    <span className="text-amber-500 font-extrabold">{s.lateCount}ت</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span>{s.attendanceRate}%</span>
+                                                            )}
                                                         </TableCell>
                                                         <TableCell className="text-center font-semibold text-sm">
-                                                            <div className="flex items-center gap-1 justify-center">
-                                                                <span>{s.behaviorRate}%</span>
-                                                                {isBehaviorInsufficient && (
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger asChild>
-                                                                            <AlertTriangle className="h-3 w-3 text-amber-500 cursor-help" />
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent className="text-xs font-bold text-right" dir="rtl">
-                                                                            تقييمات سلوك غير كافية ({s.assessedBehavior} من أصل {s.totalSessions})
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                )}
-                                                            </div>
+                                                            {showTableCounts ? (
+                                                                <div className="text-center font-bold text-xs text-amber-700 dark:text-amber-400 leading-relaxed select-none">
+                                                                    <span className="text-emerald-655 font-extrabold">{s.memorizationCounts['ممتاز'] || 0}مم</span>
+                                                                    <span className="mx-0.5 text-slate-300">/</span>
+                                                                    <span className="text-teal-655 font-extrabold">{s.memorizationCounts['جيد جداً'] || 0}ج.ج</span>
+                                                                    <span className="mx-0.5 text-slate-300">/</span>
+                                                                    <span className="text-blue-500 font-extrabold">{s.memorizationCounts['جيد'] || 0}ج</span>
+                                                                    <span className="mx-0.5 text-slate-300">/</span>
+                                                                    <span className="text-rose-500 font-extrabold">{s.memorizationCounts['لم يحفظ'] || 0}غ.ح</span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-1 justify-center">
+                                                                    <span>{s.memorizationRate}%</span>
+                                                                    {isMemorizationInsufficient && (
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger asChild>
+                                                                                <AlertTriangle className="h-3 w-3 text-amber-500 cursor-help" />
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent className="text-xs font-bold text-right" dir="rtl">
+                                                                                تقييمات حفظ غير كافية ({s.assessedMemorization} من أصل {s.totalSessions})
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="text-center font-semibold text-sm">
+                                                            {showTableCounts ? (
+                                                                <div className="text-center font-bold text-xs text-indigo-700 dark:text-indigo-400 leading-relaxed select-none">
+                                                                    <span className="text-emerald-600 font-extrabold">{s.behaviorCounts['هادئ'] || 0}هـ</span>
+                                                                    <span className="mx-0.5 text-slate-300">/</span>
+                                                                    <span className="text-amber-550 font-extrabold">{(s.behaviorCounts['متوسط'] || 0) + (s.behaviorCounts['مقبول'] || 0)}م</span>
+                                                                    <span className="mx-0.5 text-slate-300">/</span>
+                                                                    <span className="text-rose-500 font-extrabold">{(s.behaviorCounts['مشاغب'] || 0) + (s.behaviorCounts['غير منضبط'] || 0)}ش</span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-1 justify-center">
+                                                                    <span>{s.behaviorRate}%</span>
+                                                                    {isBehaviorInsufficient && (
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger asChild>
+                                                                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 cursor-help" />
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent className="text-xs font-bold text-right" dir="rtl">
+                                                                                تقييمات سلوك غير كافية ({s.assessedBehavior} من أصل {s.totalSessions})
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </TableCell>
                                                         <TableCell className="text-center font-bold text-sm bg-slate-50/50">{s.academicScore}%</TableCell>
                                                         <TableCell className="text-center font-bold text-sm bg-slate-50/50">{s.comprehensiveScore}%</TableCell>
