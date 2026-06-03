@@ -138,7 +138,6 @@ const pad = (num: number) => num < 10 ? `0${num}` : num.toString();
 const toHijri = (date: Date): string => {
   try {
     const hijriDate = new Date(date);
-    hijriDate.setDate(hijriDate.getDate() - 1);
     const fmt = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
       day: '2-digit',
       month: 'long',
@@ -541,12 +540,13 @@ export default function DailySessionsPage() {
       queryParams.set('ownerId', selectedSheikhId);
     }
 
-    // إذا تم تحديد رقم الحصة مسبقاً (عبر النقر المباشر على ماركة الحصة)
     if (sessionNumber) {
-      // التحقق من وجود الحصة الأولى قبل فتح الحصة الثانية
+      // التحقق من وجود الحصة الأولى قبل إنشاء الحصة الثانية
+      // لكن إذا كانت الحصة الثانية موجودة بالفعل (تعديل وليس إنشاء)، نسمح بالوصول
       if (sessionNumber === 2) {
         const session1 = daySessions.find(s => s.sessionNumber === 1);
-        if (!session1) {
+        const session2AlreadyExists = daySessions.some(s => s.sessionNumber === 2);
+        if (!session1 && !session2AlreadyExists) {
           toast({
             title: "تنبيه",
             description: "يجب تسجيل الحصة الأولى (الأساسية) قبل فتح الحصة الثانية (الإضافية).",
@@ -709,9 +709,12 @@ export default function DailySessionsPage() {
   const handleQuickWhatsApp = () => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const daySessions = filteredGetSessionsForDay(todayStr);
-    const session = daySessions.find(s => s.sessionNumber === 1) || daySessions[0];
+    
+    const sortedDaySessions = [...daySessions]
+      .filter(s => s.records && s.records.length > 0)
+      .sort((a, b) => (a.sessionNumber || 1) - (b.sessionNumber || 1));
 
-    if (!session || !session.records || session.records.length === 0) {
+    if (sortedDaySessions.length === 0) {
       toast({ title: "لا يوجد تقرير", description: "لم يتم تسجيل بيانات لحصة اليوم بعد.", variant: "destructive" });
       return;
     }
@@ -723,46 +726,57 @@ export default function DailySessionsPage() {
     let message = `السلام عليكم ورحمة الله وبركاته\n`;
     message += hijriStr ? `اليوم ${dayName} ${hijriStr} الموافق لـ : ${gregorianStr}\n` : `اليوم ${dayName} ${gregorianStr}\n`;
 
-    const isCounterStopped = session.isCounterStopped;
-    const tasmieSurah = surahs.find(s => s.id === session.tasmieSurahId);
-    
-    if (isCounterStopped) {
-      message += `(العداد موقوف لهذا اليوم)\n`;
-    } else if (tasmieSurah) {
-      message += `قائمة الطلبة الذين استظهروا ورد التسميع من الآية(${pad(session.tasmieFromVerse || 1)}) إلى الآية(${pad(session.tasmieToVerse || 1)}) من سورة ${tasmieSurah.name} :\n`;
-    } else {
-      message += 'قائمة الطلبة الذين استظهروا الورد اليومي :\n';
-    }
-
     const sortedActiveStudents = [...students].sort((a, b) => arabicCompare(a.fullName, b.fullName));
-    const recited = sortedActiveStudents.filter(s => {
-      const rec = session.records.find((r: any) => r.studentId === s.id);
-      return rec && (rec.attendance === 'حاضر' || rec.attendance === 'متأخر') && rec.memorization && rec.memorization !== 'لا يوجد';
-    });
 
-    if (recited.length > 0) {
-      message += recited.map(s => {
+    sortedDaySessions.forEach((session, index) => {
+      if (sortedDaySessions.length > 1) {
+        message += `\n*◄ ${session.sessionNumber === 1 ? 'الحصة الأساسية (ص)' : 'الحصة الإضافية (م)'} :*\n`;
+      }
+
+      const isCounterStopped = session.isCounterStopped;
+      const tasmieSurah = surahs.find(s => s.id === session.tasmieSurahId);
+      
+      if (isCounterStopped) {
+        message += `(العداد موقوف لهذا اليوم)\n`;
+      } else if (tasmieSurah) {
+        message += `قائمة الطلبة الذين استظهروا ورد التسميع من الآية(${pad(session.tasmieFromVerse || 1)}) إلى الآية(${pad(session.tasmieToVerse || 1)}) من سورة ${tasmieSurah.name} :\n`;
+      } else {
+        message += 'قائمة الطلبة الذين استظهروا الورد اليومي :\n';
+      }
+
+      const recited = sortedActiveStudents.filter(s => {
         const rec = session.records.find((r: any) => r.studentId === s.id);
-        return `*${s.fullName}* : ${rec.memorization}`;
-      }).join('\n');
-    } else {
-      message += 'لا يوجد';
-    }
+        return rec && (rec.attendance === 'حاضر' || rec.attendance === 'متأخر') && rec.memorization && rec.memorization !== 'لا يوجد';
+      });
 
-    const late = sortedActiveStudents.filter(s => session.records.find((r: any) => r.studentId === s.id)?.attendance === 'متأخر');
-    if (late.length > 0) {
-      message += `\n-------------\nقائمة الطلبة المتأخرين:\n${late.map(s => `*${s.fullName}*`).join('\n')}`;
-    }
+      if (recited.length > 0) {
+        message += recited.map(s => {
+          const rec = session.records.find((r: any) => r.studentId === s.id);
+          return `*${s.fullName}* : ${rec.memorization}`;
+        }).join('\n') + `\n`;
+      } else {
+        message += 'لا يوجد\n';
+      }
 
-    const absent = sortedActiveStudents.filter(s => {
-      const rec = session.records.find((r: any) => r.studentId === s.id);
-      return rec?.attendance === 'غياب' || rec?.attendance === 'غائب';
+      const late = sortedActiveStudents.filter(s => session.records.find((r: any) => r.studentId === s.id)?.attendance === 'متأخر');
+      if (late.length > 0) {
+        message += `-------------\nقائمة الطلبة المتأخرين:\n${late.map(s => `*${s.fullName}*`).join('\n')}\n`;
+      }
+
+      const absent = sortedActiveStudents.filter(s => {
+        const rec = session.records.find((r: any) => r.studentId === s.id);
+        return rec?.attendance === 'غياب' || rec?.attendance === 'غائب';
+      });
+      if (absent.length > 0) {
+        message += `-------------\nقائمة الطلبة الغائبين:\n${absent.map(s => `*${s.fullName}*`).join('\n')}\n`;
+      }
+      
+      if (index < sortedDaySessions.length - 1) {
+        message += `=========================\n`;
+      }
     });
-    if (absent.length > 0) {
-      message += `\n-------------\nقائمة الطلبة الغائبين:\n${absent.map(s => `*${s.fullName}*`).join('\n')}`;
-    }
 
-    navigator.clipboard.writeText(message);
+    navigator.clipboard.writeText(message.trim());
     toast({ title: "تم النسخ", description: "تم نسخ تقرير اليوم بصيغة WhatsApp بنجاح." });
   };
 
@@ -1327,9 +1341,43 @@ export default function DailySessionsPage() {
                                 const dateStr = format(day, 'yyyy-MM-dd');
                                 const daySessions = isAdmin5 ? (sheikhSessions[dateStr] ? Object.values(sheikhSessions[dateStr]) : []) : (dailySessions[dateStr] ? Object.values(dailySessions[dateStr] as Record<string, any>) : []);
                                 const session1 = (daySessions as any[]).find((s: any) => s.sessionNumber === 1);
-                                const record = session1?.records?.find((r: any) => r.studentId === student.id);
-                                const attendance = record?.attendance;
-                                const dotColor = attendance === 'حاضر' ? 'bg-emerald-500' : attendance === 'غائب' || attendance === 'غياب' ? 'bg-red-400' : attendance === 'متأخر' ? 'bg-amber-400' : session1?.sessionType === 'يوم عطلة' ? 'bg-sky-300' : 'bg-gray-200';
+                                const session2 = (daySessions as any[]).find((s: any) => s.sessionNumber === 2);
+                                const hasTwoSessions = !!(session1 && session2);
+
+                                const getRecord = (session: any) => session?.records?.find((r: any) => r.studentId === student.id);
+                                const getDotColor = (att: string | undefined, sessionType?: string) =>
+                                  att === 'حاضر' ? 'bg-emerald-500' :
+                                  att === 'غائب' || att === 'غياب' ? 'bg-red-400' :
+                                  att === 'متأخر' ? 'bg-amber-400' :
+                                  sessionType === 'يوم عطلة' ? 'bg-sky-300' : 'bg-gray-200';
+
+                                const record1 = getRecord(session1);
+                                const att1 = record1?.attendance;
+
+                                if (hasTwoSessions) {
+                                  const record2 = getRecord(session2);
+                                  const att2 = record2?.attendance;
+                                  return (
+                                    <TooltipProvider key={dateStr}>
+                                      <Tooltip>
+                                        <TooltipTrigger>
+                                          {/* نقطتان: فوق=صباح، تحت=مساء */}
+                                          <div className="flex flex-col gap-0.5 items-center">
+                                            <div className={`h-2.5 w-2.5 rounded-full border-2 border-amber-200 ${getDotColor(att1, session1?.sessionType)}`} title="صباح" />
+                                            <div className={`h-2.5 w-2.5 rounded-full border-2 border-indigo-200 ${getDotColor(att2, session2?.sessionType)}`} title="مساء" />
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p className="text-xs font-bold">{format(day, 'EEE dd/MM', { locale: ar })}</p>
+                                          <p className="text-[10px]">🌅 صباح: {att1 || 'لم يسجل'}</p>
+                                          <p className="text-[10px]">🌙 مساء: {att2 || 'لم يسجل'}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  );
+                                }
+
+                                const dotColor = getDotColor(att1, session1?.sessionType);
                                 return (
                                   <TooltipProvider key={dateStr}>
                                     <Tooltip>
@@ -1338,7 +1386,7 @@ export default function DailySessionsPage() {
                                       </TooltipTrigger>
                                       <TooltipContent>
                                         <p className="text-xs font-bold">{format(day, 'EEE dd/MM', { locale: ar })}</p>
-                                        <p className="text-[10px]">{attendance || (session1?.sessionType === 'يوم عطلة' ? 'عطلة' : 'لم يسجل')}</p>
+                                        <p className="text-[10px]">{att1 || (session1?.sessionType === 'يوم عطلة' ? 'عطلة' : 'لم يسجل')}</p>
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>

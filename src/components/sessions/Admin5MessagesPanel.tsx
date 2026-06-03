@@ -27,7 +27,6 @@ const pad = (num: number) => num < 10 ? `0${num}` : num.toString();
 const toHijri = (date: Date): string => {
     try {
         const hijriDate = new Date(date);
-        hijriDate.setDate(hijriDate.getDate() - 1);
         const fmt = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
             day: '2-digit',
             month: 'long',

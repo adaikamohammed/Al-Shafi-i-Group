@@ -15,15 +15,22 @@ export const DateDisplay = ({ className, showIcons = true }: DateDisplayProps) =
     useEffect(() => {
         const today = new Date();
 
-        // Hijri Date - Offset by -1 day
-        const hijriDate = new Date(today);
-        hijriDate.setDate(hijriDate.getDate() - 1);
-        const hijri = new Intl.DateTimeFormat('ar-SA-u-ca-islamic', {
+        // Hijri Date - Um Al-Qura calendar
+        const hijriFormatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
             day: 'numeric',
             month: 'long',
             year: 'numeric',
             weekday: 'long'
-        }).format(hijriDate);
+        });
+        const parts = hijriFormatter.formatToParts(today);
+        const weekday = parts.find(p => p.type === 'weekday')?.value || '';
+        const day = parts.find(p => p.type === 'day')?.value || '';
+        const month = parts.find(p => p.type === 'month')?.value || '';
+        const year = parts.find(p => p.type === 'year')?.value || '';
+        const era = parts.find(p => p.type === 'era')?.value || 'هـ';
+
+        const toWestern = (s: string) => s.replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+        const hijri = `${weekday}، ${toWestern(day)} ${month} ${toWestern(year)} ${era}`;
 
         // Gregorian Date
         const gregorian = new Intl.DateTimeFormat('ar-EG', {

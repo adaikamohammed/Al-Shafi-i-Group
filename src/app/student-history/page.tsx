@@ -199,12 +199,13 @@ const StudentMonthView = ({ year, month, data, onDayClick, viewType }: { year: n
     );
 };
 
-const StudentStatWidget = ({ title, value, unit, icon, colorClass }: { title: string, value: string | number, unit: string, icon: React.ReactNode, colorClass?: string }) => (
+const StudentStatWidget = ({ title, value, unit, icon, colorClass, subValue }: { title: string, value: string | number, unit: string, icon: React.ReactNode, colorClass?: string, subValue?: string }) => (
     <div className="flex items-center p-4 bg-card rounded-xl border shadow-sm transition-all hover:shadow-md">
-        <div className={cn("p-3 rounded-xl ml-4", colorClass || "bg-muted")}>{icon}</div>
-        <div>
+        <div className={cn("p-3 rounded-xl ml-4 flex-shrink-0", colorClass || "bg-muted")}>{icon}</div>
+        <div className="min-w-0 flex-1">
             <p className="text-sm text-muted-foreground font-body">{title}</p>
-            <p className="text-2xl font-bold font-headline">{value} <span className="text-sm font-normal text-muted-foreground">{unit}</span></p>
+            <p className="text-2xl font-bold font-headline truncate">{value} <span className="text-sm font-normal text-muted-foreground">{unit}</span></p>
+            {subValue && <p className="text-[10px] text-muted-foreground font-bold mt-1" dir="rtl">{subValue}</p>}
         </div>
     </div>
 );
@@ -340,6 +341,27 @@ function StudentHistoryContent() {
         const totalWorkSessions = presentCount + lateCount + absentCount;
         const rate = totalWorkSessions > 0 ? ((presentCount + lateCount) / totalWorkSessions) * 100 : 0;
 
+        // Split calculations for session 1 and 2
+        const records1 = allRecords.filter((r: any) => r.sessionNumber === 1);
+        const records2 = allRecords.filter((r: any) => r.sessionNumber === 2);
+
+        const presentCount1 = records1.filter((r: any) => r.attendance === 'حاضر').length;
+        const presentCount2 = records2.filter((r: any) => r.attendance === 'حاضر').length;
+
+        const lateCount1 = records1.filter((r: any) => r.attendance === 'متأخر').length;
+        const lateCount2 = records2.filter((r: any) => r.attendance === 'متأخر').length;
+
+        const absentCount1 = records1.filter((r: any) => r.attendance === 'غياب' || r.attendance === 'غائب').length;
+        const absentCount2 = records2.filter((r: any) => r.attendance === 'غياب' || r.attendance === 'غائب').length;
+
+        const total1 = presentCount1 + lateCount1 + absentCount1;
+        const rate1 = total1 > 0 ? ((presentCount1 + lateCount1) / total1) * 100 : 0;
+
+        const total2 = presentCount2 + lateCount2 + absentCount2;
+        const rate2 = total2 > 0 ? ((presentCount2 + lateCount2) / total2) * 100 : 0;
+
+        const hasSession2 = records2.length > 0;
+
         // Eval stats from all records
         const evals = allRecords.filter((r: any) => r.memorization).map((r: any) => r.memorization);
         let dominantEval = '---';
@@ -357,7 +379,16 @@ function StudentHistoryContent() {
                 totalLate: lateCount,
                 avgEval: dominantEval,
                 sheikhAbsenceNoSub,
-                sheikhAbsenceWithSub
+                sheikhAbsenceWithSub,
+                hasSession2,
+                presentCount1,
+                presentCount2,
+                lateCount1,
+                lateCount2,
+                absentCount1,
+                absentCount2,
+                rate1: rate1.toFixed(0),
+                rate2: rate2.toFixed(0)
             },
             statsTitle: title
         };
@@ -545,6 +576,7 @@ function StudentHistoryContent() {
                                                 unit="حصة"
                                                 icon={<CheckCircle className="h-5 w-5 text-emerald-600" />}
                                                 colorClass="bg-emerald-50"
+                                                subValue={stats.hasSession2 ? `ص: ${stats.presentCount1} | م: ${stats.presentCount2}` : undefined}
                                             />
                                             <StudentStatWidget
                                                 title="التقييم"
@@ -559,6 +591,7 @@ function StudentHistoryContent() {
                                                 unit="حصة"
                                                 icon={<TrendingUp className="h-5 w-5 text-blue-600" />}
                                                 colorClass="bg-blue-50"
+                                                subValue={stats.hasSession2 ? `ص: ${stats.lateCount1} | م: ${stats.lateCount2}` : undefined}
                                             />
                                             <StudentStatWidget
                                                 title="غياب"
@@ -566,6 +599,7 @@ function StudentHistoryContent() {
                                                 unit="حصة"
                                                 icon={<AlertCircle className="h-5 w-5 text-red-600" />}
                                                 colorClass="bg-red-50"
+                                                subValue={stats.hasSession2 ? `ص: ${stats.absentCount1} | م: ${stats.absentCount2}` : undefined}
                                             />
                                             <StudentStatWidget
                                                 title="غياب الشيخ"
@@ -587,6 +621,7 @@ function StudentHistoryContent() {
                                                 unit=""
                                                 icon={<ShieldAlert className="h-5 w-5 text-indigo-600" />}
                                                 colorClass="bg-indigo-50"
+                                                subValue={stats.hasSession2 ? `ص: ${stats.rate1}% | م: ${stats.rate2}%` : undefined}
                                             />
                                         </div>
                                     </CardContent>

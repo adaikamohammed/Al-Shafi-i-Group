@@ -15,7 +15,7 @@ interface WeeklyAttendanceTableProps {
     getSessionsForDay: (dateString: string) => any[];
     onDayClick: (dateStr: string, sessionNumber: number) => void;
     isAdmin5?: boolean;
-    initialDate?: Date; // Optional: sync with external calendar date
+    initialDate?: Date;
 }
 
 const getSaturday = (date: Date): Date => {
@@ -26,13 +26,13 @@ const getSaturday = (date: Date): Date => {
     return d;
 };
 
-interface StudentDayInfo {
-    attendance: string | null;
-    memorization: string | null;
-    behavior: string | null;
-    review: boolean | null;
-    notes: string;
-    sessionType: string | null;
+// بيانات يوم لطالب واحد (حصة واحدة أو حصتان)
+interface StudentDayData {
+    session1Record: { attendance: string | null; memorization: string | null; behavior: string | null; review: boolean | null; notes: string } | null;
+    session2Record: { attendance: string | null; memorization: string | null; behavior: string | null; review: boolean | null; notes: string } | null;
+    hasTwoSessions: boolean;
+    session1Type: string | null;
+    session2Type: string | null;
 }
 
 export const WeeklyAttendanceTable = ({
@@ -45,7 +45,6 @@ export const WeeklyAttendanceTable = ({
 
     const [weekStart, setWeekStart] = useState(() => getSaturday(initialDate || new Date()));
 
-    // Sync weekStart when initialDate changes from parent (calendar navigation)
     React.useEffect(() => {
         if (initialDate) {
             setWeekStart(getSaturday(initialDate));
@@ -57,7 +56,6 @@ export const WeeklyAttendanceTable = ({
             const date = addDays(weekStart, i);
             const dateStr = format(date, 'yyyy-MM-dd');
             const dayOfWeek = getDay(date);
-            // Thursday (4) and Friday (5) are potential holidays
             const isThurFri = dayOfWeek === 4 || dayOfWeek === 5;
 
             return {
@@ -69,76 +67,90 @@ export const WeeklyAttendanceTable = ({
                 monthNum: format(date, 'MM'),
                 isToday: isTodayFn(date),
                 isThurFri,
-                isWeekend: false, // will be computed below
+                isWeekend: false,
             };
         });
     }, [weekStart]);
 
+    // كل يوم يحتوي الآن على session1 و session2 منفصلتين
     const weekSessionData = useMemo(() => {
-        const data: Record<string, any> = {};
+        const data: Record<string, { session1: any | null; session2: any | null; hasTwoSessions: boolean }> = {};
         weekDaysBase.forEach(day => {
             const sessions = getSessionsForDay(day.dateStr);
-            const primary = sessions.find((s: any) => s.sessionNumber === 1);
-            data[day.dateStr] = primary || sessions[0] || null;
+            const session1 = sessions.find((s: any) => s.sessionNumber === 1) || null;
+            const session2 = sessions.find((s: any) => s.sessionNumber === 2) || null;
+            data[day.dateStr] = {
+                session1,
+                session2,
+                hasTwoSessions: !!(session1 && session2),
+            };
         });
         return data;
     }, [weekDaysBase, getSessionsForDay]);
 
-    // Compute effective isWeekend: Thu/Fri are only holidays if no real session exists
+    // تحديد عطلات نهاية الأسبوع
     const weekDays = useMemo(() => {
         return weekDaysBase.map(day => {
             if (!day.isThurFri) return { ...day, isWeekend: false };
-            const session = weekSessionData[day.dateStr];
-            // If a session exists and it's not marked as holiday, treat as working day
-            const hasRealSession = session && session.sessionType !== 'يوم عطلة';
+            const { session1 } = weekSessionData[day.dateStr];
+            const hasRealSession = session1 && session1.sessionType !== 'يوم عطلة';
             return { ...day, isWeekend: !hasRealSession };
         });
     }, [weekDaysBase, weekSessionData]);
 
-    const getColumnStyle = (day: typeof weekDays[0], session: any) => {
-        if (day.isWeekend) return "bg-sky-50/70 border-sky-100"; // Weekend always blue-ish
+    // بيانات الطالب في اليوم (تدعم حصتين)
+    const getStudentDayData = (studentId: string, dateStr: string): StudentDayData => {
+        const { session1, session2, hasTwoSessions } = weekSessionData[dateStr];
 
-        if (!session) return "";
+        const getRecord = (session: any | null) => {
+            if (!session?.records) return null;
+            const r = session.records.find((r: any) => r.studentId === studentId);
+            if (!r) return null;
+            return {
+                attendance: r.attendance || null,
+                memorization: r.memorization || null,
+                behavior: r.behavior || null,
+                review: r.review || null,
+                notes: r.notes || '',
+            };
+        };
 
-        const type = session.sessionType;
+        return {
+            session1Record: getRecord(session1),
+            session2Record: hasTwoSessions ? getRecord(session2) : null,
+            hasTwoSessions,
+            session1Type: session1?.sessionType || null,
+            session2Type: session2?.sessionType || null,
+        };
+    };
+
+    const getColumnStyle = (day: typeof weekDays[0]) => {
+        const { session1 } = weekSessionData[day.dateStr];
+        if (day.isWeekend) return "bg-sky-50/70 border-sky-100";
+        if (!session1) return "";
+        const type = session1.sessionType;
         if (type === 'يوم عطلة') return "bg-sky-50/70 border-sky-100";
         if (type === 'حصة أنشطة') return "bg-purple-50/70 border-purple-100";
         if (type === 'غياب الشيخ') {
-            return session.substituteTeacher
-                ? "bg-orange-50/70 border-orange-100" // With sub
-                : "bg-rose-50/70 border-rose-100";    // No sub
+            return session1.substituteTeacher
+                ? "bg-orange-50/70 border-orange-100"
+                : "bg-rose-50/70 border-rose-100";
         }
         return "";
     };
 
-    const getHeaderStyle = (day: typeof weekDays[0], session: any) => {
+    const getHeaderStyle = (day: typeof weekDays[0]) => {
+        const { session1 } = weekSessionData[day.dateStr];
         if (day.isWeekend) return "bg-sky-100/80 text-sky-900";
-
-        const type = session?.sessionType;
+        const type = session1?.sessionType;
         if (type === 'يوم عطلة') return "bg-sky-100/80 text-sky-900";
         if (type === 'حصة أنشطة') return "bg-purple-100/80 text-purple-900";
         if (type === 'غياب الشيخ') {
-            return session?.substituteTeacher
+            return session1?.substituteTeacher
                 ? "bg-orange-100/80 text-orange-900"
                 : "bg-rose-100/80 text-rose-900";
         }
         return "group-hover:bg-muted/30";
-    };
-
-    const getStudentDayInfo = (studentId: string, dateStr: string): StudentDayInfo => {
-        const session = weekSessionData[dateStr];
-        if (!session?.records) {
-            return { attendance: null, memorization: null, behavior: null, review: null, notes: '', sessionType: session?.sessionType || null };
-        }
-        const record = session.records.find((r: any) => r.studentId === studentId);
-        return {
-            attendance: record?.attendance || null,
-            memorization: record?.memorization || null,
-            behavior: record?.behavior || null,
-            review: record?.review || null,
-            notes: record?.notes || '',
-            sessionType: session?.sessionType || null,
-        };
     };
 
     const getAttendanceIcon = (status: string | null) => {
@@ -149,6 +161,18 @@ export const WeeklyAttendanceTable = ({
             case 'غياب': return <span className="text-red-500 font-bold text-lg">❌</span>;
             case 'تعويض': return <span className="text-blue-500 font-bold text-lg">🔄</span>;
             default: return null;
+        }
+    };
+
+    // أيقونة مصغّرة للعرض في الخلية المقسومة
+    const getAttendanceMiniIcon = (status: string | null) => {
+        switch (status) {
+            case 'حاضر': return <span className="text-emerald-600 font-bold text-base leading-none">✅</span>;
+            case 'متأخر': return <span className="text-amber-600 font-bold text-base leading-none">⏰</span>;
+            case 'غائب':
+            case 'غياب': return <span className="text-red-500 font-bold text-base leading-none">❌</span>;
+            case 'تعويض': return <span className="text-blue-500 font-bold text-base leading-none">🔄</span>;
+            default: return <span className="text-gray-300 text-xs leading-none">—</span>;
         }
     };
 
@@ -175,12 +199,6 @@ export const WeeklyAttendanceTable = ({
         }
     };
 
-    const handleCellClick = (dateStr: string) => {
-        const sessions = getSessionsForDay(dateStr);
-        const sessionNum = sessions.length > 0 ? sessions[0].sessionNumber : 1;
-        onDayClick(dateStr, sessionNum);
-    };
-
     const navigateWeek = (direction: -1 | 1) => {
         setWeekStart(prev => addDays(prev, direction * 7));
     };
@@ -194,6 +212,7 @@ export const WeeklyAttendanceTable = ({
         [students]
     );
 
+    // إحصاءات الطالب الأسبوعية — تأخذ كلتا الحصتين في الاعتبار
     const getStudentWeeklyStats = (studentId: string) => {
         let present = 0;
         let absent = 0;
@@ -202,27 +221,31 @@ export const WeeklyAttendanceTable = ({
         let warnings = 0;
 
         weekDays.forEach(day => {
-            // Skip stats for weekends
             if (day.isWeekend) return;
 
-            const info = getStudentDayInfo(studentId, day.dateStr);
-            const session = weekSessionData[day.dateStr];
+            const { session1, session2, hasTwoSessions } = weekSessionData[day.dateStr];
 
-            // Skip stats for holidays/cancelled sessions
-            const sessionType = session?.sessionType;
-            if (sessionType === 'يوم عطلة' || sessionType === 'غياب الشيخ') return;
+            const sessionType1 = session1?.sessionType;
+            if (sessionType1 === 'يوم عطلة' || sessionType1 === 'غياب الشيخ') return;
 
-            if (info.attendance === 'حاضر' || info.attendance === 'تعويض') present++;
-            if (info.attendance === 'متأخر') {
-                present++; // Counting late as present for "Presence" count? Or separate? 
-                // Usually Late is a form of presence. But we also count it separately.
-                late++;
-            }
-            const isAbsent = info.attendance === 'غائب' || info.attendance === 'غياب';
-            if (isAbsent) absent++;
+            // معالجة كل حصة بشكل مستقل
+            const processRecord = (session: any | null) => {
+                if (!session?.records) return;
+                const r = session.records.find((rec: any) => rec.studentId === studentId);
+                if (!r) return;
 
-            if (info.memorization === 'ممتاز') excellent++;
-            if (!isAbsent && (info.behavior === 'مشاغب' || info.behavior === 'غير منضبط')) warnings++;
+                const att = r.attendance;
+                if (att === 'حاضر' || att === 'تعويض') present++;
+                if (att === 'متأخر') { present++; late++; }
+                if (att === 'غائب' || att === 'غياب') absent++;
+
+                if (r.memorization === 'ممتاز') excellent++;
+                const isAbsent = att === 'غائب' || att === 'غياب';
+                if (!isAbsent && (r.behavior === 'مشاغب' || r.behavior === 'غير منضبط')) warnings++;
+            };
+
+            processRecord(session1);
+            if (hasTwoSessions) processRecord(session2);
         });
 
         return { present, absent, late, excellent, warnings };
@@ -232,6 +255,95 @@ export const WeeklyAttendanceTable = ({
         const currentSat = getSaturday(new Date());
         return weekStart.getTime() === currentSat.getTime();
     }, [weekStart]);
+
+    // عرض خلية حصة واحدة
+    const renderSingleSessionCell = (record: StudentDayData['session1Record'], sessionType: string | null, dateStr: string, sessionNum: 1 | 2) => {
+        const hasData = !!record?.attendance;
+        const isAbsent = record?.attendance === 'غائب' || record?.attendance === 'غياب';
+
+        return (
+            <div
+                onClick={() => onDayClick(dateStr, sessionNum)}
+                className={cn(
+                    "h-full w-full rounded-md border flex flex-col items-center justify-between py-1 transition-all cursor-pointer hover:shadow-sm active:scale-[0.98]",
+                    hasData ? "bg-white border-border shadow-sm" : "bg-white/50 border-dashed border-gray-300/50 hover:bg-white/80"
+                )}
+                title="اضغط للتعديل"
+            >
+                {!hasData ? (
+                    <span className="text-[9px] text-muted-foreground mt-4 opacity-50">تسجيل</span>
+                ) : (
+                    <>
+                        <div className="h-[22px] flex items-center justify-center">
+                            {getAttendanceIcon(record?.attendance ?? null)}
+                        </div>
+                        <div className="h-[18px] flex items-center justify-center w-full px-1">
+                            {getMemorizationBadge(record?.memorization ?? null)}
+                        </div>
+                        <div className="flex items-center justify-center gap-2 h-[10px]">
+                            {!isAbsent && (
+                                <>
+                                    {getBehaviorDot(record?.behavior ?? null)}
+                                    {record?.review && (
+                                        <span className="text-[8px] text-blue-500" title="تمت المراجعة">📖</span>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+        );
+    };
+
+    // عرض خلية حصتين (مقسومة: صباح فوق / مساء تحت)
+    const renderDualSessionCell = (data: StudentDayData, dateStr: string) => {
+        const { session1Record, session2Record } = data;
+
+        const renderHalf = (record: typeof session1Record, label: string, labelClass: string, bgClass: string, sessionNum: 1 | 2) => {
+            const hasData = !!record?.attendance;
+            const isAbsent = record?.attendance === 'غائب' || record?.attendance === 'غياب';
+            return (
+                <div
+                    onClick={() => onDayClick(dateStr, sessionNum)}
+                    className={cn(
+                        "flex-1 flex items-center gap-1 px-1 rounded cursor-pointer transition-all hover:opacity-80 border",
+                        hasData ? `${bgClass} border-opacity-30` : "bg-white/40 border-dashed border-gray-200"
+                    )}
+                    title={`حصة ${sessionNum === 1 ? 'أساسية' : 'إضافية'} — اضغط للتعديل`}
+                >
+                    <span className={cn("text-[8px] font-bold shrink-0 leading-none", labelClass)}>{label}</span>
+                    <div className="flex items-center gap-0.5 flex-1 justify-center">
+                        {hasData ? (
+                            <>
+                                {getAttendanceMiniIcon(record?.attendance ?? null)}
+                                {!isAbsent && record?.memorization && (
+                                    <span className="text-[7px] text-gray-500 hidden sm:block truncate max-w-[28px]">
+                                        {record.memorization}
+                                    </span>
+                                )}
+                            </>
+                        ) : (
+                            <span className="text-[8px] text-gray-300">—</span>
+                        )}
+                    </div>
+                    {!isAbsent && hasData && (
+                        <div className="flex items-center gap-0.5">
+                            {getBehaviorDot(record?.behavior ?? null)}
+                            {record?.review && <span className="text-[7px] text-blue-400">📖</span>}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        return (
+            <div className="h-full w-full flex flex-col gap-0.5">
+                {renderHalf(session1Record, 'ص', 'text-emerald-700', 'bg-emerald-50 border-emerald-200', 1)}
+                {renderHalf(session2Record, 'م', 'text-indigo-600', 'bg-indigo-50 border-indigo-200', 2)}
+            </div>
+        );
+    };
 
     return (
         <TooltipProvider>
@@ -271,28 +383,26 @@ export const WeeklyAttendanceTable = ({
                                     </th>
                                     <th className="border-b border-l bg-emerald-50/50"></th>
                                     {weekDays.map(day => {
-                                        const session = weekSessionData[day.dateStr];
-                                        const colClass = getColumnStyle(day, session);
+                                        const { session1 } = weekSessionData[day.dateStr];
+                                        const colClass = getColumnStyle(day);
 
                                         let wirdText = "—";
-                                        const sessionType = session?.sessionType;
+                                        const sessionType = session1?.sessionType;
                                         const isHolidayOrAbsence = day.isWeekend || sessionType === 'يوم عطلة' || sessionType === 'غياب الشيخ' || sessionType === 'حصة أنشطة';
 
                                         if (!isHolidayOrAbsence) {
-                                            // Admin5 uses talqinSurahId/talqinFromVerse/talqinToVerse
-                                            const talqinSurahId = session?.talqinSurahId;
+                                            const talqinSurahId = session1?.talqinSurahId;
                                             if (talqinSurahId) {
                                                 const surah = surahs.find(s => s.id === talqinSurahId);
                                                 wirdText = surah ? `${surah.name}` : "";
-                                                if (session.talqinFromVerse && session.talqinToVerse) {
-                                                    wirdText += ` (${session.talqinFromVerse}-${session.talqinToVerse})`;
+                                                if (session1.talqinFromVerse && session1.talqinToVerse) {
+                                                    wirdText += ` (${session1.talqinFromVerse}-${session1.talqinToVerse})`;
                                                 }
-                                            } else if (session?.surahId && !session?.tasmieSurahId) {
-                                                // Fallback to generic surahId if no specific talqin fields
-                                                const surah = surahs.find(s => s.id === session.surahId);
+                                            } else if (session1?.surahId && !session1?.tasmieSurahId) {
+                                                const surah = surahs.find(s => s.id === session1.surahId);
                                                 wirdText = surah ? `${surah.name}` : "";
-                                                if (session.fromVerse && session.toVerse) {
-                                                    wirdText += ` (${session.fromVerse}-${session.toVerse})`;
+                                                if (session1.fromVerse && session1.toVerse) {
+                                                    wirdText += ` (${session1.fromVerse}-${session1.toVerse})`;
                                                 }
                                             }
                                         }
@@ -320,20 +430,20 @@ export const WeeklyAttendanceTable = ({
                                     </th>
                                     <th className="border-b border-l bg-purple-50/50"></th>
                                     {weekDays.map(day => {
-                                        const session = weekSessionData[day.dateStr];
-                                        const colClass = getColumnStyle(day, session);
+                                        const { session1 } = weekSessionData[day.dateStr];
+                                        const colClass = getColumnStyle(day);
 
                                         let wirdText = "—";
-                                        const sessionType2 = session?.sessionType;
+                                        const sessionType2 = session1?.sessionType;
                                         const isHolidayOrAbsence2 = day.isWeekend || sessionType2 === 'يوم عطلة' || sessionType2 === 'غياب الشيخ' || sessionType2 === 'حصة أنشطة';
 
                                         if (!isHolidayOrAbsence2) {
-                                            const tasmieSurahId = session?.tasmieSurahId;
+                                            const tasmieSurahId = session1?.tasmieSurahId;
                                             if (tasmieSurahId) {
                                                 const surah = surahs.find(s => s.id === tasmieSurahId);
                                                 wirdText = surah ? `${surah.name}` : "";
-                                                if (session.tasmieFromVerse && session.tasmieToVerse) {
-                                                    wirdText += ` (${session.tasmieFromVerse}-${session.tasmieToVerse})`;
+                                                if (session1.tasmieFromVerse && session1.tasmieToVerse) {
+                                                    wirdText += ` (${session1.tasmieFromVerse}-${session1.tasmieToVerse})`;
                                                 }
                                             }
                                         }
@@ -366,20 +476,18 @@ export const WeeklyAttendanceTable = ({
                                 <th className="border-b border-l p-2 w-[70px] sm:w-[80px] bg-emerald-50/30">
                                     <span className="text-[10px] font-bold text-emerald-700 block text-center">الإحصاءات</span>
                                 </th>
+
                                 {/* Days Headers */}
                                 {weekDays.map(day => {
-                                    const session = weekSessionData[day.dateStr];
-                                    const sessionType = session?.sessionType;
-                                    const colClass = getHeaderStyle(day, session);
-
-                                    // Override holiday check for visualization
+                                    const { session1, hasTwoSessions } = weekSessionData[day.dateStr];
+                                    const sessionType = session1?.sessionType;
+                                    const colClass = getHeaderStyle(day);
                                     const isHoliday = day.isWeekend || sessionType === 'يوم عطلة' || sessionType === 'غياب الشيخ';
 
                                     return (
                                         <th key={day.dateStr}
-                                            onClick={() => handleCellClick(day.dateStr)}
                                             className={cn(
-                                                "border-b border-l p-2 min-w-[85px] transition-colors cursor-pointer group",
+                                                "border-b border-l p-2 min-w-[85px] transition-colors group",
                                                 colClass,
                                                 day.isToday && !colClass.includes('bg-') && "bg-primary/5 shadow-inner"
                                             )}>
@@ -390,6 +498,7 @@ export const WeeklyAttendanceTable = ({
                                                 <span className="text-[10px] opacity-70 font-mono">
                                                     {day.dayNum}
                                                 </span>
+                                                {/* بادج نوع الحصة */}
                                                 {(sessionType || day.isWeekend) && (
                                                     <span className={cn(
                                                         "text-[9px] px-1 rounded-sm mt-0.5 whitespace-nowrap",
@@ -397,7 +506,7 @@ export const WeeklyAttendanceTable = ({
                                                     )}>
                                                         {day.isWeekend ? 'عطلة' :
                                                             isHoliday ? (sessionType === 'يوم عطلة' ? 'عطلة' : sessionType) :
-                                                                `حصة ${session?.sessionNumber || 1}`}
+                                                                hasTwoSessions ? 'ص + م' : `حصة ${session1?.sessionNumber || 1}`}
                                                     </span>
                                                 )}
                                             </div>
@@ -456,17 +565,17 @@ export const WeeklyAttendanceTable = ({
 
                                         {/* Day Cells */}
                                         {weekDays.map(day => {
-                                            const info = getStudentDayInfo(student.id, day.dateStr);
-                                            const session = weekSessionData[day.dateStr];
-                                            const colClass = getColumnStyle(day, session);
+                                            const { session1, hasTwoSessions } = weekSessionData[day.dateStr];
+                                            const colClass = getColumnStyle(day);
+                                            const isHoliday = day.isWeekend || session1?.sessionType === 'يوم عطلة' || session1?.sessionType === 'غياب الشيخ';
 
-                                            // Determine visual state
-                                            const isHoliday = day.isWeekend || session?.sessionType === 'يوم عطلة' || session?.sessionType === 'غياب الشيخ';
-                                            const hasData = !!info.attendance;
+                                            const dayData = getStudentDayData(student.id, day.dateStr);
 
                                             return (
                                                 <td key={day.dateStr} className={cn(
-                                                    "border-b border-l p-1 text-center align-top h-[70px]",
+                                                    "border-b border-l p-1 text-center align-top",
+                                                    // عندما يكون هناك حصتان نجعل الخلية أطول قليلاً
+                                                    hasTwoSessions ? "h-[90px]" : "h-[70px]",
                                                     colClass,
                                                     !colClass && day.isToday && "bg-primary/[0.02]"
                                                 )}>
@@ -474,43 +583,12 @@ export const WeeklyAttendanceTable = ({
                                                         <div className="h-full flex items-center justify-center text-muted-foreground/30 text-xl select-none">
                                                             ×
                                                         </div>
+                                                    ) : hasTwoSessions ? (
+                                                        // خلية مقسومة: صباح فوق + مساء تحت
+                                                        renderDualSessionCell(dayData, day.dateStr)
                                                     ) : (
-                                                        <div
-                                                            onClick={() => handleCellClick(day.dateStr)}
-                                                            className={cn(
-                                                                "h-full w-full rounded-md border flex flex-col items-center justify-between py-1 transition-all cursor-pointer hover:shadow-sm active:scale-[0.98]",
-                                                                hasData ? "bg-white border-border shadow-sm" : "bg-white/50 border-dashed border-gray-300/50 hover:bg-white/80"
-                                                            )}
-                                                            title="اضغط للتعديل"
-                                                        >
-                                                            {!hasData ? (
-                                                                <span className="text-[9px] text-muted-foreground mt-4 opacity-50">تسجيل</span>
-                                                            ) : (
-                                                                <>
-                                                                    {/* 1. Attendance Icon */}
-                                                                    <div className="h-[22px] flex items-center justify-center">
-                                                                        {getAttendanceIcon(info.attendance)}
-                                                                    </div>
-
-                                                                    {/* 2. Evaluation Badge */}
-                                                                    <div className="h-[18px] flex items-center justify-center w-full px-1">
-                                                                        {getMemorizationBadge(info.memorization)}
-                                                                    </div>
-
-                                                                    {/* 3. Behavior & Review */}
-                                                                    <div className="flex items-center justify-center gap-2 h-[10px]">
-                                                                        {info.attendance !== 'غائب' && info.attendance !== 'غياب' && (
-                                                                            <>
-                                                                                {getBehaviorDot(info.behavior)}
-                                                                                {info.review && (
-                                                                                    <span className="text-[8px] text-blue-500" title="تمت المراجعة">📖</span>
-                                                                                )}
-                                                                            </>
-                                                                        )}
-                                                                    </div>
-                                                                </>
-                                                            )}
-                                                        </div>
+                                                        // خلية عادية: حصة واحدة
+                                                        renderSingleSessionCell(dayData.session1Record, dayData.session1Type, day.dateStr, 1)
                                                     )}
                                                 </td>
                                             );
@@ -529,6 +607,12 @@ export const WeeklyAttendanceTable = ({
                     <span className="flex items-center gap-1"><span className="text-amber-600 font-bold">⏰</span> متأخر</span>
                     <span className="flex items-center gap-1"><span className="bg-emerald-100 text-emerald-700 px-1 rounded text-[9px]">ممتاز</span> حفظ ممتاز</span>
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 block"></span> سلوك هادئ</span>
+                    <span className="flex items-center gap-1">
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1">ص</span>
+                        <span className="text-muted-foreground/50">+</span>
+                        <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1">م</span>
+                        يوم بحصتين
+                    </span>
                 </div>
             </div>
         </TooltipProvider>

@@ -87,60 +87,81 @@ export const WeeklyStatsRow = ({
 
     const dayStats = useMemo((): DayStat[] => {
         return weekDays.map(day => {
-            // For Thu/Fri, check if a real session exists
             const sessions = getSessionsForDay(day.dateStr);
-            const session = sessions.find((s: any) => s.sessionNumber === 1) || sessions[0] || null;
+            const session1 = sessions.find((s: any) => s.sessionNumber === 1) || sessions[0] || null;
+            const session2 = sessions.find((s: any) => s.sessionNumber === 2) || null;
+            const hasTwoSessions = !!(session1 && session2);
 
             // Compute effective isWeekend for this day
             let effectiveIsWeekend = false;
             if (day.isThurFri) {
-                const hasRealSession = session && session.sessionType !== 'يوم عطلة';
+                const hasRealSession = session1 && session1.sessionType !== 'يوم عطلة';
                 effectiveIsWeekend = !hasRealSession;
             }
             const effectiveDay = { ...day, isWeekend: effectiveIsWeekend };
 
             const base: DayStat = { day: effectiveDay, sessionType: null, attendance: null, excellent: null, goodPlus: null, good: null, acceptable: null, weak: null, notMemorized: null };
 
-            if (!session || effectiveIsWeekend) return base;
+            if (!session1 || effectiveIsWeekend) return base;
 
-            const sessionType = session.sessionType as string;
+            const sessionType = session1.sessionType as string;
             if (sessionType === 'يوم عطلة' || sessionType === 'غياب الشيخ' || sessionType === 'حصة أنشطة') {
                 return { ...base, sessionType };
             }
 
-            const records: any[] = session.records || [];
             const totalStudents = students.length;
             if (totalStudents === 0) return base;
 
-            let present = 0, excellent = 0, goodPlus = 0, good = 0, acceptable = 0, weak = 0, notMemorized = 0;
+            // دالة مساعدة لحساب إحصاءات حصة واحدة
+            const calcSessionStats = (session: any) => {
+                const records: any[] = session?.records || [];
+                let present = 0, excellent = 0, goodPlus = 0, good = 0, acceptable = 0, weak = 0, notMemorized = 0;
+                students.forEach(student => {
+                    const rec = records.find((r: any) => r.studentId === student.id);
+                    const att = rec?.attendance;
+                    const mem = rec?.memorization;
+                    if (att === 'حاضر' || att === 'متأخر' || att === 'تعويض') present++;
+                    if (mem === 'ممتاز') excellent++;
+                    else if (mem === 'جيد جداً' || mem === 'جيد جدا') goodPlus++;
+                    else if (mem === 'جيد') good++;
+                    else if (mem === 'مقبول' || mem === 'حسن') acceptable++;
+                    else if (mem === 'ضعيف' || mem === 'متوسط') weak++;
+                    else if (mem === 'لم يحفظ') notMemorized++;
+                });
+                return { present, excellent, goodPlus, good, acceptable, weak, notMemorized };
+            };
 
-            students.forEach(student => {
-                const rec = records.find(r => r.studentId === student.id);
-                const att = rec?.attendance;
-                const mem = rec?.memorization;
+            const s1Stats = calcSessionStats(session1);
 
-                if (att === 'حاضر' || att === 'متأخر' || att === 'تعويض') present++;
+            if (hasTwoSessions) {
+                // عند وجود حصتين: متوسط الحصتين لكل مؤشر
+                const s2Stats = calcSessionStats(session2);
+                const pct = (n1: number, n2: number) => Math.round(((n1 + n2) / (totalStudents * 2)) * 100);
+                return {
+                    day: effectiveDay,
+                    sessionType,
+                    attendance: pct(s1Stats.present, s2Stats.present),
+                    excellent: pct(s1Stats.excellent, s2Stats.excellent),
+                    goodPlus: pct(s1Stats.goodPlus, s2Stats.goodPlus),
+                    good: pct(s1Stats.good, s2Stats.good),
+                    acceptable: pct(s1Stats.acceptable, s2Stats.acceptable),
+                    weak: pct(s1Stats.weak, s2Stats.weak),
+                    notMemorized: pct(s1Stats.notMemorized, s2Stats.notMemorized),
+                };
+            }
 
-                if (mem === 'ممتاز') excellent++;
-                else if (mem === 'جيد جداً' || mem === 'جيد جدا') goodPlus++;
-                else if (mem === 'جيد') good++;
-                else if (mem === 'مقبول' || mem === 'حسن') acceptable++;
-                else if (mem === 'ضعيف' || mem === 'متوسط') weak++;
-                else if (mem === 'لم يحفظ') notMemorized++;
-            });
-
+            // حصة واحدة: الحساب العادي
             const pct = (n: number) => Math.round((n / totalStudents) * 100);
-
             return {
-                day,
+                day: effectiveDay,
                 sessionType,
-                attendance: pct(present),
-                excellent: pct(excellent),
-                goodPlus: pct(goodPlus),
-                good: pct(good),
-                acceptable: pct(acceptable),
-                weak: pct(weak),
-                notMemorized: pct(notMemorized),
+                attendance: pct(s1Stats.present),
+                excellent: pct(s1Stats.excellent),
+                goodPlus: pct(s1Stats.goodPlus),
+                good: pct(s1Stats.good),
+                acceptable: pct(s1Stats.acceptable),
+                weak: pct(s1Stats.weak),
+                notMemorized: pct(s1Stats.notMemorized),
             };
         });
     }, [weekDays, getSessionsForDay, students]);

@@ -318,6 +318,27 @@ export default function PublicStudentRecordPage() {
         const totalWorkSessions = presentCount + lateCount + absentCount;
         const rate = totalWorkSessions > 0 ? ((presentCount + lateCount) / totalWorkSessions) * 100 : 0;
 
+        // Split calculations for session 1 and 2
+        const records1 = allRecords.filter((r: any) => r.sessionNumber === 1);
+        const records2 = allRecords.filter((r: any) => r.sessionNumber === 2);
+
+        const presentCount1 = records1.filter((r: any) => r.attendance === 'حاضر').length;
+        const presentCount2 = records2.filter((r: any) => r.attendance === 'حاضر').length;
+
+        const lateCount1 = records1.filter((r: any) => r.attendance === 'متأخر').length;
+        const lateCount2 = records2.filter((r: any) => r.attendance === 'متأخر').length;
+
+        const absentCount1 = records1.filter((r: any) => r.attendance === 'غياب' || r.attendance === 'غائب').length;
+        const absentCount2 = records2.filter((r: any) => r.attendance === 'غياب' || r.attendance === 'غائب').length;
+
+        const total1 = presentCount1 + lateCount1 + absentCount1;
+        const rate1 = total1 > 0 ? ((presentCount1 + lateCount1) / total1) * 100 : 0;
+
+        const total2 = presentCount2 + lateCount2 + absentCount2;
+        const rate2 = total2 > 0 ? ((presentCount2 + lateCount2) / total2) * 100 : 0;
+
+        const hasSession2 = records2.length > 0;
+
         // Eval stats
         const evals = allRecords.filter((r: any) => r.memorization).map((r: any) => r.memorization);
         let dominantEval = '---';
@@ -334,7 +355,16 @@ export default function PublicStudentRecordPage() {
             totalLate: lateCount,
             avgEval: dominantEval,
             sheikhAbsenceNoSub,
-            sheikhAbsenceWithSub
+            sheikhAbsenceWithSub,
+            hasSession2,
+            presentCount1,
+            presentCount2,
+            lateCount1,
+            lateCount2,
+            absentCount1,
+            absentCount2,
+            rate1: rate1.toFixed(0),
+            rate2: rate2.toFixed(0)
         };
 
         return {
@@ -505,32 +535,44 @@ export default function PublicStudentRecordPage() {
                                 <div className="flex items-center justify-center gap-x-8 gap-y-4 flex-wrap">
                                     <div className="text-center">
                                         <span className="block text-2xl font-black text-emerald-600">{periodStats.totalPresent}</span>
-                                        <span className="text-[10px] font-black opacity-50 uppercase">حضور</span>
+                                        <span className="text-[10px] font-black opacity-50 uppercase block">حضور</span>
+                                        {periodStats.hasSession2 && (
+                                            <span className="text-[9px] font-bold text-muted-foreground block mt-0.5">ص: {periodStats.presentCount1} | م: {periodStats.presentCount2}</span>
+                                        )}
                                     </div>
                                     <div className="w-px h-8 bg-muted border-dotted border-l hidden sm:block" />
                                     <div className="text-center">
                                         <span className="block text-2xl font-black text-amber-600">{periodStats.avgEval}</span>
-                                        <span className="text-[10px] font-black opacity-50 uppercase">التقييم</span>
+                                        <span className="text-[10px] font-black opacity-50 uppercase block">التقييم</span>
                                     </div>
                                     <div className="w-px h-8 bg-muted border-dotted border-l hidden sm:block" />
                                     <div className="text-center">
                                         <span className="block text-2xl font-black text-blue-600">{periodStats.totalLate}</span>
-                                        <span className="text-[10px] font-black opacity-50 uppercase">تأخر</span>
+                                        <span className="text-[10px] font-black opacity-50 uppercase block">تأخر</span>
+                                        {periodStats.hasSession2 && (
+                                            <span className="text-[9px] font-bold text-muted-foreground block mt-0.5">ص: {periodStats.lateCount1} | م: {periodStats.lateCount2}</span>
+                                        )}
                                     </div>
                                     <div className="w-px h-8 bg-muted border-dotted border-l hidden sm:block" />
                                     <div className="text-center">
                                         <span className="block text-2xl font-black text-red-600">{periodStats.totalAbsent}</span>
-                                        <span className="text-[10px] font-black opacity-50 uppercase">غياب</span>
+                                        <span className="text-[10px] font-black opacity-50 uppercase block">غياب</span>
+                                        {periodStats.hasSession2 && (
+                                            <span className="text-[9px] font-bold text-muted-foreground block mt-0.5">ص: {periodStats.absentCount1} | م: {periodStats.absentCount2}</span>
+                                        )}
                                     </div>
                                     <div className="w-px h-8 bg-muted border-dotted border-l hidden sm:block" />
                                     <div className="text-center">
                                         <span className="block text-2xl font-black text-rose-600">{Number(periodStats.sheikhAbsenceNoSub) + Number(periodStats.sheikhAbsenceWithSub)}</span>
-                                        <span className="text-[10px] font-black opacity-50 uppercase">غياب الشيخ</span>
+                                        <span className="text-[10px] font-black opacity-50 uppercase block">غياب الشيخ</span>
                                     </div>
                                     <div className="w-px h-8 bg-muted border-dotted border-l hidden sm:block" />
                                     <div className="text-center">
                                         <span className="block text-2xl font-black text-primary">{periodStats.attendanceRate}%</span>
-                                        <span className="text-[10px] font-black opacity-50 uppercase">نسبة الحضور</span>
+                                        <span className="text-[10px] font-black opacity-50 uppercase block">نسبة الحضور</span>
+                                        {periodStats.hasSession2 && (
+                                            <span className="text-[9px] font-bold text-muted-foreground block mt-0.5">ص: {periodStats.rate1}% | م: {periodStats.rate2}%</span>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 bg-white p-1 rounded-2xl shadow-sm border">
