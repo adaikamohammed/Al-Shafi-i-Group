@@ -47,7 +47,7 @@ interface StudentScore {
 }
 
 export default function RankingPage() {
-    const { students, dailySessions, loading, settings } = useStudentContext();
+    const { students, dailySessions, loading, settings, allUsers } = useStudentContext();
     const { isManagement } = useAuth();
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -75,7 +75,12 @@ export default function RankingPage() {
 
         let studentsToRank = students ?? [];
         if (isManagement && selectedGroup !== 'all') {
-            studentsToRank = studentsToRank.filter(s => s.ownerId === selectedGroup);
+            const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
+            if (selectedSheikh?.group) {
+                studentsToRank = studentsToRank.filter(s => s.groupName?.trim() === selectedSheikh.group?.trim());
+            } else {
+                studentsToRank = studentsToRank.filter(s => s.ownerId === selectedGroup);
+            }
         }
 
         // Initialize all students, active or not
@@ -146,7 +151,7 @@ export default function RankingPage() {
         });
 
         return Object.values(studentScores).sort((a, b) => b.points - a.points);
-    }, [students, dailySessions, selectedMonth, selectedYear, pointsConfig]);
+    }, [students, dailySessions, selectedMonth, selectedYear, pointsConfig, allUsers, selectedGroup, isManagement]);
 
 
     const topStudents = rankingData.filter(s => s.status === 'نشط').slice(0, 3);

@@ -92,7 +92,7 @@ interface StudentEvaluationRow {
 }
 
 export default function FairEvaluationPage() {
-    const { students, dailySessions, loading, settings } = useStudentContext();
+    const { students, dailySessions, loading, settings, allUsers } = useStudentContext();
     const { isManagement, isSuperAdmin, user } = useAuth();
     
     // Filters State
@@ -193,10 +193,19 @@ export default function FairEvaluationPage() {
         let targetStudents = students.filter(s => s.status === 'نشط');
         
         if (isManagement && selectedGroup !== 'all') {
-            targetStudents = targetStudents.filter(s => s.ownerId === selectedGroup);
+            const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
+            if (selectedSheikh?.group) {
+                targetStudents = targetStudents.filter(s => s.groupName?.trim() === selectedSheikh.group?.trim());
+            } else {
+                targetStudents = targetStudents.filter(s => s.ownerId === selectedGroup);
+            }
         } else if (!isManagement && !isSuperAdmin && user) {
             // Regular Sheikh can only see their own group
-            targetStudents = targetStudents.filter(s => s.ownerId === user.uid);
+            if (user.group) {
+                targetStudents = targetStudents.filter(s => s.groupName?.trim() === user.group?.trim());
+            } else {
+                targetStudents = targetStudents.filter(s => s.ownerId === user.uid);
+            }
         }
 
         targetStudents.forEach(s => {
@@ -565,7 +574,7 @@ export default function FairEvaluationPage() {
             minSessionsRequired
         };
 
-    }, [students, dailySessions, dateBoundaries, pointsConfig, sortBy, selectedGroup, isManagement, isSuperAdmin, user, thresholdPercent]);
+    }, [students, dailySessions, dateBoundaries, pointsConfig, sortBy, selectedGroup, isManagement, isSuperAdmin, user, thresholdPercent, allUsers]);
 
     // Top three for Podium display
     const podiumStudents = useMemo(() => {

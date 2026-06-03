@@ -30,16 +30,21 @@ export default function DataExchangePage() {
     const preRegFileInputRef = useRef<HTMLInputElement>(null);
 
 
-    const { students, addDailySession, getRecordsForDateRange, importStudents, importPreRegistrations, preRegistrations, deleteAllPreRegistrations } = useStudentContext();
+    const { students, addDailySession, getRecordsForDateRange, importStudents, importPreRegistrations, preRegistrations, deleteAllPreRegistrations, allUsers } = useStudentContext();
     const { isManagement } = useAuth();
     const [selectedGroup, setSelectedGroup] = useState<string>('all');
 
     const filteredStudentsList = React.useMemo(() => {
         if (isManagement && selectedGroup !== 'all') {
-            return (students ?? []).filter(s => s.ownerId === selectedGroup);
+            const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
+            if (selectedSheikh?.group) {
+                return (students ?? []).filter(s => s.groupName?.trim() === selectedSheikh.group?.trim());
+            } else {
+                return (students ?? []).filter(s => s.ownerId === selectedGroup);
+            }
         }
         return students ?? [];
-    }, [students, isManagement, selectedGroup]);
+    }, [students, isManagement, selectedGroup, allUsers]);
 
     const activeStudents = filteredStudentsList.filter(s => s.status === 'نشط');
 
