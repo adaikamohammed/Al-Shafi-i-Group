@@ -25,7 +25,8 @@ import {
     Sparkles,
     Megaphone,
     Bell,
-    Database
+    Database,
+    Scale
 } from 'lucide-react';
 
 export interface NavItem {
@@ -69,6 +70,7 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'سباق التميز',
         items: [
             { href: '/ranking', label: 'ترتيب الطلبة', icon: Award },
+            { href: '/fair-evaluation', label: 'التقييم العادل والشامل', icon: Scale },
             { href: '/league', label: 'دوري التميز', icon: Shield },
             { href: '/points', label: 'نظام النقاط', icon: Gavel },
             { href: '/comparison', label: 'ساحة المقارنة', icon: Swords },
@@ -107,4 +109,4 @@ export const NAV_GROUPS: NavGroup[] = [
     }
 ];
 
-export const BOTTOM_NAV_ITEMS = [];
+export const BOTTOM_NAV_ITEMS: NavItem[] = [];
