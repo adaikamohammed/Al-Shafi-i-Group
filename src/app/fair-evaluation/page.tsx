@@ -93,6 +93,9 @@ export default function FairEvaluationPage() {
     const [thresholdPercent, setThresholdPercent] = useState<number>(50); // Default to 50%
     const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
     const [showGuide, setShowGuide] = useState<boolean>(false);
+    const [showCompare, setShowCompare] = useState<boolean>(false);
+    const [compareStudent1Id, setCompareStudent1Id] = useState<string>('');
+    const [compareStudent2Id, setCompareStudent2Id] = useState<string>('');
     
     // Sort State
     const [sortBy, setSortBy] = useState<'comprehensiveScore' | 'academicScore' | 'attendanceRate' | 'memorizationRate' | 'behaviorRate'>('academicScore');
@@ -373,6 +376,106 @@ export default function FairEvaluationPage() {
         }
     }, [sortBy]);
 
+    // Resolved compare students
+    const s1 = useMemo(() => {
+        if (compareStudent1Id) {
+            return evaluationData.ranked.find(s => s.id === compareStudent1Id) || evaluationData.pending.find(s => s.id === compareStudent1Id);
+        }
+        return evaluationData.ranked[1] || evaluationData.ranked[0];
+    }, [evaluationData.ranked, evaluationData.pending, compareStudent1Id]);
+
+    const s2 = useMemo(() => {
+        if (compareStudent2Id) {
+            return evaluationData.ranked.find(s => s.id === compareStudent2Id) || evaluationData.pending.find(s => s.id === compareStudent2Id);
+        }
+        return evaluationData.ranked[4] || evaluationData.ranked[2] || evaluationData.ranked[1];
+    }, [evaluationData.ranked, evaluationData.pending, compareStudent2Id]);
+
+    const generateComparisonExplanation = (std1: StudentEvaluationRow, std2: StudentEvaluationRow) => {
+        const metricKey = sortBy;
+        const metricLabel = activeMetric.label;
+        
+        const val1 = std1[metricKey];
+        const val2 = std2[metricKey];
+        
+        const higher = val1 >= val2 ? std1 : std2;
+        const lower = val1 >= val2 ? std2 : std1;
+        const diff = Math.abs(val1 - val2).toFixed(1);
+        
+        const attDiff = (std1.attendanceRate - std2.attendanceRate).toFixed(1);
+        const memoDiff = (std1.memorizationRate - std2.memorizationRate).toFixed(1);
+        const behDiff = (std1.behaviorRate - std2.behaviorRate).toFixed(1);
+        
+        let explanationText = "";
+        
+        if (val1 === val2) {
+            explanationText = `يتساوى الطالبان **${std1.name}** و **${std2.name}** في معيار ${metricLabel} بنسبة **${val1}%**. \n\n`;
+            if (std1.totalSessions !== std2.totalSessions) {
+                const sessionsHigher = std1.totalSessions > std2.totalSessions ? std1 : std2;
+                const sessionsLower = std1.totalSessions > std2.totalSessions ? std2 : std1;
+                explanationText += `ولكن تم ترتيب **${sessionsHigher.name}** أولاً لأنه يمتلك حصصاً مقيمة أكثر (${sessionsHigher.totalSessions} حصة مقابل ${sessionsLower.totalSessions} حصة) مما يعطي مصداقية أكبر لبياناته.`;
+            } else {
+                explanationText += `تم الترتيب أبجدياً لتطابق جميع الدرجات والحصص.`;
+            }
+        } else {
+            explanationText = `يتفوق الطالب **${higher.name}** على **${lower.name}** في معيار الفرز المختار (${metricLabel}) بفارق **${diff}%** (حيث حصل ${higher.name} على ${val1}% بينما حصل ${lower.name} على ${val2}%). \n\n`;
+            
+            explanationText += `**🔍 تفاصيل الفروقات بينهما:**\n`;
+            
+            // Attendance diff
+            const attDiffNum = parseFloat(attDiff);
+            if (attDiffNum > 0) {
+                explanationText += `• يتفوق **${std1.name}** في المواظبة (الحضور) بفارق **${Math.abs(attDiffNum)}%** (${std1.attendanceRate}% مقابل ${std2.attendanceRate}%).\n`;
+            } else if (attDiffNum < 0) {
+                explanationText += `• يتفوق **${std2.name}** في المواظبة (الحضور) بفارق **${Math.abs(attDiffNum)}%** (${std2.attendanceRate}% مقابل ${std1.attendanceRate}%).\n`;
+            } else {
+                explanationText += `• الطالبان متساويان تماماً في المواظبة والحضور بنسبة **${std1.attendanceRate}%**.\n`;
+            }
+
+            // Memorization diff
+            const memoDiffNum = parseFloat(memoDiff);
+            if (memoDiffNum > 0) {
+                explanationText += `• يتفوق **${std1.name}** في جودة الحفظ والتسميع بفارق **${Math.abs(memoDiffNum)}%** (${std1.memorizationRate}% مقابل ${std2.memorizationRate}%).\n`;
+            } else if (memoDiffNum < 0) {
+                explanationText += `• يتفوق **${std2.name}** في جودة الحفظ والتسميع بفارق **${Math.abs(memoDiffNum)}%** (${std2.memorizationRate}% مقابل ${std1.memorizationRate}%).\n`;
+            } else {
+                explanationText += `• الطالبان متساويان تماماً في جودة الحفظ بنسبة **${std1.memorizationRate}%**.\n`;
+            }
+
+            // Behavior diff
+            const behDiffNum = parseFloat(behDiff);
+            if (behDiffNum > 0) {
+                explanationText += `• يتفوق **${std1.name}** في انضباط السلوك بفارق **${Math.abs(behDiffNum)}%** (${std1.behaviorRate}% مقابل ${std2.behaviorRate}%).\n`;
+            } else if (behDiffNum < 0) {
+                explanationText += `• يتفوق **${std2.name}** في انضباط السلوك بفارق **${Math.abs(behDiffNum)}%** (${std2.behaviorRate}% مقابل ${std1.behaviorRate}%).\n`;
+            } else {
+                explanationText += `• الطالبان متساويان في انضباط السلوك بنسبة **${std1.behaviorRate}%**.\n`;
+            }
+
+            // Academic Score logic
+            if (metricKey === 'academicScore') {
+                explanationText += `\n**💡 كيف رُجّحت الكفة؟**\nالمعدل الأكاديمي يُحسب بمتوسط الحضور والحفظ بالتساوي (50% لكل منهما). `;
+                if (Math.abs(attDiffNum) > 0 && Math.abs(memoDiffNum) > 0) {
+                    if (Math.sign(attDiffNum) === Math.sign(memoDiffNum)) {
+                        explanationText += `يتفوق **${higher.name}** في كلا الجانبين (المواظبة وجودة الحفظ) مما جعله يستحق الصدارة بوضوح.`;
+                    } else {
+                        const betterAtt = attDiffNum > 0 ? std1 : std2;
+                        const betterMemo = memoDiffNum > 0 ? std1 : std2;
+                        explanationText += `على الرغم من أن **${betterAtt.name}** أفضل في نسبة الحضور، إلا أن تفوق **${betterMemo.name}** الأكبر في جودة الحفظ والتسميع عوّض ذلك الفارق ورجح كفته في المعدل الأكاديمي النهائي (أو العكس).`;
+                    }
+                } else if (Math.abs(attDiffNum) > 0) {
+                    explanationText += `بما أنهما متساويان في جودة الحفظ والتسميع، فإن تفوق **${higher.name}** في نسبة الحضور هو الذي حسم صدارته.`;
+                } else if (Math.abs(memoDiffNum) > 0) {
+                    explanationText += `بما أنهما متساويان في المواظبة والحضور، فإن تفوق **${higher.name}** في جودة الحفظ والتسميع هو الذي حسم صدارته.`;
+                }
+            } else if (metricKey === 'comprehensiveScore') {
+                explanationText += `\n**💡 كيف رُجّحت الكفة؟**\nالمعدل الشامل يُحسب بمتوسط الحضور والحفظ والسلوك بالتساوي (ثلث لكل جانب). التفوق في الجوانب السلوكية أو الحفظ هو الذي أحدث هذا الفارق الإجمالي.`;
+            }
+        }
+        
+        return explanationText;
+    };
+
     // Handle date navigation
     const handleDateNavigation = (direction: 'prev' | 'next') => {
         const offset = direction === 'next' ? 1 : -1;
@@ -534,6 +637,7 @@ export default function FairEvaluationPage() {
                                         <SelectItem value="50">50% من حصص الفترة</SelectItem>
                                         <SelectItem value="70">70% من حصص الفترة</SelectItem>
                                         <SelectItem value="90">90% من حصص الفترة</SelectItem>
+                                        <SelectItem value="100">100% من حصص الفترة</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <Tooltip>
@@ -646,6 +750,167 @@ export default function FairEvaluationPage() {
                         )}
                     </div>
                 )}
+
+                {/* 3.5 Compare Arena */}
+                <div className="space-y-4">
+                    <div className="flex justify-center">
+                        <Button 
+                            variant="outline" 
+                            onClick={() => setShowCompare(!showCompare)} 
+                            className={cn(
+                                "rounded-full px-6 font-bold text-xs gap-2 transition-all shadow-sm h-10",
+                                showCompare ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-700 hover:bg-indigo-500/20" : "border-slate-200 hover:bg-slate-50"
+                            )}
+                        >
+                            <TrendingUp className="h-4 w-4 text-indigo-600" />
+                            {showCompare ? "إغلاق ساحة المقارنة" : "⚖️ مقارنة ثنائية تحليلية بين طالبين"}
+                        </Button>
+                    </div>
+
+                    {showCompare && s1 && s2 && (
+                        <Card className="rounded-[2.5rem] border border-indigo-500/20 bg-gradient-to-b from-indigo-50/20 to-white shadow-lg p-6 max-w-4xl mx-auto space-y-6 animate-in slide-in-from-top-4 duration-350">
+                            <div className="border-b pb-3 border-indigo-500/10 text-center">
+                                <h3 className="font-headline font-black text-lg text-indigo-950 flex items-center justify-center gap-2">
+                                    ⚖️ ساحة التحليل والمقارنة التفصيلية
+                                </h3>
+                                <p className="text-xs text-muted-foreground font-bold mt-1">اختر أي طالبين من القائمة بالأسفل لمقارنة الأداء والنسب وتفاصيل التفوق البرمجي</p>
+                            </div>
+
+                            {/* Select Dropdowns */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1.5 text-right">
+                                    <label className="text-xs font-black text-slate-500 block">الطالب الأول:</label>
+                                    <Select dir="rtl" value={s1.id} onValueChange={(val) => setCompareStudent1Id(val)}>
+                                        <SelectTrigger className="w-full bg-background font-bold text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            {[...evaluationData.ranked, ...evaluationData.pending].map(s => (
+                                                <SelectItem key={s.id} value={s.id}>{s.name} ({s.groupName})</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1.5 text-right">
+                                    <label className="text-xs font-black text-slate-500 block">الطالب الثاني:</label>
+                                    <Select dir="rtl" value={s2.id} onValueChange={(val) => setCompareStudent2Id(val)}>
+                                        <SelectTrigger className="w-full bg-background font-bold text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            {[...evaluationData.ranked, ...evaluationData.pending].map(s => (
+                                                <SelectItem key={s.id} value={s.id}>{s.name} ({s.groupName})</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            {/* Side by side stats */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white dark:bg-slate-900/40 p-6 rounded-3xl border border-slate-100">
+                                {/* Student 1 Details */}
+                                <div className="space-y-4 text-right">
+                                    <div className="flex items-center gap-3 border-b pb-3">
+                                        <Avatar className="h-12 w-12 border shadow-sm">
+                                            <AvatarImage src={s1.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${s1.name}`} />
+                                            <AvatarFallback>{s1.name.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <h4 className="font-headline font-black text-slate-900 text-sm">{s1.name}</h4>
+                                            <Badge variant="outline" className="text-[10px] font-black mt-1 py-0.5 px-2">الترتيب: {evaluationData.ranked.findIndex(x => x.id === s1.id) !== -1 ? evaluationData.ranked.findIndex(x => x.id === s1.id) + 1 : 'خارج الترتيب'}</Badge>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-xs font-bold">
+                                                <span className="text-primary font-black">التقييم الأكاديمي: {s1.academicScore}%</span>
+                                                <span className="text-slate-400">({s1.totalSessions} حصة)</span>
+                                            </div>
+                                            <Progress value={s1.academicScore} className="h-2 bg-slate-100 [&>div]:bg-primary" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-xs font-bold">
+                                                <span className="text-emerald-600">المواظبة (الحضور): {s1.attendanceRate}%</span>
+                                            </div>
+                                            <Progress value={s1.attendanceRate} className="h-1.5 bg-slate-100 [&>div]:bg-emerald-500" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-xs font-bold">
+                                                <span className="text-amber-500">جودة الحفظ والتسميع: {s1.memorizationRate}%</span>
+                                            </div>
+                                            <Progress value={s1.memorizationRate} className="h-1.5 bg-slate-100 [&>div]:bg-amber-400" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-xs font-bold">
+                                                <span className="text-indigo-600">انضباط السلوك: {s1.behaviorRate}%</span>
+                                            </div>
+                                            <Progress value={s1.behaviorRate} className="h-1.5 bg-slate-100 [&>div]:bg-indigo-500" />
+                                        </div>
+                                        <div className="space-y-1 border-t pt-2 mt-2">
+                                            <div className="flex justify-between text-xs font-bold">
+                                                <span className="text-indigo-950 font-black">التقييم الشامل: {s1.comprehensiveScore}%</span>
+                                            </div>
+                                            <Progress value={s1.comprehensiveScore} className="h-2 bg-indigo-50 [&>div]:bg-indigo-950" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Student 2 Details */}
+                                <div className="space-y-4 text-right">
+                                    <div className="flex items-center gap-3 border-b pb-3">
+                                        <Avatar className="h-12 w-12 border shadow-sm">
+                                            <AvatarImage src={s2.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${s2.name}`} />
+                                            <AvatarFallback>{s2.name.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <h4 className="font-headline font-black text-slate-900 text-sm">{s2.name}</h4>
+                                            <Badge variant="outline" className="text-[10px] font-black mt-1 py-0.5 px-2">الترتيب: {evaluationData.ranked.findIndex(x => x.id === s2.id) !== -1 ? evaluationData.ranked.findIndex(x => x.id === s2.id) + 1 : 'خارج الترتيب'}</Badge>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-xs font-bold">
+                                                <span className="text-primary font-black">التقييم الأكاديمي: {s2.academicScore}%</span>
+                                                <span className="text-slate-400">({s2.totalSessions} حصة)</span>
+                                            </div>
+                                            <Progress value={s2.academicScore} className="h-2 bg-slate-100 [&>div]:bg-primary" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-xs font-bold">
+                                                <span className="text-emerald-600">المواظبة (الحضور): {s2.attendanceRate}%</span>
+                                            </div>
+                                            <Progress value={s2.attendanceRate} className="h-1.5 bg-slate-100 [&>div]:bg-emerald-500" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-xs font-bold">
+                                                <span className="text-amber-500">جودة الحفظ والتسميع: {s2.memorizationRate}%</span>
+                                            </div>
+                                            <Progress value={s2.memorizationRate} className="h-1.5 bg-slate-100 [&>div]:bg-amber-400" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-xs font-bold">
+                                                <span className="text-indigo-600">انضباط السلوك: {s2.behaviorRate}%</span>
+                                            </div>
+                                            <Progress value={s2.behaviorRate} className="h-1.5 bg-slate-100 [&>div]:bg-indigo-500" />
+                                        </div>
+                                        <div className="space-y-1 border-t pt-2 mt-2">
+                                            <div className="flex justify-between text-xs font-bold">
+                                                <span className="text-indigo-950 font-black">التقييم الشامل: {s2.comprehensiveScore}%</span>
+                                            </div>
+                                            <Progress value={s2.comprehensiveScore} className="h-2 bg-indigo-50 [&>div]:bg-indigo-950" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Analysis Text */}
+                            <div className="bg-indigo-500/5 border border-indigo-500/10 p-5 rounded-3xl space-y-2 text-right">
+                                <h4 className="font-headline font-black text-xs text-indigo-950 flex items-center gap-2">
+                                    🔬 تحليل الفروقات البرمجية والترتيب:
+                                </h4>
+                                <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line font-bold">
+                                    {generateComparisonExplanation(s1, s2)}
+                                </p>
+                            </div>
+                        </Card>
+                    )}
+                </div>
 
                 {/* 4. Leaderboard Grid */}
                 <Card className="rounded-[2.5rem] border shadow-md overflow-hidden">
