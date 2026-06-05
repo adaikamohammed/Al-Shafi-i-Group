@@ -16,6 +16,7 @@ import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/SearchableSelect';
+import { DailySession } from '@/lib/types';
 
 
 // Helper function to get color based on day's data
@@ -211,20 +212,57 @@ export default function YearlyPerformancePage() {
     const { students: allContextStudents, dailySessions: allContextSessions, allUsers, loading } = useStudentContext();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'year' | 'quarter' | 'month'>('year');
-    const [selectedSheikhId, setSelectedSheikhId] = useState<string>('all');
+    const [selectedSheikhId, setSelectedSheikhId] = useState<string>('sheikhs');
 
     const isAdmin = isSuperAdmin || isManagement;
 
     // Filter students and sessions based on selected sheikh
     const students = useMemo(() => {
         if (!isAdmin || selectedSheikhId === 'all') return allContextStudents;
-        const selectedIds = selectedSheikhId.split(',');
+        
+        let selectedIds: string[] = [];
+        if (selectedSheikhId === 'sheikhs') {
+            selectedIds = allUsers
+                .filter(u => {
+                    const num = parseInt(u.group?.replace(/\D/g, '') || '0');
+                    return num >= 1 && num <= 9;
+                })
+                .map(u => u.uid);
+        } else if (selectedSheikhId === 'ustadhat') {
+            selectedIds = allUsers
+                .filter(u => {
+                    const num = parseInt(u.group?.replace(/\D/g, '') || '0');
+                    return num >= 10 && num <= 18;
+                })
+                .map(u => u.uid);
+        } else {
+            selectedIds = selectedSheikhId.split(',');
+        }
+        
         return allContextStudents.filter(s => selectedIds.includes(s.ownerId));
-    }, [allContextStudents, isAdmin, selectedSheikhId]);
+    }, [allContextStudents, isAdmin, selectedSheikhId, allUsers]);
 
     const dailySessions = useMemo(() => {
         if (!isAdmin || selectedSheikhId === 'all') return allContextSessions;
-        const selectedIds = selectedSheikhId.split(',');
+        
+        let selectedIds: string[] = [];
+        if (selectedSheikhId === 'sheikhs') {
+            selectedIds = allUsers
+                .filter(u => {
+                    const num = parseInt(u.group?.replace(/\D/g, '') || '0');
+                    return num >= 1 && num <= 9;
+                })
+                .map(u => u.uid);
+        } else if (selectedSheikhId === 'ustadhat') {
+            selectedIds = allUsers
+                .filter(u => {
+                    const num = parseInt(u.group?.replace(/\D/g, '') || '0');
+                    return num >= 10 && num <= 18;
+                })
+                .map(u => u.uid);
+        } else {
+            selectedIds = selectedSheikhId.split(',');
+        }
 
         const filtered: Record<string, Record<string, DailySession>> = {};
         Object.entries(allContextSessions).forEach(([date, sessions]) => {
@@ -237,10 +275,14 @@ export default function YearlyPerformancePage() {
             }
         });
         return filtered;
-    }, [allContextSessions, isAdmin, selectedSheikhId]);
+    }, [allContextSessions, isAdmin, selectedSheikhId, allUsers]);
 
     const sheikhOptions: SearchableSelectOption[] = useMemo(() => {
-        const options: SearchableSelectOption[] = [{ value: 'all', label: 'كل الأفواج (عرض شامل)' }];
+        const options: SearchableSelectOption[] = [
+            { value: 'sheikhs', label: 'أفواج المشايخ' },
+            { value: 'ustadhat', label: 'أفواج الأستاذات' },
+            { value: 'all', label: 'كل أفواج المدرسة (عرض شامل)' }
+        ];
         if (!allUsers) return options;
 
         const sheikhs = allUsers.filter(u => u.role === 'sheikh' || u.role === 'management' || u.role === 'super_admin');
@@ -429,7 +471,7 @@ export default function YearlyPerformancePage() {
                             else if (session.sessionType === 'حصة أنشطة') stats.activitySessions++;
 
                             // حساب الحضور
-                            const attendanceCount = (session.records || []).filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
+                            const attendanceCount = (session.records || []).filter((r: any) => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
                             stats.totalAttendance += attendanceCount;
                             stats.totalPossibleAttendance += activeStudentsCount;
                         });

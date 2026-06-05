@@ -78,7 +78,7 @@ export default function ProfilePage() {
         let totalMasteredSurahs = 0;
         const khatmeenCount = activeStudents.filter(student => {
             const studentProgress = surahProgress ? (surahProgress[student.id] || {}) : {};
-            const masteredCount = Object.values(studentProgress).filter(status => status === 2).length;
+            const masteredCount = Object.values(studentProgress).filter(entry => entry.status === 2).length;
             totalMasteredSurahs += masteredCount;
             return (student.memorizedSurahsCount || 0) >= 114;
         }).length;

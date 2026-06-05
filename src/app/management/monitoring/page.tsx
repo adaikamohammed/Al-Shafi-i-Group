@@ -72,7 +72,7 @@ export default function MonitoringPage() {
                                 // Attendance
                                 if (record.attendance === 'حاضر' || record.attendance === 'متأخر') totalAttendance++;
                                 // Review
-                                if (record.isReview) totalReview++;
+                                if (record.review) totalReview++;
                                 // Evaluation
                                 const evalMap: Record<string, number> = { 'ممتاز': 100, 'جيد جداً': 80, 'جيد': 60, 'متوسط': 40, 'ضعيف': 20 };
                                 totalEvaluationPoints += evalMap[record.memorization || ''] || 0;
@@ -210,7 +210,7 @@ export default function MonitoringPage() {
                             <div key={groupData.groupName} className="transform transition-all hover:scale-[1.03]">
                                 <MonitoringRadar
                                     data={[groupData]}
-                                    selectedGroup={groupData.groupName}
+                                    selectedGroup={groupData.groupName || ''}
                                 />
                             </div>
                         ))}

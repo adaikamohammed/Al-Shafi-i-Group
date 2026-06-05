@@ -208,7 +208,7 @@ export default function CompetitionPage() {
                 return {
                     id: student.id,
                     name: student.fullName,
-                    group: student.groupName,
+                    group: student.groupName || '',
                     surahScore: surahFinal,
                     dailyScore: dailyFinal,
                     attendanceScore: attFinal,

@@ -1,6 +1,6 @@
 import { ActivityAction } from "./activityLogger";
 
-export type StudentStatus = "نشط" | "مطرود" | "محذوف";
+export type StudentStatus = "نشط" | "مطرود" | "محذوف" | "غائب طويل";
 export type MemorizationAmount = "ثمن" | "ربع" | "نصف" | "صفحة" | "أكثر";
 export type SubscriptionTier = "فئة الأكابر" | "فئة الأصاغر";
 
@@ -46,6 +46,7 @@ export interface Student {
   id: string;
   ownerId: string; // UID of the user who owns this student record
   groupName?: string; // Name of the group/sheikh
+  sheikhName?: string;
   fullName: string;
   gender: "ذكر" | "أنثى";
   pageNumber?: string;
@@ -139,6 +140,10 @@ export interface DailySession {
   isTransferred?: boolean; // Flag for sessions moved between sheikhs
   transferredFrom?: string;
   transferReason?: string;
+  createdAt?: string;
+  isHoliday?: boolean;
+  isSheikhAbsentNoSub?: boolean;
+  isSheikhAbsentWithSub?: boolean;
 }
 
 export interface DailyReport {
@@ -427,9 +432,9 @@ export interface SummerCampItem {
   quantity: string;
   provider: string; // The person responsible
   isProvided: boolean;
-  providedAt?: string; // ISO String
+  providedAt?: string | null; // ISO String
   isReturned?: boolean; // Indicates if the item was returned from the camp
-  returnedAt?: string; // ISO String
+  returnedAt?: string | null; // ISO String
   notes?: string;
   addedBy?: string;
 }

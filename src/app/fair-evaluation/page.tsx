@@ -184,9 +184,9 @@ export default function FairEvaluationPage() {
         const maxBehaviorVal = pointsConfig?.behavior ? Math.max(...Object.values(pointsConfig.behavior).map(Number)) : 10;
 
         // Helper to resolve student points
-        const getAttPoints = (att: string) => pointsConfig?.attendance?.[att] ?? ATTENDANCE_POINTS[att] ?? 0;
-        const getMemoPoints = (memo: string) => pointsConfig?.evaluation?.[memo] ?? PERFORMANCE_POINTS[memo] ?? 0;
-        const getBehPoints = (beh: string) => pointsConfig?.behavior?.[beh] ?? BEHAVIOR_POINTS[beh] ?? 0;
+        const getAttPoints = (att: string) => (pointsConfig?.attendance as any)?.[att] ?? ATTENDANCE_POINTS[att] ?? 0;
+        const getMemoPoints = (memo: string) => (pointsConfig?.evaluation as any)?.[memo] ?? PERFORMANCE_POINTS[memo] ?? 0;
+        const getBehPoints = (beh: string) => (pointsConfig?.behavior as any)?.[beh] ?? BEHAVIOR_POINTS[beh] ?? 0;
 
         // 4. Initialize scores structure
         const scores: Record<string, StudentEvaluationRow> = {};
@@ -294,7 +294,7 @@ export default function FairEvaluationPage() {
                 }
 
                 // B. Memorization
-                if (!record.review && record.memorization && record.memorization !== 'لا يوجد' && record.memorization !== '') {
+                if (!record.review && record.memorization && record.memorization !== 'لا يوجد' && (record.memorization as string) !== '') {
                     score.assessedMemorization += weight;
                     score.memorizationRate += getMemoPoints(record.memorization) * weight;
                     
@@ -309,7 +309,7 @@ export default function FairEvaluationPage() {
                 }
 
                 // C. Behavior
-                if (record.behavior && record.behavior !== '') {
+                if (record.behavior && (record.behavior as string) !== '') {
                     score.assessedBehavior += weight;
                     score.behaviorRate += getBehPoints(record.behavior) * weight;
 

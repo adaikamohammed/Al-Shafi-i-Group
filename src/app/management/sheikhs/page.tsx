@@ -11,7 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import { PORTAL_THEMES } from '@/lib/themes';
 
 export default function SheikhsMonitoringPage() {
-    const { allUsers, dailyReports } = useStudentContext();
+    const { allUsers, dailyReports, dailySessions } = useStudentContext();
     const { user } = useAuth();
 
     const currentThemeId = user?.portalTheme || 'midnight';
@@ -23,21 +23,83 @@ export default function SheikhsMonitoringPage() {
         return sheikhs.map(sheikh => {
             // Calculate report counts for this sheikh
             let reportCount = 0;
-            Object.values(dailyReports).forEach(day => {
-                Object.values(day).forEach(report => {
-                    if (report.authorId === sheikh.uid) reportCount++;
+            if (dailyReports) {
+                Object.values(dailyReports).forEach(day => {
+                    if (day) {
+                        Object.values(day).forEach(report => {
+                            if (report && report.authorId === sheikh.uid) reportCount++;
+                        });
+                    }
                 });
-            });
+            }
+
+            // Calculate actual session counts, attendance rate, and average student memorization rating
+            let sessionCount = 0;
+            let totalPresent = 0;
+            let totalRecordCount = 0;
+            let totalEvalPoints = 0;
+            let evalCount = 0;
+
+            if (dailySessions) {
+                Object.values(dailySessions).forEach(daySessions => {
+                    if (daySessions) {
+                        Object.values(daySessions).forEach((session: any) => {
+                            if (session && session.ownerId === sheikh.uid) {
+                                const sType = session.sessionType;
+                                const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
+                                if (isReal) {
+                                    sessionCount++;
+                                    const records: any[] = Array.isArray(session.records)
+                                        ? session.records
+                                        : session.records ? Object.values(session.records) : [];
+
+                                    records.forEach((r: any) => {
+                                        totalRecordCount++;
+                                        if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') {
+                                            totalPresent++;
+                                        }
+
+                                        if (r.memorization) {
+                                            evalCount++;
+                                            if (r.memorization === 'ممتاز') {
+                                                totalEvalPoints += 5;
+                                            } else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') {
+                                                totalEvalPoints += 4.5;
+                                            } else if (r.memorization === 'جيد') {
+                                                totalEvalPoints += 4;
+                                            } else if (r.memorization === 'مقبول' || r.memorization === 'حسن') {
+                                                totalEvalPoints += 3;
+                                            } else if (r.memorization === 'ضعيف' || r.memorization === 'متوسط') {
+                                                totalEvalPoints += 2;
+                                            } else if (r.memorization === 'لم يحفظ') {
+                                                totalEvalPoints += 1;
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+
+            const attendanceRate = totalRecordCount > 0
+                ? Math.round((totalPresent / totalRecordCount) * 100)
+                : 100;
+
+            const rating = evalCount > 0
+                ? parseFloat((totalEvalPoints / evalCount).toFixed(1))
+                : 5.0;
 
             return {
                 ...sheikh,
                 reportCount,
-                rating: sheikh.uid.length % 2 === 0 ? 4.8 : 4.5, // Mock rating
-                attendance: sheikh.uid.length % 2 === 0 ? "95%" : "88%", // Mock attendance
-                sessionCount: sheikh.uid.length % 3 === 0 ? 24 : 18 // Mock session count
+                rating,
+                attendance: `${attendanceRate}%`,
+                sessionCount
             };
         });
-    }, [allUsers, dailyReports]);
+    }, [allUsers, dailyReports, dailySessions]);
 
     return (
         <ProtectedPage>

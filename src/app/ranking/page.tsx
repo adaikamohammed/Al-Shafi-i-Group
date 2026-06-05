@@ -136,7 +136,7 @@ export default function RankingPage() {
         Object.values(studentScores).forEach(score => {
             if (score.status === 'نشط') {
                 (students.find(s => s.id === score.id)?.covenants || []).forEach(covenant => {
-                    if (covenant.status === 'تم الوفاء به') {
+                    if (covenant.status === 'تم الوفاء بها') {
                         try {
                             const covenantDate = parseISO(covenant.date);
                             if (getMonth(covenantDate) === selectedMonth && getYear(covenantDate) === selectedYear) {

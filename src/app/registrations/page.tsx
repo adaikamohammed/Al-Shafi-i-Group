@@ -412,7 +412,7 @@ function RegistrationForm({ onSave, onCancel, existingRegistration }: { onSave: 
                 <div className="flex flex-col items-center gap-4">
                     <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
                     <Avatar className="w-24 h-24 mb-2 border-4 border-muted">
-                        <AvatarImage src={photoPreview} />
+                        <AvatarImage src={photoPreview || undefined} />
                         <AvatarFallback className={cn(existingRegistration?.gender === 'أنثى' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600')}>
                             {(existingRegistration as any)?.gender === 'أنثى' ? <UserRound /> : <UserIcon />}
                         </AvatarFallback>
@@ -545,7 +545,7 @@ const BulkEditModal = ({ open, onOpenChange, selectedCount, onSave }: { open: bo
         const finalUpdateData: Partial<PreRegistration> = {};
         for (const field in fieldsToUpdate) {
             if (fieldsToUpdate[field as keyof typeof fieldsToUpdate] && updateData[field as keyof PreRegistration] !== undefined) {
-                finalUpdateData[field as keyof PreRegistration] = updateData[field as keyof PreRegistration];
+                (finalUpdateData as any)[field] = updateData[field as keyof PreRegistration];
             }
         }
         if (Object.keys(finalUpdateData).length > 0) {
@@ -887,7 +887,7 @@ export default function PreRegistrationPage() {
             targetOwnerId = selectedSheikh.uid;
             targetGroupName = selectedSheikh.group || "فوج غير محدد";
         } else if ('email' in selectedSheikh) {
-            targetGroupName = selectedSheikh.group;
+            targetGroupName = selectedSheikh.group || "فوج غير محدد";
             const realUser = allUsers.find(u => u.email === selectedSheikh.email);
             if (realUser) { targetOwnerId = realUser.uid; }
             else {
@@ -924,10 +924,10 @@ export default function PreRegistrationPage() {
             // 2. Add to StudentContext
             // Note: We use 'any' to bypass strict type check on addStudent if it misses ownerId in signature, 
             // but internally it should handle it if using firebase push spread.
-            await addStudent(newStudentData as any, null);
+            await addStudent(newStudentData as any);
 
             // 3. Update Registration Status
-            await updatePreRegistration(registrationToJoin.id, { status: 'تم الإنضمام' });
+            await updatePreRegistration(registrationToJoin.id, { status: 'تم الإنضمام', fullName: registrationToJoin.fullName }, true);
 
             // 4. Cleanup
             setJoinDialogOpen(false);
@@ -1073,8 +1073,8 @@ export default function PreRegistrationPage() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={isAccessModalOpen} onOpenChange={setIsAccessModalOpen} className="no-print">
-                <DialogContent>
+            <Dialog open={isAccessModalOpen} onOpenChange={setIsAccessModalOpen}>
+                <DialogContent className="no-print">
                     <DialogHeader>
                         <DialogTitle>الوصول إلى البيانات</DialogTitle>
                         <DialogDescription>
@@ -1118,14 +1118,14 @@ export default function PreRegistrationPage() {
             <Dialog open={isFormOpen} onOpenChange={(open) => {
                 setFormOpen(open);
                 if (!open) setEditingRegistration(null);
-            }} className="no-print">
-                <DialogContent className="sm:max-w-2xl">
+            }}>
+                <DialogContent className="sm:max-w-2xl no-print">
                     <RegistrationForm onSave={handleSaveRegistration} onCancel={() => setFormOpen(false)} existingRegistration={editingRegistration} />
                 </DialogContent>
             </Dialog>
 
             {selectedStudent && (
-                <Dialog open={!!selectedStudent} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)} className="no-print">
+                <Dialog open={!!selectedStudent} onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}>
                     <StudentProfileCard
                         student={selectedStudent}
                         onEdit={() => handleEdit(selectedStudent)}

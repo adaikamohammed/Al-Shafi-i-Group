@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام احتساب النقاط التنافسي الحيادي والموضوعي — حلقات الشافعي القرآنية</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: #f0f4ff;
+            color: #1e293b;
+            direction: rtl;
+        }
+
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            background: white;
+            padding: 14mm 14mm 12mm;
+            position: relative;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #6d28d9 100%);
+            border-radius: 16px;
+            padding: 20px 24px;
+            color: white;
+            margin-bottom: 18px;
+            position: relative;
+            overflow: hidden;
+        }
+        .header::before {
+            content: '⚡';
+            position: absolute;
+            left: 18px; top: 50%;
+            transform: translateY(-50%);
+            font-size: 52px;
+            opacity: 0.15;
+        }
+        .header-title {
+            font-size: 19px;
+            font-weight: 900;
+            margin-bottom: 4px;
+        }
+        .header-sub {
+            font-size: 11px;
+            opacity: 0.85;
+            font-weight: 600;
+        }
+        .header-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 20px;
+            padding: 3px 12px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-top: 8px;
+        }
+
+        /* ── Section title ── */
+        .section-title {
+            font-size: 11px;
+            font-weight: 900;
+            color: #4f46e5;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1.5px;
+            background: linear-gradient(to left, transparent, #c7d2fe);
+        }
+
+        /* ── Points grid ── */
+        .points-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .point-card {
+            border-radius: 12px;
+            padding: 12px 14px;
+            border: 1.5px solid;
+            position: relative;
+        }
+        .point-card .icon { font-size: 20px; margin-bottom: 4px; display: block; }
+        .point-card .pts {
+            font-size: 22px;
+            font-weight: 900;
+            display: block;
+            line-height: 1;
+        }
+        .point-card .pts-label {
+            font-size: 9px;
+            font-weight: 600;
+            opacity: 0.7;
+            margin-bottom: 4px;
+            display: block;
+        }
+        .point-card .title {
+            font-size: 12px;
+            font-weight: 900;
+            margin-bottom: 3px;
+        }
+        .point-card .desc {
+            font-size: 10px;
+            line-height: 1.55;
+            opacity: 0.8;
+        }
+        .point-card .pct-badge {
+            position: absolute;
+            top: 10px; left: 10px;
+            background: rgba(0,0,0,0.08);
+            border-radius: 20px;
+            padding: 1px 8px;
+            font-size: 9px;
+            font-weight: 800;
+        }
+
+        /* Colors */
+        .blue  { background:#eff6ff; border-color:#bfdbfe; color:#1e40af; }
+        .blue .pts { color:#1d4ed8; }
+        .green { background:#f0fdf4; border-color:#bbf7d0; color:#14532d; }
+        .green .pts { color:#15803d; }
+        .purple{ background:#faf5ff; border-color:#ddd6fe; color:#4c1d95; }
+        .purple .pts { color:#7c3aed; }
+        .amber { background:#fffbeb; border-color:#fde68a; color:#78350f; }
+        .amber .pts { color:#d97706; }
+        .rose  { background:#fff1f2; border-color:#fecdd3; color:#881337; }
+        .rose .pts { color:#e11d48; }
+        .teal  { background:#f0fdfa; border-color:#99f6e4; color:#134e4a; }
+        .teal .pts { color:#0d9488; }
+
+        /* ── Formula box ── */
+        .formula-box {
+            background: linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%);
+            border: 2px solid #c7d2fe;
+            border-radius: 14px;
+            padding: 14px 18px;
+            margin-bottom: 14px;
+            text-align: center;
+        }
+        .formula-text {
+            font-size: 12.5px;
+            font-weight: 900;
+            color: #3730a3;
+            line-height: 1.8;
+            direction: ltr;
+            text-align: center;
+        }
+        .formula-label {
+            font-size: 10px;
+            color: #6366f1;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .formula-note {
+            font-size: 9.5px;
+            color: #64748b;
+            margin-top: 6px;
+            font-weight: 600;
+        }
+
+        /* ── Badges grid ── */
+        .badges-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .badge-card {
+            border-radius: 10px;
+            padding: 10px 11px;
+            border: 1px solid;
+        }
+        .badge-card .badge-icon { font-size: 16px; margin-bottom: 3px; display: block; }
+        .badge-card .badge-name { font-size: 10px; font-weight: 900; margin-bottom: 2px; }
+        .badge-card .badge-cond { font-size: 9px; opacity: 0.75; line-height: 1.4; }
+
+        /* ── Principles ── */
+        .principles-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 9px;
+            margin-bottom: 14px;
+        }
+        .principle-card {
+            background: #f8faff;
+            border: 1.5px solid #e0e7ff;
+            border-radius: 10px;
+            padding: 10px;
+            text-align: center;
+        }
+        .principle-icon { font-size: 22px; display: block; margin-bottom: 4px; }
+        .principle-title { font-size: 10px; font-weight: 900; color: #3730a3; margin-bottom: 2px; }
+        .principle-desc { font-size: 9px; color: #64748b; line-height: 1.4; }
+
+        /* ── Penalty box ── */
+        .penalty-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 9px;
+            margin-bottom: 14px;
+        }
+        .penalty-card {
+            border-radius: 10px;
+            padding: 11px 13px;
+            border: 1.5px solid;
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+        }
+        .penalty-card .penalty-icon { font-size: 18px; flex-shrink: 0; }
+        .penalty-card .penalty-title { font-size: 10.5px; font-weight: 900; margin-bottom: 2px; }
+        .penalty-card .penalty-desc { font-size: 9px; opacity: 0.78; line-height: 1.45; }
+
+        /* ── Footer ── */
+        .footer {
+            background: #f8faff;
+            border: 1.5px solid #e0e7ff;
+            border-radius: 12px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 4px;
+        }
+        .footer-text { font-size: 9.5px; color: #64748b; font-weight: 600; }
+        .footer-logo { font-size: 12px; font-weight: 900; color: #4f46e5; }
+
+        /* ── Divider ── */
+        .divider { height: 1px; background: linear-gradient(to left, transparent, #e0e7ff, transparent); margin: 12px 0; }
+
+        /* ── Info row ── */
+        .info-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .info-chip {
+            flex: 1;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            text-align: center;
+        }
+        .info-chip .chip-val { font-size: 16px; font-weight: 900; color: #3730a3; display: block; }
+        .info-chip .chip-label { font-size: 9px; color: #64748b; font-weight: 600; }
+
+        /* ── Print ── */
+        @media print {
+            body { background: white; }
+            .page { margin: 0; padding: 12mm; box-shadow: none; }
+            @page { size: A4; margin: 8mm; }
+        }
+
+        /* ── Screen only ── */
+        @media screen {
+            body { padding: 20px 0 40px; }
+            .page { box-shadow: 0 8px 40px rgba(0,0,0,0.12); margin-bottom: 20px; }
+            .print-btn {
+                display: block;
+                margin: 16px auto;
+                background: linear-gradient(135deg, #4f46e5, #7c3aed);
+                color: white;
+                border: none;
+                border-radius: 12px;
+                padding: 12px 32px;
+                font-size: 14px;
+                font-weight: 900;
+                font-family: 'Cairo', sans-serif;
+                cursor: pointer;
+                box-shadow: 0 4px 20px rgba(79,70,229,0.4);
+            }
+        }
+        @media print { .print-btn { display: none; } }
+    </style>
+</head>
+<body>
+
+<button class="print-btn" onclick="window.print()">🖨️ حفظ كـ PDF / طباعة</button>
+
+<div class="page">
+
+    <!-- ══ HEADER ══ -->
+    <div class="header">
+        <div class="header-title">⚡ نظام احتساب النقاط التنافسي الحيادي والموضوعي</div>
+        <div class="header-sub">حلقات الشافعي القرآنية — دليل المعايير الرسمي لتقييم المشايخ والأفواج</div>
+        <div class="header-badge">🔒 موضوعي · حيادي · شفاف · لا يقبل التلاعب</div>
+    </div>
+
+    <!-- ══ KEY NUMBERS ══ -->
+    <div class="info-row">
+        <div class="info-chip">
+            <span class="chip-val">4</span>
+            <span class="chip-label">معايير رئيسية للتقييم</span>
+        </div>
+        <div class="info-chip">
+            <span class="chip-val">6</span>
+            <span class="chip-label">شارات تكريمية مستقلة</span>
+        </div>
+        <div class="info-chip">
+            <span class="chip-val">شهري</span>
+            <span class="chip-label">دورة إعادة الاحتساب</span>
+        </div>
+        <div class="info-chip">
+            <span class="chip-val">100%</span>
+            <span class="chip-label">مبني على بيانات موضوعية</span>
+        </div>
+    </div>
+
+    <!-- ══ PRINCIPLES ══ -->
+    <div class="section-title">🛡️ مبادئ النظام الجوهرية</div>
+    <div class="principles-row">
+        <div class="principle-card">
+            <span class="principle-icon">⚖️</span>
+            <div class="principle-title">الحيادية الكاملة</div>
+            <div class="principle-desc">لا يدخل الرأي الشخصي في أي معيار — كل شيء رقمي وآلي</div>
+        </div>
+        <div class="principle-card">
+            <span class="principle-icon">📊</span>
+            <div class="principle-title">بيانات موضوعية فقط</div>
+            <div class="principle-desc">الحضور، التوثيق، التسميع — كلها أرقام حقيقية مسجّلة</div>
+        </div>
+        <div class="principle-card">
+            <span class="principle-icon">🔍</span>
+            <div class="principle-title">الشفافية التامة</div>
+            <div class="principle-desc">كل شيخ يرى تفاصيل نقاطه ومصدر كل نقطة بالكامل</div>
+        </div>
+        <div class="principle-card">
+            <span class="principle-icon">🔄</span>
+            <div class="principle-title">التجديد الشهري</div>
+            <div class="principle-desc">الترتيب يُعاد احتسابه شهرياً — فرصة دائمة للتحسن</div>
+        </div>
+        <div class="principle-card">
+            <span class="principle-icon">👥</span>
+            <div class="principle-title">العدالة بين الأفواج</div>
+            <div class="principle-desc">المعيار يقيس النسب لا الأعداد لضمان العدل بين الأفواج</div>
+        </div>
+        <div class="principle-card">
+            <span class="principle-icon">🎯</span>
+            <div class="principle-title">تحفيز الأداء</div>
+            <div class="principle-desc">كل شيخ يمكنه تحسين ترتيبه بتحسين مستواه شهرياً</div>
+        </div>
+    </div>
+
+    <!-- ══ MAIN CRITERIA ══ -->
+    <div class="section-title">📐 معايير احتساب النقاط الأربعة الرئيسية</div>
+    <div class="points-grid">
+
+        <!-- 1. Session Recording -->
+        <div class="point-card blue">
+            <div class="pct-badge">~50% من الدرجة</div>
+            <span class="icon">📝</span>
+            <span class="pts">15 <span style="font-size:13px">نقطة</span></span>
+            <span class="pts-label">لكل حصة مسجّلة</span>
+            <div class="title">تسجيل حصص الشيخ</div>
+            <div class="desc">
+                أهم معيار في النظام — لكل حصة يسجّلها الشيخ ويوثّقها في النظام يحصل على 15 نقطة تلقائياً.
+                يشمل الحصص الأساسية، التعويضية، والإضافية.
+            </div>
+        </div>
+
+        <!-- 2. Attendance -->
+        <div class="point-card green">
+            <div class="pct-badge">~36% من الدرجة</div>
+            <span class="icon">👥</span>
+            <span class="pts">12 <span style="font-size:13px">نقطة × عدد الحصص</span></span>
+            <span class="pts-label">مضروبة في نسبة الحضور</span>
+            <div class="title">حضور طلاب الفوج</div>
+            <div class="desc">
+                <strong>الصيغة:</strong> (نسبة الحضور ÷ 100) × 12 × عدد الحصص<br>
+                معيار موضوعي تماماً — كلما ارتفعت نسبة حضور الطلاب زادت النقاط. لا دور للشيخ في التلاعب به.
+            </div>
+        </div>
+
+        <!-- 3. Commitment -->
+        <div class="point-card purple">
+            <div class="pct-badge">~11% من الدرجة</div>
+            <span class="icon">💎</span>
+            <span class="pts">30 <span style="font-size:13px">نقطة أساس</span></span>
+            <span class="pts-label">+ 40 بونص التزام كامل</span>
+            <div class="title">التزام الشيخ بالجدول</div>
+            <div class="desc">
+                <strong>النقاط الأساسية:</strong> (نسبة الالتزام ÷ 100) × 30<br>
+                <strong>بونص الالتزام الكامل:</strong> +40 نقطة إن كان الحضور 100% بدون أي غياب<br>
+                <strong>عقوبة الغياب:</strong> −20 نقطة عن كل غياب للشيخ
+            </div>
+        </div>
+
+        <!-- 4. Excellence -->
+        <div class="point-card amber">
+            <div class="pct-badge">~3% من الدرجة</div>
+            <span class="icon">⭐</span>
+            <span class="pts">3 + 1.5 <span style="font-size:13px">نقطة</span></span>
+            <span class="pts-label">ممتاز × 3 | جيد جداً × 1.5 | لكل حصة</span>
+            <div class="title">جودة التسميع (مخففة للحياد)</div>
+            <div class="desc">
+                <strong>وزن مخفَّض مقصوداً</strong> لضمان الحيادية وتفادي التشدد أو التساهل في التقييم.
+                يحتسب بنسبة الطلاب الممتازين وجيد جداً فقط.
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ══ BONUS POINTS ══ -->
+    <div class="section-title">➕ نقاط مكافأة إضافية</div>
+    <div class="penalty-grid">
+        <div class="penalty-card teal" style="border-color:#99f6e4">
+            <span class="penalty-icon">⏱️</span>
+            <div>
+                <div class="penalty-title">بونص التوثيق السريع</div>
+                <div class="penalty-desc">+5 نقاط عن كل حصة يوثّقها الشيخ خلال 36 ساعة من موعدها — تشجيع على الانتظام والدقة في التسجيل الفوري</div>
+            </div>
+        </div>
+        <div class="penalty-card blue" style="border-color:#bfdbfe">
+            <span class="penalty-icon">🔄</span>
+            <div>
+                <div class="penalty-title">بونص الحصص التعويضية والإضافية</div>
+                <div class="penalty-desc">+5 نقاط عن كل حصة تعويضية أو إضافية يسجّلها الشيخ — مكافأة على بذل الجهد الإضافي</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ FORMULA ══ -->
+    <div class="formula-box">
+        <span class="formula-label">📐 معادلة احتساب المجموع الكلي</span>
+        <div class="formula-text">
+            المجموع = (حصص × 15) + (نسبة الحضور × 12 × حصص) + التزام + (تسميع ممتاز × 3 × حصص) + (تعويضية × 5) + (سريع التوثيق × 5)
+        </div>
+        <div class="formula-note">⚠️ جميع المعادلات تُحتسب تلقائياً من بيانات النظام — لا يمكن لأحد التأثير عليها يدوياً</div>
+    </div>
+
+    <!-- ══ PENALTIES ══ -->
+    <div class="section-title">⚠️ الحسميات والعقوبات</div>
+    <div class="penalty-grid">
+        <div class="penalty-card rose" style="border-color:#fecdd3">
+            <span class="penalty-icon">🚫</span>
+            <div>
+                <div class="penalty-title">غياب الشيخ بدون عذر</div>
+                <div class="penalty-desc">−20 نقطة عن كل يوم غياب للشيخ. الغياب بعذر مسبق يُعامل كيوم عطلة ولا يُحسب عليه</div>
+            </div>
+        </div>
+        <div class="penalty-card amber" style="border-color:#fde68a">
+            <span class="penalty-icon">📉</span>
+            <div>
+                <div class="penalty-title">إلغاء بونص الالتزام الكامل</div>
+                <div class="penalty-desc">يفقد الشيخ بونص الـ 40 نقطة إذا غاب ولو يوماً واحداً طوال الشهر. يُحتسب فقط للشيخ الذي لم يغب إطلاقاً</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ══ BADGES ══ -->
+    <div class="section-title">🏅 الشارات التكريمية المستقلة عن الترتيب</div>
+    <div class="badges-grid">
+        <div class="badge-card" style="background:#f0fdf4;border-color:#bbf7d0;color:#14532d">
+            <span class="badge-icon">💎</span>
+            <div class="badge-name">التزام الشيخ الكامل</div>
+            <div class="badge-cond">حضر وسجّل جميع أيام العمل المطلوبة بدون أي غياب طوال الشهر</div>
+        </div>
+        <div class="badge-card" style="background:#fffbeb;border-color:#fde68a;color:#78350f">
+            <span class="badge-icon">👑</span>
+            <div class="badge-name">حضور طلاب الفوج</div>
+            <div class="badge-cond">متوسط حضور طلاب الفوج ≥ 95% (ذهبي) أو ≥ 90% (فضي) طوال الشهر</div>
+        </div>
+        <div class="badge-card" style="background:#f0fdf4;border-color:#bbf7d0;color:#14532d">
+            <span class="badge-icon">🌟</span>
+            <div class="badge-name">تميز تسميع الفوج</div>
+            <div class="badge-cond">25% أو أكثر من طلاب الفوج يحصلون على تقييم ممتاز في التسميع</div>
+        </div>
+        <div class="badge-card" style="background:#eef2ff;border-color:#c7d2fe;color:#3730a3">
+            <span class="badge-icon">🏅</span>
+            <div class="badge-name">جودة الفوج العالية</div>
+            <div class="badge-cond">60%+ من الطلاب بتقييم جيد جداً أو ممتاز في تسميع الشهر</div>
+        </div>
+        <div class="badge-card" style="background:#fff1f2;border-color:#fecdd3;color:#881337">
+            <span class="badge-icon">🔥</span>
+            <div class="badge-name">صفر غياب للشيخ</div>
+            <div class="badge-cond">لم يغب الشيخ نفسه ولو يوماً واحداً طوال الشهر كاملاً</div>
+        </div>
+        <div class="badge-card" style="background:#f5f3ff;border-color:#ddd6fe;color:#4c1d95">
+            <span class="badge-icon">🎯</span>
+            <div class="badge-name">انضباط الفوج المرتفع</div>
+            <div class="badge-cond">15 يوماً أو أكثر بحضور طلاب الفوج يتجاوز 90% في اليوم الواحد</div>
+        </div>
+        <div class="badge-card" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
+            <span class="badge-icon">📚</span>
+            <div class="badge-name">ثبات تسجيل الشيخ</div>
+            <div class="badge-cond">سجّل الشيخ 22 حصة أو أكثر في الشهر الواحد دون انقطاع</div>
+        </div>
+        <div class="badge-card" style="background:#f0fdfa;border-color:#99f6e4;color:#134e4a">
+            <span class="badge-icon">⏱️</span>
+            <div class="badge-name">بونص التوثيق السريع</div>
+            <div class="badge-cond">يُمنح لكل حصة توثيقها في خلال 36 ساعة من موعدها — مستقل عن الترتيب</div>
+        </div>
+        <div class="badge-card" style="background:#fef9c3;border-color:#fef08a;color:#713f12">
+            <span class="badge-icon">🔄</span>
+            <div class="badge-name">الحصص التعويضية</div>
+            <div class="badge-cond">+5 نقاط عن كل حصة تعويضية أو إضافية تُثبت اجتهاد الشيخ وعطاءه</div>
+        </div>
+    </div>
+
+    <!-- ══ FOOTER ══ -->
+    <div class="footer">
+        <div>
+            <div class="footer-logo">🕌 حلقات الشافعي القرآنية</div>
+            <div class="footer-text">هذا الدليل رسمي ومعتمد من إدارة الحلقات · يُطبَّق بداية من الشهر الجاري</div>
+        </div>
+        <div style="text-align:left">
+            <div class="footer-text" style="font-weight:900;color:#4f46e5">النظام آلي وموضوعي بالكامل</div>
+            <div class="footer-text">لا يقبل التدخل أو التحيز في الاحتساب</div>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>

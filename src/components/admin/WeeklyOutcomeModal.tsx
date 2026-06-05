@@ -131,7 +131,7 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
     const scrollRef = React.useRef<HTMLDivElement>(null);
 
     const handleSave = async () => {
-        if (!evaluation && evaluation !== 'clear') return;
+        if (!evaluation) return;
         setIsSaving(true);
         try {
             // 1. Save Weekly Outcome

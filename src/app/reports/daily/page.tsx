@@ -293,14 +293,14 @@ export default function DailyReportPage() {
     const filteredReports = useMemo(() => {
         if (filterStatus === 'all') return monthlyReports;
         if (filterStatus === 'pinned') return monthlyReports.filter(r => r.isPinned);
-        return monthlyReports.filter(r => r.status === filterStatus);
+        return monthlyReports.filter(r => r.status === (filterStatus as any));
     }, [monthlyReports, filterStatus]);
 
     const pinnedReports = useMemo(() => monthlyReports.filter(r => r.isPinned), [monthlyReports]);
     const unpinnedReports = useMemo(() => {
         if (filterStatus === 'all') return monthlyReports.filter(r => !r.isPinned);
         if (filterStatus === 'pinned') return [];
-        return monthlyReports.filter(r => !r.isPinned && (filterStatus === 'all' || (r.status as string) === filterStatus));
+        return monthlyReports.filter(r => !r.isPinned && r.status === (filterStatus as any));
     }, [monthlyReports, filterStatus]);
 
     const resetForm = () => {

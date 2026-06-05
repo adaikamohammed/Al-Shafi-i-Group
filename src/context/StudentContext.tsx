@@ -4,7 +4,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry, AdminLog, ActivityLog, Meeting, MeetingSuggestion, InternalNotification, WeeklyOutcome } from '@/lib/types';
-import { isWithinInterval, parseISO, isValid, isAfter, subDays } from 'date-fns';
+import { isWithinInterval, parseISO, isValid, isAfter, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { db, storage } from '@/lib/firebase';
@@ -846,6 +846,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       finalData.groupName,
       studentOwnerId
     );
+
+    // Auto-sync public student report
+    syncPublicStudentReport(studentId);
   };
 
   const deleteStudent = async (studentId: string, ownerId: string) => {
@@ -924,7 +927,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     try {
       // الحفظ في Firebase
       const sessionRef = ref(db, `users/${ownerId}/dailySessions/${session.date}/${session.id}`);
-      await set(sessionRef, sanitizeData({ ...session, ownerId })); // Ensure ownerId is set in the record
+      await set(sessionRef, sanitizeData({ ...session, ownerId, createdAt: session.createdAt || new Date().toISOString() })); // Ensure ownerId and createdAt are set in the record
 
       // تسجيل النشاط
       await logActivity(
@@ -937,6 +940,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         authContextUser.group || 'غير محدد',
         ownerId // The owner of the data
       );
+
+      // Auto-sync public reports for all students in this session
+      const records = session.records || [];
+      records.forEach(r => {
+        if (r.studentId) {
+          syncPublicStudentReport(r.studentId);
+        }
+      });
     } catch (error) {
       console.error("Error saving session:", error);
       throw error;
@@ -1269,6 +1280,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         title: "✅ تم التحديث الجماعي",
         description: `تم تحديث ${surahIds.length} سورة لـ ${studentIds.length} طلاب بنجاح.`,
       });
+
+      // Auto-sync public reports for all updated students
+      studentIds.forEach(id => {
+        syncPublicStudentReport(id);
+      });
     }
   };
 
@@ -1498,6 +1514,130 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const syncPublicStudentReport = async (studentId: string) => {
+    try {
+      const student = students.find(s => s.id === studentId);
+      if (!student) return;
+
+      const pointsConfig = settings.points;
+      const monthStartDate = startOfMonth(new Date());
+      const monthEndDate = endOfMonth(new Date());
+
+      // Get sessions in current month
+      const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(sessionsOnDate =>
+        Object.values(sessionsOnDate).filter(session => {
+          if (!session?.date) return false;
+          try {
+            const sessionDate = parseISO(session.date);
+            return sessionDate >= monthStartDate && sessionDate <= monthEndDate;
+          } catch (e) { return false; }
+        })
+      );
+
+      // Calculate scores for all active students in the same group
+      const groupStudents = students.filter(s => s.status === 'نشط' && s.groupName === student.groupName);
+      const studentScores: Record<string, { id: string; points: number; stats: any }> = {};
+      groupStudents.forEach(s => {
+        studentScores[s.id] = { id: s.id, points: 0, stats: { absent: 0, makeup: 0, calm: 0, medium: 0, undisciplined: 0 } };
+      });
+
+      sessionsInMonth.forEach(session => {
+        (session.records ?? []).forEach(record => {
+          if (studentScores[record.studentId]) {
+            studentScores[record.studentId].points += (pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] || 0);
+            studentScores[record.studentId].points += (pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] || 0);
+            studentScores[record.studentId].points += (pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] || 0);
+            if (record.attendance === 'غائب') studentScores[record.studentId].stats.absent++;
+            if (record.attendance === 'تعويض') studentScores[record.studentId].stats.makeup++;
+            if (record.behavior === 'هادئ') studentScores[record.studentId].stats.calm++;
+            if (record.behavior === 'متوسط') studentScores[record.studentId].stats.medium++;
+            if (record.behavior === 'غير منضبط') studentScores[record.studentId].stats.undisciplined++;
+          }
+        });
+      });
+
+      const rankedStudents = Object.values(studentScores).sort((a, b) => b.points - a.points);
+      const rankIndex = rankedStudents.findIndex(s => s.id === student.id);
+      const rank = rankIndex !== -1 ? rankIndex + 1 : null;
+
+      const currentPoints = studentScores[student.id]?.points || 0;
+      const studentStats = studentScores[student.id]?.stats || { absent: 0, makeup: 0, calm: 0, medium: 0, undisciplined: 0 };
+      const uncompensatedAbsences = studentStats.absent - studentStats.makeup;
+
+      let medal: 'gold' | 'silver' | 'bronze' | null = null;
+      if (rank === 1 && uncompensatedAbsences <= 0 && studentStats.calm > (studentStats.medium + studentStats.undisciplined)) {
+        medal = 'gold';
+      } else if (rank === 2 && uncompensatedAbsences <= 1) {
+        medal = 'silver';
+      } else if (rank === 3 && uncompensatedAbsences <= 2) {
+        medal = 'bronze';
+      }
+
+      // Mastery count
+      const studentMastery = surahProgress[student.id] || {};
+      const masteredCount = Object.values(studentMastery).filter(s => s.status === 2).length;
+
+      // Student records in month
+      const studentRecordsInMonth = sessionsInMonth.flatMap(s => s.records ?? []).filter(r => r.studentId === student.id);
+      const attendanceScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length) / studentRecordsInMonth.length) * 10 : 0;
+      const disciplineScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.behavior === 'هادئ').length * 2 + studentRecordsInMonth.filter(r => r.behavior === 'متوسط').length * 1) / (studentRecordsInMonth.length * 2)) * 10 : 0;
+      const memorizationScore = (masteredCount / 114) * 10; // 114 surahs
+
+      const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط' && c.card !== 'بدون');
+      const latestBadge = settings.badges?.find(b => b.id === 'mastery_king' && currentPoints >= b.threshold) || null;
+
+      // Generate history snapshot
+      const fullHistory: any = {};
+      Object.keys(dailySessions || {}).forEach(date => {
+        const sessions = dailySessions[date];
+        const studentSessions = Object.values(sessions).filter(s =>
+          s.records?.some(r => r.studentId === studentId)
+        );
+        if (studentSessions.length > 0) {
+          fullHistory[date] = {
+            records: studentSessions.flatMap(s => (s.records || []).filter(r => r.studentId === studentId)),
+            isHoliday: studentSessions.some(s => s.isHoliday),
+            isSheikhAbsentNoSub: studentSessions.some(s => s.isSheikhAbsentNoSub),
+            isSheikhAbsentWithSub: studentSessions.some(s => s.isSheikhAbsentWithSub),
+          };
+        }
+      });
+
+      const sheikh = allUsers.find(u => u.uid === student.ownerId);
+      const resolvedSheikhName = sheikh?.displayName || student.sheikhName || 'غير حدد';
+
+      const studentAdminLogs = (adminLogs || []).filter(log => log.studentId === studentId);
+
+      const shareRef = ref(db, `public_student_reports/${studentId}`);
+      await set(shareRef, sanitizeData({
+        student: {
+          ...student,
+          sheikhName: resolvedSheikhName,
+          // Inject pre-calculated portal metrics
+          isPublicReport: true,
+          rank,
+          medal,
+          currentPoints,
+          uncompensatedAbsences,
+          masteredCount,
+          attendanceRate: attendanceScore,
+          disciplineScore,
+          memorizationScore,
+          activeCovenant: activeCovenant || null,
+          latestBadge: latestBadge || null
+        } as any,
+        studentData: fullHistory,
+        adminLogs: studentAdminLogs.reduce((acc: any, log) => {
+          acc[log.id] = log;
+          return acc;
+        }, {}),
+        generatedAt: new Date().toISOString()
+      }));
+    } catch (e) {
+      console.error("Auto-sync public report failed:", e);
+    }
+  };
+
   const transferStudent = async (studentId: string, currentOwnerId: string, targetSheikhId: string, reason: string): Promise<void> => {
     if (!authContextUser) return;
 
@@ -1645,6 +1785,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         targetSheikhId
       );
 
+      // Auto-sync public report
+      syncPublicStudentReport(studentId);
     } catch (error: any) {
       console.error("Transfer error:", error);
       toast({
@@ -1826,6 +1968,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       title: `✅ تم تقييم السورة`,
       description: `التقييم: ${evaluation}`,
     });
+
+    // Auto-sync public student report
+    syncPublicStudentReport(studentId);
   };
 
   const migrateSurahDataToEvaluationSystem = async () => {

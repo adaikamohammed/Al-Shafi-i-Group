@@ -90,7 +90,7 @@ export default function StatsPage() {
     useEffect(() => {
         const usersRef = ref(db, 'users');
 
-        const unsubscribe = onValue(usersRef, (snapshot) => {
+        const unsubscribe = onValue(usersRef, (snapshot: any) => {
             const usersData = snapshot.val();
 
             if (!usersData) {
@@ -283,7 +283,7 @@ export default function StatsPage() {
             });
             setLoading(false);
 
-        }, (error) => {
+        }, (error: any) => {
             console.error("Error fetching stats:", error);
             setLoading(false);
         });

@@ -195,7 +195,7 @@ export default function DuesReportPage() {
     const [selectedQuarter, setSelectedQuarter] = useState(getQuarter(new Date()));
     const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
 
-    const prices = settings?.prices?.renewal || { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 };
+    const prices: Record<string, number> = settings?.prices?.renewal || { 'فئة الأكابر': 2000, 'فئة الأصاغر': 1500 };
 
     // ── جمع بيانات الفصل المحدد لكل طالب ────────────────────
     const studentsWithStatus = useMemo(() => {

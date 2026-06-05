@@ -142,7 +142,7 @@ export default function SiteUpdatesPage() {
 
     useEffect(() => {
         const updatesRef = ref(db, 'site_updates');
-        const unsubscribe = onValue(updatesRef, (snapshot) => {
+        const unsubscribe = onValue(updatesRef, (snapshot: any) => {
             if (snapshot.exists()) {
                 const data = snapshot.val();
                 const updatesList = Object.entries(data).map(([id, val]: [string, any]) => ({

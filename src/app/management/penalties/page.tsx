@@ -69,7 +69,7 @@ export default function PenaltiesPage() {
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
 
     // Filters
-    const [selectedGroup, setSelectedGroup] = useState<string>('all');
+    const [selectedGroup, setSelectedGroup] = useState<string>('sheikhs');
     const [timeframe, setTimeframe] = useState<'today' | 'week' | 'month' | 'custom'>('month'); // Changed default to month
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
@@ -138,8 +138,20 @@ export default function PenaltiesPage() {
         if (user && !isSuperAdmin && !isManagement && user.group) {
             result = result.filter(s => s.groupName === user.group);
         } else if (selectedGroup !== 'all') {
-            // Normal filter for admins
-            result = result.filter(s => s.groupName === selectedGroup);
+            if (selectedGroup === 'sheikhs') {
+                result = result.filter(s => {
+                    const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
+                    return num >= 1 && num <= 9;
+                });
+            } else if (selectedGroup === 'ustadhat') {
+                result = result.filter(s => {
+                    const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
+                    return num >= 10 && num <= 18;
+                });
+            } else {
+                // Normal filter for admins
+                result = result.filter(s => s.groupName === selectedGroup);
+            }
         }
 
         // Filter by Search
@@ -328,7 +340,17 @@ export default function PenaltiesPage() {
 
         students.forEach(student => {
             // Enforce Group Filter
-            if (selectedGroup !== 'all' && student.groupName !== selectedGroup) return;
+            if (selectedGroup !== 'all') {
+                if (selectedGroup === 'sheikhs') {
+                    const num = parseInt(student.groupName?.replace(/\D/g, '') || '0');
+                    if (num < 1 || num > 9) return;
+                } else if (selectedGroup === 'ustadhat') {
+                    const num = parseInt(student.groupName?.replace(/\D/g, '') || '0');
+                    if (num < 10 || num > 18) return;
+                } else if (student.groupName !== selectedGroup) {
+                    return;
+                }
+            }
             if (user && !isSuperAdmin && !isManagement && user.group && student.groupName !== user.group) return;
 
             if (student.covenants) {
@@ -368,7 +390,17 @@ export default function PenaltiesPage() {
         const logs: any[] = [];
         students.forEach(student => {
             // Enforce Group Filter
-            if (selectedGroup !== 'all' && student.groupName !== selectedGroup) return;
+            if (selectedGroup !== 'all') {
+                if (selectedGroup === 'sheikhs') {
+                    const num = parseInt(student.groupName?.replace(/\D/g, '') || '0');
+                    if (num < 1 || num > 9) return;
+                } else if (selectedGroup === 'ustadhat') {
+                    const num = parseInt(student.groupName?.replace(/\D/g, '') || '0');
+                    if (num < 10 || num > 18) return;
+                } else if (student.groupName !== selectedGroup) {
+                    return;
+                }
+            }
             // Double check for safety
             if (user && !isSuperAdmin && !isManagement && user.group && student.groupName !== user.group) return;
 
@@ -395,7 +427,17 @@ export default function PenaltiesPage() {
 
         students.forEach(s => {
             // Enforce Group Filter
-            if (selectedGroup !== 'all' && s.groupName !== selectedGroup) return;
+            if (selectedGroup !== 'all') {
+                if (selectedGroup === 'sheikhs') {
+                    const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
+                    if (num < 1 || num > 9) return;
+                } else if (selectedGroup === 'ustadhat') {
+                    const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
+                    if (num < 10 || num > 18) return;
+                } else if (s.groupName !== selectedGroup) {
+                    return;
+                }
+            }
             // Double check for safety
             if (user && !isSuperAdmin && !isManagement && user.group && s.groupName !== user.group) return;
 
@@ -503,7 +545,9 @@ export default function PenaltiesPage() {
                                 <SelectValue placeholder="اختر الفوج" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">كل الأفواج</SelectItem>
+                                <SelectItem value="sheikhs">أفواج المشايخ</SelectItem>
+                                <SelectItem value="ustadhat">أفواج الأستاذات</SelectItem>
+                                <SelectItem value="all">كل أفواج المدرسة</SelectItem>
                                 {groupsList.map(g => (
                                     <SelectItem key={g.groupName} value={g.groupName}>
                                         {g.groupName} - {g.sheikhName}

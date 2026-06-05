@@ -127,7 +127,7 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
                 dailyMemorizationAmount: data.memorizationAmount,
                 notes: data.notes,
                 covenants: covenants,
-                photoURL: selectedAvatarId ? photoPreview : (student?.photoURL || null),
+                photoURL: (selectedAvatarId ? photoPreview : student?.photoURL) || undefined,
                 ownerId: student?.ownerId || user?.uid || ''
             };
 
@@ -401,7 +401,7 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
                         <h3 className="text-lg font-headline font-bold text-primary flex items-center gap-2">
                             <ShieldAlert className="h-5 w-5" /> مهام التمكين والمواثيق التأديبية
                         </h3>
-                        <Button type="button" variant="primary" size="sm" onClick={handleAddCovenant} className="font-headline font-bold shadow-md">
+                        <Button type="button" variant="default" size="sm" onClick={handleAddCovenant} className="font-headline font-bold shadow-md">
                             <PlusCircle className="ml-2 h-4 w-4" /> إضافة ميثاق
                         </Button>
                     </div>

@@ -302,7 +302,7 @@ export default function ComparisonPage() {
 
                     // Performance
                     const perf = record.memorization;
-                    if (perf && perf !== 'لا يوجد' && perf !== '') {
+                    if (perf && perf !== 'لا يوجد' && (perf as any) !== '') {
                         stats.assessedPerformanceSessions++;
                         stats.performancePoints += PERFORMANCE_POINTS[perf] ?? 0;
                         
@@ -315,7 +315,7 @@ export default function ComparisonPage() {
 
                     // Behavior
                     const beh = record.behavior;
-                    if (beh && beh !== '') {
+                    if (beh && (beh as any) !== '') {
                         stats.assessedBehaviorSessions++;
                         stats.behaviorPoints += BEHAVIOR_POINTS[beh] ?? 0;
 

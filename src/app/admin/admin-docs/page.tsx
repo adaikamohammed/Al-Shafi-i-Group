@@ -39,7 +39,7 @@ export default function AdminDocsPage() {
     // Filter states for History
     const [filterType, setFilterType] = useState<string>('all');
     const [filterDate, setFilterDate] = useState<string>('');
-    const [filterSheikh, setFilterSheikh] = useState<string>('all');
+    const [filterSheikh, setFilterSheikh] = useState<string>('sheikhs');
 
     // Summon State
     const [summonDate, setSummonDate] = useState('');
@@ -302,7 +302,20 @@ export default function AdminDocsPage() {
         return adminLogs.filter(log => {
             const matchType = filterType === 'all' || log.type === filterType;
             const matchDate = !filterDate || log.date === filterDate;
-            const matchSheikh = filterSheikh === 'all' || log.groupName === filterSheikh;
+            
+            let matchSheikh = false;
+            if (filterSheikh === 'all') {
+                matchSheikh = true;
+            } else if (filterSheikh === 'sheikhs') {
+                const num = parseInt(log.groupName?.replace(/\D/g, '') || '0');
+                matchSheikh = num >= 1 && num <= 9;
+            } else if (filterSheikh === 'ustadhat') {
+                const num = parseInt(log.groupName?.replace(/\D/g, '') || '0');
+                matchSheikh = num >= 10 && num <= 18;
+            } else {
+                matchSheikh = log.groupName === filterSheikh;
+            }
+            
             return matchType && matchDate && matchSheikh;
         }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     }, [adminLogs, filterType, filterDate, filterSheikh]);
@@ -690,7 +703,9 @@ export default function AdminDocsPage() {
                                         onChange={(e) => setFilterSheikh(e.target.value)}
                                         className="bg-black/20 border-white/10 rounded-lg text-xs font-bold p-2 outline-none focus:ring-1 ring-primary"
                                     >
-                                        <option value="all">كل الأفواج</option>
+                                        <option value="sheikhs">أفواج المشايخ</option>
+                                        <option value="ustadhat">أفواج الأستاذات</option>
+                                        <option value="all">كل أفواج المدرسة</option>
                                         {sheikhGroups.map(g => (
                                             <option key={g} value={g}>{g}</option>
                                         ))}
@@ -699,7 +714,7 @@ export default function AdminDocsPage() {
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => { setFilterType('all'); setFilterDate(''); setFilterSheikh('all'); }}
+                                        onClick={() => { setFilterType('all'); setFilterDate(''); setFilterSheikh('sheikhs'); }}
                                         className="text-[10px] h-8"
                                     >
                                         إعادة تعيين

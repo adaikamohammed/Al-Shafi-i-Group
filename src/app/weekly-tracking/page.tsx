@@ -149,7 +149,7 @@ export default function WeeklyFollowUpPage() {
     const { students, dailySessions, loading, allUsers } = useStudentContext();
     const { user, isSuperAdmin, isManagement } = useAuth();
     const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
-    const [selectedGroup, setSelectedGroup] = useState<string>('all'); // For admin/management filtering
+    const [selectedGroup, setSelectedGroup] = useState<string>('sheikhs'); // For admin/management filtering
     const [currentDate, setCurrentDate] = useState(new Date());
 
     const isAdmin5 = user?.email === 'admin5@gmail.com';
@@ -159,15 +159,27 @@ export default function WeeklyFollowUpPage() {
     const activeStudents = useMemo(() => {
         let filtered = (students ?? []).filter(s => s.status === 'نشط');
 
-        // If admin/management, filter by selected group (selectedGroup is UID)
+        // If admin/management, filter by selected group (selectedGroup is UID or category)
         if ((isSuperAdmin || isManagement) && selectedGroup !== 'all') {
-            const sheikh = allUsers.find(u => u.uid === selectedGroup);
-            if (sheikh?.group) {
-                // Filter by group name instead of UID to catch students reassigned or with mismatched ownerIds
-                filtered = filtered.filter(s => s.groupName === sheikh.group);
+            if (selectedGroup === 'sheikhs') {
+                filtered = filtered.filter(s => {
+                    const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
+                    return num >= 1 && num <= 9;
+                });
+            } else if (selectedGroup === 'ustadhat') {
+                filtered = filtered.filter(s => {
+                    const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
+                    return num >= 10 && num <= 18;
+                });
             } else {
-                // Fallback to UID if sheikh group is not found
-                filtered = filtered.filter(s => s.ownerId === selectedGroup);
+                const sheikh = allUsers.find(u => u.uid === selectedGroup);
+                if (sheikh?.group) {
+                    // Filter by group name instead of UID to catch students reassigned or with mismatched ownerIds
+                    filtered = filtered.filter(s => s.groupName === sheikh.group);
+                } else {
+                    // Fallback to UID if sheikh group is not found
+                    filtered = filtered.filter(s => s.ownerId === selectedGroup);
+                }
             }
         }
 
@@ -263,7 +275,9 @@ export default function WeeklyFollowUpPage() {
                                         <SelectValue placeholder="اختر الفوج" />
                                     </SelectTrigger>
                                     <SelectContent className="max-h-[300px]">
-                                        <SelectItem value="all">كل الأفواج</SelectItem>
+                                        <SelectItem value="sheikhs">أفواج المشايخ</SelectItem>
+                                        <SelectItem value="ustadhat">أفواج الأستاذات</SelectItem>
+                                        <SelectItem value="all">كل أفواج المدرسة</SelectItem>
                                         {uniqueGroups.map((group) => (
                                             <SelectItem key={group.uid} value={group.uid}>
                                                 {group.group} - {group.displayName}

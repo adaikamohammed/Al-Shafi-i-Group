@@ -194,7 +194,7 @@ export function SurahStatsChart({ students, surahProgress }: SurahStatsChartProp
                                 mastered={surah.mastered}
                                 memorized={surah.memorized}
                                 total={surah.activeCount}
-                                isLight={theme.isLight}
+                                isLight={!!theme.isLight}
                             />
                         ))}
                     </div>

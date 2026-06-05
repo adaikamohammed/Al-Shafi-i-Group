@@ -16,12 +16,13 @@ export const AssistantReport = ({ data, timeframe }: AssistantReportProps) => {
     const topEvaluation = [...data].sort((a, b) => b.evaluationScore - a.evaluationScore)[0];
     const averageAttendance = data.reduce((acc, curr) => acc + curr.attendanceRate, 0) / (data.length || 1);
 
-    const timeframeText = {
+    const mapping: Record<string, string> = {
         'weekly': 'الأسبوعي',
         'monthly': 'الشهري',
         'seasonal': 'الفصلي',
         'yearly': 'السنوي'
-    }[timeframe as keyof typeof timeframeText] || 'الدوري';
+    };
+    const timeframeText = mapping[timeframe] || 'الدوري';
 
     return (
         <Card className="border-none shadow-2xl bg-gradient-to-br from-indigo-900/40 via-slate-900/40 to-emerald-900/20 backdrop-blur-xl border border-white/10">

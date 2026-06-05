@@ -42,8 +42,11 @@ const ACTION_CONFIG: Record<ActivityAction, { label: string, color: string, icon
     'DELETE_SESSION': { label: 'حذف حصة', color: 'bg-orange-100 text-orange-700', icon: Trash2 },
     'SAVE_REPORT': { label: 'حفظ تقرير', color: 'bg-purple-100 text-purple-700', icon: FileText },
     'DELETE_REPORT': { label: 'حذف تقرير', color: 'bg-rose-100 text-rose-700', icon: Trash2 },
+    'UPDATE_SURAH_PROGRESS': { label: 'تحديث الحفظ', color: 'bg-amber-100 text-amber-700', icon: Edit },
     'UPDATE_PRE_REGISTRATION': { label: 'تعديل تسجيل', color: 'bg-blue-50 text-blue-600', icon: Edit },
     'DELETE_PRE_REGISTRATION': { label: 'حذف تسجيل', color: 'bg-red-50 text-red-600', icon: Trash2 },
+    'MOVE_SESSION': { label: 'نقل حصة', color: 'bg-indigo-100 text-indigo-700', icon: Calendar },
+    'ADMIN_MSG': { label: 'رسالة إدارية', color: 'bg-teal-100 text-teal-700', icon: Activity },
 };
 
 const KNOWN_ACTORS = [
@@ -71,7 +74,7 @@ export default function ActivityLogsPage() {
     useEffect(() => {
         const logsRef = query(ref(db, 'activity_logs'), limitToLast(200));
 
-        const unsubscribe = onValue(logsRef, (snapshot) => {
+        const unsubscribe = onValue(logsRef, (snapshot: any) => {
             if (snapshot.exists()) {
                 const data = snapshot.val();
                 const logsArray: LogEntry[] = Object.entries(data).map(([key, value]: [string, any]) => ({
@@ -91,7 +94,7 @@ export default function ActivityLogsPage() {
                 setLogs([]);
             }
             setLoading(false);
-        }, (err) => {
+        }, (err: any) => {
             console.error("Firebase Read Error:", err);
             setError(err.message);
             setLoading(false);

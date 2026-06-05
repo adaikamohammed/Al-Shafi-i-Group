@@ -241,7 +241,7 @@ export default function PublicStudentRecordPage() {
         if (!studentId) return;
 
         const reportRef = ref(db, `public_student_reports/${studentId}`);
-        const listener = onValue(reportRef, (snap: DataSnapshot) => {
+        const listener = onValue(reportRef, (snap: any) => {
             if (snap.exists()) {
                 setSnapshot(snap.val());
             } else {
@@ -277,7 +277,27 @@ export default function PublicStudentRecordPage() {
     };
 
     const { stats: periodStats } = useMemo(() => {
-        if (!studentData) return { stats: { attendanceRate: 0, totalPresent: 0, totalAbsent: 0, totalLate: 0, avgEval: '---', sheikhAbsenceNoSub: 0, sheikhAbsenceWithSub: 0 }, displayStats: snapshot?.stats };
+        if (!studentData) return {
+            stats: {
+                attendanceRate: '0',
+                totalPresent: 0,
+                totalAbsent: 0,
+                totalLate: 0,
+                avgEval: '---',
+                sheikhAbsenceNoSub: 0,
+                sheikhAbsenceWithSub: 0,
+                hasSession2: false,
+                presentCount1: 0,
+                presentCount2: 0,
+                lateCount1: 0,
+                lateCount2: 0,
+                absentCount1: 0,
+                absentCount2: 0,
+                rate1: '0',
+                rate2: '0'
+            },
+            displayStats: snapshot?.stats
+        };
 
         let startDate: Date;
         let endDate: Date;
@@ -467,7 +487,7 @@ export default function PublicStudentRecordPage() {
                                     </div>
                                     <div className="text-center md:text-right">
                                         <p className="text-[10px] font-black text-muted-foreground opacity-50 uppercase mb-1">الرقم التعريفي</p>
-                                        <p className="font-bold text-sm tracking-tighter opacity-80">#{studentId.substring(0, 8)}</p>
+                                        <p className="font-bold text-sm tracking-tighter opacity-80">#{studentId?.substring(0, 8) || ''}</p>
                                     </div>
                                 </div>
                             </div>

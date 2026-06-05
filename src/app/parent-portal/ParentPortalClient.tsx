@@ -19,6 +19,9 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { db } from '@/lib/firebase';
+import { ref, get } from 'firebase/database';
+import { isValid } from 'date-fns';
 
 
 const calculateAge = (birthDate?: Date) => {
@@ -28,8 +31,23 @@ const calculateAge = (birthDate?: Date) => {
     return Math.abs(ageDate.getUTCFullYear() - 1970);
 };
 
-const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Student | null, onVerificationSuccess?: () => void }) => {
-    const { students, dailySessions, surahProgress, settings, loading } = useStudentContext();
+const ParentPortalContent = ({ 
+    student, 
+    students,
+    dailySessions,
+    surahProgress,
+    settings,
+    loading,
+    onVerificationSuccess 
+}: { 
+    student: Student | null, 
+    students: Student[],
+    dailySessions: any,
+    surahProgress: any,
+    settings: any,
+    loading: boolean,
+    onVerificationSuccess?: () => void 
+}) => {
     const { user: authUser } = useAuth();
     const { toast } = useToast();
     const [phoneInput, setPhoneInput] = useState('');
@@ -65,7 +83,13 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
         const phone1 = student.phone1?.replace(/\s+/g, '');
         const phone2 = student.phone2?.replace(/\s+/g, '');
 
-        if (formattedInput === phone1 || formattedInput === phone2) {
+        if (!phone1 && !phone2) {
+            toast({ title: "رقم الهاتف غير مسجل", description: "لا يوجد رقم هاتف مسجل لولي الأمر في سجلات الطالب. يرجى الاتصال بالإدارة.", variant: "destructive" });
+            setIsVerifying(false);
+            return;
+        }
+
+        if ((phone1 && formattedInput === phone1) || (phone2 && formattedInput === phone2)) {
             localStorage.setItem(verificationKey, JSON.stringify({ verified: true, timestamp: new Date().getTime() }));
             setIsVerified(true);
             if (onVerificationSuccess) onVerificationSuccess();
@@ -79,6 +103,24 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
     const studentData = useMemo(() => {
         if (loading || !student) return null;
 
+        if ((student as any).isPublicReport) {
+            const radarData = [
+                { subject: 'الحاضر', score: parseFloat(((student as any).attendanceRate || 0).toFixed(1)), fullMark: 10 },
+                { subject: 'الحفظ', score: parseFloat(((student as any).memorizationScore || 0).toFixed(1)), fullMark: 10 },
+                { subject: 'الانضباط', score: parseFloat(((student as any).disciplineScore || 0).toFixed(1)), fullMark: 10 },
+            ];
+
+            return {
+                rank: (student as any).rank || null,
+                medal: (student as any).medal || null,
+                radarData,
+                uncompensatedAbsences: (student as any).uncompensatedAbsences || 0,
+                activeCovenant: (student as any).activeCovenant || null,
+                currentPoints: (student as any).currentPoints || 0,
+                latestBadge: (student as any).latestBadge || null
+            };
+        }
+
         const pointsConfig = settings.points;
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
@@ -86,8 +128,8 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
         const monthStartDate = startOfMonth(new Date());
         const monthEndDate = endOfMonth(new Date());
 
-        const sessionsInMonth = Object.values(dailySessions ?? {}).flatMap(sessionsOnDate =>
-            Object.values(sessionsOnDate).filter(session => {
+        const sessionsInMonth = Object.values(dailySessions as Record<string, any> ?? {}).flatMap((sessionsOnDate: any) =>
+            Object.values(sessionsOnDate || {}).filter((session: any) => {
                 if (!session?.date) return false;
                 try {
                     const sessionDate = parseISO(session.date);
@@ -101,8 +143,8 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
             studentScores[s.id] = { id: s.id, points: 0, stats: { absent: 0, makeup: 0, calm: 0, medium: 0, undisciplined: 0 } };
         });
 
-        sessionsInMonth.forEach(session => {
-            (session.records ?? []).forEach(record => {
+        sessionsInMonth.forEach((session: any) => {
+            (session.records ?? []).forEach((record: any) => {
                 if (studentScores[record.studentId]) {
                     studentScores[record.studentId].points += (pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] || 0);
                     studentScores[record.studentId].points += (pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] || 0);
@@ -134,11 +176,11 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
         }
 
         const studentMastery = surahProgress[student.id] || {};
-        const masteredCount = Object.values(studentMastery).filter(s => s.status === 2).length;
+        const masteredCount = Object.values(studentMastery as Record<string, any>).filter((s: any) => s.status === 2).length;
 
-        const studentRecordsInMonth = sessionsInMonth.flatMap(s => s.records ?? []).filter(r => r.studentId === student.id);
-        const attendanceScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length) / studentRecordsInMonth.length) * 10 : 0;
-        const disciplineScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.behavior === 'هادئ').length * 2 + studentRecordsInMonth.filter(r => r.behavior === 'متوسط').length * 1) / (studentRecordsInMonth.length * 2)) * 10 : 0;
+        const studentRecordsInMonth = sessionsInMonth.flatMap((s: any) => s.records ?? []).filter((r: any) => r.studentId === student.id);
+        const attendanceScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter((r: any) => r.attendance === 'حاضر' || r.attendance === 'متأخر').length) / studentRecordsInMonth.length) * 10 : 0;
+        const disciplineScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter((r: any) => r.behavior === 'هادئ').length * 2 + studentRecordsInMonth.filter((r: any) => r.behavior === 'متوسط').length * 1) / (studentRecordsInMonth.length * 2)) * 10 : 0;
         const memorizationScore = (masteredCount / allSurahs.length) * 10;
 
         const radarData = [
@@ -148,7 +190,7 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
         ];
 
         const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط' && c.card !== 'بدون');
-        const latestBadge = settings.badges.find(b => b.id === 'mastery_king' && currentPoints >= b.threshold);
+        const latestBadge = settings.badges?.find((b: any) => b.id === 'mastery_king' && currentPoints >= b.threshold);
 
         return { rank, medal, radarData, uncompensatedAbsences, activeCovenant, currentPoints, latestBadge };
 
@@ -229,7 +271,7 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
         <div className="min-h-screen bg-gray-50 p-4 md:p-8">
             <div className="max-w-4xl mx-auto">
                 <header className="flex flex-col md:flex-row items-center gap-6 p-6 bg-white rounded-xl shadow-lg border-b-4 border-primary mb-8">
-                    <Avatar className={cn("w-28 h-28 border-4", medal ? medalClasses[medal] : 'border-muted')}>
+                    <Avatar className={cn("w-28 h-28 border-4", medal ? (medalClasses as any)[medal] : 'border-muted')}>
                         <AvatarImage src={student.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${student.fullName}`} alt={student.fullName} />
                         <AvatarFallback>{student.fullName.charAt(0)}</AvatarFallback>
                     </Avatar>
@@ -355,11 +397,33 @@ const ParentPortalContent = ({ student, onVerificationSuccess }: { student: Stud
 
 
 export default function ParentPortalStudentPage() {
-    const { students, loading: contextLoading } = useStudentContext();
+    const { 
+        students: contextStudents, 
+        dailySessions: contextSessions, 
+        surahProgress: contextProgress, 
+        settings: contextSettings, 
+        loading: contextLoading 
+    } = useStudentContext();
+    const { user: authUser } = useAuth();
     const params = useParams();
     const searchParams = useSearchParams();
 
-    // Support both dynamic route /parent-portal/ID and query param /parent-portal?id=ID
+    const [portalData, setPortalData] = useState<{
+        student: Student | null;
+        dailySessions: any;
+        surahProgress: any;
+        settings: any;
+        students: Student[];
+        loading: boolean;
+    }>({
+        student: null,
+        dailySessions: {},
+        surahProgress: {},
+        settings: {},
+        students: [],
+        loading: true,
+    });
+
     const studentID = useMemo(() => {
         const pId = params?.studentID as string;
         const qId = searchParams.get('id');
@@ -367,20 +431,78 @@ export default function ParentPortalStudentPage() {
         return qId;
     }, [params, searchParams]);
 
-    const student = useMemo(() => {
-        if (!studentID || !students || students.length === 0) return null;
-        return students.find(s => s.id === studentID);
-    }, [students, studentID]);
+    // Scenario A: Sheikh/Admin is logged in
+    useEffect(() => {
+        if (authUser && !contextLoading) {
+            const student = contextStudents.find(s => s.id === studentID) || null;
+            setPortalData({
+                student,
+                dailySessions: contextSessions,
+                surahProgress: contextProgress,
+                settings: contextSettings,
+                students: contextStudents,
+                loading: false
+            });
+        }
+    }, [authUser, contextLoading, contextStudents, contextSessions, contextProgress, contextSettings, studentID]);
 
-    if (contextLoading) {
+    // Scenario B: Visitor is a parent (anonymous)
+    useEffect(() => {
+        if (!authUser) {
+            if (!studentID) {
+                setPortalData(prev => ({ ...prev, loading: false }));
+                return;
+            }
+
+            setPortalData(prev => ({ ...prev, loading: true }));
+            const reportRef = ref(db, `public_student_reports/${studentID}`);
+            get(reportRef).then((snapshot: any) => {
+                const reportData = snapshot.val();
+                if (!reportData) {
+                    setPortalData(prev => ({ ...prev, loading: false }));
+                    return;
+                }
+
+                const s = reportData.student;
+                if (!s) {
+                    setPortalData(prev => ({ ...prev, loading: false }));
+                    return;
+                }
+
+                const parsedStudent: Student = {
+                    ...s,
+                    birthDate: s.birthDate ? parseISO(s.birthDate) : new Date(),
+                    registrationDate: s.registrationDate ? parseISO(s.registrationDate) : new Date(),
+                    updatedAt: s.updatedAt ? parseISO(s.updatedAt) : new Date(),
+                    covenants: s.covenants ? Object.values(s.covenants) : [],
+                };
+
+                setPortalData({
+                    student: parsedStudent,
+                    dailySessions: reportData.studentData || {},
+                    surahProgress: {},
+                    settings: contextSettings,
+                    students: [], // Not needed on client since isPublicReport is true
+                    loading: false
+                });
+            }).catch((err: any) => {
+                console.error("Error fetching student publicly:", err);
+                setPortalData(prev => ({ ...prev, loading: false }));
+            });
+        }
+    }, [authUser, studentID, contextSettings]);
+
+    const isLoading = authUser ? contextLoading : portalData.loading;
+
+    if (isLoading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
+            <div className="flex items-center justify-center min-h-screen bg-gray-50">
                 <Loader2 className="h-16 w-16 animate-spin text-primary" />
             </div>
         );
     }
 
-    if (!student && !contextLoading) {
+    if (!portalData.student && !isLoading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-center p-4">
                 <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
@@ -390,8 +512,17 @@ export default function ParentPortalStudentPage() {
                     <Button variant="outline" className="mt-4">العودة إلى دوري التميز</Button>
                 </Link>
             </div>
-        )
+        );
     }
 
-    return <ParentPortalContent student={student} />;
+    return (
+        <ParentPortalContent 
+            student={portalData.student} 
+            students={portalData.students}
+            dailySessions={portalData.dailySessions}
+            surahProgress={portalData.surahProgress}
+            settings={portalData.settings}
+            loading={isLoading}
+        />
+    );
 }

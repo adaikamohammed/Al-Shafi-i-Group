@@ -59,6 +59,18 @@
         "admin_documents": {
             ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')",
             ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')"
+        },
+        "settings": {
+            "sheikh_scoring_weights": {
+                ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')",
+                ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')"
+            },
+            "sheikh_goals": {
+                "$monthKey": {
+                    ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')",
+                    ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')"
+                }
+            }
         }
     }
 }

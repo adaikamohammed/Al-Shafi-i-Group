@@ -6,6 +6,8 @@ interface SummerCampReportProps {
     categoryFilter: string;
     providerFilter: string;
     date: Date;
+    showCategory?: boolean;
+    showNotes?: boolean;
 }
 
 const CATEGORIES = {

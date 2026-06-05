@@ -10,7 +10,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { FileText, Upload, Trash2, Download, Search, File, Loader2, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { formatBytes } from '@/lib/utils'; // Assuming this utility exists or I'll implement inline
 import { useToast } from '@/hooks/use-toast';
 
 // Simple bytes formatter if utils doesn't have it

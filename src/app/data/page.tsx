@@ -124,7 +124,7 @@ export default function DataExchangePage() {
                 const json = XLSX.utils.sheet_to_json<any>(worksheet, { raw: false, defval: null });
 
                 const existingStudentNames = new Set((students ?? []).map(s => s.fullName.trim().toLowerCase()));
-                const newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'>[] = [];
+                const newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[] = [];
                 let skippedCount = 0;
                 let invalidDateCount = 0;
                 let errorList: string[] = [];
@@ -161,7 +161,7 @@ export default function DataExchangePage() {
                         return; // Skip this student
                     }
 
-                    const studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount'> = {
+                    const studentData: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'> = {
                         fullName: fullName,
                         gender: gender as 'ذكر' | 'أنثى',
                         guardianName: (row['اسم الولي'] || 'N/A').trim(),

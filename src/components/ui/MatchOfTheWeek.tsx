@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Swords, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import type { LeagueStat } from '@/app/league/page';
+import type { LeagueStat } from '@/lib/types';
 
 export const MatchOfTheWeek = ({ leagueTable }: { leagueTable: LeagueStat[] }) => {
     

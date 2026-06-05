@@ -42,7 +42,7 @@ export const SurahEvaluationView: React.FC<SurahEvaluationViewProps> = ({
         if (onSurahChange) onSurahChange(id);
     };
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterGroup, setFilterGroup] = useState<string>('all');
+    const [filterGroup, setFilterGroup] = useState<string>('sheikhs');
     const [filterStatus, setFilterStatus] = useState<'all' | 'evaluated' | 'not_evaluated'>('all');
     const [activeTab, setActiveTab] = useState<'table' | 'distribution'>('table');
 
@@ -54,7 +54,19 @@ export const SurahEvaluationView: React.FC<SurahEvaluationViewProps> = ({
         let result = students.filter(s => s.status === 'نشط'); // Only active students
 
         if (filterGroup !== 'all') {
-            result = result.filter(s => s.groupName === filterGroup);
+            if (filterGroup === 'sheikhs') {
+                result = result.filter(s => {
+                    const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
+                    return num >= 1 && num <= 9;
+                });
+            } else if (filterGroup === 'ustadhat') {
+                result = result.filter(s => {
+                    const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
+                    return num >= 10 && num <= 18;
+                });
+            } else {
+                result = result.filter(s => s.groupName === filterGroup);
+            }
         }
 
         if (filterStatus !== 'all') {
@@ -248,7 +260,9 @@ export const SurahEvaluationView: React.FC<SurahEvaluationViewProps> = ({
                                             value={filterGroup}
                                             onChange={(e) => setFilterGroup(e.target.value)}
                                         >
-                                            <option value="all">كل الأفواج</option>
+                                            <option value="sheikhs">أفواج المشايخ</option>
+                                            <option value="ustadhat">أفواج الأستاذات</option>
+                                            <option value="all">كل أفواج المدرسة</option>
                                             {groups.map(g => <option key={g} value={g}>{g}</option>)}
                                         </select>
                                     </div>

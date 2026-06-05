@@ -47,6 +47,8 @@ const ACTION_CONFIG: Record<ActivityAction, { label: string, color: string, icon
     'UPDATE_SURAH_PROGRESS': { label: 'تحديث الحفظ', color: 'bg-amber-100 text-amber-700', icon: Edit },
     'UPDATE_PRE_REGISTRATION': { label: 'تعديل تسجيل', color: 'bg-blue-50 text-blue-600', icon: Edit },
     'DELETE_PRE_REGISTRATION': { label: 'حذف تسجيل', color: 'bg-red-50 text-red-600', icon: Trash2 },
+    'MOVE_SESSION': { label: 'نقل حصة', color: 'bg-indigo-100 text-indigo-700', icon: Calendar },
+    'ADMIN_MSG': { label: 'رسالة إدارية', color: 'bg-teal-100 text-teal-700', icon: Activity },
 };
 
 export default function ActivityLogsPage() {
@@ -70,7 +72,7 @@ export default function ActivityLogsPage() {
             setLoading(true);
             const logPath = `users/${user.uid}/activity_logs`;
             const logsRef = query(ref(db, logPath), limitToLast(200));
-            const unsub = onValue(logsRef, (snapshot) => {
+            const unsub = onValue(logsRef, (snapshot: any) => {
                 if (snapshot.exists()) {
                     const logsArray: LogEntry[] = Object.entries(snapshot.val()).map(([key, value]: [string, any]) => ({
                         id: key,
@@ -87,7 +89,7 @@ export default function ActivityLogsPage() {
                     setLogs([]);
                 }
                 setLoading(false);
-            }, (err) => {
+            }, (err: any) => {
                 console.error("User Logs Read Error:", err);
                 setError(err.message);
                 setLoading(false);

@@ -77,7 +77,7 @@ export default function PointsSystemPage() {
             
              // Add bonus points for fulfilled covenants
             (student.covenants || []).forEach(covenant => {
-                if (covenant.status === 'تم الوفاء به') {
+                if (covenant.status === 'تم الوفاء بها') {
                      try {
                         const covenantDate = parseISO(covenant.date);
                         if(!seasonStartDate || isAfter(covenantDate, seasonStartDate)) {
@@ -239,7 +239,7 @@ export default function PointsSystemPage() {
                                             <TooltipTrigger className="w-full">
                                                 <Button 
                                                     className="w-full"
-                                                    disabled={!selectedStudentId || !canAfford || isLocked}
+                                                    disabled={!selectedStudentId || !canAfford || !!isLocked}
                                                     onClick={() => handleRedeem(prize)}
                                                 >
                                                     {isLocked && <Lock className="ml-2 h-4 w-4" />}
