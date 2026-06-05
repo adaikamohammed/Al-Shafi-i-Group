@@ -30,6 +30,7 @@ export const PAGE_PERMISSIONS: PagePermission[] = [
     { path: '/settings', label: 'الإعدادات', icon: 'Settings', allowedRoles: ['super_admin', 'management'] },
     { path: '/management/monitoring', label: 'نظام المراقبة', icon: 'BarChart3', allowedRoles: ['super_admin', 'management'] },
     { path: '/management/sheikh-monitoring', label: 'مراقبة المشايخ', icon: 'Activity', allowedRoles: ['super_admin', 'management'] },
+    { path: '/management/my-stats', label: 'إحصائياتي الشخصية', icon: 'BarChart3', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/management/penalties', label: 'إدارة العقوبات', icon: 'Gavel', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/admin/admin-docs', label: 'الأوصال الإدارية', icon: 'ClipboardList', allowedRoles: ['sheikh', 'super_admin', 'management'] },
     { path: '/guide', label: 'الدليل', icon: 'HelpCircle', allowedRoles: ['sheikh', 'super_admin', 'management'] },

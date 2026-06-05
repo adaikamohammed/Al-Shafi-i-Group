@@ -666,6 +666,22 @@ export default function SheikhMonitoringPage() {
         else setStatsMonth(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1));
     };
 
+    const updateActiveDateMonthYear = (newYear: number, newMonth: number) => {
+        const updateDate = (prev: Date) => {
+            const d = new Date(prev);
+            d.setFullYear(newYear);
+            d.setMonth(newMonth);
+            return d;
+        };
+        if (view === 'students') {
+            setStudentSelectedDate(updateDate);
+        } else if (view === 'stats' || view === 'badges' || view === 'behavior' || view === 'heatmap' || view === 'chart') {
+            setStatsMonth(updateDate);
+        } else {
+            setSelectedDate(updateDate);
+        }
+    };
+
     const navLabel = view === 'badges'
         ? `التكريم والمتصدرين — ${format(statsMonth, 'MMMM yyyy', { locale: ar })}`
         : view === 'behavior'
@@ -771,17 +787,65 @@ export default function SheikhMonitoringPage() {
                 </div>
 
                 {/* ── Date Navigation ── */}
-                <div className="flex items-center justify-between bg-card border rounded-xl px-3 py-2">
-                    <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="h-8 px-2"><ChevronRight className="h-4 w-4" /></Button>
-                    <div className="flex flex-col items-center">
-                        <span className="text-sm font-bold">{navLabel}</span>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card border rounded-xl px-3 py-2">
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+                        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="h-8 px-2"><ChevronRight className="h-4 w-4" /></Button>
+                        <span className="text-xs text-muted-foreground hidden sm:inline">السابق</span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                        <span className="text-sm font-bold text-center">{navLabel}</span>
+                        
+                        <div className="flex items-center gap-2 bg-muted/40 p-1 rounded-xl border scale-90">
+                            <select
+                                aria-label="اختر الشهر"
+                                value={activeDate.getMonth()}
+                                onChange={e => updateActiveDateMonthYear(activeDate.getFullYear(), parseInt(e.target.value))}
+                                className="text-xs font-bold bg-transparent border-none focus:outline-none cursor-pointer text-foreground"
+                                dir="rtl"
+                            >
+                                {[
+                                    { value: 0, label: 'يناير (1)' },
+                                    { value: 1, label: 'فبراير (2)' },
+                                    { value: 2, label: 'مارس (3)' },
+                                    { value: 3, label: 'أبريل (4)' },
+                                    { value: 4, label: 'مايو (5)' },
+                                    { value: 5, label: 'يونيو (6)' },
+                                    { value: 6, label: 'يوليو (7)' },
+                                    { value: 7, label: 'أغسطس (8)' },
+                                    { value: 8, label: 'سبتمبر (9)' },
+                                    { value: 9, label: 'أكتوبر (10)' },
+                                    { value: 10, label: 'نوفمبر (11)' },
+                                    { value: 11, label: 'ديسمبر (12)' }
+                                ].map(m => (
+                                    <option key={m.value} value={m.value} className="bg-card text-foreground">{m.label}</option>
+                                ))}
+                            </select>
+                            <span className="text-muted-foreground text-xs font-normal">|</span>
+                            <select
+                                aria-label="اختر السنة"
+                                value={activeDate.getFullYear()}
+                                onChange={e => updateActiveDateMonthYear(parseInt(e.target.value), activeDate.getMonth())}
+                                className="text-xs font-bold bg-transparent border-none focus:outline-none cursor-pointer text-foreground"
+                                dir="rtl"
+                            >
+                                {Array.from({ length: 7 }, (_, i) => 2024 + i).map(y => (
+                                    <option key={y} value={y} className="bg-card text-foreground">{y}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         {(view !== 'stats') && !isToday(selectedDate) && (
-                            <button onClick={() => setSelectedDate(new Date())} className="text-[10px] text-primary flex items-center gap-1 mt-0.5">
-                                <RotateCcw className="h-2.5 w-2.5" /> اليوم
+                            <button onClick={() => setSelectedDate(new Date())} className="text-[10px] text-primary flex items-center gap-1">
+                                <RotateCcw className="h-2.5 w-2.5" /> اليوم الحالي
                             </button>
                         )}
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => navigate(1)} className="h-8 px-2"><ChevronLeft className="h-4 w-4" /></Button>
+
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                        <span className="text-xs text-muted-foreground hidden sm:inline">التالي</span>
+                        <Button variant="ghost" size="sm" onClick={() => navigate(1)} className="h-8 px-2"><ChevronLeft className="h-4 w-4" /></Button>
+                    </div>
                 </div>
 
                 {/* ── KPI Dashboard (always visible) ── */}
@@ -830,6 +894,8 @@ export default function SheikhMonitoringPage() {
                         getDayStats={getDayStats}
                         selectedDate={selectedDate}
                         monthlyStats={monthlyStats}
+                        students={students || []}
+                        atRiskStudents={atRiskStudents}
                     />
                 )}
                 {view === 'stats' && (
@@ -2435,12 +2501,14 @@ function DayTable({
 
 // ─── MonthTable Component ────────────────────────────────────────────────────
 function MonthTable({
-    sheikhs, getDayStats, selectedDate, monthlyStats
+    sheikhs, getDayStats, selectedDate, monthlyStats, students, atRiskStudents
 }: {
     sheikhs: GroupSheikhInfo[];
     getDayStats: (g: string, d: string) => DayStats | null;
     selectedDate: Date;
     monthlyStats: MonthlySheikhStats[];
+    students: any[];
+    atRiskStudents: any[];
 }) {
     const tableRef = useRef<HTMLDivElement>(null);
 
@@ -2506,6 +2574,12 @@ function MonthTable({
             </th>`).join('')}
         </tr>`;
 
+        const avgCommit = avg(monthlyStats.map(s => s.commitmentRate));
+        const avgAtt = avg(monthlyStats.map(s => s.avgAttendance));
+        const avgExc = avg(monthlyStats.map(s => s.avgExcellent));
+        const avgGp = avg(monthlyStats.map(s => s.avgGoodPlus));
+        const avgGd = avg(monthlyStats.map(s => s.avgGood));
+
         const bodyRows = sheikhs.map((sh, idx) => {
             const ms = statsMap.get(sh.group);
             const rowBg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
@@ -2513,16 +2587,14 @@ function MonthTable({
             const weekCells = weeks.map((_, wi) => {
                 const w = ms.weeklyBreakdown[wi];
                 if (!w) return `<td style="${tdStyle};background:${rowBg}">—</td>`;
-                const clrAtt = pdfPctStyle(w.avgAttendance);
-                const clrExc = pdfPctStyle(w.avgExcellent, [50, 30]);
-                return `<td style="${tdStyle};background:${rowBg}">
-                    <div style="font-size:8px">${w.sessionDays}ج</div>
-                    <div style="font-size:8px;${clrAtt}">${w.avgAttendance !== null ? w.avgAttendance + '%' : '—'}</div>
-                    <div style="font-size:8px;${clrExc}">${w.avgExcellent !== null ? '★' + w.avgExcellent + '%' : '—'}</div>
+                return `<td style="${tdStyle};background:${rowBg};font-size:7.5px">
+                    <div>${w.sessionDays}ج</div>
+                    <div style="${pdfPctStyle(w.avgAttendance)}">${w.avgAttendance !== null ? w.avgAttendance + '%' : '—'}</div>
+                    <div style="${pdfPctStyle(w.avgExcellent, [50, 30])}">${w.avgExcellent !== null ? '★' + w.avgExcellent + '%' : '—'}</div>
                 </td>`;
             }).join('');
             return `<tr>
-                <td style="${tdGroupStyle};background:${rowBg}">${sh.group}<br/><span style="font-weight:400;font-size:8px;color:#6b7280">${sh.displayName}</span></td>
+                <td style="${tdGroupStyle};background:${rowBg}">${sh.group}<br/><span style="font-weight:400;font-size:7.5px;color:#6b7280">${sh.displayName}</span></td>
                 <td style="${tdStyle};background:${rowBg}"><span style="${pdfPctStyle(ms.commitmentRate)}">${ms.commitmentRate}%</span></td>
                 <td style="${tdStyle};background:${rowBg};font-size:8px">${ms.sessionDays}</td>
                 <td style="${tdStyle};background:${rowBg};font-size:8px;${ms.sheikhabsences > 3 ? 'color:#dc2626;font-weight:700' : ms.sheikhabsences > 1 ? 'color:#d97706' : 'color:#94a3b8'}">${ms.sheikhabsences}</td>
@@ -2534,30 +2606,24 @@ function MonthTable({
             </tr>`;
         }).join('');
 
-        const avgCommit = avg(monthlyStats.map(s => s.commitmentRate));
-        const avgSessions = monthlyStats.length ? Math.round(monthlyStats.reduce((a, s) => a + s.sessionDays, 0) / monthlyStats.length) : null;
-        const avgAbs = monthlyStats.length ? Math.round(monthlyStats.reduce((a, s) => a + s.sheikhabsences, 0) / monthlyStats.length) : null;
-        const avgAtt = avg(monthlyStats.map(s => s.avgAttendance));
-        const avgExc = avg(monthlyStats.map(s => s.avgExcellent));
-        const avgGp = avg(monthlyStats.map(s => s.avgGoodPlus));
-        const avgGd = avg(monthlyStats.map(s => s.avgGood));
         const footCells = weeks.map((_, wi) => {
             const wa = schoolWeekAvgs[wi];
-            return `<td style="padding:4px 7px;border:1px solid #1e40af;background:#172554;text-align:center;color:white">
-                <div style="font-size:8px">${wa.sessionDays}ج</div>
-                <div style="font-size:8px;color:${(wa.avgAttendance ?? 0) >= 90 ? '#34d399' : (wa.avgAttendance ?? 0) >= 70 ? '#fbbf24' : '#f87171'}">${wa.avgAttendance !== null ? wa.avgAttendance + '%' : '—'}</div>
-                <div style="font-size:8px;color:#c7d2fe">${wa.avgExcellent !== null ? '★' + wa.avgExcellent + '%' : '—'}</div>
+            return `<td style="${tdStyle};background:#172554;color:white">
+                <div>${wa.sessionDays}ج</div>
+                <div style="color:${(wa.avgAttendance ?? 0) >= 90 ? '#34d399' : (wa.avgAttendance ?? 0) >= 70 ? '#fbbf24' : '#f87171'}">${wa.avgAttendance !== null ? wa.avgAttendance + '%' : '—'}</div>
+                <div style="color:#c7d2fe">${wa.avgExcellent !== null ? '★' + wa.avgExcellent + '%' : '—'}</div>
             </td>`;
         }).join('');
-        const footRow = `<tfoot><tr>
-            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;color:white;font-weight:700;font-size:9px;text-align:right">متوسط الكل</td>
-            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgCommit)}">${avgCommit !== null ? avgCommit + '%' : '—'}</span></td>
-            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;color:white;text-align:center;font-size:8px">${avgSessions ?? '—'}</td>
-            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;color:white;text-align:center;font-size:8px">${avgAbs ?? '—'}</td>
-            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgAtt)}">${avgAtt !== null ? avgAtt + '%' : '—'}</span></td>
-            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgExc, [50, 30])}">${avgExc !== null ? avgExc + '%' : '—'}</span></td>
-            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgGp, [40, 20])}">${avgGp !== null ? avgGp + '%' : '—'}</span></td>
-            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgGd, [40, 20])}">${avgGd !== null ? avgGd + '%' : '—'}</span></td>
+
+        const footRow = `<tfoot><tr style="font-weight:700">
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;color:white;font-size:8.5px;text-align:right">متوسط الكل</td>
+            <td style="${tdStyle};background:#1e3a5f;color:white"><span style="${pdfPctStyle(avgCommit)}">${avgCommit !== null ? avgCommit + '%' : '—'}</span></td>
+            <td style="${tdStyle};background:#1e3a5f;color:white;font-size:8px">${schoolWeekAvgs.length ? Math.round(schoolWeekAvgs.reduce((a, b) => a + b.sessionDays, 0) / schoolWeekAvgs.length) : '—'}</td>
+            <td style="${tdStyle};background:#1e3a5f;color:white;font-size:8px">${monthlyStats.length ? Math.round(monthlyStats.reduce((a, b) => a + b.sheikhabsences, 0) / monthlyStats.length) : '—'}</td>
+            <td style="${tdStyle};background:#1e3a5f;color:white"><span style="${pdfPctStyle(avgAtt)}">${avgAtt !== null ? avgAtt + '%' : '—'}</span></td>
+            <td style="${tdStyle};background:#1e3a5f;color:white"><span style="${pdfPctStyle(avgExc, [50, 30])}">${avgExc !== null ? avgExc + '%' : '—'}</span></td>
+            <td style="${tdStyle};background:#1e3a5f;color:white"><span style="${pdfPctStyle(avgGp, [40, 20])}">${avgGp !== null ? avgGp + '%' : '—'}</span></td>
+            <td style="${tdStyle};background:#1e3a5f;color:white"><span style="${pdfPctStyle(avgGd, [40, 20])}">${avgGd !== null ? avgGd + '%' : '—'}</span></td>
             ${footCells}
         </tr></tfoot>`;
 
@@ -2565,50 +2631,438 @@ function MonthTable({
 <html dir="rtl" lang="ar">
 <head>
     <meta charset="UTF-8"/>
-    <title>تقرير شهر ${monthLabel}</title>
+    <title>تقرير المشايخ - ${monthLabel}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; font-size: 11px; }
+        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 20px; }
+        h1 { font-size: 18px; font-weight: 900; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 8px; }
+        th, td { border: 1px solid #cbd5e1; padding: 4px; text-align: center; }
+        th { background: #1e3a5f; color: white; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>مدرسة الإمام الشافعي لتعليم القرآن الكريم</h1>
+            <p>تقرير أداء المشايخ الإحصائي — شهر ${monthLabel}</p>
+        </div>
+        <div style="text-align: left">
+            <p>تاريخ الاستخراج: ${format(new Date(), 'yyyy-MM-dd HH:mm')}</p>
+            <p>إجمالي الفصول: ${sheikhs.length}</p>
+        </div>
+    </div>
+    <table>
+        <thead>${statsHead}</thead>
+        <tbody>${bodyRows}</tbody>
+        ${footRow}
+    </table>
+    <script>window.onload = function() { window.print(); };</script>
+</body>
+</html>`;
+
+        const pw = window.open('', '_blank', 'width=1200,height=800');
+        if (!pw) { alert('يرجى السماح بالنوافذ المنبثقة لاستخراج التقرير'); return; }
+        pw.document.write(html);
+        pw.document.close();
+    };
+
+    // ── Export Comprehensive PDF (Multi-Page Executive Report) ──────────────────
+    const handleExportComprehensivePDF = () => {
+        const start = startOfMonth(selectedDate);
+        const end = endOfMonth(selectedDate);
+        const allDays = eachDayOfInterval({ start, end });
+        const currentDateStr = format(new Date(), 'dd/MM/yyyy HH:mm');
+
+        // Overall school metrics
+        const totalSheikhs = sheikhs.length;
+        const totalActiveStudents = (students || []).filter((s: any) => s.status === 'نشط').length;
+        const avgCommit = avg(monthlyStats.map(s => s.commitmentRate));
+        const avgAtt = avg(monthlyStats.map(s => s.avgAttendance));
+        const avgExc = avg(monthlyStats.map(s => s.avgExcellent));
+        const avgGp = avg(monthlyStats.map(s => s.avgGoodPlus));
+        const avgGd = avg(monthlyStats.map(s => s.avgGood));
+
+        // 1. Detailed stats table rows
+        const statsHead = `<tr>
+            <th style="background:#1e3a5f;color:white;padding:5px 7px;font-size:8px;border:1px solid #1e40af;text-align:right;white-space:nowrap">الفوج / الشيخ</th>
+            <th style="background:#1e3a5f;color:white;padding:5px 7px;font-size:8px;border:1px solid #1e40af;text-align:center">انتظام%</th>
+            <th style="background:#1e3a5f;color:white;padding:5px 7px;font-size:8px;border:1px solid #1e40af;text-align:center">جلسات</th>
+            <th style="background:#1e3a5f;color:white;padding:5px 7px;font-size:8px;border:1px solid #1e40af;text-align:center">غياب شيخ</th>
+            <th style="background:#1e3a5f;color:white;padding:5px 7px;font-size:8px;border:1px solid #1e40af;text-align:center">حضور%</th>
+            <th style="background:#1e3a5f;color:white;padding:5px 7px;font-size:8px;border:1px solid #1e40af;text-align:center">ممتاز%</th>
+            <th style="background:#1e3a5f;color:white;padding:5px 7px;font-size:8px;border:1px solid #1e40af;text-align:center">ج.جداً%</th>
+            <th style="background:#1e3a5f;color:white;padding:5px 7px;font-size:8px;border:1px solid #1e40af;text-align:center">جيد%</th>
+            ${weeks.map((w: any) => `<th style="background:#172554;color:white;padding:5px 7px;font-size:8px;border:1px solid #1e40af;text-align:center;min-width:75px">
+                <div style="font-weight:700">${w.label}</div>
+                <div style="font-weight:400;font-size:6.5px;opacity:.75">${w.dateRange}</div>
+            </th>`).join('')}
+        </tr>`;
+
+        const bodyRows = sheikhs.map((sh: GroupSheikhInfo, idx: number) => {
+            const ms = statsMap.get(sh.group);
+            const rowBg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+            if (!ms) return '';
+            const weekCells = weeks.map((_, wi) => {
+                const w = ms.weeklyBreakdown[wi];
+                if (!w) return `<td style="padding:4px 7px;border:1px solid #cbd5e1;background:${rowBg}">—</td>`;
+                const clrAtt = pdfPctStyle(w.avgAttendance);
+                const clrExc = pdfPctStyle(w.avgExcellent, [50, 30]);
+                return `<td style="padding:4px 7px;border:1px solid #cbd5e1;background:${rowBg};text-align:center">
+                    <div style="font-size:7.5px">${w.sessionDays}ج</div>
+                    <div style="font-size:7.5px;${clrAtt}">${w.avgAttendance !== null ? w.avgAttendance + '%' : '—'}</div>
+                    <div style="font-size:7.5px;${clrExc}">${w.avgExcellent !== null ? '★' + w.avgExcellent + '%' : '—'}</div>
+                </td>`;
+            }).join('');
+            return `<tr>
+                <td style="padding:4px 7px;border:1px solid #cbd5e1;background:${rowBg};text-align:right;font-weight:700;font-size:8.5px">${sh.group}<br/><span style="font-weight:400;font-size:7px;color:#6b7280">${sh.displayName}</span></td>
+                <td style="padding:4px 7px;border:1px solid #cbd5e1;background:${rowBg};text-align:center"><span style="${pdfPctStyle(ms.commitmentRate)}">${ms.commitmentRate}%</span></td>
+                <td style="padding:4px 7px;border:1px solid #cbd5e1;background:${rowBg};text-align:center;font-size:8px">${ms.sessionDays}</td>
+                <td style="padding:4px 7px;border:1px solid #cbd5e1;background:${rowBg};text-align:center;font-size:8px;${ms.sheikhabsences > 3 ? 'color:#dc2626;font-weight:700' : ms.sheikhabsences > 1 ? 'color:#d97706' : 'color:#94a3b8'}">${ms.sheikhabsences}</td>
+                <td style="padding:4px 7px;border:1px solid #cbd5e1;background:${rowBg};text-align:center"><span style="${pdfPctStyle(ms.avgAttendance)}">${ms.avgAttendance !== null ? ms.avgAttendance + '%' : '—'}</span></td>
+                <td style="padding:4px 7px;border:1px solid #cbd5e1;background:${rowBg};text-align:center"><span style="${pdfPctStyle(ms.avgExcellent, [50, 30])}">${ms.avgExcellent !== null ? ms.avgExcellent + '%' : '—'}</span></td>
+                <td style="padding:4px 7px;border:1px solid #cbd5e1;background:${rowBg};text-align:center"><span style="${pdfPctStyle(ms.avgGoodPlus, [40, 20])}">${ms.avgGoodPlus !== null ? ms.avgGoodPlus + '%' : '—'}</span></td>
+                <td style="padding:4px 7px;border:1px solid #cbd5e1;background:${rowBg};text-align:center"><span style="${pdfPctStyle(ms.avgGood, [40, 20])}">${ms.avgGood !== null ? ms.avgGood + '%' : '—'}</span></td>
+                ${weekCells}
+            </tr>`;
+        }).join('');
+
+        const footCells = weeks.map((_, wi) => {
+            const wa = schoolWeekAvgs[wi];
+            return `<td style="padding:4px 7px;border:1px solid #1e40af;background:#172554;text-align:center;color:white">
+                <div style="font-size:7.5px">${wa.sessionDays}ج</div>
+                <div style="font-size:7.5px;color:${(wa.avgAttendance ?? 0) >= 90 ? '#34d399' : (wa.avgAttendance ?? 0) >= 70 ? '#fbbf24' : '#f87171'}">${wa.avgAttendance !== null ? wa.avgAttendance + '%' : '—'}</div>
+                <div style="font-size:7.5px;color:#c7d2fe">${wa.avgExcellent !== null ? '★' + wa.avgExcellent + '%' : '—'}</div>
+            </td>`;
+        }).join('');
+
+        const footRow = `<tfoot><tr style="font-weight:700">
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;color:white;font-size:8.5px;text-align:right">متوسط الكل</td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgCommit)}">${avgCommit !== null ? avgCommit + '%' : '—'}</span></td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;color:white;text-align:center;font-size:8px">${schoolWeekAvgs.length ? Math.round(schoolWeekAvgs.reduce((a, b) => a + b.sessionDays, 0) / schoolWeekAvgs.length) : '—'}</td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;color:white;text-align:center;font-size:8px">${monthlyStats.length ? Math.round(monthlyStats.reduce((a, b) => a + b.sheikhabsences, 0) / monthlyStats.length) : '—'}</td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgAtt)}">${avgAtt !== null ? avgAtt + '%' : '—'}</span></td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgExc, [50, 30])}">${avgExc !== null ? avgExc + '%' : '—'}</span></td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgGp, [40, 20])}">${avgGp !== null ? avgGp + '%' : '—'}</span></td>
+            <td style="padding:4px 7px;border:1px solid #1e40af;background:#1e3a5f;text-align:center"><span style="${pdfPctStyle(avgGd, [40, 20])}">${avgGd !== null ? avgGd + '%' : '—'}</span></td>
+            ${footCells}
+        </tr></tfoot>`;
+
+        // 2. Attendance Heatmap rows (Compact grid)
+        const heatmapDaysHeader = allDays.map(day => `<th style="padding:3px 2px;font-size:7px;border:1px solid #cbd5e1;text-align:center;background:#1e3a5f;color:white">${format(day, 'd')}</th>`).join('');
+        const heatmapRows = sheikhs.map((sh: GroupSheikhInfo) => {
+            const dayCells = allDays.map(day => {
+                const dateStr = format(day, 'yyyy-MM-dd');
+                const st = getDayStats(sh.group, dateStr);
+                let bg = '#e2e8f0'; // grey
+                let text = '#64748b';
+                let label = '';
+                if (st) {
+                    if (st.type === 'يوم عطلة') { bg = '#e0f2fe'; text = '#0369a1'; label = 'ع'; }
+                    else if (st.type === 'غياب الشيخ') { bg = '#ffe4e6'; text = '#e11d48'; label = 'غ'; }
+                    else {
+                        const att = st.attendance;
+                        if (att === null) { bg = '#f8fafc'; }
+                        else if (att >= 90) { bg = '#d1fae5'; text = '#065f46'; }
+                        else if (att >= 75) { bg = '#a7f3d0'; text = '#047857'; }
+                        else if (att >= 60) { bg = '#fef3c7'; text = '#92400e'; }
+                        else if (att >= 40) { bg = '#ffedd5'; text = '#c2410c'; }
+                        else { bg = '#ffe4e6'; text = '#b91c1c'; }
+                    }
+                }
+                const cellText = label ? label : (st && st.attendance !== null ? st.attendance + '%' : '—');
+                return `<td style="padding:3px 2px;font-size:7px;border:1px solid #cbd5e1;background:${bg};color:${text};text-align:center;font-weight:700">${cellText}</td>`;
+            }).join('');
+            return `<tr>
+                <td style="padding:4px 6px;border:1px solid #cbd5e1;text-align:right;font-weight:700;font-size:8px;background:#f8fafc">${sh.group}<br/><span style="font-weight:400;font-size:6.5px;color:#6b7280">${sh.displayName}</span></td>
+                ${dayCells}
+            </tr>`;
+        }).join('');
+
+        // 3. At-risk students rows
+        const warningRows = atRiskStudents.map((s: any, i: number) => `
+            <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'}">
+                <td style="padding:6px;border:1px solid #cbd5e1;text-align:right;font-weight:700">${s.name}</td>
+                <td style="padding:6px;border:1px solid #cbd5e1;font-weight:700;color:${s.riskLevel === 'high' ? '#e11d48' : '#d97706'}">${s.riskLevel === 'high' ? 'خطورة عالية 🔴' : 'انتباه 🟡'}</td>
+                <td style="padding:6px;border:1px solid #cbd5e1">${s.group}</td>
+                <td style="padding:6px;border:1px solid #cbd5e1;font-weight:700;color:#e11d48">${s.absenceRate}%</td>
+                <td style="padding:6px;border:1px solid #cbd5e1">${s.absencesLast2Weeks} حصة</td>
+                <td style="padding:6px;border:1px solid #cbd5e1;text-align:right;font-size:8px">${s.reasons.join(' ، ')}</td>
+                <td style="padding:6px;border:1px solid #cbd5e1;text-align:right;font-size:8px;color:#1e3a5f">${s.recommendation}</td>
+            </tr>
+        `).join('');
+
+        // 4. Badges rows
+        const badgeRows = monthlyStats.map((ms, i) => {
+            const badges: string[] = [];
+            if (ms.commitmentRate >= 100 && ms.sessionDays > 0) badges.push('💎 التزام الشيخ الكامل');
+            if (ms.avgAttendance !== null && ms.avgAttendance >= 95 && ms.sessionDays > 0) badges.push('👑 حضور متميز (👑)');
+            else if (ms.avgAttendance !== null && ms.avgAttendance >= 90 && ms.sessionDays > 0) badges.push('⭐ حضور متميز (⭐)');
+            if (ms.avgExcellent !== null && ms.avgExcellent >= 25 && ms.sessionDays > 0) badges.push('🌟 تميز تسميع ممتاز');
+            if (ms.avgExcellent !== null && ms.avgGoodPlus !== null && (ms.avgExcellent + ms.avgGoodPlus) >= 60 && ms.sessionDays > 0) badges.push('🏅 جودة الفوج العالية');
+            if (ms.sheikhabsences === 0 && ms.sessionDays > 0) badges.push('✅ مواظبة الحضور');
+
+            return `
+                <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'}">
+                    <td style="padding:6px;border:1px solid #cbd5e1;text-align:right;font-weight:700;font-size:8.5px">${ms.group} - <span style="font-weight:400;font-size:7.5px;color:#6b7280">${ms.displayName}</span></td>
+                    <td style="padding:6px;border:1px solid #cbd5e1;text-align:right">
+                        ${badges.length > 0 ? badges.map(b => `<span style="display:inline-block;padding:2px 5px;border-radius:4px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;font-size:7.5px;margin-left:4px;font-weight:700">${b}</span>`).join('') : '<span style="color:#94a3b8">—</span>'}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        const html = `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8"/>
+    <title>التقرير التنفيذي الشامل لشهر ${monthLabel}</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Cairo', Arial, sans-serif; direction: rtl; background: white; color: #1e293b; font-size: 9px; }
+        body { font-family: 'Cairo', Arial, sans-serif; direction: rtl; background: white; color: #0f172a; padding: 0; font-size: 8.5px; }
+        .page { width: 297mm; height: 210mm; padding: 12mm 15mm; margin: 0 auto; position: relative; display: flex; flex-col; justify-content: space-between; page-break-after: always; break-after: page; }
+        .page-portrait { width: 210mm; height: 297mm; padding: 15mm; }
+        
+        /* Typography */
+        .title-main { font-size: 18px; font-weight: 900; color: #1e3a5f; text-align: center; margin-bottom: 25px; }
+        .title-section { font-size: 11px; font-weight: 700; color: #1e3a5f; border-bottom: 1.5px solid #1e3a5f; padding-bottom: 4px; margin-bottom: 12px; }
+        
+        /* Cover Page details */
+        .cover { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 100%; border: 3px solid #1e3a5f; padding: 40px; border-radius: 12px; }
+        .cover-logo { font-size: 14px; font-weight: 700; color: #64748b; margin-bottom: 15px; }
+        .cover-title { font-size: 26px; font-weight: 900; color: #1e3a5f; margin: 25px 0 10px 0; }
+        .cover-subtitle { font-size: 14px; color: #475569; margin-bottom: 50px; }
+        .cover-kpis { display: grid; grid-template-cols: repeat(4, 1fr); gap: 15px; width: 100%; max-width: 800px; margin-top: 30px; }
+        .cover-kpi { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 15px; background: #f8fafc; }
+        .cover-kpi-val { font-size: 20px; font-weight: 900; color: #1e3a5f; }
+        .cover-kpi-lbl { font-size: 9px; color: #64748b; margin-top: 2px; }
+        
+        /* Table styles */
+        table { border-collapse: collapse; width: 100%; margin-bottom: 10px; }
+        th, td { border: 1px solid #cbd5e1; padding: 4px 6px; text-align: center; vertical-align: middle; }
+        th { background: #1e3a5f; color: white; font-weight: 700; font-size: 8px; }
+        
+        .footer-print { font-size: 7.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 5px; display: flex; justify-content: space-between; width: 100%; }
+        
         @media print {
-            @page { size: A4 landscape; margin: 8mm; }
+            body { background: white; width: auto; height: auto; }
+            .page { border: none; margin: 0; padding: 8mm 10mm; width: 297mm; height: 210mm; }
+            .page-portrait { width: 210mm; height: 297mm; }
+            .no-print { display: none; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            body { font-size: 8px; }
         }
-        table { border-collapse: collapse; width: 100%; }
     </style>
 </head>
-<body style="padding:10px">
-    <div style="border-bottom:2px solid #1e3a5f;padding-bottom:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start">
+<body>
+    <!-- ─── PAGE 1: COVER PAGE (Portrait) ─── -->
+    <div class="page page-portrait" style="display:flex;flex-direction:column;justify-content:space-between">
+        <div class="cover">
+            <div class="cover-logo">مدرسة الإمام الشافعي لتعليم القرآن الكريم</div>
+            <div style="width:80px;height:3px;background:#1e3a5f;margin:0 auto"></div>
+            <div class="cover-title">التقرير التنفيذي الشامل لمتابعة أداء الشيوخ والحلقات</div>
+            <div class="cover-subtitle">شهر التقرير: ${monthLabel}</div>
+            
+            <div style="margin: 40px 0; font-size:10.5px; max-width:600px; color:#475569; text-align:justify; line-height:1.6">
+                يقدم هذا التقرير تحليلاً شاملاً وتقييماً إحصائياً دقيقاً لنشاط المشايخ وحلقات التحفيظ بالمدرسة خلال الشهر المذكور. يشمل التقرير نسب التزام المعلمين بالحلقات، ومعدلات حضور الطلاب التراكمية، ومؤشرات الجودة والتميز النوعي لتسميع القرآن الكريم، بالإضافة لقوائم الإنذار المبكر للطلاب المتعثرين لضمان المتابعة والتقويم المستمر.
+            </div>
+
+            <div class="cover-kpis">
+                <div class="cover-kpi">
+                    <div class="cover-kpi-val">${avgCommit}%</div>
+                    <div class="cover-kpi-lbl">التزام المشايخ بالحصص</div>
+                </div>
+                <div class="cover-kpi">
+                    <div class="cover-kpi-val">${avgAtt}%</div>
+                    <div class="cover-kpi-lbl">حضور الطلاب المتوسط</div>
+                </div>
+                <div class="cover-kpi">
+                    <div class="cover-kpi-val">${avgExc}%</div>
+                    <div class="cover-kpi-lbl">نسبة التسميع المتميز (★)</div>
+                </div>
+                <div class="cover-kpi">
+                    <div class="cover-kpi-val">${totalActiveStudents}</div>
+                    <div class="cover-kpi-lbl">إجمالي طلاب المدرسة النشطين</div>
+                </div>
+            </div>
+        </div>
+        <div class="footer-print">
+            <div>موقع مدرسة الإمام الشافعي • تقرير سري وموجه للإدارة</div>
+            <div>تاريخ الاستخراج: ${currentDateStr} • صفحة 1 من 6</div>
+        </div>
+    </div>
+
+    <!-- ─── PAGE 2: DETAILED TABLE (Landscape) ─── -->
+    <div class="page" style="display:flex;flex-direction:column;justify-content:space-between">
         <div>
-            <h1 style="color:#1e3a5f;font-size:14px;font-weight:900">تقرير مراقبة المشايخ — الشهري</h1>
-            <p style="margin-top:3px;font-size:9px;color:#475569">شهر ${monthLabel}</p>
-            <p style="margin-top:2px;font-size:8px;color:#64748b">عدد الأفواج: ${sheikhs.length}</p>
+            <div class="title-section">جدول التقييم الإحصائي المفصل لأداء المشايخ — شهر ${monthLabel}</div>
+            <table style="font-size: 7.5px;">
+                <thead>${statsHead}</thead>
+                <tbody>${bodyRows}</tbody>
+                ${footRow}
+            </table>
         </div>
-        <div style="text-align:left;font-size:8px;color:#64748b">
-            <div style="font-weight:700">المدرسة القرآنية للشافعي</div>
-            <div>${format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
+        <div class="footer-print">
+            <div>* الانتظام: نسبة إعطاء الحصص الفعلية • حضور%: متوسط الحضور اليومي للطلاب • ممتاز%: نسبة تقييم ممتاز للتسميع</div>
+            <div>صفحة 2 من 6</div>
         </div>
     </div>
-    <div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
-        <div style="background:#1e3a5f;color:white;padding:5px 10px;font-weight:700;font-size:9px">ملخص شهر ${monthLabel}</div>
-        <table>
-            <thead>${statsHead}</thead>
-            <tbody>${bodyRows}</tbody>
-            ${footRow}
-        </table>
+
+    <!-- ─── PAGE 3: ATTENDANCE HEATMAP (Landscape) ─── -->
+    <div class="page" style="display:flex;flex-direction:column;justify-content:space-between">
+        <div>
+            <div class="title-section">خريطة الحضور والالتزام اليومية للأفواج — شهر ${monthLabel}</div>
+            <div style="margin-bottom:8px;display:flex;gap:15px;font-size:7.5px;font-weight:bold">
+                <div style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#d1fae5;border:1px solid #cbd5e1"></span> حضور مرتفع (90%+)</div>
+                <div style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#a7f3d0;border:1px solid #cbd5e1"></span> حضور مقبول (75-89%)</div>
+                <div style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#fef3c7;border:1px solid #cbd5e1"></span> حضور منخفض (60-74%)</div>
+                <div style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#ffedd5;border:1px solid #cbd5e1"></span> حضور ضعيف (40-59%)</div>
+                <div style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#ffe4e6;border:1px solid #cbd5e1"></span> غياب/شبه فارغ (<40%)</div>
+                <div style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#e0f2fe;border:1px solid #cbd5e1"></span> عطلة (ع) / غياب الشيخ (غ)</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="background:#1e3a5f;color:white;padding:4px;font-size:8px;border:1px solid #cbd5e1;text-align:right">الفوج / الشيخ</th>
+                        ${heatmapDaysHeader}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${heatmapRows}
+                </tbody>
+            </table>
+        </div>
+        <div class="footer-print">
+            <div>موقع مدرسة الإمام الشافعي • توثيق الحضور اليومي للمشايخ والطلاب</div>
+            <div>صفحة 3 من 6</div>
+        </div>
     </div>
-    <p style="margin-top:8px;font-size:8px;color:#94a3b8">* الانتظام = الجلسات ÷ أيام العمل الفعلية · تاريخ الطباعة: ${format(new Date(), 'EEEE d MMMM yyyy', { locale: ar })}</p>
+
+    <!-- ─── PAGE 4: EARLY WARNING (Portrait) ─── -->
+    <div class="page page-portrait" style="display:flex;flex-direction:column;justify-content:space-between">
+        <div>
+            <div class="title-section">نظام الإنذار المبكر — الطلاب الأكثر غياباً وتعثراً في الحفظ</div>
+            <div style="margin-bottom:10px;font-size:8.5px;color:#475569">
+                يحتوي هذا الجدول على قائمة بالطلاب الذين تم رصدهم في دائرة الخطر التعليمية (غياب متكرر بنسبة 25% أو أكثر، أو الحصول على تقدير "لم يحفظ" لمرتين متتاليتين أو أكثر في آخر أسبوعين).
+            </div>
+            ${atRiskStudents.length > 0 ? `
+            <table style="font-size:8px">
+                <thead>
+                    <tr>
+                        <th style="text-align:right">اسم الطالب</th>
+                        <th>مستوى الخطر</th>
+                        <th>الفوج</th>
+                        <th>نسبة الغياب</th>
+                        <th>الغياب (أسبوعين)</th>
+                        <th style="text-align:right">أسباب التنبيه</th>
+                        <th style="text-align:right">التوصية المقترحة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${warningRows}
+                </tbody>
+            </table>
+            ` : `
+            <div style="text-align:center;padding:50px;border:1px dashed #10b981;background:#f0fdf4;border-radius:8px;margin-top:20px">
+                <span style="font-size:24px">🎉</span>
+                <div style="font-size:12px;font-weight:bold;color:#065f46;margin-top:5px">لا يوجد طلاب في دائرة الخطر حالياً</div>
+                <p style="font-size:8.5px;color:#047857;margin-top:2px">جميع طلاب المدرسة يظهرون مستويات حضور وحفظ مستقرة.</p>
+            </div>
+            `}
+        </div>
+        <div class="footer-print">
+            <div>نظام الإنذار المبكر الآلي للطلاب المعرضين للتعثر الدراسي</div>
+            <div>صفحة 4 من 6</div>
+        </div>
+    </div>
+
+    <!-- ─── PAGE 5: SHEIKH BADGES & HONORS (Portrait) ─── -->
+    <div class="page page-portrait" style="display:flex;flex-direction:column;justify-content:space-between">
+        <div>
+            <div class="title-section">لوحة شرف المشايخ — الأوسمة والشارات التقديرية</div>
+            <div style="margin-bottom:10px;font-size:8.5px;color:#475569">
+                تُمنح شارات التميز للمشايخ والأساتذة الذين حققوا معايير الجودة والالتزام المقررة في نظام درع التميز للحلقة والتوثيق.
+            </div>
+            <table style="font-size:8.5px">
+                <thead>
+                    <tr>
+                        <th style="text-align:right;width:180px">الشيخ / الفوج</th>
+                        <th style="text-align:right">الشارات والأوسمة المستحقة هذا الشهر</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${badgeRows}
+                </tbody>
+            </table>
+        </div>
+        <div class="footer-print">
+            <div>نظام شارات التقدير والتميز لأداء الكادر التعليمي</div>
+            <div>صفحة 5 من 6</div>
+        </div>
+    </div>
+
+    <!-- ─── PAGE 6: NOTES & SIGNATURES (Portrait) ─── -->
+    <div class="page page-portrait" style="display:flex;flex-direction:column;justify-content:space-between">
+        <div>
+            <div class="title-section">ملاحظات واعتمادات الإدارة العامة</div>
+            
+            <div style="margin-top:15px;border:1.5px solid #cbd5e1;border-radius:8px;padding:15px;min-height:220px">
+                <div style="font-weight:700;font-size:10px;color:#1e3a5f;margin-bottom:8px">✍️ ملاحظات وتوجيهات الإشراف العام:</div>
+                <div style="border-bottom:1px dashed #cbd5e1;margin-top:25px;height:1px"></div>
+                <div style="border-bottom:1px dashed #cbd5e1;margin-top:25px;height:1px"></div>
+                <div style="border-bottom:1px dashed #cbd5e1;margin-top:25px;height:1px"></div>
+                <div style="border-bottom:1px dashed #cbd5e1;margin-top:25px;height:1px"></div>
+                <div style="border-bottom:1px dashed #cbd5e1;margin-top:25px;height:1px"></div>
+                <div style="border-bottom:1px dashed #cbd5e1;margin-top:25px;height:1px"></div>
+                <div style="border-bottom:1px dashed #cbd5e1;margin-top:25px;height:1px"></div>
+            </div>
+
+            <div style="margin-top:25px;border:1.5px solid #cbd5e1;border-radius:8px;padding:15px;min-height:120px;background:#f8fafc">
+                <div style="font-weight:700;font-size:10px;color:#1e3a5f;margin-bottom:5px">💡 توصيات التقرير التلقائية:</div>
+                <ul style="padding-right:15px;font-size:8.5px;line-height:1.6;color:#334155;list-style-type:disc">
+                    <li>متابعة حثيثة للطلاب المسجلين في نظام التنبيه المبكر للحد من التراجع.</li>
+                    <li>تقديم الشكر للمشايخ الحاصلين على وسام "التزام الشيخ الكامل" لهذا الشهر.</li>
+                    <li>التنسيق لعقد حصص تعويضية للمجموعات التي يقل التزامها العام عن 85%.</li>
+                    <li>حث أولياء الأمور على تفعيل بوابة المتابعة الرقمية لمتابعة نشاط الطلاب يومياً.</li>
+                </ul>
+            </div>
+
+            <!-- Signatures Section -->
+            <div style="margin-top:60px;display:grid;grid-template-cols:repeat(3, 1fr);gap:20px;text-align:center">
+                <div>
+                    <div style="font-weight:700;font-size:9.5px">المشرف العام على الحلقات</div>
+                    <div style="margin:25px 0 5px 0;font-size:8px;color:#94a3b8">_____________________</div>
+                    <div style="font-size:8px;color:#64748b">التوقيع / الختم</div>
+                </div>
+                <div>
+                    <div style="font-weight:700;font-size:9.5px">المراقب الإداري والمالي</div>
+                    <div style="margin:25px 0 5px 0;font-size:8px;color:#94a3b8">_____________________</div>
+                    <div style="font-size:8px;color:#64748b">التوقيع / الختم</div>
+                </div>
+                <div>
+                    <div style="font-weight:700;font-size:9.5px">مدير المدرسة</div>
+                    <div style="margin:25px 0 5px 0;font-size:8px;color:#94a3b8">_____________________</div>
+                    <div style="font-size:8px;color:#64748b">التوقيع / الختم</div>
+                </div>
+            </div>
+        </div>
+        <div class="footer-print">
+            <div>مدرسة الإمام الشافعي • نهاية مستند التقرير التنفيذي الشامل</div>
+            <div>صفحة 6 من 6</div>
+        </div>
+    </div>
 </body>
 </html>`;
 
         const pw = window.open('', '_blank', 'width=1400,height=900');
-        if (!pw) { alert('يرجى السماح بالنوافذ المنبثقة لهذا الموقع'); return; }
+        if (!pw) { alert('يرجى السماح بالنوافذ المنبثقة لهذا الموقع لاستخراج التقرير الشامل'); return; }
         pw.document.write(html);
         pw.document.close();
-        pw.focus();
-        setTimeout(() => { pw.print(); }, 800);
     };
+
+
 
     // ── Render ───────────────────────────────────────────────────────────────
     if (monthlyStats.length === 0) {
@@ -2619,6 +3073,9 @@ function MonthTable({
         <div className="space-y-3">
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-2 justify-end">
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-indigo-700 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/70" onClick={handleExportComprehensivePDF}>
+                    <FileDown className="h-3.5 w-3.5" /> التقرير الشامل PDF
+                </Button>
                 <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => window.print()}>
                     <Printer className="h-3.5 w-3.5" /> طباعة
                 </Button>
