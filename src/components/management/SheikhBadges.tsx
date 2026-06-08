@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { HonorCardGenerator, HonorCardData } from './HonorCardGenerator';
 import { db } from '@/lib/firebase';
 import { ref, set, onValue } from 'firebase/database';
+import { useAuth } from '@/context/AuthContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -165,6 +166,8 @@ const isSessionPunctual = (session: any): boolean => {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadgesProps) {
+    const { role } = useAuth();
+    const isManagement = role === 'super_admin' || role === 'management';
     const printRef = useRef<HTMLDivElement>(null);
     const [showGuide, setShowGuide] = useState(false);
     const [showWeightsSim, setShowWeightsSim] = useState(false);
@@ -540,6 +543,48 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
 
         return rawScores;
     }, [sheikhs, getDayStats, selectedDate, weights]);
+
+    // Sync computed scores to firebase database so they can be viewed by sheikhs
+    useEffect(() => {
+        if (!scores || scores.length === 0 || !isManagement) return;
+        const monthKey = format(selectedDate, 'yyyy-MM');
+        const scoresRef = ref(db, `sheikh_scores/${monthKey}`);
+        
+        const serialized = scores.map(s => ({
+            group: s.group,
+            displayName: s.displayName,
+            totalPoints: s.totalPoints,
+            sessionPoints: s.sessionPoints,
+            excellencePoints: s.excellencePoints,
+            attendancePoints: s.attendancePoints,
+            commitmentPoints: s.commitmentPoints,
+            extraSessionBonus: s.extraSessionBonus,
+            punctualityBonus: s.punctualityBonus,
+            totalSessions: s.totalSessions,
+            totalDays: s.totalDays,
+            avgAttendance: s.avgAttendance,
+            avgExcellent: s.avgExcellent,
+            avgGoodPlus: s.avgGoodPlus,
+            commitmentRate: s.commitmentRate,
+            highAttDays: s.highAttDays,
+            sheikhabsences: s.sheikhabsences,
+            rank: s.rank,
+            podiumCounts: s.podiumCounts,
+            extraSessionsCount: s.extraSessionsCount,
+            punctualSessionsCount: s.punctualSessionsCount,
+            badges: s.badges.map(b => ({
+                icon: b.icon,
+                label: b.label,
+                colorClass: b.colorClass,
+                glowClass: b.glowClass,
+                description: b.description
+            }))
+        }));
+
+        set(scoresRef, serialized).catch((err: any) => {
+            console.error("Failed to sync sheikh scores to Firebase:", err);
+        });
+    }, [scores, selectedDate, isManagement]);
 
     // Phase 3: Calculate previous month scores for regression comparison
     const prevMonthScores = useMemo<Record<string, number>>(() => {
@@ -1351,7 +1396,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
 }
 
 // ─── SheikhScoreDetailModal ──────────────────────────────────────────────────
-function SheikhScoreDetailModal({
+export function SheikhScoreDetailModal({
     sheikh,
     getDayStats,
     selectedDate,

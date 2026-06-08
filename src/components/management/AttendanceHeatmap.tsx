@@ -41,6 +41,7 @@ interface AttendanceHeatmapProps {
         excellent: number | null;
     } | null;
     groupFilter?: string; // 'all' | specific group
+    onDayClick?: (dateStr: string) => void; // Optional: parent intercepts day clicks
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -80,7 +81,7 @@ function heatLabel(att: number | null): string {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export function AttendanceHeatmap({ sheikhs, getDayStats }: AttendanceHeatmapProps) {
+export function AttendanceHeatmap({ sheikhs, getDayStats, onDayClick }: AttendanceHeatmapProps) {
     const [year, setYear] = useState(() => new Date().getFullYear());
     const [selectedDay, setSelectedDay] = useState<DayDetail | null>(null);
     const [groupFilter, setGroupFilter] = useState<string>('all');
@@ -169,7 +170,9 @@ export function AttendanceHeatmap({ sheikhs, getDayStats }: AttendanceHeatmapPro
             isHoliday: d.isHoliday,
             sheikhabsence: d.sheikhabsence,
         });
-    }, []);
+        // Also notify parent (e.g. to show per-student attendance modal)
+        onDayClick?.(d.dateStr);
+    }, [onDayClick]);
 
     const dayDataMap = useMemo(() => {
         const m = new Map<string, typeof yearlyData[0]>();
