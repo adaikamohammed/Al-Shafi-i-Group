@@ -69,29 +69,42 @@ const calculatePeriodStats = (
     workSessions.forEach(session => {
         const sessionDate = parseISO(session.date);
         activeStudents.forEach(student => {
-            if (sessionDate >= student.registrationDate) {
-                totalPossibleAttendance++;
-                const record = session.records?.find(r => r.studentId === student.id);
-                if (record) {
-                    if (record.attendance === 'حاضر' || record.attendance === 'متأخر') {
-                        totalAttendance++;
-                    }
+            const regDate = student.registrationDate
+                ? (student.registrationDate instanceof Date
+                    ? student.registrationDate
+                    : new Date(student.registrationDate as any))
+                : null;
 
-                    if (record.behavior && record.behavior in behaviorScoreMap) {
-                        behaviorSum += behaviorScoreMap[record.behavior];
-                        behaviorCount++;
-                    }
+            if (regDate) {
+                const regDateNoon = new Date(regDate);
+                regDateNoon.setHours(0, 0, 0, 0);
+                const sessionDateNoon = new Date(sessionDate);
+                sessionDateNoon.setHours(0, 0, 0, 0);
 
-                    if (session.sessionType === 'حصة أساسية' || session.sessionType === 'حصة إضافية') {
-                        reviewCount++;
-                        if (record.review) {
-                            reviewSum++;
+                if (sessionDateNoon >= regDateNoon) {
+                    totalPossibleAttendance++;
+                    const record = session.records?.find(r => r.studentId === student.id);
+                    if (record) {
+                        if (record.attendance === 'حاضر' || record.attendance === 'متأخر') {
+                            totalAttendance++;
                         }
-                    }
 
-                    if (record.memorization && record.memorization in memorizationScoreMap) {
-                        memorizationSum += memorizationScoreMap[record.memorization];
-                        memorizationCount++;
+                        if (record.behavior && record.behavior in behaviorScoreMap) {
+                            behaviorSum += behaviorScoreMap[record.behavior];
+                            behaviorCount++;
+                        }
+
+                        if (session.sessionType === 'حصة أساسية' || session.sessionType === 'حصة إضافية') {
+                            reviewCount++;
+                            if (record.review) {
+                                reviewSum++;
+                            }
+                        }
+
+                        if (record.memorization && record.memorization in memorizationScoreMap) {
+                            memorizationSum += memorizationScoreMap[record.memorization];
+                            memorizationCount++;
+                        }
                     }
                 }
             }

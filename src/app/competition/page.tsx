@@ -156,7 +156,23 @@ export default function CompetitionPage() {
                 let expectedDays = 0, presentDays = 0, absentDays = 0, lateDays = 0;
                 let dailyEvalSum = 0, dailyEvalCount = 0;
 
+                // تاريخ تسجيل الطالب — لتجاهل الأيام قبل انضمامه
+                const regDate = student.registrationDate
+                    ? (student.registrationDate instanceof Date
+                        ? student.registrationDate
+                        : new Date(student.registrationDate as any))
+                    : null;
+
                 datesToProcess.forEach(dateStr => {
+                    // الأيام قبل تسجيل الطالب لا تُحسب عليه
+                    if (regDate) {
+                        const regDateNoon = new Date(regDate);
+                        regDateNoon.setHours(0, 0, 0, 0);
+                        const sessionDateNoon = new Date(dateStr);
+                        sessionDateNoon.setHours(0, 0, 0, 0);
+                        if (sessionDateNoon < regDateNoon) return;
+                    }
+
                     const sessions = dailySessions[dateStr] ? Object.values(dailySessions[dateStr]) : [];
                     sessions.forEach((session: any) => {
                         const rec = session.records?.find((r: any) => r.studentId === student.id);
@@ -181,7 +197,11 @@ export default function CompetitionPage() {
                 // Weekly
                 let weeklyEvalSum = 0, weeklyEvalCount = 0;
                 datesToProcess.forEach(dateStr => {
+                    // الأيام قبل تسجيل الطالب لا تُحسب عليه
+                    if (regDate && new Date(dateStr) < regDate) return;
                     const outcome = weeklyOutcomes[`${student.id}_${dateStr}`];
+                    // تجاهل الأسابيع المعيَّنة كـ "لا يوجد حصيلة" — لا تُحسب ولا تُعاقب
+                    if (outcome?.evaluation === 'لا يوجد حصيلة') return;
                     if (outcome?.evaluation && perfPoints[outcome.evaluation] !== undefined) {
                         weeklyEvalSum += perfPoints[outcome.evaluation];
                         weeklyEvalCount++;

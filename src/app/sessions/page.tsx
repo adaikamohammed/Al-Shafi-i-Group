@@ -40,6 +40,7 @@ import {
   Calendar,
   Calendar as CalendarIcon,
   CalendarDays,
+  CalendarOff,
   Settings,
   RefreshCw,
   MoreVertical,
@@ -156,7 +157,7 @@ const toHijri = (date: Date): string => {
 
 export default function DailySessionsPage() {
   const { user, isSuperAdmin } = useAuth();
-  const { allUsers, students, dailySessions, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById, moveDailySession, weeklyOutcomes } = useStudentContext();
+  const { allUsers, students, dailySessions, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById, moveDailySession, weeklyOutcomes, saveWeeklyOutcome } = useStudentContext();
 
   const { toast } = useToast();
   const router = useRouter();
@@ -187,6 +188,7 @@ export default function DailySessionsPage() {
   const [bulkHolidaySheikhs, setBulkHolidaySheikhs] = useState<string[]>([]);
   const [isSubmittingBulk, setIsSubmittingBulk] = useState(false);
   const [isCleaningDB, setIsCleaningDB] = useState(false);
+  const [isSettingBulkNoSession, setIsSettingBulkNoSession] = useState(false);
 
   // State for selected sheikh's sessions loaded directly from Firebase
   const [sheikhSessions, setSheikhSessions] = useState<Record<string, Record<string, any>>>({});
@@ -244,6 +246,37 @@ export default function DailySessionsPage() {
     return Array.from({ length: 7 }, (_, i) => addDays(outcomeWeekStart, i));
   }, [outcomeWeekStart]);
 
+  // تعيين "لا يوجد حصيلة" لجميع طلاب الفوج دفعة واحدة
+  const handleBulkNoSession = async () => {
+    if (!activeStudentsForWeeklyOutcome.length) return;
+    const weekStartStr = format(weekDates[0], 'yyyy-MM-dd');
+    const confirm = window.confirm(
+      `هل تريد تعيين "لا يوجد حصيلة" لجميع الطلاب (${activeStudentsForWeeklyOutcome.length}) لأسبوع ${format(weekDates[0], 'dd/MM')} - ${format(weekDates[6], 'dd/MM')}؟`
+    );
+    if (!confirm) return;
+    setIsSettingBulkNoSession(true);
+    try {
+      await Promise.all(
+        activeStudentsForWeeklyOutcome.map(student => {
+          const outcomeId = `${student.id}_${weekStartStr}`;
+          return saveWeeklyOutcome({
+            id: outcomeId,
+            studentId: student.id,
+            weekStartDate: weekStartStr,
+            evaluation: 'لا يوجد حصيلة' as any,
+            timestamp: new Date().toISOString(),
+          });
+        })
+      );
+      toast({ title: 'تم بنجاح', description: `تم تعيين "لا يوجد حصيلة" لـ ${activeStudentsForWeeklyOutcome.length} طالب.` });
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'خطأ', description: 'حدث خطأ أثناء التعيين', variant: 'destructive' });
+    } finally {
+      setIsSettingBulkNoSession(false);
+    }
+  };
+
   // Keep outcome week in sync if user navigates large month jumps, but allow independent week tweaking
   React.useEffect(() => {
     if (getMonth(outcomeWeekStart) !== getMonth(currentDate)) {
@@ -292,7 +325,7 @@ export default function DailySessionsPage() {
             continue;
           }
 
-          const sessionNumber = existingSessions.length > 0 ? (existingSessions.some((s: any) => s.sessionNumber === 1) ? 2 : 1) : 1;
+          const sessionNumber = existingSessions.length > 0 ? (existingSessions.some((s: any) => Number(s.sessionNumber || 1) === 1) ? 2 : 1) : 1;
 
           if (existingSessions.length < 2) {
             await addDailySession({
@@ -544,8 +577,8 @@ export default function DailySessionsPage() {
       // التحقق من وجود الحصة الأولى قبل إنشاء الحصة الثانية
       // لكن إذا كانت الحصة الثانية موجودة بالفعل (تعديل وليس إنشاء)، نسمح بالوصول
       if (sessionNumber === 2) {
-        const session1 = daySessions.find(s => s.sessionNumber === 1);
-        const session2AlreadyExists = daySessions.some(s => s.sessionNumber === 2);
+        const session1 = daySessions.find(s => Number(s.sessionNumber || 1) === 1);
+        const session2AlreadyExists = daySessions.some(s => Number(s.sessionNumber || 1) === 2);
         if (!session1 && !session2AlreadyExists) {
           toast({
             title: "تنبيه",
@@ -566,7 +599,7 @@ export default function DailySessionsPage() {
       setSessionChoiceData({ day, dateStr, sessions: daySessions });
     } else if (daySessions.length === 1) {
       // إذا كانت هناك حصة واحدة فقط، نفتحها مباشرة
-      const existingSession = daySessions[0].sessionNumber;
+      const existingSession = daySessions[0].sessionNumber !== undefined ? Number(daySessions[0].sessionNumber) : (daySessions[0].id && daySessions[0].id.endsWith('-s2') ? 2 : 1);
       queryParams.set('session', existingSession.toString());
       router.push(`/sessions/register?${queryParams.toString()}`);
     } else {
@@ -620,7 +653,7 @@ export default function DailySessionsPage() {
     }
 
     // تحديد رقم الحصة المفقودة تلقائياً
-    const existingSession1 = daySessions.find(s => s.sessionNumber === 1);
+    const existingSession1 = daySessions.find(s => Number(s.sessionNumber || 1) === 1);
     const sessionNumToOpen = existingSession1 ? 2 : 1;
 
     // التحقق من وجود الحصة الأولى إذا كان المستخدم يريد إضافة الحصة الثانية
@@ -712,7 +745,7 @@ export default function DailySessionsPage() {
     
     const sortedDaySessions = [...daySessions]
       .filter(s => s.records && s.records.length > 0)
-      .sort((a, b) => (a.sessionNumber || 1) - (b.sessionNumber || 1));
+      .sort((a, b) => Number(a.sessionNumber || 1) - Number(b.sessionNumber || 1));
 
     if (sortedDaySessions.length === 0) {
       toast({ title: "لا يوجد تقرير", description: "لم يتم تسجيل بيانات لحصة اليوم بعد.", variant: "destructive" });
@@ -730,7 +763,7 @@ export default function DailySessionsPage() {
 
     sortedDaySessions.forEach((session, index) => {
       if (sortedDaySessions.length > 1) {
-        message += `\n*◄ ${session.sessionNumber === 1 ? 'الحصة الأساسية (ص)' : 'الحصة الإضافية (م)'} :*\n`;
+        message += `\n*◄ ${Number(session.sessionNumber || 1) === 1 ? 'الحصة الأساسية (ص)' : 'الحصة الإضافية (م)'} :*\n`;
       }
 
       const isCounterStopped = session.isCounterStopped;
@@ -816,7 +849,7 @@ export default function DailySessionsPage() {
                 <DropdownMenuItem onClick={() => {
                   const todayStr = format(new Date(), 'yyyy-MM-dd');
                   const daySessions = filteredGetSessionsForDay(todayStr);
-                  const session = daySessions.find(s => s.sessionNumber === 1) || daySessions[0];
+                  const session = daySessions.find(s => Number(s.sessionNumber || 1) === 1) || daySessions[0];
                   if (session) handleExportSession({ stopPropagation: () => { } } as any, session.id);
                   else toast({ title: "لا يوجد تقرير", description: "لم يتم تسجيل بيانات لحصة اليوم بعد.", variant: "destructive" });
                 }} className="gap-2 cursor-pointer py-2.5">
@@ -1019,7 +1052,7 @@ export default function DailySessionsPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-1 gap-3 py-4">
-              {sessionChoiceData?.sessions.sort((a, b) => a.sessionNumber - b.sessionNumber).map((session) => (
+              {sessionChoiceData?.sessions.sort((a, b) => Number(a.sessionNumber || 1) - Number(b.sessionNumber || 1)).map((session) => (
                 <Button
                   key={session.id}
                   variant="outline"
@@ -1027,7 +1060,7 @@ export default function DailySessionsPage() {
                   onClick={() => {
                     const queryParams = new URLSearchParams();
                     queryParams.set('date', sessionChoiceData.dateStr);
-                    queryParams.set('session', session.sessionNumber.toString());
+                    queryParams.set('session', Number(session.sessionNumber || 1).toString());
                     if (selectedSheikhId) {
                       queryParams.set('ownerId', selectedSheikhId);
                     }
@@ -1040,7 +1073,7 @@ export default function DailySessionsPage() {
                       <FileText className="h-5 w-5" />
                     </div>
                     <div className="text-right">
-                      <div className="font-bold text-lg">حصة {session.sessionNumber === 1 ? 'أساسية' : 'إضافية'}</div>
+                      <div className="font-bold text-lg">حصة {Number(session.sessionNumber || 1) === 1 ? 'أساسية' : 'إضافية'}</div>
                       <div className="text-xs text-muted-foreground">{session.sessionType}</div>
                     </div>
                   </div>
@@ -1289,16 +1322,31 @@ export default function DailySessionsPage() {
                 <Star className="h-5 w-5 fill-purple-600 text-purple-600" />
                 جدول الحصيلة الأسبوعية
               </CardTitle>
-              <div className="flex items-center gap-2" dir="ltr">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setOutcomeWeekStart(prev => addDays(prev, 7))}>
-                  <ChevronRight className="h-4 w-4" />
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                {/* زر تعيين لا يوجد حصيلة للجميع */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBulkNoSession}
+                  disabled={isSettingBulkNoSession || !activeStudentsForWeeklyOutcome.length}
+                  className="gap-1 text-slate-500 border-slate-300 hover:bg-slate-100 text-xs"
+                >
+                  {isSettingBulkNoSession
+                    ? <Loader2 className="h-3 w-3 animate-spin" />
+                    : <CalendarOff className="h-3 w-3" />}
+                  لا يوجد حصيلة للجميع
                 </Button>
-                <div className="text-sm font-bold text-purple-900 bg-white px-3 py-1 rounded-md border min-w-[120px] text-center shadow-sm">
-                  {format(weekDates[0], 'dd MMM', { locale: ar })} - {format(weekDates[6], 'dd MMM', { locale: ar })}
+                <div className="flex items-center gap-2" dir="ltr">
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setOutcomeWeekStart(prev => addDays(prev, 7))}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <div className="text-sm font-bold text-purple-900 bg-white px-3 py-1 rounded-md border min-w-[120px] text-center shadow-sm">
+                    {format(weekDates[0], 'dd MMM', { locale: ar })} - {format(weekDates[6], 'dd MMM', { locale: ar })}
+                  </div>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setOutcomeWeekStart(prev => addDays(prev, -7))}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setOutcomeWeekStart(prev => addDays(prev, -7))}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -1321,6 +1369,13 @@ export default function DailySessionsPage() {
                       // Calculate daily status dots
                       const days = weekDates.slice(0, 7); // Sat to Fri
 
+                      // تاريخ تسجيل الطالب — لتجاهل الأيام قبل انضمامه
+                      const studentRegDate = student.registrationDate
+                        ? (student.registrationDate instanceof Date
+                            ? student.registrationDate
+                            : new Date(student.registrationDate as any))
+                        : null;
+
                       return (
                         <tr key={student.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
                           <td className="p-4 align-middle font-medium">
@@ -1339,9 +1394,33 @@ export default function DailySessionsPage() {
                             <div className="flex gap-1 justify-center flex-wrap">
                               {days.map((day) => {
                                 const dateStr = format(day, 'yyyy-MM-dd');
+
+                                const dayNoon = new Date(day);
+                                dayNoon.setHours(0, 0, 0, 0);
+                                const regDateNoon = studentRegDate ? new Date(studentRegDate) : null;
+                                if (regDateNoon) regDateNoon.setHours(0, 0, 0, 0);
+
+                                // الأيام قبل تسجيل الطالب — لا تُحسب عليه
+                                const isBeforeReg = regDateNoon && dayNoon < regDateNoon;
+                                if (isBeforeReg) {
+                                  return (
+                                    <TooltipProvider key={dateStr}>
+                                      <Tooltip>
+                                        <TooltipTrigger>
+                                          <div className="h-3 w-3 rounded-full bg-slate-200 border border-dashed border-slate-400 opacity-50" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p className="text-xs font-bold">{format(day, 'EEE dd/MM', { locale: ar })}</p>
+                                          <p className="text-[10px] text-slate-400">قبل تاريخ التسجيل</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  );
+                                }
+
                                 const daySessions = isAdmin5 ? (sheikhSessions[dateStr] ? Object.values(sheikhSessions[dateStr]) : []) : (dailySessions[dateStr] ? Object.values(dailySessions[dateStr] as Record<string, any>) : []);
-                                const session1 = (daySessions as any[]).find((s: any) => s.sessionNumber === 1);
-                                const session2 = (daySessions as any[]).find((s: any) => s.sessionNumber === 2);
+                                const session1 = (daySessions as any[]).find((s: any) => Number(s.sessionNumber || 1) === 1);
+                                const session2 = (daySessions as any[]).find((s: any) => Number(s.sessionNumber || 1) === 2);
                                 const hasTwoSessions = !!(session1 && session2);
 
                                 const getRecord = (session: any) => session?.records?.find((r: any) => r.studentId === student.id);
@@ -1361,7 +1440,6 @@ export default function DailySessionsPage() {
                                     <TooltipProvider key={dateStr}>
                                       <Tooltip>
                                         <TooltipTrigger>
-                                          {/* نقطتان: فوق=صباح، تحت=مساء */}
                                           <div className="flex flex-col gap-0.5 items-center">
                                             <div className={`h-2.5 w-2.5 rounded-full border-2 border-amber-200 ${getDotColor(att1, session1?.sessionType)}`} title="صباح" />
                                             <div className={`h-2.5 w-2.5 rounded-full border-2 border-indigo-200 ${getDotColor(att2, session2?.sessionType)}`} title="مساء" />
@@ -1395,7 +1473,16 @@ export default function DailySessionsPage() {
                             </div>
                           </td>
                           <td className="p-4 align-middle text-center">
-                            {outcome && outcome.evaluation ? (
+                            {outcome && outcome.evaluation === 'لا يوجد حصيلة' ? (
+                              // أسبوع بدون حصص — لا يوجد حصيلة
+                              <div className="flex items-center justify-center gap-2 rounded-full py-1 px-3 w-fit mx-auto border shadow-sm bg-slate-100 text-slate-400 border-slate-200">
+                                <CalendarOff className="h-4 w-4" />
+                                <div className="flex flex-col items-start leading-none">
+                                  <span className="font-bold text-xs">لا يوجد حصيلة</span>
+                                  <span className="text-[10px] text-slate-400">أسبوع بدون حصص</span>
+                                </div>
+                              </div>
+                            ) : outcome && outcome.evaluation ? (
                               <div className={cn(
                                 "flex items-center justify-center gap-2 rounded-full py-1 px-3 w-fit mx-auto border shadow-sm transition-all",
                                 outcome.evaluation === 'ممتاز' ? "bg-green-100 text-green-700 border-green-200" :
@@ -1424,9 +1511,15 @@ export default function DailySessionsPage() {
                               size="sm"
                               variant={outcome && outcome.evaluation ? "ghost" : "default"}
                               onClick={() => setOutcomeModalStudent(student)}
-                              className={cn("gap-2 text-xs", !(outcome && outcome.evaluation) && "bg-purple-600 hover:bg-purple-700 shadow-md")}
+                              className={cn(
+                                "gap-2 text-xs",
+                                !(outcome && outcome.evaluation) && "bg-purple-600 hover:bg-purple-700 shadow-md",
+                                outcome?.evaluation === 'لا يوجد حصيلة' && "text-slate-500"
+                              )}
                             >
-                              <Star className="h-3 w-3" />
+                              {outcome?.evaluation === 'لا يوجد حصيلة'
+                                ? <CalendarOff className="h-3 w-3" />
+                                : <Star className="h-3 w-3" />}
                               {outcome && outcome.evaluation ? 'تعديل' : 'تقييم'}
                             </Button>
                           </td>

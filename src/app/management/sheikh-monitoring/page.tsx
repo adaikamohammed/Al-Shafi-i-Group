@@ -20,7 +20,7 @@ import {
     eachDayOfInterval, getDay, isToday, addDays, addMonths, subMonths
 } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, arabicCompare } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell,
@@ -50,6 +50,233 @@ const isUstadhatGroup = (groupName?: string) => {
     const num = parseInt(groupName.replace(/\D/g, '') || '0');
     return num >= 10 && num <= 18;
 };
+
+// Constants for fallback points
+const ATTENDANCE_POINTS: Record<string, number> = {
+    'حاضر': 10,
+    'تعويض': 8,
+    'متأخر': 5,
+    'غائب': 0,
+    'غياب': 0
+};
+
+const PERFORMANCE_POINTS: Record<string, number> = {
+    'ممتاز': 10,
+    'جيد جدا': 8,
+    'جيد جداً': 8,
+    'جيد': 6,
+    'حسن': 5,
+    'متوسط': 4,
+    'مقبول': 3,
+    'ضعيف': 1,
+    'لم يحفظ': 0,
+};
+
+const BEHAVIOR_POINTS: Record<string, number> = {
+    'هادئ': 10,
+    'متوسط': 7,
+    'مقبول': 5,
+    'غير منضبط': 2,
+    'مشاغب': 0,
+};
+
+function calculateFairStudentStats({
+    students,
+    dailySessions,
+    sheikhs,
+    dateStrings,
+    pointsConfig
+}: {
+    students: any[];
+    dailySessions: any;
+    sheikhs: GroupSheikhInfo[];
+    dateStrings: string[];
+    pointsConfig: any;
+}) {
+    const sessionsInRange: any[] = [];
+    if (dailySessions) {
+        dateStrings.forEach(dateStr => {
+            const daySess = (dailySessions as any)[dateStr];
+            if (!daySess) return;
+            Object.values(daySess as Record<string, any>).forEach((session: any) => {
+                if (!session) return;
+                const sType = session.sessionType;
+                if (sType === 'يوم عطلة' || (sType === 'غياب الشيخ' && !session.substituteTeacher)) return;
+                const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
+                if (!isReal) return;
+                sessionsInRange.push(session);
+            });
+        });
+    }
+
+    const sessionsByDate: Record<string, any[]> = {};
+    sessionsInRange.forEach(session => {
+        if (!sessionsByDate[session.date]) {
+            sessionsByDate[session.date] = [];
+        }
+        sessionsByDate[session.date].push(session);
+    });
+
+    const maxAttendanceVal = pointsConfig?.attendance ? Math.max(...Object.values(pointsConfig.attendance).map(Number)) : 10;
+    const maxMemorizationVal = pointsConfig?.evaluation ? Math.max(...Object.values(pointsConfig.evaluation).map(Number)) : 10;
+    const maxBehaviorVal = pointsConfig?.behavior ? Math.max(...Object.values(pointsConfig.behavior).map(Number)) : 10;
+
+    const getAttPoints = (att: string) => (pointsConfig?.attendance as any)?.[att] ?? ATTENDANCE_POINTS[att] ?? 0;
+    const getMemoPoints = (memo: string) => (pointsConfig?.evaluation as any)?.[memo] ?? PERFORMANCE_POINTS[memo] ?? 0;
+    const getBehPoints = (beh: string) => (pointsConfig?.behavior as any)?.[beh] ?? BEHAVIOR_POINTS[beh] ?? 0;
+
+    const studentMap = new Map<string, any>();
+
+    const activeStudents = (students || []).filter((s: any) => s.status === 'نشط');
+    activeStudents.forEach((s: any) => {
+        const grp = (s as any).group || s.groupName || '—';
+        studentMap.set(s.id, {
+            id: s.id,
+            name: s.fullName,
+            group: grp,
+            attendanceDays: 0,
+            totalSessionDays: 0,
+            attendanceRate: 0,
+            excellent: 0,
+            goodPlus: 0,
+            good: 0,
+            acceptable: 0,
+            weak: 0,
+            notMem: 0,
+            evalScore: 0,
+            totalEvals: 0,
+            avgEvalScore: 0,
+            bestEval: '—',
+            lateDays: 0,
+            behaviorCalm: 0,
+            behaviorOk: 0,
+            behaviorBad: 0,
+            behaviorScore: 0,
+            totalBehaviorEvals: 0,
+            avgBehaviorScore: 0,
+            overallScore: 0,
+            totalSessions: 0,
+            weightedSessions: 0,
+            assessedMemorization: 0,
+            assessedBehavior: 0,
+            attendancePointsSum: 0,
+            memorizationPointsSum: 0,
+            behaviorPointsSum: 0
+        });
+    });
+
+    const groupSessionDates = new Map<string, Set<string>>();
+    sheikhs.forEach(sh => groupSessionDates.set(sh.group, new Set()));
+
+    const groupDateProcessed = new Map<string, Set<string>>();
+    sheikhs.forEach(sh => groupDateProcessed.set(sh.group, new Set()));
+
+    sessionsInRange.forEach(session => {
+        const shOwner = sheikhs.find(sh => sh.uids.has(session.ownerId));
+        if (shOwner) {
+            if (!groupDateProcessed.get(shOwner.group)?.has(session.date)) {
+                groupDateProcessed.get(shOwner.group)?.add(session.date);
+                groupSessionDates.get(shOwner.group)?.add(session.date);
+            }
+        }
+
+        const dateSessions = sessionsByDate[session.date] || [];
+        const weight = dateSessions.length >= 2 ? 0.5 : 1.0;
+
+        const records: any[] = Array.isArray(session.records)
+            ? session.records
+            : session.records ? Object.values(session.records) : [];
+
+        records.forEach((r: any) => {
+            const sid = r.studentId;
+            if (!sid || !studentMap.has(sid)) return;
+            const st = studentMap.get(sid)!;
+
+            st.totalSessions++;
+
+            if (r.attendance) {
+                const earned = getAttPoints(r.attendance) * weight;
+                st.attendancePointsSum += earned;
+                st.weightedSessions += weight;
+
+                if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') {
+                    st.attendanceDays++;
+                }
+                if (r.attendance === 'متأخر') {
+                    st.lateDays++;
+                }
+            }
+
+            if (!r.review && r.memorization && r.memorization !== 'لا يوجد' && r.memorization !== '') {
+                st.assessedMemorization += weight;
+                st.totalEvals++;
+                const earned = getMemoPoints(r.memorization) * weight;
+                st.memorizationPointsSum += earned;
+
+                const memoKey = r.memorization === 'جيد جدا' ? 'جيد جداً' : r.memorization;
+                if (memoKey === 'ممتاز') st.excellent++;
+                else if (memoKey === 'جيد جداً') st.goodPlus++;
+                else if (memoKey === 'جيد') st.good++;
+                else if (memoKey === 'مقبول' || memoKey === 'حسن') st.acceptable++;
+                else if (memoKey === 'ضعيف' || memoKey === 'متوسط') st.weak++;
+                else if (memoKey === 'لم يحفظ') st.notMem++;
+            } else if (r.review && pointsConfig?.review?.completed) {
+                st.assessedMemorization += weight;
+                st.totalEvals++;
+                const earned = pointsConfig.review.completed * weight;
+                st.memorizationPointsSum += earned;
+            }
+
+            if (r.behavior && r.behavior !== '') {
+                st.assessedBehavior += weight;
+                st.totalBehaviorEvals++;
+                const earned = getBehPoints(r.behavior) * weight;
+                st.behaviorPointsSum += earned;
+
+                const behKey = r.behavior;
+                if (behKey === 'هادئ') st.behaviorCalm++;
+                else if (behKey === 'متوسط' || behKey === 'مقبول') st.behaviorOk++;
+                else st.behaviorBad++;
+            }
+        });
+    });
+
+    let maxSessionsInPeriod = 0;
+    studentMap.forEach(st => {
+        st.totalSessionDays = groupSessionDates.get(st.group)?.size || 0;
+        if (st.totalSessions > maxSessionsInPeriod) {
+            maxSessionsInPeriod = st.totalSessions;
+        }
+    });
+
+    const minSessionsRequired = Math.max(1, Math.round(maxSessionsInPeriod * 0.5));
+
+    const all = Array.from(studentMap.values()).map(st => {
+        const maxAttPoints = st.weightedSessions * maxAttendanceVal;
+        const maxMemoPoints = st.assessedMemorization * maxMemorizationVal;
+        const maxBehPoints = st.assessedBehavior * maxBehaviorVal;
+
+        const attPct = maxAttPoints > 0 ? (st.attendancePointsSum / maxAttPoints) * 100 : 0;
+        const memoPct = maxMemoPoints > 0 ? (st.memorizationPointsSum / maxMemoPoints) * 100 : 0;
+        const behPct = maxBehPoints > 0 ? (st.behaviorPointsSum / maxBehPoints) * 100 : 0;
+
+        const academicScore = (attPct + memoPct) / 2;
+        const overallScore = Math.max(0, Math.round(academicScore * 10) / 10);
+
+        const avgEvalScore = st.assessedMemorization > 0 ? Math.round((st.memorizationPointsSum / st.assessedMemorization) * 10) / 10 : 0;
+        const avgBehaviorScore = st.assessedBehavior > 0 ? Math.round((st.behaviorPointsSum / st.assessedBehavior) * 10) / 10 : 0;
+
+        st.attendanceRate = Math.max(0, Math.round(attPct));
+        st.avgEvalScore = avgEvalScore;
+        st.avgBehaviorScore = avgBehaviorScore;
+        st.overallScore = overallScore;
+        st.bestEval = st.excellent > 0 ? 'ممتاز' : st.goodPlus > 0 ? 'جيد جداً' : st.good > 0 ? 'جيد' : st.acceptable > 0 ? 'مقبول' : st.weak > 0 ? 'ضعيف' : st.notMem > 0 ? 'لم يحفظ' : '—';
+
+        return st;
+    });
+
+    return { all, maxSessionsInPeriod, minSessionsRequired };
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface GroupSheikhInfo {
@@ -157,7 +384,7 @@ function SummaryCard({ icon, label, value, color }: { icon: React.ReactNode; lab
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function SheikhMonitoringPage() {
-    const { dailySessions, allUsers, loading, students } = useStudentContext();
+    const { dailySessions, allUsers, loading, students, settings } = useStudentContext();
     const { isManagement } = useAuth();
 
     type ViewMode = 'day' | 'week' | 'month' | 'stats' | 'students' | 'chart' | 'topStudents' | 'earlyWarning' | 'badges' | 'heatmap' | 'behavior';
@@ -455,133 +682,19 @@ export default function SheikhMonitoringPage() {
         const weekDays = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(wSat, i));
         const weekDateStrs = weekDays.map(d => format(d, 'yyyy-MM-dd'));
 
-        // Build group → session dates (only real sessions)
-        const groupSessionDates = new Map<string, Set<string>>();
-        sheikhs.forEach(sh => groupSessionDates.set(sh.group, new Set()));
-
-        // Per-student accumulator
-        type StudentStat = {
-            id: string; name: string; group: string;
-            attendanceDays: number; totalSessionDays: number;
-            excellent: number; goodPlus: number; good: number;
-            acceptable: number; weak: number; notMem: number;
-            evalScore: number; totalEvals: number;
-            lateDays: number;
-            behaviorCalm: number; behaviorOk: number; behaviorBad: number;
-            behaviorScore: number; totalBehaviorEvals: number;
-        };
-        const studentMap = new Map<string, StudentStat>();
-        (students || []).filter(s => s.status === 'نشط').forEach(s => {
-            const grp = (s as any).group || s.groupName || '—';
-            studentMap.set(s.id, {
-                id: s.id, name: s.fullName, group: grp,
-                attendanceDays: 0, totalSessionDays: 0,
-                excellent: 0, goodPlus: 0, good: 0,
-                acceptable: 0, weak: 0, notMem: 0,
-                evalScore: 0, totalEvals: 0,
-                lateDays: 0,
-                behaviorCalm: 0, behaviorOk: 0, behaviorBad: 0,
-                behaviorScore: 0, totalBehaviorEvals: 0,
-            });
-        });
-
-        // Build group→studentIds
-        const groupStudentIds = new Map<string, Set<string>>();
-        sheikhs.forEach(sh => groupStudentIds.set(sh.group, new Set()));
-        (students || []).filter(s => s.status === 'نشط').forEach(s => {
-            const grp = (s as any).group || s.groupName || '';
-            groupStudentIds.get(grp)?.add(s.id);
-        });
-
-        // Track which dates each group had a real session (to avoid duplicates)
-        const groupDateProcessed = new Map<string, Set<string>>();
-        sheikhs.forEach(sh => groupDateProcessed.set(sh.group, new Set()));
-
-        if (dailySessions) {
-            weekDateStrs.forEach(dateStr => {
-                const daySess = (dailySessions as any)[dateStr];
-                if (!daySess) return;
-                Object.values(daySess as Record<string, any>).forEach((session: any) => {
-                    if (!session) return;
-                    const sType = session.sessionType;
-                    const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
-                    if (!isReal) return;
-                    const shOwner = sheikhs.find(sh => sh.uids.has(session.ownerId));
-                    if (!shOwner) return;
-                    // Avoid double-counting same group+date
-                    if (groupDateProcessed.get(shOwner.group)?.has(dateStr)) return;
-                    groupDateProcessed.get(shOwner.group)?.add(dateStr);
-                    groupSessionDates.get(shOwner.group)?.add(dateStr);
-
-                    const records: any[] = Array.isArray(session.records)
-                        ? session.records
-                        : session.records ? Object.values(session.records) : [];
-                    const recordedIds = new Set<string>(records.map((r: any) => r.studentId).filter(Boolean));
-
-                    // Mark attendance for recorded students
-                    records.forEach((r: any) => {
-                        const sid = r.studentId;
-                        if (!sid || !studentMap.has(sid)) return;
-                        const st = studentMap.get(sid)!;
-                        if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') {
-                            st.attendanceDays++;
-                        }
-                        if (r.attendance === 'متأخر') {
-                            st.lateDays++;
-                        }
-                        // Behavior eval
-                        if (r.behavior) {
-                            st.totalBehaviorEvals++;
-                            if (r.behavior === 'هادئ') { st.behaviorCalm++; st.behaviorScore += 2; }
-                            else if (r.behavior === 'مقبول') { st.behaviorOk++; st.behaviorScore += 1; }
-                            else if (r.behavior === 'مشاغب' || r.behavior === 'غير منضبط') { st.behaviorBad++; st.behaviorScore += -1; }
-                        }
-                        // Memorization eval (not review)
-                        if (!r.review && r.memorization) {
-                            st.totalEvals++;
-                            if (r.memorization === 'ممتاز') { st.excellent++; st.evalScore += 5; }
-                            else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') { st.goodPlus++; st.evalScore += 6; }
-                            else if (r.memorization === 'جيد') { st.good++; st.evalScore += 3; }
-                            else if (r.memorization === 'مقبول' || r.memorization === 'حسن') { st.acceptable++; st.evalScore += 2; }
-                            else if (r.memorization === 'ضعيف' || r.memorization === 'متوسط') { st.weak++; st.evalScore += 1; }
-                            else if (r.memorization === 'لم يحفظ') { st.notMem++; st.evalScore += 0; }
-                        }
-                    });
-                });
-            });
-        }
-
-        // Set totalSessionDays for each student based on their group
-        studentMap.forEach(st => {
-            st.totalSessionDays = groupSessionDates.get(st.group)?.size || 0;
-        });
-
-        // Compute and return all students
-        const all = Array.from(studentMap.values()).map(st => {
-            const attendanceRate = st.totalSessionDays > 0 ? Math.round((st.attendanceDays / st.totalSessionDays) * 100) : 0;
-            const avgEvalScore = st.totalEvals > 0 ? Math.round((st.evalScore / st.totalEvals) * 100) / 100 : 0;
-            const avgBehaviorScore = st.totalBehaviorEvals > 0 ? Math.round((st.behaviorScore / st.totalBehaviorEvals) * 100) / 100 : 0;
-            // Scoring: attendance 40 + eval 40 + behavior×5 - late×2
-            const attPoints = st.totalSessionDays > 0 ? (st.attendanceDays / st.totalSessionDays) * 40 : 0;
-            const evalPoints = st.totalEvals > 0 ? (avgEvalScore / 6) * 40 : 0;
-            const behPoints = avgBehaviorScore * 5;
-            const latePenalty = st.lateDays * 2;
-            const overallScore = Math.max(0, Math.round(attPoints + evalPoints + behPoints - latePenalty));
-            return {
-                ...st,
-                attendanceRate,
-                avgEvalScore,
-                avgBehaviorScore,
-                overallScore,
-                bestEval: st.excellent > 0 ? 'ممتاز' : st.goodPlus > 0 ? 'جيد جداً' : st.good > 0 ? 'جيد' : st.acceptable > 0 ? 'مقبول' : st.weak > 0 ? 'ضعيف' : st.notMem > 0 ? 'لم يحفظ' : '—',
-            };
+        const { all, minSessionsRequired, maxSessionsInPeriod } = calculateFairStudentStats({
+            students,
+            dailySessions,
+            sheikhs,
+            dateStrings: weekDateStrs,
+            pointsConfig: settings?.points
         });
 
         // Week label
         const weekLabel = `سبت ${format(wSat, 'd MMM', { locale: ar })} — جمعة ${format(addDays(wSat, 6), 'd MMM yyyy', { locale: ar })}`;
 
-        return { all, weekLabel, weekStart: wSat, weekEnd: addDays(wSat, 6) };
-    }, [students, dailySessions, sheikhs, selectedDate]);
+        return { all, weekLabel, weekStart: wSat, weekEnd: addDays(wSat, 6), minSessionsRequired, maxSessionsInPeriod };
+    }, [students, dailySessions, sheikhs, selectedDate, settings]);
 
     // ── At-Risk Students (Early Warning) ──────────────────────────────────
     const atRiskStudents = useMemo(() => {
@@ -4055,6 +4168,7 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
     dailySessions: any;
     students: any;
 }) {
+    const { settings } = useStudentContext();
     const [excludeNotMemorized, setExcludeNotMemorized] = useState(false);
 
     // Monthly stats computation
@@ -4064,85 +4178,20 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
         const mEnd = endOfMonth(selectedDate);
         const monthDays = eachDayOfInterval({ start: mStart, end: mEnd }).map(d => format(d, 'yyyy-MM-dd'));
 
-        const groupSessionDates = new Map<string, Set<string>>();
-        sheikhs.forEach(sh => groupSessionDates.set(sh.group, new Set()));
+        const { all, minSessionsRequired, maxSessionsInPeriod } = calculateFairStudentStats({
+            students,
+            dailySessions,
+            sheikhs,
+            dateStrings: monthDays,
+            pointsConfig: settings?.points
+        });
 
-        type MStat = TopStudentEntry & {};
-        const studentMap = new Map<string, any>();
-        (students || []).filter((s: any) => s.status === 'نشط').forEach((s: any) => {
-            const grp = (s as any).group || s.groupName || '—';
-            studentMap.set(s.id, {
-                id: s.id, name: s.fullName, group: grp,
-                attendanceDays: 0, totalSessionDays: 0, excellent: 0, goodPlus: 0, good: 0,
-                acceptable: 0, weak: 0, notMem: 0, evalScore: 0, totalEvals: 0,
-                lateDays: 0, behaviorCalm: 0, behaviorOk: 0, behaviorBad: 0,
-                behaviorScore: 0, totalBehaviorEvals: 0,
-            });
-        });
-        const groupStudentIds = new Map<string, Set<string>>();
-        sheikhs.forEach(sh => groupStudentIds.set(sh.group, new Set()));
-        (students || []).filter((s: any) => s.status === 'نشط').forEach((s: any) => {
-            const grp = (s as any).group || s.groupName || '';
-            groupStudentIds.get(grp)?.add(s.id);
-        });
-        const groupDateProcessed = new Map<string, Set<string>>();
-        sheikhs.forEach(sh => groupDateProcessed.set(sh.group, new Set()));
-
-        if (dailySessions) {
-            monthDays.forEach(dateStr => {
-                const daySess = (dailySessions as any)[dateStr];
-                if (!daySess) return;
-                Object.values(daySess as Record<string, any>).forEach((session: any) => {
-                    if (!session) return;
-                    const sType = session.sessionType;
-                    const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
-                    if (!isReal) return;
-                    const shOwner = sheikhs.find(sh => sh.uids.has(session.ownerId));
-                    if (!shOwner) return;
-                    if (groupDateProcessed.get(shOwner.group)?.has(dateStr)) return;
-                    groupDateProcessed.get(shOwner.group)?.add(dateStr);
-                    groupSessionDates.get(shOwner.group)?.add(dateStr);
-                    const records: any[] = Array.isArray(session.records) ? session.records : session.records ? Object.values(session.records) : [];
-                    records.forEach((r: any) => {
-                        const sid = r.studentId;
-                        if (!sid || !studentMap.has(sid)) return;
-                        const st = studentMap.get(sid)!;
-                        if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') st.attendanceDays++;
-                        if (r.attendance === 'متأخر') st.lateDays++;
-                        if (r.behavior) {
-                            st.totalBehaviorEvals++;
-                            if (r.behavior === 'هادئ') { st.behaviorCalm++; st.behaviorScore += 2; }
-                            else if (r.behavior === 'مقبول') { st.behaviorOk++; st.behaviorScore += 1; }
-                            else { st.behaviorBad++; st.behaviorScore += -1; }
-                        }
-                        if (!r.review && r.memorization) {
-                            st.totalEvals++;
-                            if (r.memorization === 'ممتاز') { st.excellent++; st.evalScore += 5; }
-                            else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') { st.goodPlus++; st.evalScore += 6; }
-                            else if (r.memorization === 'جيد') { st.good++; st.evalScore += 3; }
-                            else if (r.memorization === 'مقبول' || r.memorization === 'حسن') { st.acceptable++; st.evalScore += 2; }
-                            else if (r.memorization === 'ضعيف' || r.memorization === 'متوسط') { st.weak++; st.evalScore += 1; }
-                            else if (r.memorization === 'لم يحفظ') { st.notMem++; st.evalScore += 0; }
-                        }
-                    });
-                });
-            });
-        }
-        studentMap.forEach(st => { st.totalSessionDays = groupSessionDates.get(st.group)?.size || 0; });
-        const all: TopStudentEntry[] = Array.from(studentMap.values()).map((st: any) => {
-            const attendanceRate = st.totalSessionDays > 0 ? Math.round((st.attendanceDays / st.totalSessionDays) * 100) : 0;
-            const avgEvalScore = st.totalEvals > 0 ? Math.round((st.evalScore / st.totalEvals) * 100) / 100 : 0;
-            const avgBehaviorScore = st.totalBehaviorEvals > 0 ? Math.round((st.behaviorScore / st.totalBehaviorEvals) * 100) / 100 : 0;
-            const attPts = st.totalSessionDays > 0 ? (st.attendanceDays / st.totalSessionDays) * 40 : 0;
-            const evalPts = st.totalEvals > 0 ? (avgEvalScore / 6) * 40 : 0;
-            const behPts = avgBehaviorScore * 5;
-            const latePenalty = st.lateDays * 2;
-            return { ...st, attendanceRate, avgEvalScore, avgBehaviorScore, overallScore: Math.max(0, Math.round(attPts + evalPts + behPts - latePenalty)), bestEval: st.excellent > 0 ? 'ممتاز' : st.goodPlus > 0 ? 'جيد جداً' : st.good > 0 ? 'جيد' : st.acceptable > 0 ? 'مقبول' : st.weak > 0 ? 'ضعيف' : st.notMem > 0 ? 'لم يحفظ' : '—' };
-        });
-        return { all, weekLabel: format(selectedDate, 'MMMM yyyy', { locale: ar }), weekStart: mStart, weekEnd: mEnd };
-    }, [starsMode, selectedDate, dailySessions, students, sheikhs]);
+        return { all, weekLabel: format(selectedDate, 'MMMM yyyy', { locale: ar }), weekStart: mStart, weekEnd: mEnd, minSessionsRequired, maxSessionsInPeriod };
+    }, [starsMode, selectedDate, dailySessions, students, sheikhs, settings]);
 
     const dataSource = starsMode === 'month' && monthlyData ? monthlyData : stats;
+    const minSessionsRequired = (dataSource as any).minSessionsRequired || 1;
+
     const filtered = dataSource.all.filter(s => {
         if (groupFilter === 'all') return true;
         if (groupFilter === 'sheikhs') return isSheikhGroup(s.group);
@@ -4151,20 +4200,40 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
     });
     const active = filtered.filter(s => s.totalSessionDays > 0);
 
-    // Top performers
-    const topAttendance = [...active].filter(s => s.attendanceRate > 0).sort((a, b) => b.attendanceRate - a.attendanceRate || b.attendanceDays - a.attendanceDays);
-    const topExcellent = [...active].filter(s => s.excellent > 0).sort((a, b) => b.excellent - a.excellent || b.evalScore - a.evalScore);
+    // Top performers (filtered by minSessionsRequired to exclude low-attendance students)
+    const topAttendance = [...active]
+        .filter(s => (s.totalSessions || 0) >= minSessionsRequired && s.attendanceRate > 0)
+        .sort((a, b) => b.attendanceRate - a.attendanceRate || b.attendanceDays - a.attendanceDays);
 
-    // Overall ranking using comprehensive score
+    const topExcellent = [...active]
+        .filter(s => (s.totalSessions || 0) >= minSessionsRequired && s.excellent > 0)
+        .sort((a, b) => b.excellent - a.excellent || b.evalScore - a.evalScore);
+
+    // Overall ranking using the fair evaluation sorting logic (meeting threshold first)
     const overallRanked = [...active]
-        .filter(s => s.totalEvals > 0 || s.attendanceDays > 0)
-        .sort((a, b) => b.overallScore - a.overallScore);
+        .sort((a: any, b: any) => {
+            const aMeets = (a.totalSessions || 0) >= minSessionsRequired;
+            const bMeets = (b.totalSessions || 0) >= minSessionsRequired;
+            if (aMeets !== bMeets) return aMeets ? -1 : 1;
+            
+            if (b.overallScore !== a.overallScore) return b.overallScore - a.overallScore;
+            if (b.totalSessions !== a.totalSessions) return b.totalSessions - a.totalSessions;
+            return arabicCompare(a.name, b.name);
+        });
 
     // Group champions: top 3 per group
     const groupChampions = sheikhs.map(sh => {
         const groupStudents = [...dataSource.all]
-            .filter(s => s.group === sh.group && s.totalSessionDays > 0 && (s.totalEvals > 0 || s.attendanceDays > 0))
-            .sort((a, b) => b.overallScore - a.overallScore);
+            .filter(s => s.group === sh.group && s.totalSessionDays > 0)
+            .sort((a: any, b: any) => {
+                const aMeets = (a.totalSessions || 0) >= minSessionsRequired;
+                const bMeets = (b.totalSessions || 0) >= minSessionsRequired;
+                if (aMeets !== bMeets) return aMeets ? -1 : 1;
+                
+                if (b.overallScore !== a.overallScore) return b.overallScore - a.overallScore;
+                if (b.totalSessions !== a.totalSessions) return b.totalSessions - a.totalSessions;
+                return arabicCompare(a.name, b.name);
+            });
         return { group: sh.group, displayName: sh.displayName, top3: groupStudents.slice(0, 3) };
     });
 
@@ -4279,7 +4348,7 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
             stats: [
                 { label: 'نسبة الحضور', value: `${st.attendanceRate}%` },
                 { label: 'ممتاز في الحفظ', value: `${st.excellent} حصص` },
-                { label: 'معدل التسميع', value: `${st.avgEvalScore.toFixed(1)}/6` },
+                { label: 'معدل التسميع', value: `${st.avgEvalScore.toFixed(1)}/10` },
                 { label: 'النقاط الإجمالية', value: `${st.overallScore}ن` }
             ]
         });
@@ -4288,61 +4357,117 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
     const RANKING_PAGE_SIZE = 15;
 
     // All-students rank (ignores groupFilter)
-    const allActiveRanked = useMemo(() => [
-        ...dataSource.all]
-        .filter(s => s.totalSessionDays > 0 && (s.totalEvals > 0 || s.attendanceDays > 0))
-        .sort((a, b) => b.overallScore - a.overallScore),
-    [dataSource]);
+    const allActiveRanked = useMemo(() => {
+        return [...dataSource.all]
+            .filter(s => s.totalSessionDays > 0)
+            .sort((a: any, b: any) => {
+                const aMeets = (a.totalSessions || 0) >= minSessionsRequired;
+                const bMeets = (b.totalSessions || 0) >= minSessionsRequired;
+                if (aMeets !== bMeets) return aMeets ? -1 : 1;
+                
+                if (b.overallScore !== a.overallScore) return b.overallScore - a.overallScore;
+                if (b.totalSessions !== a.totalSessions) return b.totalSessions - a.totalSessions;
+                return arabicCompare(a.name, b.name);
+            });
+    }, [dataSource, minSessionsRequired]);
 
     const overallRankMap = useMemo(() => {
         const map = new Map<string, number>();
-        allActiveRanked.forEach((s, i) => map.set(s.id, i + 1));
+        let rank = 1;
+        allActiveRanked.forEach((s) => {
+            const meets = (s.totalSessions || 0) >= minSessionsRequired;
+            if (meets) {
+                map.set(s.id, rank++);
+            }
+        });
         return map;
-    }, [allActiveRanked]);
+    }, [allActiveRanked, minSessionsRequired]);
 
     const groupRankMap = useMemo(() => {
         const map = new Map<string, number>();
         sheikhs.forEach(sh => {
-            [...dataSource.all]
-                .filter(s => s.group === sh.group && s.totalSessionDays > 0 && (s.totalEvals > 0 || s.attendanceDays > 0))
-                .sort((a, b) => b.overallScore - a.overallScore)
-                .forEach((s, i) => map.set(s.id, i + 1));
+            const groupStudents = [...dataSource.all]
+                .filter(s => s.group === sh.group && s.totalSessionDays > 0)
+                .sort((a: any, b: any) => {
+                    const aMeets = (a.totalSessions || 0) >= minSessionsRequired;
+                    const bMeets = (b.totalSessions || 0) >= minSessionsRequired;
+                    if (aMeets !== bMeets) return aMeets ? -1 : 1;
+                    
+                    if (b.overallScore !== a.overallScore) return b.overallScore - a.overallScore;
+                    if (b.totalSessions !== a.totalSessions) return b.totalSessions - a.totalSessions;
+                    return arabicCompare(a.name, b.name);
+                });
+            let rank = 1;
+            groupStudents.forEach(s => {
+                const meets = (s.totalSessions || 0) >= minSessionsRequired;
+                if (meets) {
+                    map.set(s.id, rank++);
+                }
+            });
         });
         return map;
-    }, [dataSource, sheikhs]);
+    }, [dataSource, sheikhs, minSessionsRequired]);
 
     // Category active ranked (Sheikhs 1-9 vs Ustadhat 10-18)
-    const sheikhsActiveRanked = useMemo(() => [
-        ...dataSource.all]
-        .filter(s => isSheikhGroup(s.group) && s.totalSessionDays > 0 && (s.totalEvals > 0 || s.attendanceDays > 0))
-        .sort((a, b) => b.overallScore - a.overallScore),
-    [dataSource]);
+    const sheikhsActiveRanked = useMemo(() => {
+        return [...dataSource.all]
+            .filter(s => isSheikhGroup(s.group) && s.totalSessionDays > 0)
+            .sort((a: any, b: any) => {
+                const aMeets = (a.totalSessions || 0) >= minSessionsRequired;
+                const bMeets = (b.totalSessions || 0) >= minSessionsRequired;
+                if (aMeets !== bMeets) return aMeets ? -1 : 1;
+                
+                if (b.overallScore !== a.overallScore) return b.overallScore - a.overallScore;
+                if (b.totalSessions !== a.totalSessions) return b.totalSessions - a.totalSessions;
+                return arabicCompare(a.name, b.name);
+            });
+    }, [dataSource, minSessionsRequired]);
 
-    const ustadhatActiveRanked = useMemo(() => [
-        ...dataSource.all]
-        .filter(s => isUstadhatGroup(s.group) && s.totalSessionDays > 0 && (s.totalEvals > 0 || s.attendanceDays > 0))
-        .sort((a, b) => b.overallScore - a.overallScore),
-    [dataSource]);
+    const ustadhatActiveRanked = useMemo(() => {
+        return [...dataSource.all]
+            .filter(s => isUstadhatGroup(s.group) && s.totalSessionDays > 0)
+            .sort((a: any, b: any) => {
+                const aMeets = (a.totalSessions || 0) >= minSessionsRequired;
+                const bMeets = (b.totalSessions || 0) >= minSessionsRequired;
+                if (aMeets !== bMeets) return aMeets ? -1 : 1;
+                
+                if (b.overallScore !== a.overallScore) return b.overallScore - a.overallScore;
+                if (b.totalSessions !== a.totalSessions) return b.totalSessions - a.totalSessions;
+                return arabicCompare(a.name, b.name);
+            });
+    }, [dataSource, minSessionsRequired]);
 
     const sheikhsRankMap = useMemo(() => {
         const map = new Map<string, number>();
-        sheikhsActiveRanked.forEach((s, i) => map.set(s.id, i + 1));
+        let rank = 1;
+        sheikhsActiveRanked.forEach((s) => {
+            const meets = (s.totalSessions || 0) >= minSessionsRequired;
+            if (meets) {
+                map.set(s.id, rank++);
+            }
+        });
         return map;
-    }, [sheikhsActiveRanked]);
+    }, [sheikhsActiveRanked, minSessionsRequired]);
 
     const ustadhatRankMap = useMemo(() => {
         const map = new Map<string, number>();
-        ustadhatActiveRanked.forEach((s, i) => map.set(s.id, i + 1));
+        let rank = 1;
+        ustadhatActiveRanked.forEach((s) => {
+            const meets = (s.totalSessions || 0) >= minSessionsRequired;
+            if (meets) {
+                map.set(s.id, rank++);
+            }
+        });
         return map;
-    }, [ustadhatActiveRanked]);
+    }, [ustadhatActiveRanked, minSessionsRequired]);
 
     const groupTotalMap = useMemo(() => {
         const map = new Map<string, number>();
         sheikhs.forEach(sh => {
-            map.set(sh.group, dataSource.all.filter(s => s.group === sh.group && s.totalSessionDays > 0 && (s.totalEvals > 0 || s.attendanceDays > 0)).length);
+            map.set(sh.group, dataSource.all.filter(s => s.group === sh.group && s.totalSessionDays > 0 && (s.totalSessions || 0) >= minSessionsRequired).length);
         });
         return map;
-    }, [dataSource, sheikhs]);
+    }, [dataSource, sheikhs, minSessionsRequired]);
 
     if (active.length === 0) {
         return (
@@ -4725,6 +4850,7 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                                 <th className="p-2 border-l text-right min-w-[130px] font-bold">الطالب</th>
                                 <th className="p-2 border-l text-center min-w-[70px] font-bold">الفوج</th>
                                 <th className="p-2 border-l text-center min-w-[55px] font-bold text-amber-700">حضور%</th>
+                                <th className="p-2 border-l text-center min-w-[45px] font-bold text-slate-600" title="إجمالي حصص التقييم المسجلة للطالب">الحصص</th>
                                 <th className="p-2 border-l text-center min-w-[40px] font-bold text-orange-600">تأخر</th>
                                 <th className="p-2 border-l text-center min-w-[45px] font-bold text-emerald-700">ممتاز</th>
                                 <th className="p-2 border-l text-center min-w-[45px] font-bold text-green-600">ج.جداً</th>
@@ -4738,25 +4864,32 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                         <tbody>
                             {searchedRanked.slice(rankingPage * RANKING_PAGE_SIZE, (rankingPage + 1) * RANKING_PAGE_SIZE).map((s, idx) => {
                                 const actualRank = overallRanked.findIndex(x => x.id === s.id);
+                                const meets = (s.totalSessions || 0) >= minSessionsRequired;
+                                const rankNumber = meets ? (overallRankMap.get(s.id) ?? null) : null;
                                 return (
                                     <tr key={s.id}
                                         className={cn(
                                             "border-b hover:bg-amber-50/50 transition-colors cursor-pointer",
-                                            actualRank === 0 ? "bg-amber-50/40" : actualRank === 1 ? "bg-slate-50/40" : actualRank === 2 ? "bg-orange-50/30" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/20"
+                                            !meets ? "opacity-60 bg-slate-50/10" : (rankNumber === 1 ? "bg-amber-50/40" : rankNumber === 2 ? "bg-slate-50/40" : rankNumber === 3 ? "bg-orange-50/30" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/20")
                                         )}
                                         onClick={() => setSelectedStudentDetail(s)}
                                         title="انقر لرؤية تفصيل النقاط"
                                     >
                                         <td className={cn("sticky right-0 z-10 p-2 border-l text-center font-black text-sm",
-                                            actualRank === 0 ? "bg-amber-50/40" : actualRank === 1 ? "bg-slate-50/40" : actualRank === 2 ? "bg-orange-50/30" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/20"
+                                            !meets ? "bg-slate-50/20 text-muted-foreground" : (rankNumber === 1 ? "bg-amber-50/40" : rankNumber === 2 ? "bg-slate-50/40" : rankNumber === 3 ? "bg-orange-50/30" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/20")
                                         )}>
-                                            {medalEmoji(actualRank)}
+                                            {rankNumber !== null ? medalEmoji(rankNumber - 1) : '—'}
                                         </td>
                                         <td className="p-2 border-l">
-                                            <div className="font-bold text-[11px] leading-tight">{s.name}</div>
+                                            <div className="font-bold text-[11px] leading-tight flex items-center gap-1">
+                                                {s.name}
+                                                {!meets && (
+                                                    <span className="text-[8px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded font-normal" title="لم يبلغ الحد الأدنى لحضور الحصص">غير مصنف</span>
+                                                )}
+                                            </div>
                                             <div className="flex gap-2 mt-0.5">
-                                                <span className="text-[9px] text-indigo-600 font-bold">#{overallRankMap.get(s.id) ?? '—'} عاماً</span>
-                                                <span className="text-[9px] text-amber-600 font-bold">#{groupRankMap.get(s.id) ?? '—'} في فوجه</span>
+                                                <span className="text-[9px] text-indigo-600 font-bold">#{rankNumber ?? '—'} عاماً</span>
+                                                <span className="text-[9px] text-amber-600 font-bold">#{meets ? (groupRankMap.get(s.id) ?? '—') : '—'} في فوجه</span>
                                             </div>
                                         </td>
                                         <td className="p-2 border-l text-center">
@@ -4766,6 +4899,9 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                                             <span className={cn("font-bold", s.attendanceRate >= 90 ? "text-emerald-700" : s.attendanceRate >= 70 ? "text-amber-600" : "text-rose-600")}>
                                                 {s.attendanceRate}%
                                             </span>
+                                        </td>
+                                        <td className="p-2 border-l text-center font-bold text-slate-600">
+                                            {s.totalSessions}
                                         </td>
                                         <td className="p-2 border-l text-center">
                                             {s.lateDays > 0 ? <span className="text-orange-600 font-bold">{s.lateDays}</span> : <span className="text-muted-foreground/30">—</span>}
@@ -4796,9 +4932,9 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                                         </td>
                                         <td className="p-2 border-l text-center">
                                             <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full",
-                                                s.avgEvalScore >= 5 ? "bg-emerald-100 text-emerald-700" :
-                                                    s.avgEvalScore >= 3 ? "bg-blue-100 text-blue-700" :
-                                                        s.avgEvalScore >= 1 ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"
+                                                s.avgEvalScore >= 8.33 ? "bg-emerald-100 text-emerald-700" :
+                                                    s.avgEvalScore >= 5.0 ? "bg-blue-100 text-blue-700" :
+                                                        s.avgEvalScore >= 1.67 ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"
                                             )}>{s.avgEvalScore.toFixed(1)}</span>
                                         </td>
                                         <td className="p-2 text-center">
@@ -4852,26 +4988,37 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                             </div>
                             {gc.top3.length > 0 ? (
                                 <div className="space-y-1.5">
-                                    {gc.top3.map((ch, i) => (
-                                        <div
-                                            key={ch.id}
-                                            className={cn("flex items-start gap-2 rounded-lg p-1.5 cursor-pointer hover:bg-indigo-100/30 transition-all", i === 0 ? "bg-amber-50/50" : "bg-slate-50/50")}
-                                            onClick={() => setSelectedStudentDetail(ch)}
-                                            title="انقر لرؤية التفاصيل وتصدير التكريم"
-                                        >
-                                            <span className="text-sm font-black mt-0.5">{medalEmoji(i)}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-bold text-[11px] leading-tight truncate">{ch.name}</div>
-                                                <div className="flex flex-wrap gap-1 mt-0.5">
-                                                    <span className="text-[9px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-bold">{ch.attendanceRate}%</span>
-                                                    {ch.excellent > 0 && <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1 py-0.5 rounded">{ch.excellent}ممتاز</span>}
-                                                    {ch.lateDays > 0 && <span className="text-[9px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded">{ch.lateDays}تأخر</span>}
-                                                    {ch.behaviorBad > 0 && <span className="text-[9px] bg-rose-100 text-rose-600 px-1 py-0.5 rounded">{ch.behaviorBad}مش</span>}
-                                                    <span className="text-[9px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded font-black">{ch.overallScore}نقطة</span>
+                                    {gc.top3.map((ch, i) => {
+                                        const meets = (ch.totalSessions || 0) >= minSessionsRequired;
+                                        return (
+                                            <div
+                                                key={ch.id}
+                                                className={cn(
+                                                    "flex items-start gap-2 rounded-lg p-1.5 cursor-pointer hover:bg-indigo-100/30 transition-all",
+                                                    !meets ? "opacity-60 bg-slate-50/10" : (i === 0 ? "bg-amber-50/50" : "bg-slate-50/50")
+                                                )}
+                                                onClick={() => setSelectedStudentDetail(ch)}
+                                                title="انقر لرؤية التفاصيل وتصدير التكريم"
+                                            >
+                                                <span className="text-sm font-black mt-0.5">{meets ? medalEmoji(i) : '—'}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-bold text-[11px] leading-tight truncate flex items-center gap-1">
+                                                        {ch.name}
+                                                        {!meets && (
+                                                            <span className="text-[8px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded font-normal">غير مصنف</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1 mt-0.5">
+                                                        <span className="text-[9px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-bold">{ch.attendanceRate}%</span>
+                                                        {ch.excellent > 0 && <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1 py-0.5 rounded">{ch.excellent}ممتاز</span>}
+                                                        {ch.lateDays > 0 && <span className="text-[9px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded">{ch.lateDays}تأخر</span>}
+                                                        {ch.behaviorBad > 0 && <span className="text-[9px] bg-rose-100 text-rose-600 px-1 py-0.5 rounded">{ch.behaviorBad}مش</span>}
+                                                        <span className="text-[9px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded font-black">{ch.overallScore}نقطة</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <div className="text-xs text-muted-foreground py-2 text-center">لا بيانات</div>
@@ -4892,7 +5039,15 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                     {sheikhs.map(sh => {
                         const grpStudents = [...dataSource.all]
                             .filter(s => s.group === sh.group && s.totalSessionDays > 0)
-                            .sort((a, b) => b.overallScore - a.overallScore)
+                            .sort((a: any, b: any) => {
+                                const aMeets = (a.totalSessions || 0) >= minSessionsRequired;
+                                const bMeets = (b.totalSessions || 0) >= minSessionsRequired;
+                                if (aMeets !== bMeets) return aMeets ? -1 : 1;
+                                
+                                if (b.overallScore !== a.overallScore) return b.overallScore - a.overallScore;
+                                if (b.totalSessions !== a.totalSessions) return b.totalSessions - a.totalSessions;
+                                return arabicCompare(a.name, b.name);
+                            })
                             .slice(0, 5);
                         return (
                             <div key={sh.group} className="border rounded-xl overflow-hidden">
@@ -4915,34 +5070,47 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {grpStudents.map((s, i) => (
-                                                    <tr
-                                                        key={s.id}
-                                                        className={cn("border-b cursor-pointer hover:bg-indigo-50/30 transition-colors", i === 0 ? "bg-amber-50/30" : i % 2 === 0 ? "bg-white" : "bg-slate-50/20")}
-                                                        onClick={() => setSelectedStudentDetail(s)}
-                                                        title="انقر لرؤية التفاصيل وتصدير التكريم"
-                                                    >
-                                                        <td className="p-1.5 text-center font-black">{medalEmoji(i)}</td>
-                                                        <td className="p-1.5 font-bold truncate max-w-[120px]">{s.name}</td>
-                                                        <td className="p-1.5 text-center">
-                                                            <span className={cn("font-bold", s.attendanceRate >= 90 ? "text-emerald-700" : s.attendanceRate >= 70 ? "text-amber-600" : "text-rose-600")}>{s.attendanceRate}%</span>
-                                                        </td>
-                                                        <td className="p-1.5 text-center">
-                                                            <span className={cn("font-bold", s.avgEvalScore >= 5 ? "text-emerald-700" : s.avgEvalScore >= 3 ? "text-blue-600" : "text-amber-600")}>{s.avgEvalScore.toFixed(1)}</span>
-                                                        </td>
-                                                        <td className="p-1.5 text-center">
-                                                            {s.totalBehaviorEvals > 0 ? (
-                                                                <span className={cn("font-bold", s.avgBehaviorScore >= 1.5 ? "text-teal-700" : s.avgBehaviorScore >= 0 ? "text-amber-600" : "text-rose-600")}>{s.avgBehaviorScore.toFixed(1)}</span>
-                                                            ) : <span className="text-muted-foreground/30">—</span>}
-                                                        </td>
-                                                        <td className="p-1.5 text-center">
-                                                            {s.lateDays > 0 ? <span className="text-orange-600 font-bold">{s.lateDays}</span> : <span className="text-muted-foreground/30">—</span>}
-                                                        </td>
-                                                        <td className="p-1.5 text-center">
-                                                            <span className="font-black text-purple-700">{s.overallScore}</span>
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                {grpStudents.map((s, i) => {
+                                                    const meets = (s.totalSessions || 0) >= minSessionsRequired;
+                                                    return (
+                                                        <tr
+                                                            key={s.id}
+                                                            className={cn(
+                                                                "border-b cursor-pointer hover:bg-indigo-50/30 transition-colors",
+                                                                !meets ? "opacity-60 bg-slate-50/10" : (i === 0 ? "bg-amber-50/30" : i % 2 === 0 ? "bg-white" : "bg-slate-50/20")
+                                                            )}
+                                                            onClick={() => setSelectedStudentDetail(s)}
+                                                            title="انقر لرؤية التفاصيل وتصدير التكريم"
+                                                        >
+                                                            <td className="p-1.5 text-center font-black">{meets ? medalEmoji(i) : '—'}</td>
+                                                            <td className="p-1.5 font-bold truncate max-w-[120px]">
+                                                                <div className="flex items-center gap-1">
+                                                                    {s.name}
+                                                                    {!meets && (
+                                                                        <span className="text-[8px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded font-normal">غير مصنف</span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-1.5 text-center">
+                                                                <span className={cn("font-bold", s.attendanceRate >= 90 ? "text-emerald-700" : s.attendanceRate >= 70 ? "text-amber-600" : "text-rose-600")}>{s.attendanceRate}%</span>
+                                                            </td>
+                                                            <td className="p-1.5 text-center">
+                                                                <span className={cn("font-bold", s.avgEvalScore >= 8.33 ? "text-emerald-700" : s.avgEvalScore >= 5.0 ? "text-blue-600" : "text-amber-600")}>{s.avgEvalScore.toFixed(1)}</span>
+                                                            </td>
+                                                            <td className="p-1.5 text-center">
+                                                                {s.totalBehaviorEvals > 0 ? (
+                                                                    <span className={cn("font-bold", s.avgBehaviorScore >= 7.5 ? "text-teal-700" : s.avgBehaviorScore >= 5.0 ? "text-amber-600" : "text-rose-600")}>{s.avgBehaviorScore.toFixed(1)}</span>
+                                                                ) : <span className="text-muted-foreground/30">—</span>}
+                                                            </td>
+                                                            <td className="p-1.5 text-center">
+                                                                {s.lateDays > 0 ? <span className="text-orange-600 font-bold">{s.lateDays}</span> : <span className="text-muted-foreground/30">—</span>}
+                                                            </td>
+                                                            <td className="p-1.5 text-center">
+                                                                <span className="font-black text-purple-700">{s.overallScore}</span>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>
@@ -5136,15 +5304,53 @@ function StudentScoreDetailModal({
     onClose: () => void;
     onExportHonorCard?: (student: TopStudentEntry) => void;
 }) {
+    const { settings } = useStudentContext();
+    const pointsConfig = settings?.points;
+
+    // Resolve active point limits dynamically
+    const maxAttendanceVal = pointsConfig?.attendance ? Math.max(...Object.values(pointsConfig.attendance).map(Number)) : 10;
+    const maxMemorizationVal = pointsConfig?.evaluation ? Math.max(...Object.values(pointsConfig.evaluation).map(Number)) : 10;
+    const maxBehaviorVal = pointsConfig?.behavior ? Math.max(...Object.values(pointsConfig.behavior).map(Number)) : 10;
+
+    const getAttPoints = (att: string) => (pointsConfig?.attendance as any)?.[att] ?? ATTENDANCE_POINTS[att] ?? 0;
+    const getMemoPoints = (memo: string) => (pointsConfig?.evaluation as any)?.[memo] ?? PERFORMANCE_POINTS[memo] ?? 0;
+    const getBehPoints = (beh: string) => (pointsConfig?.behavior as any)?.[beh] ?? BEHAVIOR_POINTS[beh] ?? 0;
+
     type DayRec = {
         date: string; label: string; sessionType: string;
         attendance: string; memorization: string | null;
         behavior: string | null; isReview: boolean;
         evalGrade: number; behaviorGrade: number; isLate: boolean;
+        weight: number;
     };
 
     const dayRecords = useMemo<DayRec[]>(() => {
         const days = eachDayOfInterval({ start: periodStart, end: periodEnd });
+        
+        // Group sessions by date for weights
+        const sessionsInRange: any[] = [];
+        days.forEach(day => {
+            const dateStr = format(day, 'yyyy-MM-dd');
+            const daySess = (dailySessions as any)?.[dateStr];
+            if (!daySess) return;
+            Object.values(daySess as Record<string, any>).forEach((session: any) => {
+                if (!session) return;
+                const sType = session.sessionType;
+                if (sType === 'يوم عطلة' || (sType === 'غياب الشيخ' && !session.substituteTeacher)) return;
+                const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
+                if (!isReal) return;
+                sessionsInRange.push(session);
+            });
+        });
+
+        const sessionsByDate: Record<string, any[]> = {};
+        sessionsInRange.forEach(session => {
+            if (!sessionsByDate[session.date]) {
+                sessionsByDate[session.date] = [];
+            }
+            sessionsByDate[session.date].push(session);
+        });
+
         const recs: DayRec[] = [];
         days.forEach(day => {
             const dateStr = format(day, 'yyyy-MM-dd');
@@ -5159,23 +5365,30 @@ function StudentScoreDetailModal({
                 const shOwner = sheikhs.find(sh => sh.uids.has(session.ownerId));
                 if (!shOwner || shOwner.group !== student.group) return;
                 processed = true;
+
+                const dateSessions = sessionsByDate[session.date] || [];
+                const weight = dateSessions.length >= 2 ? 0.5 : 1.0;
+
                 const sessionRecs: any[] = Array.isArray(session.records) ? session.records : session.records ? Object.values(session.records) : [];
                 const myRec = sessionRecs.find((r: any) => r.studentId === student.id);
                 const mem = myRec?.memorization || null;
                 const beh = myRec?.behavior || null;
                 const isReview = !!myRec?.review;
+                
                 let evalGrade = 0;
-                if (myRec && !isReview && mem) {
-                    if (mem === 'ممتاز') evalGrade = 5;
-                    else if (mem === 'جيد جدا' || mem === 'جيد جداً') evalGrade = 6;
-                    else if (mem === 'جيد') evalGrade = 3;
-                    else if (mem === 'مقبول' || mem === 'حسن') evalGrade = 2;
-                    else if (mem === 'ضعيف' || mem === 'متوسط') evalGrade = 1;
+                if (myRec) {
+                    if (isReview && pointsConfig?.review?.completed) {
+                        evalGrade = pointsConfig.review.completed;
+                    } else if (!isReview && mem) {
+                        evalGrade = getMemoPoints(mem);
+                    }
                 }
+
                 let behaviorGrade = 0;
-                if (beh === 'هادئ') behaviorGrade = 2;
-                else if (beh === 'مقبول') behaviorGrade = 1;
-                else if (beh === 'مشاغب' || beh === 'غير منضبط') behaviorGrade = -1;
+                if (beh) {
+                    behaviorGrade = getBehPoints(beh);
+                }
+
                 recs.push({
                     date: dateStr,
                     label: format(day, 'EEE d MMM', { locale: ar }),
@@ -5185,24 +5398,62 @@ function StudentScoreDetailModal({
                     behavior: beh,
                     isReview, evalGrade, behaviorGrade,
                     isLate: myRec?.attendance === 'متأخر',
+                    weight
                 });
             });
         });
         return recs.sort((a, b) => a.date.localeCompare(b.date));
-    }, [student, dailySessions, sheikhs, periodStart, periodEnd]);
+    }, [student, dailySessions, sheikhs, periodStart, periodEnd, pointsConfig]);
 
-    const attended = dayRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض');
-    const totalSess = dayRecords.length;
-    const lateDays = dayRecords.filter(r => r.isLate).length;
-    const evalRecs = dayRecords.filter(r => !r.isReview && r.memorization && r.attendance !== 'غائب' && r.attendance !== 'غياب');
-    const avgEval = evalRecs.length > 0 ? evalRecs.reduce((s, r) => s + r.evalGrade, 0) / evalRecs.length : 0;
-    const behRecs = dayRecords.filter(r => r.behavior);
-    const avgBeh = behRecs.length > 0 ? behRecs.reduce((s, r) => s + r.behaviorGrade, 0) / behRecs.length : 0;
-    const attPts = totalSess > 0 ? (attended.length / totalSess) * 40 : 0;
-    const evalPts = evalRecs.length > 0 ? (avgEval / 6) * 40 : 0;
-    const behPts = avgBeh * 5;
-    const latePenalty = lateDays * 2;
-    const score = Math.max(0, Math.round(attPts + evalPts + behPts - latePenalty));
+    // Compute total metrics matching calculateFairStudentStats
+    let weightedSessions = 0;
+    let assessedMemorization = 0;
+    let assessedBehavior = 0;
+    let attendancePointsSum = 0;
+    let memorizationPointsSum = 0;
+    let behaviorPointsSum = 0;
+
+    dayRecords.forEach(rec => {
+        const weight = rec.weight;
+        
+        if (rec.attendance) {
+            weightedSessions += weight;
+            attendancePointsSum += getAttPoints(rec.attendance) * weight;
+        }
+
+        const isPresent = rec.attendance === 'حاضر' || rec.attendance === 'تعويض' || rec.attendance === 'متأخر';
+        const hasMemoEval = !rec.isReview && rec.memorization && rec.memorization.trim() !== '' && rec.memorization !== 'لا يوجد';
+        if (isPresent) {
+            if (hasMemoEval) {
+                assessedMemorization += weight;
+                const cleanMem = rec.isReview ? '' : rec.memorization;
+                if (cleanMem) {
+                    memorizationPointsSum += getMemoPoints(cleanMem) * weight;
+                }
+            } else if (rec.isReview && pointsConfig?.review?.completed) {
+                assessedMemorization += weight;
+                memorizationPointsSum += pointsConfig.review.completed * weight;
+            }
+        }
+
+        if (rec.behavior && rec.behavior.trim() !== '') {
+            assessedBehavior += weight;
+            behaviorPointsSum += getBehPoints(rec.behavior) * weight;
+        }
+    });
+
+    const maxAttPoints = weightedSessions * maxAttendanceVal;
+    const maxMemoPoints = assessedMemorization * maxMemorizationVal;
+    const maxBehPoints = assessedBehavior * maxBehaviorVal;
+
+    const attPct = maxAttPoints > 0 ? (attendancePointsSum / maxAttPoints) * 100 : 0;
+    const memoPct = maxMemoPoints > 0 ? (memorizationPointsSum / maxMemoPoints) * 100 : 0;
+    const behPct = maxBehPoints > 0 ? (behaviorPointsSum / maxBehPoints) * 100 : 0;
+
+    const academicScore = (attPct + memoPct) / 2;
+    const score = Math.max(0, Math.round(academicScore * 10) / 10);
+
+    const isUnclassified = groupRank === 0 || overallRank === 0;
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4" onClick={onClose}>
@@ -5213,11 +5464,17 @@ function StudentScoreDetailModal({
                         <div className="font-black text-lg leading-tight">{student.name}</div>
                         <div className="text-purple-200 text-sm mt-0.5">{student.group} · {periodLabel}</div>
                         <div className="flex gap-2 mt-2 flex-wrap">
-                            <span className="bg-white/20 text-white px-2 py-0.5 rounded-lg text-xs font-bold">🏆 {groupRank}/{groupTotal} في فوجه</span>
-                            {categoryRank > 0 && (
-                                <span className="bg-emerald-500 text-white px-2 py-0.5 rounded-lg text-xs font-bold">🌍 {categoryRank}/{categoryTotal} {categoryLabel}</span>
+                            {isUnclassified ? (
+                                <span className="bg-amber-500 text-white px-2 py-0.5 rounded-lg text-xs font-bold">⚠️ غير مصنف لقلة حضور الحصص</span>
+                            ) : (
+                                <>
+                                    <span className="bg-white/20 text-white px-2 py-0.5 rounded-lg text-xs font-bold">🏆 {groupRank}/{groupTotal} في فوجه</span>
+                                    {categoryRank > 0 && (
+                                        <span className="bg-emerald-500 text-white px-2 py-0.5 rounded-lg text-xs font-bold">🌍 {categoryRank}/{categoryTotal} {categoryLabel}</span>
+                                    )}
+                                    <span className="bg-white/20 text-white px-2 py-0.5 rounded-lg text-xs font-bold">🌍 {overallRank}/{overallTotal} عاماً</span>
+                                </>
                             )}
-                            <span className="bg-white/20 text-white px-2 py-0.5 rounded-lg text-xs font-bold">🌍 {overallRank}/{overallTotal} عاماً</span>
                         </div>
                     </div>
                     <button onClick={onClose} className="text-white/70 hover:text-white text-2xl font-bold leading-none mt-1">×</button>
@@ -5225,16 +5482,16 @@ function StudentScoreDetailModal({
                 {/* Score breakdown */}
                 <div className="grid grid-cols-4 gap-0 border-b shrink-0 divide-x divide-border">
                     {[
-                        { label: 'الحضور', val: `${attended.length}/${totalSess}`, pts: Math.round(attPts), max: 40, color: 'text-amber-700' },
-                        { label: 'التقييم', val: avgEval.toFixed(1) + '/6', pts: Math.round(evalPts), max: 40, color: 'text-emerald-700' },
-                        { label: 'السلوك', val: avgBeh.toFixed(1), pts: Math.round(behPts), max: null, color: 'text-teal-700' },
-                        { label: 'الإجمالي', val: score.toString(), pts: latePenalty > 0 ? -latePenalty : null, max: null, color: 'text-purple-700' },
+                        { label: 'الحضور', val: `${attPct.toFixed(1)}%`, pts: attendancePointsSum, max: maxAttPoints, color: 'text-amber-700' },
+                        { label: 'التقييم الأكاديمي', val: `${memoPct.toFixed(1)}%`, pts: memorizationPointsSum, max: maxMemoPoints, color: 'text-emerald-700' },
+                        { label: 'السلوك', val: `${behPct.toFixed(1)}%`, pts: behaviorPointsSum, max: maxBehPoints, color: 'text-teal-700' },
+                        { label: 'المعدل العام', val: `${score.toFixed(1)}%`, pts: null, max: null, color: 'text-purple-700' },
                     ].map(c => (
                         <div key={c.label} className="text-center py-2.5 px-1">
                             <div className="text-[10px] text-muted-foreground mb-0.5">{c.label}</div>
-                            <div className={cn('font-black text-base leading-none', c.color)}>{c.val}</div>
+                            <div className={cn('font-black text-xs sm:text-sm leading-none', c.color)}>{c.val}</div>
                             <div className="text-[9px] text-muted-foreground mt-0.5">
-                                {c.pts !== null ? (c.max ? `${c.pts}/${c.max} نقطة` : (c.pts < 0 ? `${c.pts} تأخر` : `${c.pts} نقطة`)) : ''}
+                                {c.pts !== null && c.max !== null ? `${c.pts.toFixed(1)}/${c.max.toFixed(1)}` : ''}
                             </div>
                         </div>
                     ))}
@@ -5249,19 +5506,28 @@ function StudentScoreDetailModal({
                                 <th className="p-2 text-center font-bold">الحضور</th>
                                 <th className="p-2 text-center font-bold">التقييم</th>
                                 <th className="p-2 text-center font-bold">السلوك</th>
-                                <th className="p-2 text-center font-bold text-purple-700">نقاط</th>
+                                <th className="p-2 text-center font-bold text-purple-700">المساهمة</th>
                             </tr>
                         </thead>
                         <tbody>
                             {dayRecords.map((rec, i) => {
                                 const isAbsent = rec.attendance === 'غائب' || rec.attendance === 'غياب';
                                 const isPresent = rec.attendance === 'حاضر' || rec.attendance === 'تعويض' || rec.attendance === 'متأخر';
-                                // Approximate per-day contribution
-                                const dayAtt = isPresent ? (totalSess > 0 ? 40 / totalSess : 0) : 0;
-                                const dayEval = !rec.isReview && isPresent && evalRecs.length > 0 ? (rec.evalGrade / 6) * (40 / evalRecs.length) : 0;
-                                const dayBeh = rec.behavior && behRecs.length > 0 ? rec.behaviorGrade * (5 / behRecs.length) : 0;
-                                const dayLate = rec.isLate ? 2 : 0;
-                                const dayTotal = Math.round(dayAtt + dayEval + dayBeh - dayLate);
+                                
+                                // Daily contribution to the overall score (out of 100%)
+                                const dayAttContrib = isPresent && maxAttPoints > 0 ? ((getAttPoints(rec.attendance) * rec.weight) / maxAttPoints) * 100 : 0;
+                                
+                                const cleanMem = rec.isReview ? '' : rec.memorization;
+                                let dayEvalPoints = 0;
+                                if (rec.isReview && pointsConfig?.review?.completed) {
+                                    dayEvalPoints = pointsConfig.review.completed * rec.weight;
+                                } else if (cleanMem) {
+                                    dayEvalPoints = getMemoPoints(cleanMem) * rec.weight;
+                                }
+                                const dayEvalContrib = isPresent && maxMemoPoints > 0 ? (dayEvalPoints / maxMemoPoints) * 100 : 0;
+                                
+                                const dayTotal = Math.round((dayAttContrib + dayEvalContrib) / 2 * 10) / 10;
+                                
                                 return (
                                     <tr key={rec.date + i} className={cn('border-b', isAbsent ? 'bg-rose-50/40' : rec.isLate ? 'bg-amber-50/30' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50/20')}>
                                         <td className="p-1.5 font-medium whitespace-nowrap">{rec.label}</td>
@@ -5275,21 +5541,21 @@ function StudentScoreDetailModal({
                                         </td>
                                         <td className="p-1.5 text-center">
                                             {rec.memorization ? (
-                                                <span className={cn('font-bold', rec.evalGrade >= 5 ? 'text-emerald-700' : rec.evalGrade >= 3 ? 'text-blue-600' : rec.evalGrade >= 1 ? 'text-amber-600' : 'text-gray-400')}>
-                                                    {rec.memorization}{!rec.isReview && <span className="text-[9px] text-muted-foreground ml-0.5">({rec.evalGrade})</span>}
+                                                <span className={cn('font-bold', rec.evalGrade >= (maxMemorizationVal * 0.8) ? 'text-emerald-700' : rec.evalGrade >= (maxMemorizationVal * 0.5) ? 'text-blue-600' : 'text-gray-400')}>
+                                                    {rec.memorization}{!rec.isReview && <span className="text-[9px] text-muted-foreground ml-0.5">({rec.evalGrade}/{maxMemorizationVal})</span>}
                                                 </span>
                                             ) : <span className="text-muted-foreground/30">—</span>}
                                         </td>
                                         <td className="p-1.5 text-center">
                                             {rec.behavior ? (
-                                                <span className={cn('font-bold', rec.behaviorGrade >= 2 ? 'text-teal-700' : rec.behaviorGrade > 0 ? 'text-blue-600' : rec.behaviorGrade < 0 ? 'text-rose-600' : 'text-gray-400')}>
-                                                    {rec.behavior}<span className="text-[9px] ml-0.5">({rec.behaviorGrade > 0 ? '+' : ''}{rec.behaviorGrade})</span>
+                                                <span className={cn('font-bold', rec.behaviorGrade >= (maxBehaviorVal * 0.75) ? 'text-teal-700' : rec.behaviorGrade >= (maxBehaviorVal * 0.5) ? 'text-blue-600' : 'text-rose-600')}>
+                                                    {rec.behavior}<span className="text-[9px] ml-0.5">({rec.behaviorGrade}/{maxBehaviorVal})</span>
                                                 </span>
                                             ) : <span className="text-muted-foreground/30">—</span>}
                                         </td>
                                         <td className="p-1.5 text-center">
-                                            <span className={cn('font-black', dayTotal > 0 ? 'text-purple-700' : dayTotal < 0 ? 'text-rose-600' : 'text-gray-300')}>
-                                                {dayTotal > 0 ? `+${dayTotal}` : dayTotal || '—'}
+                                            <span className={cn('font-black', dayTotal > 0 ? 'text-purple-700' : 'text-gray-300')}>
+                                                {dayTotal > 0 ? `+${dayTotal.toFixed(1)}%` : '—'}
                                             </span>
                                         </td>
                                     </tr>
@@ -5304,7 +5570,7 @@ function StudentScoreDetailModal({
                 {/* Footer */}
                 <div className="p-3 border-t bg-slate-50 flex items-center justify-between shrink-0 gap-2">
                     <div className="text-[10px] text-muted-foreground flex-1">
-                        الإجمالي = حضور ({Math.round(attPts)}) + تقييم ({Math.round(evalPts)}) + سلوك ({Math.round(behPts)}) − تأخر ({latePenalty}) = <span className="font-black text-purple-700">{score} نقطة</span>
+                        التقييم = متوسط الحضور ({attPct.toFixed(1)}%) والتقييم الأكاديمي ({memoPct.toFixed(1)}%) = <span className="font-black text-purple-700">{score.toFixed(1)}%</span>
                     </div>
                     <div className="flex gap-2 shrink-0">
                         {onExportHonorCard && (

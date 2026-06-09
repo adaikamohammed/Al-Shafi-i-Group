@@ -688,7 +688,20 @@ export default function MyStatsPage() {
             ? session.records
             : session.records ? Object.values(session.records) : [];
 
-        const total = groupStudentCount[group] || 0;
+        // حساب عدد الطلاب النشطين في الفوج الذين انضموا قبل أو في هذا اليوم
+        const sessionDate = new Date(dateStr);
+        sessionDate.setHours(12, 0, 0, 0);
+        const total = (students || []).filter(s => {
+            if (s.status !== 'نشط' || s.groupName !== group) return false;
+            if (!s.registrationDate) return true;
+            const regDate = s.registrationDate instanceof Date
+                ? s.registrationDate
+                : new Date(s.registrationDate as any);
+            const regDateNoon = new Date(regDate);
+            regDateNoon.setHours(12, 0, 0, 0);
+            return sessionDate >= regDateNoon;
+        }).length;
+
         if (!records.length || !total) return { session, type: session.sessionType, attendance: null, excellent: null, goodPlus: null, good: null, acceptable: null, weak: null, notMemorized: null };
 
         let present = 0, excellent = 0, goodPlus = 0, good = 0, acceptable = 0, weak = 0, notMem = 0;
@@ -705,7 +718,7 @@ export default function MyStatsPage() {
         });
         const p = (n: number) => total > 0 ? Math.round((n / total) * 100) : 0;
         return { session, type: session.sessionType, attendance: p(present), excellent: p(excellent), goodPlus: p(goodPlus), good: p(good), acceptable: p(acceptable), weak: p(weak), notMemorized: p(notMem) };
-    }, [dailySessions, sheikhsList, groupStudentCount]);
+    }, [dailySessions, sheikhsList, students]);
 
     const sheikhScores = useMemo(() => {
         if (dbSheikhScores && dbSheikhScores.length > 0) {

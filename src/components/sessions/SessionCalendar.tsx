@@ -64,9 +64,10 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
             const sessions = getSessionsForDay(formattedDate);
             const isTodayDate = isToday(dayDate);
 
-            const hasSession2 = sessions.some((s: any) => s.sessionNumber === 2);
+            const getSessionNum = (s: any) => s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
+            const hasSession2 = sessions.some((s: any) => getSessionNum(s) === 2);
             const canAddSession2 = !hasSession2 && sessions.some((s: any) =>
-                s.sessionNumber === 1 &&
+                getSessionNum(s) === 1 &&
                 s.sessionType !== 'يوم عطلة' &&
                 s.sessionType !== 'غياب الشيخ' &&
                 s.sessionType !== 'حصة أنشطة'
@@ -118,12 +119,12 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                                 key={idx}
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    onDayClick(day, session.sessionNumber as 1 | 2);
+                                    onDayClick(day, getSessionNum(session) as 1 | 2);
                                 }}
                                 className="flex items-center justify-center text-xs font-bold text-muted-foreground bg-white/60 hover:bg-white/90 border border-transparent hover:border-primary/30 rounded-lg px-2 py-1.5 truncate transition-all cursor-pointer shadow-sm hover:shadow-md"
                             >
                                 {session.sessionType === 'حصة أساسية'
-                                    ? (session.sessionNumber === 1 ? 'حصة أساسية' : 'حصة إضافية')
+                                    ? (getSessionNum(session) === 1 ? 'حصة أساسية' : 'حصة إضافية')
                                     : session.sessionType}
                             </div>
                         ))}
@@ -160,10 +161,10 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                                     {sessions.map((session: any, sIdx: number) => (
                                         <React.Fragment key={session.id || sIdx}>
                                             <div className="px-2 py-1 text-[10px] text-muted-foreground flex items-center justify-between">
-                                                <span>{session.sessionNumber === 1 ? 'حصة أساسية' : 'حصة إضافية'}</span>
+                                                <span>{getSessionNum(session) === 1 ? 'حصة أساسية' : 'حصة إضافية'}</span>
                                                 <Badge variant="outline" className="text-[9px] h-4 px-1">{String(session.id).slice(-4)}</Badge>
                                             </div>
-                                            <DropdownMenuItem onClick={() => onDayClick(day, session.sessionNumber as 1 | 2)} className="rounded-lg">
+                                            <DropdownMenuItem onClick={() => onDayClick(day, getSessionNum(session) as 1 | 2)} className="rounded-lg">
                                                 <Copy className="ml-2 h-3.5 w-3.5" /> تعديل البيانات
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onClick={(e) => onExportSession(e, session.id)} className="rounded-lg">

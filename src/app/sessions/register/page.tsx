@@ -92,16 +92,28 @@ function RegisterSessionContent() {
 
     const surahOptions: SearchableSelectOption[] = useMemo(() => surahs.map(s => ({ value: s.id.toString(), label: `${s.id}. ${s.name}` })), []);
 
-    const activeStudents = useMemo(() =>
-        (students ?? []).filter(s => {
+    const activeStudents = useMemo(() => {
+        const sessionDate = selectedDay;
+        return (students ?? []).filter(s => {
+            // لا يظهر الطالب إذا كانت الحصة قبل تاريخ انضمامه للفوج
+            if (sessionDate && s.registrationDate) {
+                const regDate = s.registrationDate instanceof Date
+                    ? s.registrationDate
+                    : new Date(s.registrationDate as any);
+                const regDateNoon = new Date(regDate);
+                regDateNoon.setHours(0, 0, 0, 0);
+                const sessionDateNoon = new Date(sessionDate);
+                sessionDateNoon.setHours(0, 0, 0, 0);
+                if (sessionDateNoon < regDateNoon) return false;
+            }
             // If specific owner is targeted, filter by that owner. Otherwise fall back to group name check or super admin view.
             if (effectiveOwnerId && effectiveOwnerId !== user?.uid) {
                 return s.ownerId === effectiveOwnerId && s.status === "نشط";
             }
             const isGroupMatch = isSuperAdmin ? true : s.groupName === user?.group;
             return s.status === "نشط" && isGroupMatch;
-        }).sort((a, b) => arabicCompare(a.fullName, b.fullName)),
-        [students, isSuperAdmin, user, effectiveOwnerId]);
+        }).sort((a, b) => arabicCompare(a.fullName, b.fullName));
+    }, [students, isSuperAdmin, user, effectiveOwnerId, selectedDay]);
 
     // Combined list: Active Students + Students who have a record in this specific session
     // This solves the "Empty Sessions" issue for students who became inactive.
@@ -268,7 +280,10 @@ function RegisterSessionContent() {
 
                 if (!ownerIdParam) {
                     const contextSessions = getSessionsForDay(dateStr);
-                    const existingContextSession = contextSessions.find((s: any) => s.sessionNumber == sessionToOpen);
+                    const existingContextSession = contextSessions.find((s: any) => {
+                        const num = s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
+                        return num === sessionToOpen;
+                    });
                     if (existingContextSession && existingContextSession.ownerId) {
                         sessionOwnerId = existingContextSession.ownerId;
                     }
@@ -279,8 +294,26 @@ function RegisterSessionContent() {
 
                 let existingSession = null;
                 if (snapshot.exists()) {
-                    const sessions = snapshot.val();
-                    existingSession = Object.values(sessions).find((s: any) => s.sessionNumber === sessionToOpen);
+                    const val = snapshot.val();
+                    let sessionsDict: Record<string, any> = {};
+                    if (val && typeof val === 'object') {
+                        if ('date' in val && ('records' in val || 'sessionType' in val)) {
+                            // Old structure: single session object directly under the date key
+                            const sessionId = val.id || `${dateStr}-s1`;
+                            sessionsDict[sessionId] = {
+                                ...val,
+                                id: sessionId,
+                                sessionNumber: val.sessionNumber !== undefined ? Number(val.sessionNumber) : 1
+                            };
+                        } else {
+                            // New structure: dictionary of session objects
+                            sessionsDict = val;
+                        }
+                    }
+                    existingSession = Object.values(sessionsDict).find((s: any) => {
+                        const num = s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
+                        return num === sessionToOpen;
+                    });
                 }
 
                 if (existingSession) {
@@ -553,7 +586,10 @@ function RegisterSessionContent() {
 
         if (!id) {
             const existingSessions = getSessionsForDay(dateStr);
-            const existingSession = existingSessions.find(s => s.sessionNumber == sessionToOpen);
+            const existingSession = existingSessions.find(s => {
+                const num = s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
+                return num === sessionToOpen;
+            });
             id = existingSession ? existingSession.id : `${dateStr}-s${sessionToOpen}`;
             setCurrentSessionId(id); // Lock it for future saves in this session
         }
@@ -766,7 +802,10 @@ function RegisterSessionContent() {
 
             if (!ownerIdParam) {
                 const contextSessions = getSessionsForDay(dateStr);
-                const existingContextSession = contextSessions.find((s: any) => s.sessionNumber == sessionToOpen);
+                const existingContextSession = contextSessions.find((s: any) => {
+                    const num = s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
+                    return num === sessionToOpen;
+                });
                 if (existingContextSession && existingContextSession.ownerId) {
                     sessionOwnerId = existingContextSession.ownerId;
                 }
@@ -776,8 +815,25 @@ function RegisterSessionContent() {
             const snapshot = await get(sessionsRef);
 
             if (snapshot.exists()) {
-                const sessions = snapshot.val();
-                const existingSession = Object.values(sessions).find((s: any) => s.sessionNumber === sessionToOpen);
+                const val = snapshot.val();
+                let sessionsDict: Record<string, any> = {};
+                if (val && typeof val === 'object') {
+                    if ('date' in val && ('records' in val || 'sessionType' in val)) {
+                        // Old structure
+                        const sessionId = val.id || `${dateStr}-s1`;
+                        sessionsDict[sessionId] = {
+                            ...val,
+                            id: sessionId,
+                            sessionNumber: val.sessionNumber !== undefined ? Number(val.sessionNumber) : 1
+                        };
+                    } else {
+                        sessionsDict = val;
+                    }
+                }
+                const existingSession = Object.values(sessionsDict).find((s: any) => {
+                    const num = s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
+                    return num === sessionToOpen;
+                });
 
                 if (existingSession) {
                     const session = existingSession as any;

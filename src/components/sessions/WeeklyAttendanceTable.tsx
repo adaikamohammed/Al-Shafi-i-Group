@@ -77,8 +77,9 @@ export const WeeklyAttendanceTable = ({
         const data: Record<string, { session1: any | null; session2: any | null; hasTwoSessions: boolean }> = {};
         weekDaysBase.forEach(day => {
             const sessions = getSessionsForDay(day.dateStr);
-            const session1 = sessions.find((s: any) => s.sessionNumber === 1) || null;
-            const session2 = sessions.find((s: any) => s.sessionNumber === 2) || null;
+            const getSessionNum = (s: any) => s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
+            const session1 = sessions.find((s: any) => getSessionNum(s) === 1) || null;
+            const session2 = sessions.find((s: any) => getSessionNum(s) === 2) || null;
             data[day.dateStr] = {
                 session1,
                 session2,
@@ -117,7 +118,7 @@ export const WeeklyAttendanceTable = ({
 
         return {
             session1Record: getRecord(session1),
-            session2Record: hasTwoSessions ? getRecord(session2) : null,
+            session2Record: getRecord(session2), // Always return session2 record if it exists
             hasTwoSessions,
             session1Type: session1?.sessionType || null,
             session2Type: session2?.sessionType || null,
@@ -479,10 +480,14 @@ export const WeeklyAttendanceTable = ({
 
                                 {/* Days Headers */}
                                 {weekDays.map(day => {
-                                    const { session1, hasTwoSessions } = weekSessionData[day.dateStr];
-                                    const sessionType = session1?.sessionType;
+                                    const { session1, session2, hasTwoSessions } = weekSessionData[day.dateStr];
+                                    const activeSession = session1 || session2;
+                                    const sessionType = activeSession?.sessionType;
                                     const colClass = getHeaderStyle(day);
                                     const isHoliday = day.isWeekend || sessionType === 'يوم عطلة' || sessionType === 'غياب الشيخ';
+                                    
+                                    const getSessionNum = (s: any) => s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
+                                    const activeSessionNum = activeSession ? getSessionNum(activeSession) : 1;
 
                                     return (
                                         <th key={day.dateStr}
@@ -506,7 +511,7 @@ export const WeeklyAttendanceTable = ({
                                                     )}>
                                                         {day.isWeekend ? 'عطلة' :
                                                             isHoliday ? (sessionType === 'يوم عطلة' ? 'عطلة' : sessionType) :
-                                                                hasTwoSessions ? 'ص + م' : `حصة ${session1?.sessionNumber || 1}`}
+                                                                hasTwoSessions ? 'ص + م' : `حصة ${activeSessionNum}`}
                                                     </span>
                                                 )}
                                             </div>
@@ -565,9 +570,12 @@ export const WeeklyAttendanceTable = ({
 
                                         {/* Day Cells */}
                                         {weekDays.map(day => {
-                                            const { session1, hasTwoSessions } = weekSessionData[day.dateStr];
+                                            const { session1, session2, hasTwoSessions } = weekSessionData[day.dateStr];
+                                            const activeSession = session1 || session2;
+                                            const getSessionNum = (s: any) => s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
+                                            const activeSessionNum = activeSession ? getSessionNum(activeSession) : 1;
                                             const colClass = getColumnStyle(day);
-                                            const isHoliday = day.isWeekend || session1?.sessionType === 'يوم عطلة' || session1?.sessionType === 'غياب الشيخ';
+                                            const isHoliday = day.isWeekend || activeSession?.sessionType === 'يوم عطلة' || activeSession?.sessionType === 'غياب الشيخ';
 
                                             const dayData = getStudentDayData(student.id, day.dateStr);
 

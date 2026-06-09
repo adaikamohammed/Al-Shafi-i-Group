@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { format, addDays, parseISO, isSameDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Loader2, Save, Star, CheckCircle2, ThumbsUp, Smile, AlertCircle, XCircle, UserMinus, Minus } from 'lucide-react';
+import { Loader2, Save, Star, CheckCircle2, ThumbsUp, Smile, AlertCircle, XCircle, UserMinus, Minus, CalendarOff } from 'lucide-react';
 import type { Student, DailySession, DailyRecord, WeeklyOutcome, PerformanceLevel } from '@/lib/types';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
@@ -55,6 +55,7 @@ const getDerivedWeeklyEvaluation = (memorizationLevels: (string | undefined)[]):
 };
 
 const EVALUATION_OPTIONS: PerformanceLevel[] = ['ممتاز', 'جيد جداً', 'جيد', 'حسن', 'متوسط', 'لم يحفظ'];
+const NO_SESSION_VALUE = 'لا يوجد حصيلة' as PerformanceLevel;
 
 const normalizeLevel = (level: string | null | undefined): PerformanceLevel => {
     if (!level) return '' as PerformanceLevel;
@@ -70,6 +71,7 @@ const getEvaluationIcon = (level: string | undefined) => {
         case 'حسن': return <Smile className="h-4 w-4 text-yellow-600" />;
         case 'متوسط': return <AlertCircle className="h-4 w-4 text-amber-600" />;
         case 'لم يحفظ': return <XCircle className="h-4 w-4 text-red-600" />;
+        case 'لا يوجد حصيلة': return <CalendarOff className="h-4 w-4 text-slate-400" />;
         case 'غائب':
         case 'غياب': return <UserMinus className="h-4 w-4 text-gray-400" />;
         default: return <Minus className="h-4 w-4 text-gray-300" />;
@@ -84,6 +86,7 @@ const getEvaluationColor = (level: string | undefined) => {
         case 'حسن': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
         case 'متوسط': return 'bg-amber-50 text-amber-700 border-amber-200';
         case 'لم يحفظ': return 'bg-red-50 text-red-700 border-red-200';
+        case 'لا يوجد حصيلة': return 'bg-slate-50 text-slate-400 border-slate-200';
         default: return 'bg-gray-50 text-gray-500 border-gray-200';
     }
 };
@@ -391,6 +394,13 @@ export function WeeklyOutcomeModal({ isOpen, onClose, student, weekStartDate, cu
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="clear" className="font-bold text-red-600">إلغاء التقييم</SelectItem>
+                                    {/* Special: no session this week */}
+                                    <SelectItem value={NO_SESSION_VALUE} className="font-bold text-slate-500">
+                                        <div className="flex items-center gap-2">
+                                            <CalendarOff className="h-4 w-4 text-slate-400" />
+                                            لا يوجد حصيلة (أسبوع بدون حصص)
+                                        </div>
+                                    </SelectItem>
                                     {EVALUATION_OPTIONS.map(opt => (
                                         <SelectItem key={opt} value={opt} className="font-bold">{opt}</SelectItem>
                                     ))}

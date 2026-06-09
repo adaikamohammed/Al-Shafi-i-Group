@@ -257,11 +257,33 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             if (userData.dailySessions) {
               for (const date in userData.dailySessions) {
                 if (!allSessions[date]) allSessions[date] = {};
-                Object.entries(userData.dailySessions[date]).forEach(([sessionId, session]: [string, any]) => {
-                  // Use a unique key to prevent collisions between different sheikhs' sessions
-                  const uniqueKey = `${uid}_${sessionId}`;
-                  allSessions[date][uniqueKey] = { ...session, ownerId: uid };
-                });
+                const dayVal = userData.dailySessions[date];
+                if (dayVal && typeof dayVal === 'object') {
+                  if ('date' in dayVal && ('records' in dayVal || 'sessionType' in dayVal)) {
+                    // Old structure: single session object directly under the date key
+                    const sessionId = dayVal.id || `${date}-s1`;
+                    const uniqueKey = `${uid}_${sessionId}`;
+                    allSessions[date][uniqueKey] = {
+                      ...dayVal,
+                      id: sessionId,
+                      sessionNumber: dayVal.sessionNumber !== undefined ? Number(dayVal.sessionNumber) : 1,
+                      ownerId: uid
+                    };
+                  } else {
+                    // New structure: dictionary of session objects
+                    Object.entries(dayVal).forEach(([sessionId, session]: [string, any]) => {
+                      if (session && typeof session === 'object' && 'date' in session) {
+                        const uniqueKey = `${uid}_${sessionId}`;
+                        allSessions[date][uniqueKey] = {
+                          ...session,
+                          id: session.id || sessionId,
+                          sessionNumber: session.sessionNumber !== undefined ? Number(session.sessionNumber) : (sessionId.endsWith('-s2') ? 2 : 1),
+                          ownerId: uid
+                        };
+                      }
+                    });
+                  }
+                }
               }
             }
             if (userData.dailyReports) {
@@ -371,7 +393,36 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         ) : []);
       }, handleError);
 
-      onValue(sessionsRef, (s: any) => setDailySessions(s.val() || {}), handleError);
+      onValue(sessionsRef, (s: any) => {
+        const val = s.val() || {};
+        const normalized: Record<string, Record<string, DailySession>> = {};
+        Object.entries(val).forEach(([date, dayVal]: [string, any]) => {
+          normalized[date] = {};
+          if (dayVal && typeof dayVal === 'object') {
+            if ('date' in dayVal && ('records' in dayVal || 'sessionType' in dayVal)) {
+              // Old structure: single session object directly under the date key
+              const sessionId = dayVal.id || `${date}-s1`;
+              normalized[date][sessionId] = {
+                ...dayVal,
+                id: sessionId,
+                sessionNumber: dayVal.sessionNumber !== undefined ? Number(dayVal.sessionNumber) : 1
+              };
+            } else {
+              // New structure: dictionary of session objects
+              Object.entries(dayVal).forEach(([sessionId, session]: [string, any]) => {
+                if (session && typeof session === 'object' && 'date' in session) {
+                  normalized[date][sessionId] = {
+                    ...session,
+                    id: session.id || sessionId,
+                    sessionNumber: session.sessionNumber !== undefined ? Number(session.sessionNumber) : (sessionId.endsWith('-s2') ? 2 : 1)
+                  };
+                }
+              });
+            }
+          }
+        });
+        setDailySessions(normalized);
+      }, handleError);
       onValue(reportsRef, (s: any) => setDailyReports(s.val() || {}), handleError);
       onValue(progressRef, (s: any) => setSurahProgress(s.val() || {}), handleError);
       onValue(paymentsRef, (s: any) => {
@@ -460,7 +511,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       
       activeStudents.forEach(student => {
         // Only count sessions after student joined
-        if (session.date && student.registrationDate && parseISO(session.date) < student.registrationDate) return;
+        if (session.date && student.registrationDate) {
+          const sDate = parseISO(session.date);
+          const rDate = new Date(student.registrationDate);
+          sDate.setHours(0, 0, 0, 0);
+          rDate.setHours(0, 0, 0, 0);
+          if (sDate < rDate) return;
+        }
         
         if (presentIds.has(student.id)) {
           stats[student.id].current++;
@@ -498,7 +555,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const excellentIds = new Set(records.filter(r => r.memorization === 'ممتاز').map(r => r.studentId));
       
       activeStudents.forEach(student => {
-        if (session.date && student.registrationDate && parseISO(session.date) < student.registrationDate) return;
+        if (session.date && student.registrationDate) {
+          const sDate = parseISO(session.date);
+          const rDate = new Date(student.registrationDate);
+          sDate.setHours(0, 0, 0, 0);
+          rDate.setHours(0, 0, 0, 0);
+          if (sDate < rDate) return;
+        }
         
         if (excellentIds.has(student.id)) {
           stats[student.id].current++;
@@ -536,7 +599,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const calmIds = new Set(records.filter(r => r.behavior === 'هادئ').map(r => r.studentId));
       
       activeStudents.forEach(student => {
-        if (session.date && student.registrationDate && parseISO(session.date) < student.registrationDate) return;
+        if (session.date && student.registrationDate) {
+          const sDate = parseISO(session.date);
+          const rDate = new Date(student.registrationDate);
+          sDate.setHours(0, 0, 0, 0);
+          rDate.setHours(0, 0, 0, 0);
+          if (sDate < rDate) return;
+        }
         
         if (calmIds.has(student.id)) {
           stats[student.id].current++;
@@ -925,6 +994,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const ownerId = (isSuperAdmin || isManagement) && targetOwnerId ? targetOwnerId : authContextUser.uid;
 
     try {
+      // Clean up old top-level keys if the date path has the old structure
+      const dayRef = ref(db, `users/${ownerId}/dailySessions/${session.date}`);
+      const daySnap = await get(dayRef);
+      if (daySnap.exists()) {
+        const val = daySnap.val();
+        if (val && typeof val === 'object' && 'date' in val) {
+          // It's the old structure! Delete the entire date node first to clean up the top-level keys
+          await remove(dayRef);
+        }
+      }
+
       // الحفظ في Firebase
       const sessionRef = ref(db, `users/${ownerId}/dailySessions/${session.date}/${session.id}`);
       await set(sessionRef, sanitizeData({ ...session, ownerId, createdAt: session.createdAt || new Date().toISOString() })); // Ensure ownerId and createdAt are set in the record
@@ -963,25 +1043,50 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     // استخدام التاريخ الممرر أو استخراجه من الـ ID كخيار احتياطي
     const targetDate = date || sessionId.substring(0, 10);
 
-    const sessionRef = ref(db, `users/${ownerId}/dailySessions/${targetDate}/${sessionId}`);
+    const dayRef = ref(db, `users/${ownerId}/dailySessions/${targetDate}`);
 
-    // Attempt to find session in local state for logging (might not be accurate for admin view of others if not fully synced)
+    // Attempt to find session in local state for logging
     const sessionsForDate = dailySessions[targetDate] || {};
     const sessionToDelete = Object.values(sessionsForDate).find(s => s.id === sessionId);
 
-    remove(sessionRef).then(() => {
-      logActivity(
-        'DELETE_SESSION',
-        authContextUser.uid,
-        `تم حذف حصة بتاريخ: ${targetDate} ${targetOwnerId ? '(نيابة عن شيخ)' : ''}`,
-        sessionId,
-        sessionToDelete?.sessionType || 'غير معروف',
-        authContextUser.displayName || 'Unknown',
-        authContextUser.group || 'غير محدد',
-        ownerId
-      );
+    get(dayRef).then((snap: any) => {
+      if (snap.exists()) {
+        const val = snap.val();
+        if (val && typeof val === 'object') {
+          if ('date' in val) {
+            // Old structure - delete the whole day node
+            remove(dayRef).then(() => {
+              logActivity(
+                'DELETE_SESSION',
+                authContextUser.uid,
+                `تم حذف حصة بتاريخ: ${targetDate} ${targetOwnerId ? '(نيابة عن شيخ)' : ''}`,
+                sessionId,
+                sessionToDelete?.sessionType || 'غير معروف',
+                authContextUser.displayName || 'Unknown',
+                authContextUser.group || 'غير محدد',
+                ownerId
+              );
+            });
+          } else {
+            // New structure - delete just the session id
+            const sessionRef = ref(db, `users/${ownerId}/dailySessions/${targetDate}/${sessionId}`);
+            remove(sessionRef).then(() => {
+              logActivity(
+                'DELETE_SESSION',
+                authContextUser.uid,
+                `تم حذف حصة بتاريخ: ${targetDate} ${targetOwnerId ? '(نيابة عن شيخ)' : ''}`,
+                sessionId,
+                sessionToDelete?.sessionType || 'غير معروف',
+                authContextUser.displayName || 'Unknown',
+                authContextUser.group || 'غير محدد',
+                ownerId
+              );
+            });
+          }
+        }
+      }
     });
-  }
+  };
 
   const getSessionsForDay = (date: string): DailySession[] => {
     const sessionsForDate = (dailySessions ?? {})[date];
@@ -1834,37 +1939,51 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const moveDailySession = async (sessionId: string, date: string, sourceOwnerId: string, targetOwnerId: string) => {
     if (!authContextUser || !sessionId || !sourceOwnerId || !targetOwnerId) return;
 
-    const sourceRef = ref(db, `users/${sourceOwnerId}/dailySessions/${date}/${sessionId}`);
-
     try {
-      const snapshot = await get(sourceRef);
-      if (snapshot.exists()) {
-        const sessionData = snapshot.val();
-        // Update ownerId in the data itself
-        const updatedSessionData = { ...sessionData, ownerId: targetOwnerId };
+      // Check if old structure exists
+      const dayRef = ref(db, `users/${sourceOwnerId}/dailySessions/${date}`);
+      const daySnap = await get(dayRef);
+      if (daySnap.exists()) {
+        const val = daySnap.val();
+        let sessionDataToMove = null;
+        let isOldStructure = false;
 
-        // Atomic update: write to target, remove from source
-        const updates: any = {};
-        updates[`users/${targetOwnerId}/dailySessions/${date}/${sessionId}`] = updatedSessionData;
-        updates[`users/${sourceOwnerId}/dailySessions/${date}/${sessionId}`] = null;
+        if (val && typeof val === 'object' && 'date' in val) {
+          sessionDataToMove = val;
+          isOldStructure = true;
+        } else if (val && typeof val === 'object' && val[sessionId]) {
+          sessionDataToMove = val[sessionId];
+        }
 
-        await update(ref(db), updates);
+        if (sessionDataToMove) {
+          const updatedSessionData = { ...sessionDataToMove, ownerId: targetOwnerId, id: sessionId };
 
-        await logActivity(
-          'MOVE_SESSION',
-          authContextUser.uid,
-          `تم نقل حصة بتاريخ ${date} من المستخدم ${sourceOwnerId} إلى ${targetOwnerId}`,
-          sessionId,
-          sessionData.sessionType,
-          authContextUser.displayName || 'Unknown',
-          authContextUser.group || 'غير محدد',
-          targetOwnerId
-        );
+          const updates: any = {};
+          updates[`users/${targetOwnerId}/dailySessions/${date}/${sessionId}`] = updatedSessionData;
+          if (isOldStructure) {
+            updates[`users/${sourceOwnerId}/dailySessions/${date}`] = null;
+          } else {
+            updates[`users/${sourceOwnerId}/dailySessions/${date}/${sessionId}`] = null;
+          }
 
-        toast({
-          title: "تم النقل بنجاح",
-          description: "تم نقل الحصة إلى حساب الشيخ المحدد.",
-        });
+          await update(ref(db), updates);
+
+          await logActivity(
+            'MOVE_SESSION',
+            authContextUser.uid,
+            `تم نقل حصة بتاريخ ${date} من المستخدم ${sourceOwnerId} إلى ${targetOwnerId}`,
+            sessionId,
+            sessionDataToMove.sessionType,
+            authContextUser.displayName || 'Unknown',
+            authContextUser.group || 'غير محدد',
+            targetOwnerId
+          );
+
+          toast({
+            title: "تم النقل بنجاح",
+            description: "تم نقل الحصة إلى حساب الشيخ المحدد.",
+          });
+        }
       }
     } catch (error) {
       console.error("Error moving session:", error);
