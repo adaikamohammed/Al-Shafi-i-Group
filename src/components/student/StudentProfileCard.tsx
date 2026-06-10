@@ -340,7 +340,14 @@ export const StudentProfileCard = memo(({ student, user, rankingData, medalHisto
                                     </div>
                                     <div className="flex justify-between items-center text-sm">
                                         <span className="text-muted-foreground">رقم الهاتف:</span>
-                                        <span className="font-bold flex items-center gap-1 dir-ltr">{student.phone1} <Phone className="h-3 w-3" /></span>
+                                        <span className="font-bold flex items-center gap-1 dir-ltr">
+                                            {student.phone1} <Phone className="h-3 w-3" />
+                                            {student.hasWhatsApp !== false ? (
+                                                <span className="text-[10px] text-green-600 bg-green-50 dark:bg-green-950/30 px-1.5 py-0.5 rounded border border-green-200 dark:border-green-900/50 mr-1 font-bold">واتساب ✅</span>
+                                            ) : (
+                                                <span className="text-[10px] text-slate-500 bg-slate-50 dark:bg-slate-950/30 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800 mr-1 font-bold">SMS ✉️</span>
+                                            )}
+                                        </span>
                                     </div>
                                 </CardContent>
                             </Card>

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import Image from 'next/image';
 import ContactModal from './ContactModal';
 
@@ -55,6 +55,9 @@ export default function PublicNavbar() {
                                 </Button>
                             </SheetTrigger>
                             <SheetContent side="right" className="pt-20">
+                                <SheetHeader className="sr-only">
+                                    <SheetTitle>قائمة التنقل الجانبية</SheetTitle>
+                                </SheetHeader>
                                 <div className="flex flex-col gap-6">
                                     <Link href="/#stats" className="text-lg font-bold text-gray-800">إحصائياتنا</Link>
                                     <Link href="/about" className="text-lg font-bold text-gray-800">تاريخ المدرسة</Link>

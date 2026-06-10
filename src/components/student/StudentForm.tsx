@@ -21,9 +21,16 @@ import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/SearchableSelect';
+import { Switch } from '@/components/ui/switch';
 
 const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
 const educationalLevelOptions: SearchableSelectOption[] = educationalLevels.map(level => ({ value: level, label: level }));
+
+const isGroup8 = (name?: string) => {
+    if (!name) return false;
+    const clean = name.trim();
+    return clean === 'فوج 8' || clean === 'فوج الشيخ عبد الحق نصيرة' || clean.includes('عبد الحق');
+};
 
 interface StudentFormProps {
     student?: Student;
@@ -56,6 +63,7 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [educationalLevel, setEducationalLevel] = useState<string>(student?.educationalLevel || "");
     const [groupName, setGroupName] = useState<string>(student?.groupName || user?.group || "");
+    const [hasWhatsApp, setHasWhatsApp] = useState<boolean>(student?.hasWhatsApp !== false);
 
     const groupOptions: SearchableSelectOption[] = [
         { value: "فوج الشيخ زياد درويش", label: "فوج الشيخ زياد درويش" },
@@ -111,15 +119,19 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
                 }
             });
 
+            const targetGroup = isSuperAdmin ? groupName : (student?.groupName || user?.group);
+            const isGrp8 = isGroup8(targetGroup);
+
             const studentData: Partial<Student> = {
                 fullName: data.fullName,
                 gender: data.gender,
                 pageNumber: data.pageNumber,
                 educationalLevel: data.educationalLevel,
-                groupName: isSuperAdmin ? data.groupName : (student?.groupName || user?.group),
+                groupName: targetGroup,
                 guardianName: data.guardianName,
                 phone1: data.phone1,
                 phone2: data.phone2,
+                hasWhatsApp: hasWhatsApp,
                 birthDate: birthDate,
                 registrationDate: registrationDate || new Date(),
                 status: data.status,
@@ -128,7 +140,8 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
                 notes: data.notes,
                 covenants: covenants,
                 photoURL: (selectedAvatarId ? photoPreview : student?.photoURL) || undefined,
-                ownerId: student?.ownerId || user?.uid || ''
+                ownerId: student?.ownerId || user?.uid || '',
+                memorizationMultiplier: isGrp8 ? (data.memorizationMultiplier ? parseFloat(data.memorizationMultiplier) : (student?.memorizationMultiplier || 1.0)) : 1.0
             };
 
             if (student && updateStudent) {
@@ -282,6 +295,16 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
                         <div className="space-y-2">
                             <Label htmlFor="phone1" className="font-headline font-bold">رقم هاتف الولي 1</Label>
                             <Input name="phone1" id="phone1" type="tel" defaultValue={student?.phone1} className="font-body shadow-sm dir-ltr text-right" placeholder="0XXXXXXXXX" />
+                            <div className="flex items-center gap-2 mt-2">
+                                <Switch
+                                    id="hasWhatsApp"
+                                    checked={hasWhatsApp}
+                                    onCheckedChange={setHasWhatsApp}
+                                />
+                                <Label htmlFor="hasWhatsApp" className="text-xs font-bold text-slate-500 cursor-pointer">
+                                    هذا الرقم لديه واتساب (لتلقي التقارير)
+                                </Label>
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="phone2" className="font-headline font-bold">رقم هاتف الولي 2 (اختياري)</Label>
@@ -388,6 +411,23 @@ export const StudentForm = ({ student, onSuccess, onCancel, addStudent, updateSt
                             </Select>
                         </div>
                     </div>
+                    {isGroup8(groupName) && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="memorizationMultiplier" className="font-headline font-bold text-amber-600">معامل تقييم الحفظ (خاص بفوج 8)</Label>
+                                <Select dir="rtl" name="memorizationMultiplier" defaultValue={student?.memorizationMultiplier?.toString() ?? '1'}>
+                                    <SelectTrigger id="memorizationMultiplier" className="font-body shadow-sm border-amber-300 focus:border-amber-400 focus:ring-amber-400">
+                                        <SelectValue placeholder="اختر المعامل" />
+                                    </SelectTrigger>
+                                    <SelectContent className="font-body">
+                                        <SelectItem value="0.5">0.5 (نصف صفحة)</SelectItem>
+                                        <SelectItem value="1">1.0 (صفحة)</SelectItem>
+                                        <SelectItem value="1.5">1.5 (صفحة ونصف)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-2 pt-4">

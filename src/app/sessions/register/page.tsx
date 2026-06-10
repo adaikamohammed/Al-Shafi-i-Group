@@ -43,8 +43,6 @@ function RegisterSessionContent() {
         d.setHours(12, 0, 0, 0);
         return d;
     }, [dateParam]);
-    const sessionToOpen = useMemo(() => (sessionNumParam === '2' ? 2 : 1) as 1 | 2, [sessionNumParam]);
-
     const isManagement = user?.role === 'management';
 
     // Determine the effective owner ID (either specified in URL for admins, or current user)
@@ -54,6 +52,23 @@ function RegisterSessionContent() {
         }
         return user?.uid;
     }, [isSuperAdmin, isManagement, ownerIdParam, user]);
+
+    const sessionToOpen = useMemo(() => {
+        const rawSession = sessionNumParam === '2' ? 2 : 1;
+        if (rawSession === 2 && dateParam) {
+            const sessionOwnerId = effectiveOwnerId || user?.uid;
+            const contextSessions = getSessionsForDay(dateParam);
+            const hasSession1 = contextSessions.some((s: any) => {
+                const ownerMatches = s.ownerId === sessionOwnerId;
+                const num = s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
+                return ownerMatches && num === 1;
+            });
+            if (!hasSession1) {
+                return 1; // Force to session 1 if session 1 doesn't exist
+            }
+        }
+        return rawSession as 1 | 2;
+    }, [sessionNumParam, dateParam, getSessionsForDay, effectiveOwnerId, user]);
 
     const [sessionType, setSessionType] = useState<'حصة أساسية' | 'حصة تعويضية' | 'يوم عطلة' | 'غياب الشيخ' | 'حصة أنشطة' | 'حصة إضافية'>('حصة أساسية');
     const [teacherAbsenceReason, setTeacherAbsenceReason] = useState('');
@@ -896,8 +911,22 @@ function RegisterSessionContent() {
         try {
             await performSave(sessionData); // Save immediate state
             toast({
-                title: "تم الحفظ",
-                description: `تم حفظ بيانات الحصة بنجاح.`,
+                title: "تم الحفظ بنجاح ✅",
+                description: "هل تريد إرسال تقارير الحصة للأولياء عبر واتساب؟",
+                action: (
+                    <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        className="font-bold shrink-0 font-headline bg-white text-slate-900 hover:bg-slate-100"
+                        onClick={() => {
+                            const dateStr = format(selectedDay, 'yyyy-MM-dd');
+                            router.push(`/parent-communication?mode=bulk&type=daily&date=${dateStr}`);
+                        }}
+                    >
+                        إرسال التقارير
+                    </Button>
+                ),
+                duration: 7000,
             });
             router.push('/sessions');
         } catch (error) {

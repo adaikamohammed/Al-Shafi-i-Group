@@ -17,7 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { useRouter } from 'next/navigation';
 import { Student, StudentStatus } from '@/lib/types';
-import { arabicCompare } from '@/lib/utils';
+import { arabicCompare, isStudentInMenSheikhs, isStudentInWomenUstadhats } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
@@ -35,9 +35,8 @@ const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ا
 
 export function StudentManagement() {
     const router = useRouter();
-    const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings, addStudent, allUsers, dailyReports } = useStudentContext();
+    const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings, addStudent, allUsers, dailyReports, selectedGroup, setSelectedGroup } = useStudentContext();
     const { user, isSuperAdmin, isManagement } = useAuth();
-    const [selectedGroup, setSelectedGroup] = useState<string>('all');
     const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
     const [isEditStudentDialogOpen, setEditStudentDialogOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -118,11 +117,17 @@ export function StudentManagement() {
 
         // Management Filter
         if (isManagement && selectedGroup !== 'all') {
-            const selectedUser = allUsers.find(u => u.uid === selectedGroup);
-            if (selectedUser?.group) {
-                sortableStudents = sortableStudents.filter(s => s.groupName?.trim() === selectedUser.group?.trim());
+            if (selectedGroup === 'sheikhs_all') {
+                sortableStudents = sortableStudents.filter(s => isStudentInMenSheikhs(s, allUsers));
+            } else if (selectedGroup === 'ustadhats_all') {
+                sortableStudents = sortableStudents.filter(s => isStudentInWomenUstadhats(s, allUsers));
             } else {
-                sortableStudents = sortableStudents.filter(s => s.ownerId === selectedGroup);
+                const selectedUser = allUsers.find(u => u.uid === selectedGroup);
+                if (selectedUser?.group) {
+                    sortableStudents = sortableStudents.filter(s => s.groupName?.trim() === selectedUser.group?.trim());
+                } else {
+                    sortableStudents = sortableStudents.filter(s => s.ownerId === selectedGroup);
+                }
             }
         }
         sortableStudents = sortableStudents.filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -161,11 +166,17 @@ export function StudentManagement() {
     const allStudents = useMemo(() => {
         let list = isSuperAdmin || isManagement ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
         if (isManagement && selectedGroup !== 'all') {
-            const selectedUser = allUsers.find(u => u.uid === selectedGroup);
-            if (selectedUser?.group) {
-                list = list.filter(s => s.groupName?.trim() === selectedUser.group?.trim());
+            if (selectedGroup === 'sheikhs_all') {
+                list = list.filter(s => isStudentInMenSheikhs(s, allUsers));
+            } else if (selectedGroup === 'ustadhats_all') {
+                list = list.filter(s => isStudentInWomenUstadhats(s, allUsers));
             } else {
-                list = list.filter(s => s.ownerId === selectedGroup);
+                const selectedUser = allUsers.find(u => u.uid === selectedGroup);
+                if (selectedUser?.group) {
+                    list = list.filter(s => s.groupName?.trim() === selectedUser.group?.trim());
+                } else {
+                    list = list.filter(s => s.ownerId === selectedGroup);
+                }
             }
         }
         return list;

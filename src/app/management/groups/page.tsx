@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { useStudentContext } from '@/context/StudentContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Shield, Users, UserCheck, TrendingUp, Search } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, isSheikhMenUser, isSheikhWomenUser, isStudentInMenSheikhs, isStudentInWomenUstadhats } from '@/lib/utils';
 import { ProtectedPage } from '@/components/ui/ProtectedPage';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
@@ -12,9 +12,8 @@ import { PORTAL_THEMES } from '@/lib/themes';
 import { GroupSelector } from '@/components/management/GroupSelector';
 
 export default function GroupsMonitoringPage() {
-    const { students, allUsers } = useStudentContext();
+    const { students, allUsers, selectedGroup, setSelectedGroup } = useStudentContext();
     const { user } = useAuth();
-    const [selectedGroup, setSelectedGroup] = React.useState<string>('all');
 
     const currentThemeId = user?.portalTheme || 'midnight';
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
@@ -22,8 +21,15 @@ export default function GroupsMonitoringPage() {
     const groupsData = useMemo(() => {
         const groups: Record<string, any> = {};
 
+        // Filter sheikhs to match collective groups if selected
+        const filteredSheikhs = allUsers.filter(u => u.role === 'sheikh').filter(sheikh => {
+            if (selectedGroup === 'sheikhs_all') return isSheikhMenUser(sheikh);
+            if (selectedGroup === 'ustadhats_all') return isSheikhWomenUser(sheikh);
+            return true;
+        });
+
         // Initialize groups from sheikhs
-        allUsers.filter(u => u.role === 'sheikh').forEach(sheikh => {
+        filteredSheikhs.forEach(sheikh => {
             groups[sheikh.group || 'غير محدد'] = {
                 groupName: sheikh.group || 'غير محدد',
                 sheikhName: sheikh.displayName,
@@ -35,6 +41,9 @@ export default function GroupsMonitoringPage() {
 
         // Add student counts
         students.forEach(student => {
+            if (selectedGroup === 'sheikhs_all' && !isStudentInMenSheikhs(student, allUsers)) return;
+            if (selectedGroup === 'ustadhats_all' && !isStudentInWomenUstadhats(student, allUsers)) return;
+
             const gName = student.groupName || 'غير محدد';
             if (!groups[gName]) {
                 groups[gName] = {
@@ -50,7 +59,7 @@ export default function GroupsMonitoringPage() {
         });
 
         return Object.values(groups).filter(g => {
-            if (selectedGroup === 'all') return true;
+            if (selectedGroup === 'all' || selectedGroup === 'sheikhs_all' || selectedGroup === 'ustadhats_all') return true;
             // Find the sheikh UID for this group if possible, or filter by what we have.
             // Our GroupSelector returns UID. 'groups' keys are Group Names.
             // We need to match UID to GroupName.

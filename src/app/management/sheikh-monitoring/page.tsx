@@ -14,6 +14,8 @@ import {
     ChevronDown, ChevronUp, FileDown, FileSpreadsheet, Save, Trophy, Crown, Medal, Sparkles, Target, Flame, Share2, Search
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import {
     format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
@@ -134,6 +136,7 @@ function calculateFairStudentStats({
             id: s.id,
             name: s.fullName,
             group: grp,
+            memorizationMultiplier: s.memorizationMultiplier ?? 1.0,
             attendanceDays: 0,
             totalSessionDays: 0,
             attendanceRate: 0,
@@ -207,12 +210,14 @@ function calculateFairStudentStats({
                 }
             }
 
-            if (!r.review && r.memorization && r.memorization !== 'لا يوجد' && r.memorization !== '') {
-                st.assessedMemorization += weight;
-                st.totalEvals++;
-                const earned = getMemoPoints(r.memorization) * weight;
-                st.memorizationPointsSum += earned;
+            let earnedMemoPoints = 0;
+            let hasMemo = false;
+            const hasNewMemo = !r.review && r.memorization && r.memorization !== 'لا يوجد' && r.memorization !== '';
+            const hasReview = r.review && pointsConfig?.review?.completed;
 
+            if (hasNewMemo) {
+                earnedMemoPoints += getMemoPoints(r.memorization);
+                hasMemo = true;
                 const memoKey = r.memorization === 'جيد جدا' ? 'جيد جداً' : r.memorization;
                 if (memoKey === 'ممتاز') st.excellent++;
                 else if (memoKey === 'جيد جداً') st.goodPlus++;
@@ -220,11 +225,19 @@ function calculateFairStudentStats({
                 else if (memoKey === 'مقبول' || memoKey === 'حسن') st.acceptable++;
                 else if (memoKey === 'ضعيف' || memoKey === 'متوسط') st.weak++;
                 else if (memoKey === 'لم يحفظ') st.notMem++;
-            } else if (r.review && pointsConfig?.review?.completed) {
+            }
+            if (hasReview) {
+                earnedMemoPoints += pointsConfig.review.completed;
+                hasMemo = true;
+            }
+
+            if (hasMemo) {
                 st.assessedMemorization += weight;
                 st.totalEvals++;
-                const earned = pointsConfig.review.completed * weight;
-                st.memorizationPointsSum += earned;
+                const isGroup8User = st.group === 'فوج 8' || st.group === 'فوج الشيخ عبد الحق نصيرة' || st.group.includes('عبد الحق');
+                const multiplier = isGroup8User ? (st.memorizationMultiplier ?? 1.0) : 1.0;
+                const penalty = (hasNewMemo && r.isDelayed) ? 0.8 : 1.0;
+                st.memorizationPointsSum += earnedMemoPoints * weight * multiplier * penalty;
             }
 
             if (r.behavior && r.behavior !== '') {
@@ -387,7 +400,7 @@ export default function SheikhMonitoringPage() {
     const { dailySessions, allUsers, loading, students, settings } = useStudentContext();
     const { isManagement } = useAuth();
 
-    type ViewMode = 'day' | 'week' | 'month' | 'stats' | 'students' | 'chart' | 'topStudents' | 'earlyWarning' | 'badges' | 'heatmap' | 'behavior';
+    type ViewMode = 'day' | 'week' | 'month' | 'stats' | 'students' | 'chart' | 'topStudents' | 'earlyWarning' | 'badges' | 'heatmap' | 'behavior' | 'audit';
     const [view, setView] = useState<ViewMode>('day');
     const [studentPeriod, setStudentPeriod] = useState<'day' | 'week' | 'month'>('month');
     const [studentGroupFilter, setStudentGroupFilter] = useState<string>('sheikhs');
@@ -801,6 +814,8 @@ export default function SheikhMonitoringPage() {
             ? `تحليل السلوك — ${format(statsMonth, 'MMMM yyyy', { locale: ar })}`
         : view === 'earlyWarning'
             ? `آخر أسبوعين حتى ${format(selectedDate, 'd MMMM yyyy', { locale: ar })}`
+        : view === 'audit'
+            ? `تقرير تدقيق البيانات واكتمالها`
             : view === 'topStudents'
                 ? (starsMode === 'month' ? format(selectedDate, 'MMMM yyyy', { locale: ar }) : weeklyStudentStats.weekLabel)
                 : view === 'students'
@@ -892,85 +907,89 @@ export default function SheikhMonitoringPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 border flex-wrap">
-                    {(['day', 'week', 'month', 'stats', 'students', 'chart', 'topStudents', 'earlyWarning', 'badges', 'heatmap', 'behavior'] as const).map(v => (
-                        <button key={v} onClick={() => setView(v)} className={cn("px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all", view === v ? (v === 'earlyWarning' ? 'bg-rose-500 text-white shadow-sm' : v === 'heatmap' ? 'bg-orange-500 text-white shadow-sm' : v === 'behavior' ? 'bg-teal-500 text-white shadow-sm' : 'bg-primary text-white shadow-sm') : "text-muted-foreground hover:bg-muted", v === 'earlyWarning' && atRiskStudents.length > 0 && view !== v && 'text-rose-500')}>
-                            {v === 'day' ? '📅 اليوم' : v === 'week' ? '📆 الأسبوع' : v === 'month' ? '🗓 الشهر' : v === 'stats' ? '📊 إحصائيات' : v === 'students' ? '📋 متابعة' : v === 'chart' ? '📈 منحنى الحفظ' : v === 'topStudents' ? '🌟 نجوم' : v === 'earlyWarning' ? `🔔 إنذارات${atRiskStudents.length > 0 ? ` (${atRiskStudents.length})` : ''}` : v === 'heatmap' ? '🌡️ خريطة الحضور' : v === 'behavior' ? '🧠 السلوك' : '🏆 المتصدرين والتكريم'}
+                    {(['day', 'week', 'month', 'stats', 'students', 'chart', 'topStudents', 'earlyWarning', 'badges', 'heatmap', 'behavior', 'audit'] as const).map(v => (
+                        <button key={v} onClick={() => setView(v)} className={cn("px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all", view === v ? (v === 'earlyWarning' ? 'bg-rose-500 text-white shadow-sm' : v === 'heatmap' ? 'bg-orange-500 text-white shadow-sm' : v === 'behavior' ? 'bg-teal-500 text-white shadow-sm' : v === 'audit' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-primary text-white shadow-sm') : "text-muted-foreground hover:bg-muted", v === 'earlyWarning' && atRiskStudents.length > 0 && view !== v && 'text-rose-500')}>
+                            {v === 'day' ? '📅 اليوم' : v === 'week' ? '📆 الأسبوع' : v === 'month' ? '🗓 الشهر' : v === 'stats' ? '📊 إحصائيات' : v === 'students' ? '📋 متابعة' : v === 'chart' ? '📈 منحنى الحفظ' : v === 'topStudents' ? '🌟 نجوم' : v === 'earlyWarning' ? `🔔 إنذارات${atRiskStudents.length > 0 ? ` (${atRiskStudents.length})` : ''}` : v === 'heatmap' ? '🌡️ خريطة الحضور' : v === 'behavior' ? '🧠 السلوك' : v === 'audit' ? '🔍 تدقيق البيانات' : '🏆 المتصدرين والتكريم'}
                         </button>
                     ))}
                 </div>
 
-                {/* ── Date Navigation ── */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card border rounded-xl px-3 py-2">
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
-                        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="h-8 px-2"><ChevronRight className="h-4 w-4" /></Button>
-                        <span className="text-xs text-muted-foreground hidden sm:inline">السابق</span>
-                    </div>
+                {view !== 'audit' && (
+                    <>
+                        {/* ── Date Navigation ── */}
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card border rounded-xl px-3 py-2">
+                            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+                                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="h-8 px-2"><ChevronRight className="h-4 w-4" /></Button>
+                                <span className="text-xs text-muted-foreground hidden sm:inline">السابق</span>
+                            </div>
 
-                    <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
-                        <span className="text-sm font-bold text-center">{navLabel}</span>
-                        
-                        <div className="flex items-center gap-2 bg-muted/40 p-1 rounded-xl border scale-90">
-                            <select
-                                aria-label="اختر الشهر"
-                                value={activeDate.getMonth()}
-                                onChange={e => updateActiveDateMonthYear(activeDate.getFullYear(), parseInt(e.target.value))}
-                                className="text-xs font-bold bg-transparent border-none focus:outline-none cursor-pointer text-foreground"
-                                dir="rtl"
-                            >
-                                {[
-                                    { value: 0, label: 'يناير (1)' },
-                                    { value: 1, label: 'فبراير (2)' },
-                                    { value: 2, label: 'مارس (3)' },
-                                    { value: 3, label: 'أبريل (4)' },
-                                    { value: 4, label: 'مايو (5)' },
-                                    { value: 5, label: 'يونيو (6)' },
-                                    { value: 6, label: 'يوليو (7)' },
-                                    { value: 7, label: 'أغسطس (8)' },
-                                    { value: 8, label: 'سبتمبر (9)' },
-                                    { value: 9, label: 'أكتوبر (10)' },
-                                    { value: 10, label: 'نوفمبر (11)' },
-                                    { value: 11, label: 'ديسمبر (12)' }
-                                ].map(m => (
-                                    <option key={m.value} value={m.value} className="bg-card text-foreground">{m.label}</option>
-                                ))}
-                            </select>
-                            <span className="text-muted-foreground text-xs font-normal">|</span>
-                            <select
-                                aria-label="اختر السنة"
-                                value={activeDate.getFullYear()}
-                                onChange={e => updateActiveDateMonthYear(parseInt(e.target.value), activeDate.getMonth())}
-                                className="text-xs font-bold bg-transparent border-none focus:outline-none cursor-pointer text-foreground"
-                                dir="rtl"
-                            >
-                                {Array.from({ length: 7 }, (_, i) => 2024 + i).map(y => (
-                                    <option key={y} value={y} className="bg-card text-foreground">{y}</option>
-                                ))}
-                            </select>
+                            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                                <span className="text-sm font-bold text-center">{navLabel}</span>
+                                
+                                <div className="flex items-center gap-2 bg-muted/40 p-1 rounded-xl border scale-90">
+                                    <select
+                                        aria-label="اختر الشهر"
+                                        value={activeDate.getMonth()}
+                                        onChange={e => updateActiveDateMonthYear(activeDate.getFullYear(), parseInt(e.target.value))}
+                                        className="text-xs font-bold bg-transparent border-none focus:outline-none cursor-pointer text-foreground"
+                                        dir="rtl"
+                                    >
+                                        {[
+                                            { value: 0, label: 'يناير (1)' },
+                                            { value: 1, label: 'فبراير (2)' },
+                                            { value: 2, label: 'مارس (3)' },
+                                            { value: 3, label: 'أبريل (4)' },
+                                            { value: 4, label: 'مايو (5)' },
+                                            { value: 5, label: 'يونيو (6)' },
+                                            { value: 6, label: 'يوليو (7)' },
+                                            { value: 7, label: 'أغسطس (8)' },
+                                            { value: 8, label: 'سبتمبر (9)' },
+                                            { value: 9, label: 'أكتوبر (10)' },
+                                            { value: 10, label: 'نوفمبر (11)' },
+                                            { value: 11, label: 'ديسمبر (12)' }
+                                        ].map(m => (
+                                            <option key={m.value} value={m.value} className="bg-card text-foreground">{m.label}</option>
+                                        ))}
+                                    </select>
+                                    <span className="text-muted-foreground text-xs font-normal">|</span>
+                                    <select
+                                        aria-label="اختر السنة"
+                                        value={activeDate.getFullYear()}
+                                        onChange={e => updateActiveDateMonthYear(parseInt(e.target.value), activeDate.getMonth())}
+                                        className="text-xs font-bold bg-transparent border-none focus:outline-none cursor-pointer text-foreground"
+                                        dir="rtl"
+                                    >
+                                        {Array.from({ length: 7 }, (_, i) => 2024 + i).map(y => (
+                                            <option key={y} value={y} className="bg-card text-foreground">{y}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {(view !== 'stats') && !isToday(selectedDate) && (
+                                    <button onClick={() => setSelectedDate(new Date())} className="text-[10px] text-primary flex items-center gap-1">
+                                        <RotateCcw className="h-2.5 w-2.5" /> اليوم الحالي
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                                <span className="text-xs text-muted-foreground hidden sm:inline">التالي</span>
+                                <Button variant="ghost" size="sm" onClick={() => navigate(1)} className="h-8 px-2"><ChevronLeft className="h-4 w-4" /></Button>
+                            </div>
                         </div>
 
-                        {(view !== 'stats') && !isToday(selectedDate) && (
-                            <button onClick={() => setSelectedDate(new Date())} className="text-[10px] text-primary flex items-center gap-1">
-                                <RotateCcw className="h-2.5 w-2.5" /> اليوم الحالي
-                            </button>
-                        )}
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                        <span className="text-xs text-muted-foreground hidden sm:inline">التالي</span>
-                        <Button variant="ghost" size="sm" onClick={() => navigate(1)} className="h-8 px-2"><ChevronLeft className="h-4 w-4" /></Button>
-                    </div>
-                </div>
-
-                {/* ── KPI Dashboard (always visible) ── */}
-                <KPIDashboard
-                    sheikhs={filteredSheikhs}
-                    getDayStats={getDayStats}
-                    dailySessions={dailySessions}
-                    groupSessions={groupSessions}
-                    selectedDate={activeDate}
-                    students={students || []}
-                    view={view === 'chart' ? 'topStudents' : (view === 'topStudents' ? (starsMode === 'month' ? 'month' : 'week') : view as any)}
-                />
+                        {/* ── KPI Dashboard (always visible) ── */}
+                        <KPIDashboard
+                            sheikhs={filteredSheikhs}
+                            getDayStats={getDayStats}
+                            dailySessions={dailySessions}
+                            groupSessions={groupSessions}
+                            selectedDate={activeDate}
+                            students={students || []}
+                            view={view === 'chart' ? 'topStudents' : (view === 'topStudents' ? (starsMode === 'month' ? 'month' : 'week') : view as any)}
+                        />
+                    </>
+                )}
 
                 {/* ── Summary Row (Day view only) ── */}
                 {view === 'day' && (
@@ -1072,6 +1091,12 @@ export default function SheikhMonitoringPage() {
                     <BehaviorAnalysisView
                         data={behaviorData}
                         monthLabel={format(statsMonth, 'MMMM yyyy', { locale: ar })}
+                    />
+                )}
+                {view === 'audit' && (
+                    <DataAuditView
+                        sheikhs={filteredSheikhs}
+                        students={students || []}
                     />
                 )}
             </div>
@@ -4155,6 +4180,7 @@ type TopStudentEntry = {
     behaviorCalm: number; behaviorOk: number; behaviorBad: number;
     behaviorScore: number; totalBehaviorEvals: number; avgBehaviorScore: number;
     overallScore: number;
+    memorizationMultiplier?: number;
 };
 
 function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMode, setStarsMode, selectedDate, dailySessions, students }: {
@@ -5322,6 +5348,7 @@ function StudentScoreDetailModal({
         behavior: string | null; isReview: boolean;
         evalGrade: number; behaviorGrade: number; isLate: boolean;
         weight: number;
+        isDelayed: boolean;
     };
 
     const dayRecords = useMemo<DayRec[]>(() => {
@@ -5398,7 +5425,8 @@ function StudentScoreDetailModal({
                     behavior: beh,
                     isReview, evalGrade, behaviorGrade,
                     isLate: myRec?.attendance === 'متأخر',
-                    weight
+                    weight,
+                    isDelayed: !!myRec?.isDelayed
                 });
             });
         });
@@ -5422,18 +5450,28 @@ function StudentScoreDetailModal({
         }
 
         const isPresent = rec.attendance === 'حاضر' || rec.attendance === 'تعويض' || rec.attendance === 'متأخر';
-        const hasMemoEval = !rec.isReview && rec.memorization && rec.memorization.trim() !== '' && rec.memorization !== 'لا يوجد';
-        if (isPresent) {
-            if (hasMemoEval) {
-                assessedMemorization += weight;
-                const cleanMem = rec.isReview ? '' : rec.memorization;
-                if (cleanMem) {
-                    memorizationPointsSum += getMemoPoints(cleanMem) * weight;
-                }
-            } else if (rec.isReview && pointsConfig?.review?.completed) {
-                assessedMemorization += weight;
-                memorizationPointsSum += pointsConfig.review.completed * weight;
-            }
+        const cleanMem = rec.isReview ? '' : rec.memorization;
+        const hasMemoEval = isPresent && cleanMem && cleanMem.trim() !== '' && cleanMem !== 'لا يوجد';
+        const hasReview = isPresent && rec.isReview && pointsConfig?.review?.completed;
+
+        let earnedMemoPoints = 0;
+        let hasMemo = false;
+
+        if (hasMemoEval) {
+            earnedMemoPoints += getMemoPoints(cleanMem);
+            hasMemo = true;
+        }
+        if (hasReview) {
+            earnedMemoPoints += pointsConfig.review.completed;
+            hasMemo = true;
+        }
+
+        if (hasMemo) {
+            assessedMemorization += weight;
+            const isGroup8User = student.group === 'فوج 8' || student.group === 'فوج الشيخ عبد الحق نصيرة' || (student.group || '').includes('عبد الحق');
+            const multiplier = isGroup8User ? (student.memorizationMultiplier ?? 1.0) : 1.0;
+            const penalty = (hasMemoEval && rec.isDelayed) ? 0.8 : 1.0;
+            memorizationPointsSum += earnedMemoPoints * weight * multiplier * penalty;
         }
 
         if (rec.behavior && rec.behavior.trim() !== '') {
@@ -5585,6 +5623,344 @@ function StudentScoreDetailModal({
                         <button onClick={onClose} className="text-xs px-4 py-1.5 bg-primary text-white rounded-lg font-bold">إغلاق</button>
                     </div>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Phase 5: DataAuditView Component ──────────────────────────────────────────
+function DataAuditView({ sheikhs, students }: { sheikhs: any[]; students: any[] }) {
+    const { toast } = useToast();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sheikhFilter, setSheikhFilter] = useState('all');
+
+    // Helper functions
+    const getMissingFields = (student: any) => {
+        const missing = [];
+        
+        // Guardian Name
+        const isGuardianMissing = !student.guardianName || 
+            student.guardianName.trim() === '' || 
+            student.guardianName === 'غير مسجل' || 
+            student.guardianName === 'لا يوجد' || 
+            student.guardianName === '-' ||
+            student.guardianName === 'N/A';
+            
+        // Phone
+        const isPhoneMissing = !student.phone1 || 
+            student.phone1.trim() === '' || 
+            student.phone1 === '0' || 
+            student.phone1 === 'غير مسجل' || 
+            student.phone1 === '-' ||
+            student.phone1 === 'N/A';
+            
+        // Educational Level
+        const isLevelMissing = !student.educationalLevel || 
+            student.educationalLevel.trim() === '' || 
+            student.educationalLevel === 'غير محدد' || 
+            student.educationalLevel === 'لم يحدد' || 
+            student.educationalLevel === '-' ||
+            student.educationalLevel === 'N/A';
+            
+        // Birth Date / Age
+        const isBirthDateMissing = !student.birthDate || 
+            (student.birthDate instanceof Date ? student.birthDate.getFullYear() : new Date(student.birthDate).getFullYear()) >= 2026;
+
+        if (isGuardianMissing) missing.push('اسم الولي');
+        if (isPhoneMissing) missing.push('رقم الهاتف');
+        if (isLevelMissing) missing.push('المستوى الدراسي');
+        if (isBirthDateMissing) missing.push('تاريخ الميلاد/العمر');
+        
+        return missing;
+    };
+
+    const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
+    
+    const auditedStudents = useMemo(() => {
+        return activeStudents.map(s => ({
+            student: s,
+            missingFields: getMissingFields(s)
+        })).filter(item => item.missingFields.length > 0);
+    }, [activeStudents]);
+
+    // Statistics
+    const totalActive = activeStudents.length;
+    const totalMissing = auditedStudents.length;
+    const totalComplete = totalActive - totalMissing;
+    const completionRate = totalActive > 0 ? Math.round((totalComplete / totalActive) * 100) : 100;
+
+    // Grouped and filtered
+    const groupedData = useMemo(() => {
+        const groups: Record<string, { sheikh: any, studentsList: { name: string, student: any, fields: string[] }[] }> = {};
+        
+        auditedStudents.forEach(item => {
+            const s = item.student;
+            const groupName = s.groupName || 'غير محدد';
+            
+            // Find sheikh info
+            const sheikhInfo = sheikhs.find(sh => sh.group === groupName) || {
+                group: groupName,
+                displayName: s.sheikhName || 'شيخ غير محدد'
+            };
+
+            if (!groups[groupName]) {
+                groups[groupName] = {
+                    sheikh: sheikhInfo,
+                    studentsList: []
+                };
+            }
+
+            groups[groupName].studentsList.push({
+                name: s.fullName,
+                student: s,
+                fields: item.missingFields
+            });
+        });
+
+        return Object.values(groups)
+            .filter(g => {
+                const matchesSheikh = sheikhFilter === 'all' || g.sheikh.group === sheikhFilter;
+                const matchesSearch = searchQuery === '' || g.studentsList.some(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+                return matchesSheikh && matchesSearch;
+            })
+            .map(g => {
+                if (searchQuery !== '') {
+                    return {
+                        ...g,
+                        studentsList: g.studentsList.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    };
+                }
+                return g;
+            })
+            .filter(g => g.studentsList.length > 0);
+    }, [auditedStudents, sheikhs, sheikhFilter, searchQuery]);
+
+    const handleCopyReport = (sheikhName: string, groupName: string, missingList: { name: string, fields: string[] }[]) => {
+        const studentsText = missingList.map((s, idx) => `${idx + 1}. *${s.name}*: (ينقصه: ${s.fields.join('، ')})`).join('\n');
+        const text = `السلام عليكم ورحمة الله وبركاته فضيلة الشيخ *${sheikhName}* (${groupName}).
+
+نرجو منكم فضلاً استكمال البيانات الأساسية الناقصة للطلاب التاليين في منظومة الشافعي ليتسنى لنا تفعيل الإشعارات وحساب الترتيب بالشكل الصحيح:
+
+${studentsText}
+
+شاكرين لكم حسن تعاونكم وحرصكم الدائم على مصلحة الطلاب.`;
+
+        navigator.clipboard.writeText(text).then(() => {
+            toast({
+                title: "📋 تم النسخ بنجاح",
+                description: `تم نسخ تقرير ${groupName} إلى الحافظة لإرساله عبر الواتساب.`,
+            });
+        }).catch(err => {
+            console.error(err);
+            toast({
+                title: "❌ خطأ في النسخ",
+                description: "حدث خطأ أثناء نسخ التقرير.",
+                variant: "destructive"
+            });
+        });
+    };
+
+    const handleSaveAsImage = async (elementId: string, sheikhName: string, groupName: string) => {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+        try {
+            const html2canvas = (await import('html2canvas')).default;
+            const canvas = await html2canvas(element, {
+                useCORS: true,
+                scale: 2,
+                backgroundColor: '#ffffff'
+            });
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `تدقيق-${sheikhName}-${groupName}.png`;
+            link.href = dataUrl;
+            link.click();
+            toast({
+                title: "📸 تم حفظ الصورة",
+                description: "تم تحميل الصورة بنجاح.",
+            });
+        } catch (err) {
+            console.error(err);
+            toast({
+                title: "❌ خطأ في توليد الصورة",
+                description: "حدث خطأ أثناء محاولة حفظ الصورة.",
+                variant: "destructive"
+            });
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Statistics Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-bottom-3 duration-500">
+                <div className="bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+                    <div className="bg-blue-500/10 p-3 rounded-xl text-blue-600">
+                        <Users className="h-6 w-6" />
+                    </div>
+                    <div>
+                        <div className="text-2xl font-black text-gray-800">{totalActive}</div>
+                        <div className="text-xs text-muted-foreground font-bold mt-0.5">إجمالي الطلاب النشطين</div>
+                    </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-rose-50/80 to-red-50/50 border border-rose-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+                    <div className="bg-rose-500/10 p-3 rounded-xl text-rose-600">
+                        <AlertTriangle className="h-6 w-6" />
+                    </div>
+                    <div>
+                        <div className="text-2xl font-black text-gray-800">{totalMissing}</div>
+                        <div className="text-xs text-muted-foreground font-bold mt-0.5">طلاب بحاجة لاستكمال بياناتهم</div>
+                    </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+                    <div className="bg-emerald-500/10 p-3 rounded-xl text-emerald-600">
+                        <CheckCircle2 className="h-6 w-6" />
+                    </div>
+                    <div>
+                        <div className="text-2xl font-black text-gray-800">{completionRate}%</div>
+                        <div className="text-xs text-muted-foreground font-bold mt-0.5">نسبة اكتمال بيانات المنصة</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Filter controls */}
+            <div className="bg-card border rounded-2xl p-4 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    <div className="relative flex-1 md:flex-initial min-w-[200px]">
+                        <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            type="text"
+                            placeholder="ابحث عن اسم طالب..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="pr-9 h-9 font-body text-xs rounded-xl"
+                        />
+                    </div>
+                    
+                    <select
+                        aria-label="تصفية حسب الشيخ"
+                        value={sheikhFilter}
+                        onChange={e => setSheikhFilter(e.target.value)}
+                        className="h-9 px-3 border border-input bg-background rounded-xl text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-body min-w-[150px]"
+                    >
+                        <option value="all">كل المشايخ</option>
+                        {sheikhs.map(sh => (
+                            <option key={sh.group} value={sh.group}>{sh.displayName} ({sh.group})</option>
+                        ))}
+                    </select>
+                </div>
+                
+                <div className="text-xs font-bold text-muted-foreground">
+                    تم العثور على {groupedData.length} أفواج بها بيانات ناقصة
+                </div>
+            </div>
+
+            {/* Groups list */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                {groupedData.map(group => {
+                    const cardId = `audit-card-${group.sheikh.group.replace(/\s+/g, '-')}`;
+                    return (
+                        <div
+                            key={group.sheikh.group}
+                            id={cardId}
+                            className="bg-card border rounded-2xl p-5 shadow-sm relative overflow-hidden transition-all duration-300 hover:shadow-md border-slate-200/60 flex flex-col justify-between"
+                        >
+                            <div>
+                                {/* Header */}
+                                <div className="flex items-center justify-between border-b pb-3 mb-4">
+                                    <div>
+                                        <h3 className="font-headline font-black text-base text-gray-800">{group.sheikh.displayName}</h3>
+                                        <p className="text-xs text-muted-foreground font-bold mt-0.5">{group.sheikh.group}</p>
+                                    </div>
+                                    <div className="bg-rose-500/10 text-rose-600 text-[10px] font-extrabold px-2.5 py-1 rounded-full border border-rose-200/50">
+                                        {group.studentsList.length} طلاب بحاجة لتعديل
+                                    </div>
+                                </div>
+
+                                {/* Table */}
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs text-right border-collapse">
+                                        <thead>
+                                            <tr className="border-b text-muted-foreground font-bold">
+                                                <th className="pb-2 text-right">الطالب</th>
+                                                <th className="pb-2 text-center">اسم الولي</th>
+                                                <th className="pb-2 text-center">الهاتف</th>
+                                                <th className="pb-2 text-center">المستوى الدراسي</th>
+                                                <th className="pb-2 text-center">تاريخ الميلاد/العمر</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {group.studentsList.map((item, index) => (
+                                                <tr key={item.student.id} className="border-b last:border-0 hover:bg-slate-50/50">
+                                                    <td className="py-2.5 font-bold text-gray-800">{item.name}</td>
+                                                    <td className="py-2.5 text-center">
+                                                        {item.fields.includes('اسم الولي') ? (
+                                                            <span className="text-[10px] px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-100 rounded font-bold">ناقص</span>
+                                                        ) : (
+                                                            <span className="text-emerald-600 font-bold">✅</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2.5 text-center">
+                                                        {item.fields.includes('رقم الهاتف') ? (
+                                                            <span className="text-[10px] px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-100 rounded font-bold">ناقص</span>
+                                                        ) : (
+                                                            <span className="text-emerald-600 font-bold">✅</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2.5 text-center">
+                                                        {item.fields.includes('المستوى الدراسي') ? (
+                                                            <span className="text-[10px] px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-100 rounded font-bold">ناقص</span>
+                                                        ) : (
+                                                            <span className="text-emerald-600 font-bold">✅</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2.5 text-center">
+                                                        {item.fields.includes('تاريخ الميلاد/العمر') ? (
+                                                            <span className="text-[10px] px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-100 rounded font-bold">ناقص</span>
+                                                        ) : (
+                                                            <span className="text-emerald-600 font-bold">✅</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-2 mt-6 border-t pt-4" data-html2canvas-ignore="true">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleCopyReport(group.sheikh.displayName, group.sheikh.group, group.studentsList)}
+                                    className="flex-1 font-body text-xs font-bold flex items-center justify-center gap-1.5 border-slate-200 hover:bg-slate-50 hover:text-slate-800"
+                                >
+                                    <Share2 className="h-3.5 w-3.5 text-slate-500" />
+                                    نسخ تقرير الواتساب
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleSaveAsImage(cardId, group.sheikh.displayName, group.sheikh.group)}
+                                    className="flex-1 font-body text-xs font-bold flex items-center justify-center gap-1.5 border-slate-200 hover:bg-slate-50 hover:text-slate-800"
+                                >
+                                    <ImageDown className="h-3.5 w-3.5 text-slate-500" />
+                                    حفظ كصورة PNG
+                                </Button>
+                            </div>
+                        </div>
+                    );
+                })}
+
+                {groupedData.length === 0 && (
+                    <div className="col-span-full bg-card border rounded-2xl p-12 text-center shadow-sm">
+                        <div className="text-emerald-500 text-5xl mb-4">🎉</div>
+                        <h3 className="font-headline font-black text-lg text-gray-800">بيانات جميع الطلاب مكتملة!</h3>
+                        <p className="text-xs text-muted-foreground mt-1 font-body">لم يتم العثور على أي بيانات ناقصة في الأفواج المحددة.</p>
+                    </div>
+                )}
             </div>
         </div>
     );

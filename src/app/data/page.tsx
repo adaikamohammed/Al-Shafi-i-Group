@@ -16,6 +16,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { GroupSelector } from '@/components/management/GroupSelector';
+import { isStudentInMenSheikhs, isStudentInWomenUstadhats } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -30,17 +31,22 @@ export default function DataExchangePage() {
     const preRegFileInputRef = useRef<HTMLInputElement>(null);
 
 
-    const { students, addDailySession, getRecordsForDateRange, importStudents, importPreRegistrations, preRegistrations, deleteAllPreRegistrations, allUsers } = useStudentContext();
+    const { students, addDailySession, getRecordsForDateRange, importStudents, importPreRegistrations, preRegistrations, deleteAllPreRegistrations, allUsers, selectedGroup, setSelectedGroup } = useStudentContext();
     const { isManagement } = useAuth();
-    const [selectedGroup, setSelectedGroup] = useState<string>('all');
 
     const filteredStudentsList = React.useMemo(() => {
         if (isManagement && selectedGroup !== 'all') {
-            const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
-            if (selectedSheikh?.group) {
-                return (students ?? []).filter(s => s.groupName?.trim() === selectedSheikh.group?.trim());
+            if (selectedGroup === 'sheikhs_all') {
+                return (students ?? []).filter(s => isStudentInMenSheikhs(s, allUsers));
+            } else if (selectedGroup === 'ustadhats_all') {
+                return (students ?? []).filter(s => isStudentInWomenUstadhats(s, allUsers));
             } else {
-                return (students ?? []).filter(s => s.ownerId === selectedGroup);
+                const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
+                if (selectedSheikh?.group) {
+                    return (students ?? []).filter(s => s.groupName?.trim() === selectedSheikh.group?.trim());
+                } else {
+                    return (students ?? []).filter(s => s.ownerId === selectedGroup);
+                }
             }
         }
         return students ?? [];

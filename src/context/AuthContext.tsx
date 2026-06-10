@@ -61,8 +61,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<'sheikh' | 'super_admin' | 'management' | null>(null);
   const { toast } = useToast();
+  const role = user?.role || null;
   const isSuperAdmin = role === 'super_admin';
   const isManagement = role === 'management';
 
@@ -124,10 +124,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
         setUser(appUser);
-        setRole(appUser.role || 'sheikh');
       } else {
         setUser(null);
-        setRole(null);
       }
       setLoading(false);
     });

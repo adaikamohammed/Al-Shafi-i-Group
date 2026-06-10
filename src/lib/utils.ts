@@ -61,3 +61,52 @@ export function arabicCompare(a: string, b: string): number {
   }
   return la - lb;
 }
+
+// ─── Sheikh and Ustadhat classification helpers ──────────────────────────────────────────
+export function getAdminNumber(email: string): number | null {
+  const match = (email || '').toLowerCase().match(/admin(\d+)/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+export function getGroupNumber(group: string): number | null {
+  const match = (group || '').match(/\d+/);
+  return match ? parseInt(match[0], 10) : null;
+}
+
+export function isSheikhMenUser(u: any): boolean {
+  if (!u) return false;
+  const emailNum = getAdminNumber(u.email || '');
+  const groupNum = getGroupNumber(u.group || '');
+  const displayName = u.displayName || '';
+  return (emailNum !== null && emailNum >= 1 && emailNum <= 9) || 
+         (groupNum !== null && groupNum >= 1 && groupNum <= 9) ||
+         displayName.includes('الشيخ');
+}
+
+export function isSheikhWomenUser(u: any): boolean {
+  if (!u) return false;
+  const emailNum = getAdminNumber(u.email || '');
+  const groupNum = getGroupNumber(u.group || '');
+  const displayName = u.displayName || '';
+  return (emailNum !== null && emailNum >= 10 && emailNum <= 18) || 
+         (groupNum !== null && groupNum >= 10 && groupNum <= 18) ||
+         displayName.includes('الأستاذة');
+}
+
+export function isStudentInMenSheikhs(s: any, allUsers: any[]): boolean {
+  const ownerUser = (allUsers || []).find(u => u.uid === s.ownerId);
+  if (ownerUser) {
+    return isSheikhMenUser(ownerUser);
+  }
+  const groupNum = getGroupNumber(s.groupName || '');
+  return groupNum !== null && groupNum >= 1 && groupNum <= 9;
+}
+
+export function isStudentInWomenUstadhats(s: any, allUsers: any[]): boolean {
+  const ownerUser = (allUsers || []).find(u => u.uid === s.ownerId);
+  if (ownerUser) {
+    return isSheikhWomenUser(ownerUser);
+  }
+  const groupNum = getGroupNumber(s.groupName || '');
+  return groupNum !== null && groupNum >= 10 && groupNum <= 18;
+}

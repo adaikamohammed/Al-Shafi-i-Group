@@ -117,6 +117,8 @@ interface StudentContextType {
   markManagementMessageAsRead: (reportId: string, date: string) => Promise<void>;
   moveDailySession: (sessionId: string, date: string, sourceOwnerId: string, targetOwnerId: string) => Promise<void>;
   restoreSessions: (sessions: DailySession[]) => Promise<void>;
+  selectedGroup: string;
+  setSelectedGroup: (group: string) => void;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -142,6 +144,23 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [weeklyOutcomes, setWeeklyOutcomes] = useState<Record<string, WeeklyOutcome>>({});
   const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
+  const [selectedGroup, setSelectedGroupState] = useState<string>('sheikhs_all');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('selectedGroup');
+      if (stored) {
+        setSelectedGroupState(stored);
+      }
+    }
+  }, []);
+
+  const setSelectedGroup = (val: string) => {
+    setSelectedGroupState(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selectedGroup', val);
+    }
+  };
 
   useEffect(() => {
     if (authLoading) {
@@ -2237,7 +2256,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       weeklyOutcomes,
       saveWeeklyOutcome,
       deleteMultipleDailyReports,
-      migrateSurahDataToEvaluationSystem
+      migrateSurahDataToEvaluationSystem,
+      selectedGroup,
+      setSelectedGroup
     }}>
       {children}
     </StudentContext.Provider>

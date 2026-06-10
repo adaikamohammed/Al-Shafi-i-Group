@@ -8,9 +8,12 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    SelectGroup,
+    SelectLabel,
+    SelectSeparator,
 } from "@/components/ui/select";
 import { useAuth } from '@/context/AuthContext';
-import { cn } from '@/lib/utils';
+import { cn, isSheikhMenUser, isSheikhWomenUser } from '@/lib/utils';
 import { PORTAL_THEMES } from '@/lib/themes';
 
 interface GroupSelectorProps {
@@ -57,6 +60,25 @@ export function GroupSelector({ value, onChange, className }: GroupSelectorProps
             });
     }, [allUsers]);
 
+    // Categorize sheikhs into Men's ( المشايخ ) and Women's ( الأستاذات ) groups
+    const groupedSheikhs = useMemo(() => {
+        const sheikhsMen: typeof sheikhs = [];
+        const sheikhsWomen: typeof sheikhs = [];
+        const sheikhsOthers: typeof sheikhs = [];
+
+        sheikhs.forEach(sheikh => {
+            if (isSheikhMenUser(sheikh)) {
+                sheikhsMen.push(sheikh);
+            } else if (isSheikhWomenUser(sheikh)) {
+                sheikhsWomen.push(sheikh);
+            } else {
+                sheikhsOthers.push(sheikh);
+            }
+        });
+
+        return { sheikhsMen, sheikhsWomen, sheikhsOthers };
+    }, [sheikhs]);
+
     return (
         <div className={cn("min-w-[200px]", className)}>
             <Select value={value} onValueChange={onChange}>
@@ -69,21 +91,81 @@ export function GroupSelector({ value, onChange, className }: GroupSelectorProps
                     <SelectValue placeholder="اختر الفوج للعرض" />
                 </SelectTrigger>
                 <SelectContent align="end" className={cn(
-                    "max-h-[300px]",
+                    "max-h-[300px] overflow-y-auto",
                     theme.isLight ? "bg-white" : "bg-slate-900 border-white/10 text-white"
                 )}>
-                    <SelectItem value="all" className="font-bold cursor-pointer">
+                    <SelectItem value="all" className="font-bold cursor-pointer mb-1">
                         🏛️ كل المدرسة (عرض شامل)
                     </SelectItem>
-                    {sheikhs.map((sheikh) => (
-                        <SelectItem key={sheikh.uid} value={sheikh.uid} className="cursor-pointer">
-                            <span className="flex items-center gap-2">
-                                <span className={cn("inline-block w-2 h-2 rounded-full", theme.isLight ? "bg-slate-400" : "bg-white/40")} />
-                                <span>{sheikh.group || 'فوج غير محدد'}</span>
-                                <span className="text-xs opacity-50 mx-1">({sheikh.displayName})</span>
-                            </span>
-                        </SelectItem>
-                    ))}
+                    <SelectItem value="sheikhs_all" className="font-bold cursor-pointer text-indigo-600 dark:text-indigo-400 mb-1">
+                        👨‍🏫 أفواج المشايخ (admin1 to admin9)
+                    </SelectItem>
+                    <SelectItem value="ustadhats_all" className="font-bold cursor-pointer text-pink-600 dark:text-pink-400 mb-2">
+                        👩‍🏫 أفواج الأستاذات (admin10 to admin18)
+                    </SelectItem>
+
+                    {groupedSheikhs.sheikhsMen.length > 0 && (
+                        <SelectGroup>
+                            <SelectSeparator className="my-1" />
+                            <SelectLabel className={cn(
+                                "font-bold text-[11px] py-1.5 pl-8 pr-2 sticky top-0 z-10 rounded-sm",
+                                theme.isLight ? "bg-slate-100 text-slate-600" : "bg-slate-800 text-slate-300"
+                            )}>
+                                تفصيل أفواج المشايخ
+                            </SelectLabel>
+                            {groupedSheikhs.sheikhsMen.map((sheikh) => (
+                                <SelectItem key={sheikh.uid} value={sheikh.uid} className="cursor-pointer">
+                                    <span className="flex items-center gap-2">
+                                        <span className={cn("inline-block w-2 h-2 rounded-full", theme.isLight ? "bg-slate-400" : "bg-white/40")} />
+                                        <span>{sheikh.group || 'فوج غير محدد'}</span>
+                                        <span className="text-xs opacity-50 mx-1">({sheikh.displayName})</span>
+                                    </span>
+                                </SelectItem>
+                            ))}
+                        </SelectGroup>
+                    )}
+
+                    {groupedSheikhs.sheikhsWomen.length > 0 && (
+                        <SelectGroup>
+                            <SelectSeparator className="my-1" />
+                            <SelectLabel className={cn(
+                                "font-bold text-[11px] py-1.5 pl-8 pr-2 sticky top-0 z-10 rounded-sm",
+                                theme.isLight ? "bg-slate-100 text-slate-600" : "bg-slate-800 text-slate-300"
+                            )}>
+                                تفصيل أفواج الأستاذات
+                            </SelectLabel>
+                            {groupedSheikhs.sheikhsWomen.map((sheikh) => (
+                                <SelectItem key={sheikh.uid} value={sheikh.uid} className="cursor-pointer">
+                                    <span className="flex items-center gap-2">
+                                        <span className={cn("inline-block w-2 h-2 rounded-full", theme.isLight ? "bg-slate-400" : "bg-white/40")} />
+                                        <span>{sheikh.group || 'فوج غير محدد'}</span>
+                                        <span className="text-xs opacity-50 mx-1">({sheikh.displayName})</span>
+                                    </span>
+                                </SelectItem>
+                            ))}
+                        </SelectGroup>
+                    )}
+
+                    {groupedSheikhs.sheikhsOthers.length > 0 && (
+                        <SelectGroup>
+                            <SelectSeparator className="my-1" />
+                            <SelectLabel className={cn(
+                                "font-bold text-[11px] py-1.5 pl-8 pr-2 sticky top-0 z-10 rounded-sm",
+                                theme.isLight ? "bg-slate-100 text-slate-600" : "bg-slate-800 text-slate-300"
+                            )}>
+                                أفواج أخرى
+                            </SelectLabel>
+                            {groupedSheikhs.sheikhsOthers.map((sheikh) => (
+                                <SelectItem key={sheikh.uid} value={sheikh.uid} className="cursor-pointer">
+                                    <span className="flex items-center gap-2">
+                                        <span className={cn("inline-block w-2 h-2 rounded-full", theme.isLight ? "bg-slate-400" : "bg-white/40")} />
+                                        <span>{sheikh.group || 'فوج غير محدد'}</span>
+                                        <span className="text-xs opacity-50 mx-1">({sheikh.displayName})</span>
+                                    </span>
+                                </SelectItem>
+                            ))}
+                        </SelectGroup>
+                    )}
                 </SelectContent>
             </Select>
         </div>

@@ -15,6 +15,12 @@ import { cn } from '@/lib/utils';
 const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط", "1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا", "جامعي", "متوقف عن الدراسة"];
 const memorizationAmounts = ["ثمن", "ربع", "نصف", "صفحة", "أكثر"];
 
+const isGroup8 = (name?: string) => {
+    if (!name) return false;
+    const clean = name.trim();
+    return clean === 'فوج 8' || clean === 'فوج الشيخ عبد الحق نصيرة' || clean.includes('عبد الحق');
+};
+
 interface BulkStudentEditViewProps {
     students: Student[];
     onClose: () => void;
@@ -26,6 +32,10 @@ export const BulkStudentEditView = ({ students: initialStudents, onClose }: Bulk
     const [searchTerm, setSearchTerm] = useState('');
     const [localChanges, setLocalChanges] = useState<Record<string, Partial<Student>>>({});
     const [isSaving, setIsSaving] = useState(false);
+
+    const hasGroup8Students = useMemo(() => {
+        return initialStudents.some(s => isGroup8(s.groupName));
+    }, [initialStudents]);
 
     const filteredStudents = useMemo(() => {
         return initialStudents.filter(s =>
@@ -108,6 +118,7 @@ export const BulkStudentEditView = ({ students: initialStudents, onClose }: Bulk
                             <TableHead className="min-w-[80px] text-center font-bold">الصفحة</TableHead>
                             <TableHead className="min-w-[120px] text-right font-bold">الحالة</TableHead>
                             <TableHead className="min-w-[130px] text-right font-bold">خطة الحفظ</TableHead>
+                            {hasGroup8Students && <TableHead className="min-w-[120px] text-center font-bold">معامل الحفظ</TableHead>}
                             <TableHead className="min-w-[200px] text-right font-bold">ملاحظات</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -244,6 +255,24 @@ export const BulkStudentEditView = ({ students: initialStudents, onClose }: Bulk
                                                 </SelectContent>
                                             </Select>
                                         </TableCell>
+                                        {hasGroup8Students && (
+                                            <TableCell className="p-2">
+                                                {isGroup8(student.groupName) ? (
+                                                    <Select value={getVal('memorizationMultiplier')?.toString() ?? '1'} onValueChange={(val) => handleChange(student.id, 'memorizationMultiplier', parseFloat(val))}>
+                                                        <SelectTrigger className={cn("h-9 font-body border-transparent hover:border-border text-center", isChanged('memorizationMultiplier') && "border-amber-400 bg-amber-50/50")}>
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent className="font-body">
+                                                            <SelectItem value="0.5">0.5</SelectItem>
+                                                            <SelectItem value="1">1.0</SelectItem>
+                                                            <SelectItem value="1.5">1.5</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                ) : (
+                                                    <div className="text-center text-muted-foreground">—</div>
+                                                )}
+                                            </TableCell>
+                                        )}
                                         <TableCell className="p-2">
                                             <Input
                                                 value={getVal('notes') || ''}
@@ -256,7 +285,7 @@ export const BulkStudentEditView = ({ students: initialStudents, onClose }: Bulk
                             })
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={10} className="h-32 text-center text-muted-foreground font-body">
+                                <TableCell colSpan={hasGroup8Students ? 12 : 11} className="h-32 text-center text-muted-foreground font-body">
                                     لم يتم العثور على نتائج للبحث.
                                 </TableCell>
                             </TableRow>

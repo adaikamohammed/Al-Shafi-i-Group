@@ -70,6 +70,8 @@ export interface Student {
   expulsionReason?: string | null;
   expulsionHistory?: ExpulsionRecord[];
   transferHistory?: TransferRecord[];
+  memorizationMultiplier?: number;
+  hasWhatsApp?: boolean;
 }
 
 export type AttendanceStatus = "حاضر" | "غياب" | "غائب" | "متأخر" | "تعويض" | "";
@@ -93,6 +95,7 @@ export interface DailyRecord {
   attendance: AttendanceStatus;
   memorization: PerformanceLevel | null;
   review: boolean | null;
+  isDelayed?: boolean;
   catchUpRecords?: CatchUpEntry[];
   behavior: BehaviorLevel | null;
   notes?: string;

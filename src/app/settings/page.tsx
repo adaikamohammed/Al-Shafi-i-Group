@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, Save, WandSparkles, ShieldCheck, Info, Trash2, PlusCircle, History } from 'lucide-react';
+import { Loader2, Save, WandSparkles, ShieldCheck, Info, Trash2, PlusCircle, History, SlidersHorizontal, Goal } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { AppSettings, PointsConfig, Reward, BadgeConfig } from '@/lib/types';
 import { produce } from 'immer';
@@ -16,7 +16,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { db } from '@/lib/firebase';
+import { ref, set, onValue } from 'firebase/database';
+import { useAuth } from '@/context/AuthContext';
+import { ScoringWeights, DEFAULT_WEIGHTS } from '@/components/management/SheikhBadges';
 import { ProtectedPage } from '@/components/ui/ProtectedPage';
+
 
 type Category = keyof PointsConfig;
 type Key<C extends Category> = keyof PointsConfig[C];
@@ -28,11 +33,69 @@ export default function SettingsPage() {
     const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
     const [isLoading, setIsLoading] = useState(false);
 
+    const { user } = useAuth();
+    const [sheikhWeights, setSheikhWeights] = useState<ScoringWeights>(DEFAULT_WEIGHTS);
+    const [sheikhGoals, setSheikhGoals] = useState({ attendanceTarget: 85, excellentTarget: 25, commitmentTarget: 90 });
+    const [goalsMonth, setGoalsMonth] = useState(format(new Date(), 'yyyy-MM'));
+
     useEffect(() => {
         if (settings) {
             setLocalSettings(settings);
         }
     }, [settings]);
+
+    useEffect(() => {
+        const weightsRef = ref(db, 'settings/sheikh_scoring_weights');
+        const unsubWeights = onValue(weightsRef, (snapshot: any) => {
+            if (snapshot.exists()) {
+                setSheikhWeights(snapshot.val());
+            }
+        });
+
+        return () => {
+            unsubWeights();
+        };
+    }, []);
+
+    useEffect(() => {
+        const goalsRef = ref(db, `settings/sheikh_goals/${goalsMonth}`);
+        const unsubGoals = onValue(goalsRef, (snapshot: any) => {
+            if (snapshot.exists()) {
+                const val = snapshot.val();
+                setSheikhGoals({
+                    attendanceTarget: val.attendanceTarget ?? 85,
+                    excellentTarget: val.excellentTarget ?? 25,
+                    commitmentTarget: val.commitmentTarget ?? 90,
+                });
+            } else {
+                setSheikhGoals({ attendanceTarget: 85, excellentTarget: 25, commitmentTarget: 90 });
+            }
+        });
+
+        return () => {
+            unsubGoals();
+        };
+    }, [goalsMonth]);
+
+    const handleSheikhWeightChange = (key: keyof ScoringWeights, value: string) => {
+        const numVal = Number(value);
+        if (!isNaN(numVal)) {
+            setSheikhWeights(prev => ({
+                ...prev,
+                [key]: numVal
+            }));
+        }
+    };
+
+    const handleGoalChange = (key: 'attendanceTarget' | 'excellentTarget' | 'commitmentTarget', value: string) => {
+        const numVal = Number(value);
+        if (!isNaN(numVal)) {
+            setSheikhGoals(prev => ({
+                ...prev,
+                [key]: numVal
+            }));
+        }
+    };
 
     const handlePointsChange = <C extends Category>(category: C, key: Key<C>, value: string) => {
         const numericValue = Number(value);
@@ -98,9 +161,18 @@ export default function SettingsPage() {
         setIsLoading(true);
         try {
             await saveSettings(localSettings);
+            
+            // Save sheikh scoring weights
+            const weightsRef = ref(db, 'settings/sheikh_scoring_weights');
+            await set(weightsRef, sheikhWeights);
+
+            // Save monthly goals
+            const goalsRef = ref(db, `settings/sheikh_goals/${goalsMonth}`);
+            await set(goalsRef, sheikhGoals);
+
             toast({
                 title: "تم الحفظ",
-                description: "تم حفظ الإعدادات المخصصة بنجاح."
+                description: "تم حفظ كل الإعدادات بنجاح."
             });
         } catch (error) {
             toast({
@@ -302,6 +374,88 @@ export default function SettingsPage() {
                                     </div>
                                 </div>
                             ))}
+                        </CardContent>
+                    </Card>
+
+                    {/* أوزان تقييم المشايخ */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><SlidersHorizontal className="h-5 w-5 text-indigo-500" /> أوزان تقييم وأسس نقاط المشايخ</CardTitle>
+                            <CardDescription>
+                                تحكم في قيم النقاط، المكافآت (البونص)، والخصومات التي يعتمد عليها نظام تقييم المشايخ الشهري.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="space-y-1">
+                                    <Label>نقاط تسجيل الحصة (أساسية)</Label>
+                                    <Input type="number" value={sheikhWeights.sessionWeight} onChange={e => handleSheikhWeightChange('sessionWeight', e.target.value)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>الوزن الأقصى لحضور الطلاب</Label>
+                                    <Input type="number" value={sheikhWeights.attendanceWeight} onChange={e => handleSheikhWeightChange('attendanceWeight', e.target.value)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>بونص الحصة التعويضية/الإضافية</Label>
+                                    <Input type="number" value={sheikhWeights.extraSessionBonus} onChange={e => handleSheikhWeightChange('extraSessionBonus', e.target.value)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>بونص التقييم الممتاز للطلاب</Label>
+                                    <Input type="number" value={sheikhWeights.excellentBonus} onChange={e => handleSheikhWeightChange('excellentBonus', e.target.value)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>بونص التقييم جيد جداً للطلاب</Label>
+                                    <Input type="number" value={sheikhWeights.goodPlusBonus} onChange={e => handleSheikhWeightChange('goodPlusBonus', e.target.value)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>بونص الالتزام الكامل للشيخ (100%)</Label>
+                                    <Input type="number" value={sheikhWeights.commitmentBonus} onChange={e => handleSheikhWeightChange('commitmentBonus', e.target.value)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>نقاط الالتزام النسبي للشيخ</Label>
+                                    <Input type="number" value={sheikhWeights.commitmentBase} onChange={e => handleSheikhWeightChange('commitmentBase', e.target.value)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>عقوبة غياب الشيخ (خصم)</Label>
+                                    <Input type="number" value={sheikhWeights.absencePenalty} onChange={e => handleSheikhWeightChange('absencePenalty', e.target.value)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>بونص التوثيق السريع (خلال 36 ساعة)</Label>
+                                    <Input type="number" value={sheikhWeights.punctualityBonus} onChange={e => handleSheikhWeightChange('punctualityBonus', e.target.value)} />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* المستهدفات الشهرية لمراقبة المشايخ */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Goal className="h-5 w-5 text-emerald-500" /> المستهدفات والأهداف الشهرية للأفواج</CardTitle>
+                            <CardDescription>
+                                حدد نسب الحضور والحفظ والالتزام المستهدفة لمقارنة أداء الأفواج.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="flex items-center gap-4 border-b pb-4 mb-4">
+                                <div className="space-y-1 max-w-[200px] w-full">
+                                    <Label>الشهر المستهدف</Label>
+                                    <Input type="month" value={goalsMonth} onChange={e => setGoalsMonth(e.target.value)} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-1">
+                                    <Label>نسبة الحضور المستهدفة لطلاب الفوج (%)</Label>
+                                    <Input type="number" value={sheikhGoals.attendanceTarget} onChange={e => handleGoalChange('attendanceTarget', e.target.value)} min={0} max={100} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>نسبة تقييم "ممتاز" المستهدفة (%)</Label>
+                                    <Input type="number" value={sheikhGoals.excellentTarget} onChange={e => handleGoalChange('excellentTarget', e.target.value)} min={0} max={100} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>نسبة التزام الشيخ بتسجيل الحصص (%)</Label>
+                                    <Input type="number" value={sheikhGoals.commitmentTarget} onChange={e => handleGoalChange('commitmentTarget', e.target.value)} min={0} max={100} />
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
 

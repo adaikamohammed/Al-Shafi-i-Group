@@ -1,0 +1,63 @@
+diff --git a/src/app/management/sheikh-monitoring/page.tsx b/src/app/management/sheikh-monitoring/page.tsx
+index 77c0242..89782cb 100644
+--- a/src/app/management/sheikh-monitoring/page.tsx
++++ b/src/app/management/sheikh-monitoring/page.tsx
+@@ -4055,6 +4055,7 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
+     dailySessions: any;
+     students: any;
+ }) {
++    const { settings } = useStudentContext();
+     const [excludeNotMemorized, setExcludeNotMemorized] = useState(false);
+ 
+     // Monthly stats computation
+@@ -4062,50 +4063,6 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
+         if (starsMode !== 'month') return null;
+         const mStart = startOfMonth(selectedDate);
+         const mEnd = endOfMonth(selectedDate);
+-        const monthDays = eachDayOfInterval({ start: mStart, end: mEnd }).map(d => format(d, 'yyyy-MM-dd'));
+-
+-        const groupSessionDates = new Map<string, Set<string>>();
+-        sheikhs.forEach(sh => groupSessionDates.set(sh.group, new Set()));
+-
+-        type MStat = TopStudentEntry & {};
+-        const studentMap = new Map<string, any>();
+-        (students || []).filter((s: any) => s.status === 'نشط').forEach((s: any) => {
+-            const grp = (s as any).group || s.groupName || '—';
+-            studentMap.set(s.id, {
+-                id: s.id, name: s.fullName, group: grp,
+-                attendanceDays: 0, totalSessionDays: 0, excellent: 0, goodPlus: 0, good: 0,
+-                acceptable: 0, weak: 0, notMem: 0, evalScore: 0, totalEvals: 0,
+-                lateDays: 0, behaviorCalm: 0, behaviorOk: 0, behaviorBad: 0,
+-                behaviorScore: 0, totalBehaviorEvals: 0,
+-            });
+-        });
+-        const groupStudentIds = new Map<string, Set<string>>();
+-        sheikhs.forEach(sh => groupStudentIds.set(sh.group, new Set()));
+-        (students || []).filter((s: any) => s.status === 'نشط').forEach((s: any) => {
+-            const grp = (s as any).group || s.groupName || '';
+-            groupStudentIds.get(grp)?.add(s.id);
+-        });
+-        const groupDateProcessed = new Map<string, Set<string>>();
+-        sheikhs.forEach(sh => groupDateProcessed.set(sh.group, new Set()));
+-
+-        if (dailySessions) {
+-            monthDays.forEach(dateStr => {
+-                const daySess = (dailySessions as any)[dateStr];
+-                if (!daySess) return;
+-                Object.values(daySess as Record<string, any>).forEach((session: any) => {
+-                    if (!session) return;
+-                    const sType = session.sessionType;
+-                    const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
+-                    if (!isReal) return;
+-                    const shOwner = sheikhs.find(sh => sh.uids.has(session.ownerId));
+-                    if (!shOwner) return;
+-                    if (groupDateProcessed.get(shOwner.group)?.has(dateStr)) return;
+-                    groupDateProcessed.get(shOwner.group)?.add(dateStr);
+-                    groupSessionDates.get(shOwner.group)?.add(dateStr);
+-                    const records: any[] = Array.isArray(session.records) ? session.records : session.records ? Object.values(session.records) : [];
+-                    records.forEach((r: any) => {
+-                        const sid = r.studentId;
+-                        if (!sid || !studentMap.has(sid)) return;
+                         const st = studentMap.get(sid)!;
+                         if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') st.attendanceDays++;
+                         if (r.attendance === 'متأخر') st.lateDays++;

@@ -48,7 +48,7 @@ export default function MonitoringPage() {
         }
 
         // 2. Identify all groups
-        const uniqueGroups = Array.from(new Set(allUsers.filter(u => u.role === 'sheikh' && u.group).map(u => u.group)));
+        const uniqueGroups = Array.from(new Set(allUsers.filter(u => u.role === 'sheikh' && u.group).map(u => u.group))) as string[];
 
         // 3. Aggregate data per group
         return uniqueGroups.map(groupName => {
@@ -74,8 +74,15 @@ export default function MonitoringPage() {
                                 // Review
                                 if (record.review) totalReview++;
                                 // Evaluation
+                                const student = students.find(s => s.id === record.studentId);
+                                const isGroup8User = groupName === 'فوج 8' || groupName === 'فوج الشيخ عبد الحق نصيرة' || groupName.includes('عبد الحق');
+                                const multiplier = (isGroup8User && student) ? (student.memorizationMultiplier ?? 1.0) : 1.0;
+                                const isDelayedMemo = record.memorization && record.memorization !== 'لا يوجد' && (record.memorization as string) !== '' && !record.review && record.isDelayed;
+                                const penalty = isDelayedMemo ? 0.8 : 1.0;
+
                                 const evalMap: Record<string, number> = { 'ممتاز': 100, 'جيد جداً': 80, 'جيد': 60, 'متوسط': 40, 'ضعيف': 20 };
-                                totalEvaluationPoints += evalMap[record.memorization || ''] || 0;
+                                const basePoints = evalMap[record.memorization || ''] || 0;
+                                totalEvaluationPoints += basePoints * multiplier * penalty;
                                 // Behavior
                                 const behavMap: Record<string, number> = { 'هادئ': 100, 'متوسط': 60, 'غير منضبط': 20 };
                                 totalBehaviorPoints += behavMap[record.behavior || ''] || 0;

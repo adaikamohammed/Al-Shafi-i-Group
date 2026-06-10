@@ -1241,9 +1241,15 @@ export default function MyStatsPage() {
 
                 let score: number | null = null;
                 if (isPresent && rec) {
-                    if (!rec.review && rec.memorization && rec.memorization !== 'لا يوجد' && rec.memorization !== '') {
-                        assessedMemorization += weight;
-                        memorizationPointsEarned += getMemoPoints(rec.memorization) * weight;
+                    const hasNewMemo = !rec.review && rec.memorization && rec.memorization !== 'لا يوجد' && rec.memorization !== '';
+                    const hasReview = rec.review && pointsConfig?.review?.completed;
+
+                    let earnedMemoPoints = 0;
+                    let hasMemo = false;
+
+                    if (hasNewMemo) {
+                        earnedMemoPoints += getMemoPoints(rec.memorization);
+                        hasMemo = true;
 
                         score = EVAL_SCORE[rec.memorization] ?? null;
                         if (score !== null) { scoreSum += score; scoreCount++; }
@@ -1253,9 +1259,18 @@ export default function MyStatsPage() {
                         else if (m === 'جيد')                                  good++;
                         else if (m === 'مقبول' || m === 'متوسط' || m === 'حسن') acceptable++;
                         else if (m === 'ضعيف' || m === 'لم يحفظ')              weak++;
-                    } else if (rec.review && pointsConfig?.review?.completed) {
+                    }
+                    if (hasReview) {
+                        earnedMemoPoints += pointsConfig.review.completed;
+                        hasMemo = true;
+                    }
+
+                    if (hasMemo) {
                         assessedMemorization += weight;
-                        memorizationPointsEarned += pointsConfig.review.completed * weight;
+                        const isGroup8User = student.groupName === 'فوج 8' || student.groupName === 'فوج الشيخ عبد الحق نصيرة' || (student.groupName || '').includes('عبد الحق');
+                        const multiplier = isGroup8User ? (student.memorizationMultiplier ?? 1.0) : 1.0;
+                        const penalty = (hasNewMemo && rec.isDelayed) ? 0.8 : 1.0;
+                        memorizationPointsEarned += earnedMemoPoints * weight * multiplier * penalty;
                     }
                 }
 

@@ -5,7 +5,7 @@ import { useStudentContext } from '@/context/StudentContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, UserCheck, Shield, UserPlus, TrendingUp, BarChart3, Award, Calendar, ChevronRight, Activity, Target, PieChart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { cn, isSheikhMenUser, isSheikhWomenUser, isStudentInMenSheikhs, isStudentInWomenUstadhats } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { PORTAL_THEMES } from '@/lib/themes';
@@ -109,12 +109,28 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export const ManagementDashboard = () => {
-    const { students, preRegistrations, allUsers, dailySessions, loading, generateDemoData } = useStudentContext();
+    const { students, preRegistrations, allUsers, dailySessions, loading, generateDemoData, selectedGroup, setSelectedGroup } = useStudentContext();
     const { user, isManagement, isSuperAdmin } = useAuth();
-    const [selectedGroup, setSelectedGroup] = React.useState<string>('all');
     const [timeframe, setTimeframe] = React.useState<string>('weekly');
     const [aggregatedData, setAggregatedData] = React.useState<any[]>([]);
     const [isStatsLoading, setIsStatsLoading] = React.useState(false);
+
+    const filteredAggregatedData = React.useMemo(() => {
+        if (!aggregatedData) return [];
+        if (selectedGroup === 'sheikhs_all') {
+            return aggregatedData.filter(g => {
+                const u = allUsers.find(user => user.group === g.groupName);
+                return u ? isSheikhMenUser(u) : false;
+            });
+        }
+        if (selectedGroup === 'ustadhats_all') {
+            return aggregatedData.filter(g => {
+                const u = allUsers.find(user => user.group === g.groupName);
+                return u ? isSheikhWomenUser(u) : false;
+            });
+        }
+        return aggregatedData;
+    }, [aggregatedData, selectedGroup, allUsers]);
 
     const isSheikh = user?.role === 'sheikh';
 
@@ -166,14 +182,31 @@ export const ManagementDashboard = () => {
 
         // Filter by Group Name instead of Owner ID to handle duplicates/merges
         if (selectedGroup !== 'all') {
-            activeStudentsList = students.filter(s => s.groupName === selectedGroup);
+            if (selectedGroup === 'sheikhs_all') {
+                activeStudentsList = students.filter(s => isStudentInMenSheikhs(s, allUsers));
+            } else if (selectedGroup === 'ustadhats_all') {
+                activeStudentsList = students.filter(s => isStudentInWomenUstadhats(s, allUsers));
+            } else {
+                activeStudentsList = students.filter(s => s.groupName === selectedGroup);
+            }
         }
 
         const countActive = activeStudentsList.filter(s => s.status === 'نشط').length;
 
         // Fix: Count unique groups for Total Sheikhs
-        const uniqueSheikhGroups = new Set(allUsers.filter(u => u.role === 'sheikh' && u.group).map(u => u.group));
-        const totalSheikhs = selectedGroup === 'all' ? uniqueSheikhGroups.size : 1;
+        const uniqueSheikhGroups = new Set(
+            allUsers
+                .filter(u => u.role === 'sheikh' && u.group)
+                .filter(u => {
+                    if (selectedGroup === 'sheikhs_all') return isSheikhMenUser(u);
+                    if (selectedGroup === 'ustadhats_all') return isSheikhWomenUser(u);
+                    return true;
+                })
+                .map(u => u.group)
+        );
+        const totalSheikhs = (selectedGroup === 'all' || selectedGroup === 'sheikhs_all' || selectedGroup === 'ustadhats_all') 
+            ? uniqueSheikhGroups.size 
+            : 1;
 
         const countPending = preRegistrations.filter(r => r.status === 'مرشح').length;
 
@@ -183,7 +216,13 @@ export const ManagementDashboard = () => {
             ? allUsers.filter(u => u.role === 'sheikh' && u.group)
             : (isSheikh && user ? [{ ...user }] : []);
 
-        const uniqueGroups = Array.from(new Set(sheikhUsers.map(u => u.group)));
+        const filteredSheikhUsers = sheikhUsers.filter(u => {
+            if (selectedGroup === 'sheikhs_all') return isSheikhMenUser(u);
+            if (selectedGroup === 'ustadhats_all') return isSheikhWomenUser(u);
+            return true;
+        });
+
+        const uniqueGroups = Array.from(new Set(filteredSheikhUsers.map(u => u.group)));
 
         const groupComparisonData = uniqueGroups.map(groupName => {
             // Find primary sheikh for display name (just pick one)
@@ -360,7 +399,7 @@ export const ManagementDashboard = () => {
                                 <h3 className="font-bold text-sm bg-white/50 backdrop-blur px-2 py-1 rounded-lg">الأداء النوعي للفوج</h3>
                             </div>
                             <ErrorBoundary fallback={<div className="h-full flex items-center justify-center text-muted-foreground italic text-xs">خطأ في عرض رادار الأداء</div>}>
-                                <MonitoringRadar data={aggregatedData} selectedGroup={selectedGroup} />
+                                <MonitoringRadar data={filteredAggregatedData} selectedGroup={selectedGroup} />
                             </ErrorBoundary>
                         </div>
 
@@ -371,7 +410,7 @@ export const ManagementDashboard = () => {
                         )}>
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-xl font-bold flex items-center justify-between">
-                                    <span>{selectedGroup === 'all' ? 'متوسط الأداء العام' : selectedGroup}</span>
+                                    <span>{selectedGroup === 'all' ? 'متوسط الأداء العام' : selectedGroup === 'sheikhs_all' ? 'أفواج المشايخ (شامل)' : selectedGroup === 'ustadhats_all' ? 'أفواج الأستاذات (شامل)' : selectedGroup}</span>
                                     <Target className="h-6 w-6 opacity-80" />
                                 </CardTitle>
                                 <CardDescription className="text-white/70">
@@ -382,8 +421,8 @@ export const ManagementDashboard = () => {
                                 <div className="flex justify-between items-end border-b border-white/20 pb-4">
                                     <span className="text-sm opacity-80">نسبة الحضور</span>
                                     <span className="text-3xl font-black font-headline">
-                                        {selectedGroup === 'all'
-                                            ? (aggregatedData.length > 0 ? Math.round(aggregatedData.reduce((acc, curr) => acc + curr.attendanceRate, 0) / aggregatedData.length) : 0)
+                                        {selectedGroup === 'all' || selectedGroup === 'sheikhs_all' || selectedGroup === 'ustadhats_all'
+                                            ? (filteredAggregatedData.length > 0 ? Math.round(filteredAggregatedData.reduce((acc, curr) => acc + curr.attendanceRate, 0) / filteredAggregatedData.length) : 0)
                                             : (aggregatedData.find(g => g.groupName === selectedGroup)?.attendanceRate || 0)
                                         }%
                                     </span>
@@ -391,8 +430,8 @@ export const ManagementDashboard = () => {
                                 <div className="flex justify-between items-end border-b border-white/20 pb-4">
                                     <span className="text-sm opacity-80">نسبة المراجعة</span>
                                     <span className="text-3xl font-black font-headline text-emerald-300">
-                                        {selectedGroup === 'all'
-                                            ? (aggregatedData.length > 0 ? Math.round(aggregatedData.reduce((acc, curr) => acc + curr.reviewRate, 0) / aggregatedData.length) : 0)
+                                        {selectedGroup === 'all' || selectedGroup === 'sheikhs_all' || selectedGroup === 'ustadhats_all'
+                                            ? (filteredAggregatedData.length > 0 ? Math.round(filteredAggregatedData.reduce((acc, curr) => acc + curr.reviewRate, 0) / filteredAggregatedData.length) : 0)
                                             : (aggregatedData.find(g => g.groupName === selectedGroup)?.reviewRate || 0)
                                         }%
                                     </span>
@@ -400,8 +439,8 @@ export const ManagementDashboard = () => {
                                 <div className="flex justify-between items-end">
                                     <span className="text-sm opacity-80">تقييم الحفظ</span>
                                     <span className="text-3xl font-black font-headline text-amber-300">
-                                        {selectedGroup === 'all'
-                                            ? (aggregatedData.length > 0 ? Math.round(aggregatedData.reduce((acc, curr) => acc + curr.evaluationScore, 0) / aggregatedData.length) : 0)
+                                        {selectedGroup === 'all' || selectedGroup === 'sheikhs_all' || selectedGroup === 'ustadhats_all'
+                                            ? (filteredAggregatedData.length > 0 ? Math.round(filteredAggregatedData.reduce((acc, curr) => acc + curr.evaluationScore, 0) / filteredAggregatedData.length) : 0)
                                             : (aggregatedData.find(g => g.groupName === selectedGroup)?.evaluationScore || 0)
                                         }
                                         <span className="text-sm text-white/50 mr-1">/100</span>

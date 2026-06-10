@@ -26,6 +26,7 @@ export interface AttendanceRecord {
     behavior: BehaviorLevel;
     notes: string;
     review: boolean;
+    isDelayed?: boolean;
     surahId?: number;
     fromVerse?: number;
     toVerse?: number;
@@ -132,10 +133,7 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                                         <button
                                                             type="button"
                                                             onClick={() => {
-                                                                const newReview = !record.review;
-                                                                onUpdateRecord(student.id, 'review', newReview);
-                                                                // Clear memorization when review mode is turned on
-                                                                if (newReview) onUpdateRecord(student.id, 'memorization', '');
+                                                                onUpdateRecord(student.id, 'review', !record.review);
                                                             }}
                                                             className={cn(
                                                                 "flex items-center gap-1 h-8 md:h-9 px-2 md:px-3 rounded-lg border-2 font-bold text-[10px] md:text-xs transition-all",
@@ -148,25 +146,32 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                                             مراجعة
                                                         </button>
 
-                                                        {/* Memorization dropdown — hidden when review mode is active */}
-                                                        {!record.review ? (
-                                                            <Select value={record.memorization} onValueChange={(val) => onUpdateRecord(student.id, 'memorization', val)} dir="rtl">
-                                                                <SelectTrigger className="h-8 md:h-9 text-[10px] md:text-xs font-bold w-[90px] md:w-[110px]">
-                                                                    <SelectValue placeholder="الحفظ" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="ممتاز">🌟 ممتاز</SelectItem>
-                                                                    <SelectItem value="جيد جدا">✅ جيد جداً</SelectItem>
-                                                                    <SelectItem value="جيد">👍 جيد</SelectItem>
-                                                                    <SelectItem value="مقبول">⚠️ مقبول</SelectItem>
-                                                                    <SelectItem value="ضعيف">❌ ضعيف</SelectItem>
-                                                                    <SelectItem value="لم يحفظ">🚫 لم يحفظ</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        ) : (
-                                                            <span className="inline-flex items-center gap-1 h-8 md:h-9 px-2 md:px-3 rounded-lg bg-blue-50 border border-blue-300 text-blue-700 font-bold text-[10px] md:text-xs">
-                                                                <BookOpen className="h-3 w-3" /> وضع مراجعة
-                                                            </span>
+                                                        {/* Memorization dropdown — always visible */}
+                                                        <Select value={record.memorization || ""} onValueChange={(val) => onUpdateRecord(student.id, 'memorization', val)} dir="rtl">
+                                                            <SelectTrigger className="h-8 md:h-9 text-[10px] md:text-xs font-bold w-[90px] md:w-[110px]">
+                                                                <SelectValue placeholder="الحفظ" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="ممتاز">🌟 ممتاز</SelectItem>
+                                                                <SelectItem value="جيد جدا">✅ جيد جداً</SelectItem>
+                                                                <SelectItem value="جيد">👍 جيد</SelectItem>
+                                                                <SelectItem value="مقبول">⚠️ مقبول</SelectItem>
+                                                                <SelectItem value="ضعيف">❌ ضعيف</SelectItem>
+                                                                <SelectItem value="لم يحفظ">🚫 لم يحفظ</SelectItem>
+                                                                <SelectItem value="لا يوجد">لا يوجد حفظ</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+
+                                                        {/* Late/delayed memorization checkbox */}
+                                                        {record.memorization && record.memorization !== 'لم يحفظ' && record.memorization !== 'لا يوجد' && record.memorization !== 'لا يوجد حصيلة' && (
+                                                            <label className="flex items-center gap-1.5 cursor-pointer text-[9px] md:text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 md:py-1 rounded-lg shrink-0 select-none">
+                                                                <Checkbox
+                                                                    checked={!!record.isDelayed}
+                                                                    onCheckedChange={(checked) => onUpdateRecord(student.id, 'isDelayed', !!checked)}
+                                                                    className="h-3.5 w-3.5 border-amber-400 data-[state=checked]:bg-amber-600 data-[state=checked]:text-white"
+                                                                />
+                                                                <span>استدراك</span>
+                                                            </label>
                                                         )}
                                                     </>
                                                 )}

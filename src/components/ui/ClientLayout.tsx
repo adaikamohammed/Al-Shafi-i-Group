@@ -7,7 +7,7 @@ import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
@@ -69,13 +69,23 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/firebase-messaging-sw.js').then(registration => {
-          console.log('Firebase Messaging SW registered: ', registration);
-        }).catch(registrationError => {
-          console.log('Firebase Messaging SW registration failed: ', registrationError);
+      if (process.env.NODE_ENV === 'development') {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (let registration of registrations) {
+            registration.unregister().then(success => {
+              if (success) console.log('Successfully unregistered stale service worker in development mode.');
+            });
+          }
         });
-      });
+      } else {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/firebase-messaging-sw.js').then(registration => {
+            console.log('Firebase Messaging SW registered: ', registration);
+          }).catch(registrationError => {
+            console.log('Firebase Messaging SW registration failed: ', registrationError);
+          });
+        });
+      }
     }
   }, []);
 
@@ -653,6 +663,9 @@ function AppSidebarContent({
               </main>
             </div>
             <SheetContent side="right" className="flex flex-col p-0 bg-card border-none w-72 print:hidden">
+              <SheetHeader className="sr-only">
+                <SheetTitle>القائمة الجانبية</SheetTitle>
+              </SheetHeader>
               {sidebarContent}
             </SheetContent>
           </Sheet>

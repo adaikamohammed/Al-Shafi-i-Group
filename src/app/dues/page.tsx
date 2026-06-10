@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Payment, PaymentStatus, Student } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, isStudentInMenSheikhs, isStudentInWomenUstadhats } from '@/lib/utils';
 import { GroupSelector } from '@/components/management/GroupSelector';
 
 
@@ -33,7 +33,7 @@ const statusVariant: { [key in 'نشط' | 'مطرود']: "default" | "destructiv
 
 
 export default function DuesPage() {
-    const { students, payments, addPayment, updatePaymentStatus, loading, settings, saveSettings, allUsers } = useStudentContext();
+    const { students, payments, addPayment, updatePaymentStatus, loading, settings, saveSettings, allUsers, selectedGroup, setSelectedGroup } = useStudentContext();
     const { isSuperAdmin, isManagement } = useAuth();
     const { toast } = useToast();
     const [currentYear, setCurrentYear] = useState(getYear(new Date()));
@@ -43,7 +43,6 @@ export default function DuesPage() {
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('نشط');
     const [isSaving, setIsSaving] = useState(false);
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-    const [selectedGroup, setSelectedGroup] = useState('all');
     const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
     const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
@@ -161,13 +160,19 @@ export default function DuesPage() {
             // Group Filter Logic
             let groupMatch = true;
             if (selectedGroup !== 'all' && (isSuperAdmin || isManagement)) {
-                // Find the group name associated with the selected sheikh UID
-                const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
-                if (selectedSheikh?.group) {
-                    groupMatch = student.groupName === selectedSheikh.group;
+                if (selectedGroup === 'sheikhs_all') {
+                    groupMatch = isStudentInMenSheikhs(student, allUsers);
+                } else if (selectedGroup === 'ustadhats_all') {
+                    groupMatch = isStudentInWomenUstadhats(student, allUsers);
                 } else {
-                    // Fallback to strict owner matching if group name not found (unlikely)
-                    groupMatch = student.ownerId === selectedGroup;
+                    // Find the group name associated with the selected sheikh UID
+                    const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
+                    if (selectedSheikh?.group) {
+                        groupMatch = student.groupName === selectedSheikh.group;
+                    } else {
+                        // Fallback to strict owner matching if group name not found (unlikely)
+                        groupMatch = student.ownerId === selectedGroup;
+                    }
                 }
             }
 

@@ -10,7 +10,7 @@ import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, startOfW
 import { ar } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn, arabicCompare } from '@/lib/utils';
+import { cn, arabicCompare, isStudentInMenSheikhs, isStudentInWomenUstadhats } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/AuthContext';
 import { GroupSelector } from '@/components/management/GroupSelector';
@@ -53,6 +53,7 @@ interface StudentEvaluationRow {
     groupName: string;
     ownerId: string;
     registrationDate?: Date;
+    memorizationMultiplier?: number;
     
     // Sessions Stats
     totalSessions: number; // Raw count
@@ -92,14 +93,13 @@ interface StudentEvaluationRow {
 }
 
 export default function FairEvaluationPage() {
-    const { students, dailySessions, loading, settings, allUsers } = useStudentContext();
+    const { students, dailySessions, loading, settings, allUsers, selectedGroup, setSelectedGroup } = useStudentContext();
     const { isManagement, isSuperAdmin, user } = useAuth();
     
     // Filters State
     const [periodType, setPeriodType] = useState<'week' | 'month' | 'season' | 'year'>('month');
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [selectedSeason, setSelectedSeason] = useState<number>(Math.floor(new Date().getMonth() / 3) + 1);
-    const [selectedGroup, setSelectedGroup] = useState<string>('all');
     const [thresholdPercent, setThresholdPercent] = useState<number>(50); // Default to 50%
     const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
     const [showGuide, setShowGuide] = useState<boolean>(false);
@@ -193,11 +193,17 @@ export default function FairEvaluationPage() {
         let targetStudents = students.filter(s => s.status === 'نشط');
         
         if (isManagement && selectedGroup !== 'all') {
-            const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
-            if (selectedSheikh?.group) {
-                targetStudents = targetStudents.filter(s => s.groupName?.trim() === selectedSheikh.group?.trim());
+            if (selectedGroup === 'sheikhs_all') {
+                targetStudents = targetStudents.filter(s => isStudentInMenSheikhs(s, allUsers));
+            } else if (selectedGroup === 'ustadhats_all') {
+                targetStudents = targetStudents.filter(s => isStudentInWomenUstadhats(s, allUsers));
             } else {
-                targetStudents = targetStudents.filter(s => s.ownerId === selectedGroup);
+                const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
+                if (selectedSheikh?.group) {
+                    targetStudents = targetStudents.filter(s => s.groupName?.trim() === selectedSheikh.group?.trim());
+                } else {
+                    targetStudents = targetStudents.filter(s => s.ownerId === selectedGroup);
+                }
             }
         } else if (!isManagement && !isSuperAdmin && user) {
             // Regular Sheikh can only see their own group
@@ -216,6 +222,7 @@ export default function FairEvaluationPage() {
                 groupName: s.groupName || 'غير محدد',
                 ownerId: s.ownerId,
                 registrationDate: s.registrationDate ? new Date(s.registrationDate) : undefined,
+                memorizationMultiplier: s.memorizationMultiplier ?? 1.0,
                 totalSessions: 0,
                 weightedSessions: 0,
                 assessedMemorization: 0,
@@ -294,18 +301,32 @@ export default function FairEvaluationPage() {
                 }
 
                 // B. Memorization
-                if (!record.review && record.memorization && record.memorization !== 'لا يوجد' && (record.memorization as string) !== '') {
-                    score.assessedMemorization += weight;
-                    score.memorizationRate += getMemoPoints(record.memorization) * weight;
-                    
-                    const memoKey = record.memorization === 'جيد جدا' ? 'جيد جداً' : record.memorization;
+                let earnedMemoPoints = 0;
+                let hasMemoAssessed = false;
+                const hasNewMemo = record.memorization && record.memorization !== 'لا يوجد' && (record.memorization as string) !== '';
+                const hasReview = record.review && pointsConfig?.review?.completed;
+
+                if (hasNewMemo && record.memorization) {
+                    const cleanMemo = record.memorization as string;
+                    earnedMemoPoints += getMemoPoints(cleanMemo);
+                    hasMemoAssessed = true;
+                    const memoKey = cleanMemo === 'جيد جدا' ? 'جيد جداً' : cleanMemo;
                     if (score.memorizationCounts[memoKey] !== undefined) {
                         score.memorizationCounts[memoKey]++;
                     }
-                } else if (record.review && pointsConfig?.review?.completed) {
-                    score.assessedMemorization += weight;
-                    score.memorizationRate += pointsConfig.review.completed * weight;
+                }
+                if (hasReview) {
+                    earnedMemoPoints += pointsConfig.review.completed;
+                    hasMemoAssessed = true;
                     score.memorizationCounts['أوراد مراجعة']++;
+                }
+
+                if (hasMemoAssessed) {
+                    score.assessedMemorization += weight;
+                    const isGroup8User = score.groupName === 'فوج 8' || score.groupName === 'فوج الشيخ عبد الحق نصيرة' || score.groupName.includes('عبد الحق');
+                    const multiplier = isGroup8User ? (score.memorizationMultiplier ?? 1.0) : 1.0;
+                    const penalty = (hasNewMemo && record.isDelayed) ? 0.8 : 1.0;
+                    score.memorizationRate += earnedMemoPoints * weight * multiplier * penalty;
                 }
 
                 // C. Behavior
@@ -412,12 +433,24 @@ export default function FairEvaluationPage() {
                     if (record.attendance) {
                         mScore.attendanceRate += getAttPoints(record.attendance) * weight;
                     }
-                    if (!record.review && record.memorization && record.memorization !== 'لا يوجد' && record.memorization !== '') {
+                    const studentObj = targetStudents.find(x => x.id === sId);
+                    const isGroup8User = studentObj && (studentObj.groupName === 'فوج 8' || studentObj.groupName === 'فوج الشيخ عبد الحق نصيرة' || (studentObj.groupName && studentObj.groupName.includes('عبد الحق')));
+                    const multiplier = isGroup8User ? (studentObj?.memorizationMultiplier ?? 1.0) : 1.0;
+                    const penalty = record.isDelayed ? 0.8 : 1.0;
+
+                    let earnedMemoPoints = 0;
+                    let hasMemo = false;
+                    if (record.memorization && record.memorization !== 'لا يوجد' && record.memorization !== '') {
+                        earnedMemoPoints += getMemoPoints(record.memorization);
+                        hasMemo = true;
+                    }
+                    if (record.review && pointsConfig?.review?.completed) {
+                        earnedMemoPoints += pointsConfig.review.completed;
+                        hasMemo = true;
+                    }
+                    if (hasMemo) {
                         mScore.assessedMemorization += weight;
-                        mScore.memorizationRate += getMemoPoints(record.memorization) * weight;
-                    } else if (record.review && pointsConfig?.review?.completed) {
-                        mScore.assessedMemorization += weight;
-                        mScore.memorizationRate += pointsConfig.review.completed * weight;
+                        mScore.memorizationRate += earnedMemoPoints * weight * multiplier * penalty;
                     }
                     if (record.behavior && record.behavior !== '') {
                         mScore.assessedBehavior += weight;
@@ -1324,6 +1357,18 @@ export default function FairEvaluationPage() {
                                                             <div>
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                                     <span className="font-bold text-sm text-foreground leading-tight">{s.name}</span>
+                                                                    {s.memorizationMultiplier !== undefined && (s.memorizationMultiplier !== 1.0 || s.groupName === 'فوج 8' || s.groupName === 'فوج الشيخ عبد الحق نصيرة' || s.groupName.includes('عبد الحق')) && (
+                                                                        <Badge variant="outline" className={cn(
+                                                                            "px-1 py-0 h-4 text-[9px] font-bold shadow-sm shrink-0 flex items-center gap-0.5 select-none",
+                                                                            s.memorizationMultiplier === 1.5 
+                                                                                ? "bg-indigo-50 text-indigo-650 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400" 
+                                                                                : s.memorizationMultiplier === 0.5 
+                                                                                    ? "bg-amber-50 text-amber-650 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400" 
+                                                                                    : "bg-slate-100 text-slate-650 border-slate-200 dark:bg-slate-900 dark:text-slate-400"
+                                                                        )}>
+                                                                            {s.memorizationMultiplier === 1.5 ? "📚 x1.5" : s.memorizationMultiplier === 0.5 ? "📖 x0.5" : "📄 x1.0"}
+                                                                        </Badge>
+                                                                    )}
                                                                     {s.podiumCounts && (s.podiumCounts.first > 0 || s.podiumCounts.second > 0 || s.podiumCounts.third > 0) && (
                                                                         <div className="flex items-center gap-0.5 select-none shrink-0 scale-90 origin-right">
                                                                             {s.podiumCounts.first > 0 && (
@@ -1504,6 +1549,18 @@ export default function FairEvaluationPage() {
                                                                 <div>
                                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                                         <span className="font-bold text-sm text-foreground leading-tight">{s.name}</span>
+                                                                        {s.memorizationMultiplier !== undefined && (s.memorizationMultiplier !== 1.0 || s.groupName === 'فوج 8' || s.groupName === 'فوج الشيخ عبد الحق نصيرة' || s.groupName.includes('عبد الحق')) && (
+                                                                            <Badge variant="outline" className={cn(
+                                                                                "px-1 py-0 h-4 text-[9px] font-bold shadow-sm shrink-0 flex items-center gap-0.5 select-none",
+                                                                                s.memorizationMultiplier === 1.5 
+                                                                                    ? "bg-indigo-50 text-indigo-650 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400" 
+                                                                                    : s.memorizationMultiplier === 0.5 
+                                                                                        ? "bg-amber-50 text-amber-650 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400" 
+                                                                                        : "bg-slate-100 text-slate-650 border-slate-200 dark:bg-slate-900 dark:text-slate-400"
+                                                                            )}>
+                                                                                {s.memorizationMultiplier === 1.5 ? "📚 x1.5" : s.memorizationMultiplier === 0.5 ? "📖 x0.5" : "📄 x1.0"}
+                                                                            </Badge>
+                                                                        )}
                                                                         {s.podiumCounts && (s.podiumCounts.first > 0 || s.podiumCounts.second > 0 || s.podiumCounts.third > 0) && (
                                                                             <div className="flex items-center gap-0.5 select-none shrink-0 scale-90 origin-right">
                                                                                 {s.podiumCounts.first > 0 && (
@@ -1635,7 +1692,21 @@ function StudentDetailCard({ student, maxSessions }: { student: StudentEvaluatio
                         <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div>
-                        <h4 className="font-headline font-black text-slate-800 dark:text-white text-md leading-tight">{student.name}</h4>
+                        <div className="flex items-center gap-2">
+                            <h4 className="font-headline font-black text-slate-800 dark:text-white text-md leading-tight">{student.name}</h4>
+                            {student.memorizationMultiplier !== undefined && (student.memorizationMultiplier !== 1.0 || student.groupName === 'فوج 8' || student.groupName === 'فوج الشيخ عبد الحق نصيرة' || student.groupName.includes('عبد الحق')) && (
+                                <Badge variant="outline" className={cn(
+                                    "px-2 py-0.5 text-[10px] font-bold shadow-sm flex items-center gap-1 select-none",
+                                    student.memorizationMultiplier === 1.5 
+                                        ? "bg-indigo-50 text-indigo-600 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400" 
+                                        : student.memorizationMultiplier === 0.5 
+                                            ? "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400" 
+                                            : "bg-slate-100 text-slate-650 border-slate-200 dark:bg-slate-900 dark:text-slate-400"
+                                )}>
+                                    {student.memorizationMultiplier === 1.5 ? "📚 معامل الحفظ: صفحة ونصف (x1.5)" : student.memorizationMultiplier === 0.5 ? "📖 معامل الحفظ: نصف صفحة (x0.5)" : "📄 معامل الحفظ: صفحة (x1.0)"}
+                                </Badge>
+                            )}
+                        </div>
                         <p className="text-[10px] text-muted-foreground font-bold mt-1">
                             {student.groupName} | تاريخ انضمام الطالب: {student.registrationDate ? format(student.registrationDate, 'd MMMM yyyy', { locale: ar }) : 'غير محدد'}
                         </p>
