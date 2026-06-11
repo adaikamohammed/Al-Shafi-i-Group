@@ -57,10 +57,18 @@ addEventListener('message', (event) => {
                             totalRecords++;
                             if (record.attendance === 'حاضر' || record.attendance === 'متأخر') totalAttendance++;
                             if (record.review) totalReview++;
-                            const evalMap: Record<string, number> = { 'ممتاز': 100, 'جيد جداً': 80, 'جيد': 60, 'متوسط': 40, 'ضعيف': 20 };
-                            totalEvaluationPoints += evalMap[record.memorization || ''] || 0;
-                            const behavMap: Record<string, number> = { 'هادئ': 100, 'متوسط': 60, 'غير منضبط': 20 };
-                            totalBehaviorPoints += behavMap[record.behavior || ''] || 0;
+                            let memoLevel = record.memorization;
+                            if (memoLevel === 'متوسط') memoLevel = 'مقبول';
+                            if (memoLevel === 'جيد جدا') memoLevel = 'جيد جداً';
+
+                            let behaviorLevel = record.behavior;
+                            if (behaviorLevel === 'متوسط') behaviorLevel = 'مقبول';
+                            if (behaviorLevel === 'غير منضبط') behaviorLevel = 'مشاغب';
+
+                            const evalMap: Record<string, number> = { 'ممتاز': 100, 'جيد جداً': 80, 'جيد': 60, 'حسن': 45, 'مقبول': 30, 'ضعيف': 15 };
+                            totalEvaluationPoints += evalMap[memoLevel || ''] || 0;
+                            const behavMap: Record<string, number> = { 'هادئ': 100, 'مقبول': 60, 'مشاغب': 20 };
+                            totalBehaviorPoints += behavMap[behaviorLevel || ''] || 0;
                         });
                     }
                 });

@@ -64,21 +64,18 @@ const ATTENDANCE_POINTS: Record<string, number> = {
 
 const PERFORMANCE_POINTS: Record<string, number> = {
     'ممتاز': 10,
-    'جيد جدا': 8,
-    'جيد جداً': 8,
-    'جيد': 6,
-    'حسن': 5,
-    'متوسط': 4,
-    'مقبول': 3,
+    'جيد جدا': 7,
+    'جيد جداً': 7,
+    'جيد': 5,
+    'حسن': 3,
+    'مقبول': 2,
     'ضعيف': 1,
     'لم يحفظ': 0,
 };
 
 const BEHAVIOR_POINTS: Record<string, number> = {
     'هادئ': 10,
-    'متوسط': 7,
     'مقبول': 5,
-    'غير منضبط': 2,
     'مشاغب': 0,
 };
 
@@ -222,8 +219,8 @@ function calculateFairStudentStats({
                 if (memoKey === 'ممتاز') st.excellent++;
                 else if (memoKey === 'جيد جداً') st.goodPlus++;
                 else if (memoKey === 'جيد') st.good++;
-                else if (memoKey === 'مقبول' || memoKey === 'حسن') st.acceptable++;
-                else if (memoKey === 'ضعيف' || memoKey === 'متوسط') st.weak++;
+                else if (memoKey === 'مقبول' || memoKey === 'حسن' || memoKey === 'متوسط') st.acceptable++;
+                else if (memoKey === 'ضعيف') st.weak++;
                 else if (memoKey === 'لم يحفظ') st.notMem++;
             }
             if (hasReview) {
@@ -482,8 +479,8 @@ export default function SheikhMonitoringPage() {
                 if (r.memorization === 'ممتاز') excellent++;
                 else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') goodPlus++;
                 else if (r.memorization === 'جيد') good++;
-                else if (r.memorization === 'مقبول' || r.memorization === 'حسن') acceptable++;
-                else if (r.memorization === 'ضعيف' || r.memorization === 'متوسط') weak++;
+                else if (r.memorization === 'مقبول' || r.memorization === 'حسن' || r.memorization === 'متوسط') acceptable++;
+                else if (r.memorization === 'ضعيف') weak++;
                 else if (r.memorization === 'لم يحفظ') notMem++;
             }
         });
@@ -751,9 +748,8 @@ export default function SheikhMonitoringPage() {
                         if (!grp) return;
                         grp.total++;
                         if (b === 'هادئ') { grp.calm++; totalCalm++; }
-                        else if (b === 'عادي' || b === 'متوسط') { grp.ok++; totalOk++; }
-                        else if (b === 'غير منضبط') { grp.bad++; totalBad++; if (r.studentId && studentBehaviorBad[r.studentId]) studentBehaviorBad[r.studentId].badCount++; }
-                        else if (b === 'مشاغب') { grp.veryBad++; totalVeryBad++; if (r.studentId && studentBehaviorBad[r.studentId]) studentBehaviorBad[r.studentId].badCount += 2; }
+                        else if (b === 'عادي' || b === 'متوسط' || b === 'مقبول') { grp.ok++; totalOk++; }
+                        else if (b === 'غير منضبط' || b === 'مشاغب') { grp.veryBad++; totalVeryBad++; if (r.studentId && studentBehaviorBad[r.studentId]) studentBehaviorBad[r.studentId].badCount += 2; }
                     });
                 });
             });
@@ -1133,8 +1129,7 @@ function BehaviorAnalysisView({
 
     const BEHAVIOR_SEGMENTS = [
         { label: 'هادئ', value: data.totalCalm, color: '#10b981', bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300', icon: '😊' },
-        { label: 'عادي / متوسط', value: data.totalOk, color: '#3b82f6', bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300', icon: '😐' },
-        { label: 'غير منضبط', value: data.totalBad, color: '#f59e0b', bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300', icon: '😤' },
+        { label: 'مقبول', value: data.totalOk, color: '#3b82f6', bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300', icon: '😐' },
         { label: 'مشاغب', value: data.totalVeryBad, color: '#ef4444', bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-300', icon: '😠' },
     ];
 
@@ -1266,14 +1261,12 @@ function BehaviorAnalysisView({
                                             </div>
                                             <div className="flex rounded-full h-3 overflow-hidden bg-slate-100">
                                                 {g.calm > 0 && <div style={{ width: `${Math.round((g.calm/gTotal)*100)}%`, background: '#10b981' }} className="h-full transition-all duration-700" title={`هادئ: ${g.calm}`} />}
-                                                {g.ok > 0 && <div style={{ width: `${Math.round((g.ok/gTotal)*100)}%`, background: '#3b82f6' }} className="h-full transition-all duration-700" title={`عادي: ${g.ok}`} />}
-                                                {g.bad > 0 && <div style={{ width: `${Math.round((g.bad/gTotal)*100)}%`, background: '#f59e0b' }} className="h-full transition-all duration-700" title={`غير منضبط: ${g.bad}`} />}
+                                                {g.ok > 0 && <div style={{ width: `${Math.round((g.ok/gTotal)*100)}%`, background: '#3b82f6' }} className="h-full transition-all duration-700" title={`مقبول: ${g.ok}`} />}
                                                 {g.veryBad > 0 && <div style={{ width: `${Math.round((g.veryBad/gTotal)*100)}%`, background: '#ef4444' }} className="h-full transition-all duration-700" title={`مشاغب: ${g.veryBad}`} />}
                                             </div>
                                             <div className="flex gap-2 text-[9px] text-slate-500">
                                                 {g.calm > 0 && <span>😊 هادئ: {g.calm}</span>}
-                                                {g.ok > 0 && <span>😐 عادي: {g.ok}</span>}
-                                                {g.bad > 0 && <span className="text-amber-600">😤 غير منضبط: {g.bad}</span>}
+                                                {g.ok > 0 && <span>😐 مقبول: {g.ok}</span>}
                                                 {g.veryBad > 0 && <span className="text-rose-600">😠 مشاغب: {g.veryBad}</span>}
                                             </div>
                                         </div>
@@ -3763,31 +3756,35 @@ function StudentTrackingView({
     const getGroupDisplayName = (groupName: string) => {
         const sh = sheikhs.find(s => s.group === groupName);
         if (sh) {
+            const num = parseInt(groupName.replace(/\D/g, '') || '0');
+            if (num > 0) {
+                return `فوج ${num} ${sh.displayName}`;
+            }
             if (sh.displayName.startsWith('الشيخ') || sh.displayName.startsWith('الأستاذة')) {
                 return `فوج ${sh.displayName}`;
             }
             return `فوج الشيخ ${sh.displayName}`;
         }
         const num = parseInt(groupName.replace(/\D/g, '') || '0');
-        if (num === 1) return "فوج الشيخ زياد درويش";
-        if (num === 2) return "فوج الشيخ عبد الحميد";
-        if (num === 3) return "فوج الشيخ فؤاد بن عمر";
-        if (num === 4) return "فوج الشيخ أحمد بن عمر";
-        if (num === 5) return "فوج الشيخ إبراهيم مراد";
-        if (num === 6) return "فوج الشيخ سفيان نصيرة";
-        if (num === 7) return "فوج الشيخ محمد منصور";
-        if (num === 8) return "فوج الشيخ عبد الحق نصيرة";
-        if (num === 9) return "فوج الشيخ صهيب نصيب";
+        if (num === 1) return "فوج 1 الشيخ زياد درويش";
+        if (num === 2) return "فوج 2 الشيخ عبد الحميد";
+        if (num === 3) return "فوج 3 الشيخ فؤاد بن عمر";
+        if (num === 4) return "فوج 4 الشيخ أحمد بن عمر";
+        if (num === 5) return "فوج 5 الشيخ إبراهيم مراد";
+        if (num === 6) return "فوج 6 الشيخ سفيان نصيرة";
+        if (num === 7) return "فوج 7 الشيخ محمد منصور";
+        if (num === 8) return "فوج 8 الشيخ عبد الحق نصيرة";
+        if (num === 9) return "فوج 9 الشيخ صهيب نصيب";
         
-        if (num === 10) return "فوج الأستاذة سعيدة";
-        if (num === 11) return "فوج الأستاذة سميرة";
-        if (num === 12) return "فوج الأستاذة رقية";
-        if (num === 13) return "فوج الأستاذة ثريا";
-        if (num === 14) return "فوج الأستاذة أميرة";
-        if (num === 15) return "فوج الأستاذة زينب";
-        if (num === 16) return "فوج الأستاذة جهاد";
-        if (num === 17) return "فوج الأستاذة ميمونه";
-        if (num === 18) return "فوج الأستاذة حياة";
+        if (num === 10) return "فوج 10 الأستاذة سعيدة";
+        if (num === 11) return "فوج 11 الأستاذة سميرة";
+        if (num === 12) return "فوج 12 الأستاذة رقية";
+        if (num === 13) return "فوج 13 الأستاذة ثريا";
+        if (num === 14) return "فوج 14 الأستاذة أميرة";
+        if (num === 15) return "فوج 15 الأستاذة زينب";
+        if (num === 16) return "فوج 16 الأستاذة جهاد";
+        if (num === 17) return "فوج 17 الأستاذة ميمونه";
+        if (num === 18) return "فوج 18 الأستاذة حياة";
 
         return groupName;
     };

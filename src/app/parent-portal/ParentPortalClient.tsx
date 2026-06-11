@@ -149,11 +149,14 @@ const ParentPortalContent = ({
                     studentScores[record.studentId].points += (pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] || 0);
                     studentScores[record.studentId].points += (pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] || 0);
                     studentScores[record.studentId].points += (pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] || 0);
+                    if (record.review && pointsConfig.review?.completed) {
+                        studentScores[record.studentId].points += pointsConfig.review.completed;
+                    }
                     if (record.attendance === 'غائب') studentScores[record.studentId].stats.absent++;
                     if (record.attendance === 'تعويض') studentScores[record.studentId].stats.makeup++;
                     if (record.behavior === 'هادئ') studentScores[record.studentId].stats.calm++;
-                    if (record.behavior === 'متوسط') studentScores[record.studentId].stats.medium++;
-                    if (record.behavior === 'غير منضبط') studentScores[record.studentId].stats.undisciplined++;
+                    if (record.behavior === 'متوسط' || record.behavior === 'مقبول') studentScores[record.studentId].stats.medium++;
+                    if (record.behavior === 'غير منضبط' || record.behavior === 'مشاغب') studentScores[record.studentId].stats.undisciplined++;
                 }
             });
         });
@@ -180,7 +183,7 @@ const ParentPortalContent = ({
 
         const studentRecordsInMonth = sessionsInMonth.flatMap((s: any) => s.records ?? []).filter((r: any) => r.studentId === student.id);
         const attendanceScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter((r: any) => r.attendance === 'حاضر' || r.attendance === 'متأخر').length) / studentRecordsInMonth.length) * 10 : 0;
-        const disciplineScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter((r: any) => r.behavior === 'هادئ').length * 2 + studentRecordsInMonth.filter((r: any) => r.behavior === 'متوسط').length * 1) / (studentRecordsInMonth.length * 2)) * 10 : 0;
+        const disciplineScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter((r: any) => r.behavior === 'هادئ').length * 2 + studentRecordsInMonth.filter((r: any) => r.behavior === 'متوسط' || r.behavior === 'مقبول').length * 1) / (studentRecordsInMonth.length * 2)) * 10 : 0;
         const memorizationScore = (masteredCount / allSurahs.length) * 10;
 
         const radarData = [

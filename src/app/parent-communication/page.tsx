@@ -229,8 +229,18 @@ export default function ParentCommunicationPage() {
 
                 if (record.memorization && record.memorization !== 'لم يحفظ' && record.memorization !== 'لا يوجد') {
                     stats.memorizationDays++;
-                    const scores: any = { 'ممتاز': 10, 'جيد جداً': 8, 'جيد': 6, 'متوسط': 4, 'ضعيف': 2 };
-                    if (scores[record.memorization]) {
+                    const scores: any = {
+                        'ممتاز': 10,
+                        'جيد جداً': 7,
+                        'جيد جدا': 7,
+                        'جيد': 5,
+                        'حسن': 3,
+                        'مقبول': 2,
+                        'متوسط': 2,
+                        'ضعيف': 1,
+                        'لم يحفظ': 0,
+                    };
+                    if (scores[record.memorization] !== undefined) {
                         stats.evalScore += scores[record.memorization];
                         stats.evalCount++;
                     }
@@ -1032,7 +1042,7 @@ export default function ParentCommunicationPage() {
                                             </div>
                                             <div>
                                                 <p className="text-[10px] text-slate-400 font-bold">الحلقة</p>
-                                                <p className="text-sm font-black">{selectedStudent.groupName || '-'}</p>
+                                                <p className="text-sm font-black">{formatGroupName(selectedStudent.groupName, allUsers) || '-'}</p>
                                             </div>
                                         </div>
                                     </div>

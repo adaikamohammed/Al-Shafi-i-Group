@@ -110,3 +110,58 @@ export function isStudentInWomenUstadhats(s: any, allUsers: any[]): boolean {
   const groupNum = getGroupNumber(s.groupName || '');
   return groupNum !== null && groupNum >= 10 && groupNum <= 18;
 }
+
+export const GROUP_SHEIKH_MAPPING: Record<string, string> = {
+  "فوج 1": "الشيخ زياد درويش",
+  "فوج 2": "الشيخ عبد الحميد",
+  "فوج 3": "الشيخ فؤاد بن عمر",
+  "فوج 4": "الشيخ أحمد بن عمر",
+  "فوج 5": "الشيخ إبراهيم مراد",
+  "فوج 6": "الشيخ سفيان نصيرة",
+  "فوج 7": "الشيخ محمد منصور",
+  "فوج 8": "الشيخ عبد الحق نصيرة",
+  "فوج 9": "الشيخ صهيب نصيب",
+  "فوج 10": "الأستاذة سعيدة",
+  "فوج 11": "الأستاذة سميرة",
+  "فوج 12": "الأستاذة رقية",
+  "فوج 13": "الأستاذة ثريا",
+  "فوج 14": "الأستاذة أميرة",
+  "فوج 15": "الأستاذة زينب",
+  "فوج 16": "الأستاذة جهاد",
+  "فوج 17": "الأستاذة ميمونه",
+  "فوج 18": "الأستاذة حياة",
+};
+
+export function getGroupSheikhName(groupName: string, allUsers?: any[]): string {
+  if (!groupName) return '';
+  const trimmed = groupName.trim();
+  
+  // Try to find dynamically in allUsers first
+  if (allUsers && Array.isArray(allUsers)) {
+    const sheikhUser = allUsers.find(u => u.role === 'sheikh' && u.group?.trim() === trimmed);
+    if (sheikhUser?.displayName) {
+      return sheikhUser.displayName;
+    }
+  }
+
+  // Fallback to static mapping
+  return GROUP_SHEIKH_MAPPING[trimmed] || '';
+}
+
+export function formatGroupName(groupName: string, allUsers?: any[]): string {
+  if (!groupName) return '';
+  const trimmed = groupName.trim();
+  if (trimmed === 'كل الأفواج' || trimmed === '—' || trimmed === 'غير محدد') return trimmed;
+  
+  // If the group name already includes the sheikh's name (e.g. "الشيخ" or "الأستاذة"), return it as is
+  if (trimmed.includes('الشيخ') || trimmed.includes('الأستاذة') || trimmed.includes('أستاذة')) {
+    return trimmed;
+  }
+  
+  const sheikhName = getGroupSheikhName(trimmed, allUsers);
+  if (sheikhName) {
+    return `${trimmed} ${sheikhName}`;
+  }
+  return trimmed;
+}
+

@@ -106,28 +106,28 @@ const ATTENDANCE_POINTS: Record<string, number> = {
 
 const PERFORMANCE_POINTS: Record<string, number> = {
     'ممتاز': 10,
-    'جيد جدا': 8,
-    'جيد جداً': 8,
-    'جيد': 6,
-    'حسن': 5,
-    'متوسط': 4,
-    'مقبول': 3,
+    'جيد جدا': 7,
+    'جيد جداً': 7,
+    'جيد': 5,
+    'حسن': 3,
+    'متوسط': 2,
+    'مقبول': 2,
     'ضعيف': 1,
     'لم يحفظ': 0,
 };
 
 const BEHAVIOR_POINTS: Record<string, number> = {
     'هادئ': 10,
-    'متوسط': 7,
     'مقبول': 5,
-    'غير منضبط': 2,
+    'متوسط': 5, // قيمة قديمة - تُحوّل إلى مقبول
     'مشاغب': 0,
+    'غير منضبط': 0, // قيمة قديمة - تُحوّل إلى مشاغب
 };
 
 const EVAL_SCORE: Record<string, number> = {
     'ممتاز': 6, 'جيد جداً': 5, 'جيد جدا': 5,
-    'جيد': 4, 'مقبول': 3, 'حسن': 3, 'متوسط': 2.5,
-    'ضعيف': 2, 'لم يحفظ': 1,
+    'جيد': 4, 'حسن': 3, 'مقبول': 2, 'متوسط': 2,
+    'ضعيف': 1, 'لم يحفظ': 0,
 };
 
 const SESSION_TYPES = ['حصة أساسية', 'حصة تعويضية', 'حصة إضافية'];
@@ -242,7 +242,7 @@ function MemBadge({ mem, review }: { mem?: string; review?: boolean }) {
 
 function BehaviorEmoji({ beh }: { beh?: string }) {
     if (!beh) return null;
-    const map: Record<string, string> = { 'هادئ': '😊', 'متوسط': '😐', 'غير منضبط': '😤' };
+    const map: Record<string, string> = { 'هادئ': '😊', 'مقبول': '😐', 'متوسط': '😐', 'مشاغب': '😠', 'غير منضبط': '😠' };
     return <span className="text-sm" title={beh}>{map[beh] || ''}</span>;
 }
 
@@ -711,8 +711,8 @@ export default function MyStatsPage() {
                 if (r.memorization === 'ممتاز') excellent++;
                 else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') goodPlus++;
                 else if (r.memorization === 'جيد') good++;
-                else if (r.memorization === 'مقبول' || r.memorization === 'حسن') acceptable++;
-                else if (r.memorization === 'ضعيف' || r.memorization === 'متوسط') weak++;
+                else if (r.memorization === 'مقبول' || r.memorization === 'حسن' || r.memorization === 'متوسط') acceptable++;
+                else if (r.memorization === 'ضعيف') weak++;
                 else if (r.memorization === 'لم يحفظ') notMem++;
             }
         });

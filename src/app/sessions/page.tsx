@@ -12,7 +12,7 @@ import { ar } from 'date-fns/locale';
 import { v4 as uuidv4 } from 'uuid';
 import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
-import { cn, arabicCompare } from '@/lib/utils';
+import { cn, arabicCompare, formatGroupName } from '@/lib/utils';
 import { surahs } from '@/lib/surahs';
 import { SessionType } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -104,24 +104,29 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { PerformanceLevel, WeeklyOutcome } from '@/lib/types';
 
 const PERFORMANCE_MAPPING: Record<string, number> = {
-  'ممتاز': 5,
-  'جيد جداً': 4,
-  'جيد جدا': 4,
-  'جيد': 3,
-  'حسن': 2,
+  'ممتاز': 10,
+  'جيد جداً': 7,
+  'جيد جدا': 7,
+  'جيد': 5,
+  'حسن': 3,
   'مقبول': 2,
-  'متوسط': 1,
+  'متوسط': 2,
   'ضعيف': 1,
   'لم يحفظ': 0,
 };
 
 const REVERSE_MAPPING: PerformanceLevel[] = [
   'لم يحفظ', // 0
-  'متوسط',   // 1
-  'حسن',     // 2
-  'جيد',     // 3
-  'جيد جداً', // 4
-  'ممتاز',   // 5
+  'ضعيف',   // 1
+  'مقبول',   // 2
+  'حسن',     // 3
+  'لا يوجد', // 4
+  'جيد',     // 5
+  'لا يوجد', // 6
+  'جيد جداً', // 7
+  'لا يوجد', // 8
+  'لا يوجد', // 9
+  'ممتاز',   // 10
 ];
 
 const getDerivedWeeklyEvaluation = (records: any[]): PerformanceLevel => {
@@ -892,7 +897,7 @@ export default function DailySessionsPage() {
                       })
                       .map(sheikh => (
                         <SelectItem key={sheikh.uid} value={sheikh.uid}>
-                          {sheikh.displayName || 'شيخ مجهول'} ({sheikh.group || 'بدون فوج'})
+                          {formatGroupName(sheikh.group, allUsers) || 'بدون فوج'}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -1260,7 +1265,7 @@ export default function DailySessionsPage() {
                             else setBulkHolidaySheikhs(prev => prev.filter(id => id !== sheikh.uid));
                           }}
                         />
-                        <label htmlFor={`sh-${sheikh.uid}`} className="text-xs font-bold cursor-pointer flex-1 truncate">{sheikh.group || 'بدون فوج'}</label>
+                        <label htmlFor={`sh-${sheikh.uid}`} className="text-xs font-bold cursor-pointer flex-1 truncate">{formatGroupName(sheikh.group, allUsers) || 'بدون فوج'}</label>
                       </div>
                     ))}
                 </div>
@@ -1296,7 +1301,7 @@ export default function DailySessionsPage() {
                   <SelectContent>
                     {allUsers?.filter(u => u.role === 'sheikh').map(sheikh => (
                       <SelectItem key={sheikh.uid} value={sheikh.uid}>
-                        {sheikh.displayName} ({sheikh.group})
+                        {formatGroupName(sheikh.group, allUsers)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1386,7 +1391,7 @@ export default function DailySessionsPage() {
                               </Avatar>
                               <div className="flex flex-col">
                                 <span>{student.fullName}</span>
-                                <span className="text-xs text-muted-foreground">{student.groupName}</span>
+                                <span className="text-xs text-muted-foreground">{formatGroupName(student.groupName, allUsers)}</span>
                               </div>
                             </div>
                           </td>
@@ -1489,14 +1494,17 @@ export default function DailySessionsPage() {
                                   (outcome.evaluation === 'جيد جداً' || outcome.evaluation === 'جيد جدا') ? "bg-blue-100 text-blue-700 border-blue-200" :
                                     outcome.evaluation === 'جيد' ? "bg-cyan-100 text-cyan-700 border-cyan-200" :
                                       outcome.evaluation === 'حسن' ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
-                                        "bg-red-100 text-red-700 border-red-200"
+                                        (outcome.evaluation === 'مقبول' || outcome.evaluation === 'متوسط') ? "bg-amber-100 text-amber-700 border-amber-200" :
+                                          outcome.evaluation === 'ضعيف' ? "bg-orange-100 text-orange-700 border-orange-200" :
+                                            "bg-red-100 text-red-700 border-red-200"
                               )}>
                                 <span className="text-lg">
                                   {outcome.evaluation === 'ممتاز' ? '🌟' :
                                     (outcome.evaluation === 'جيد جداً' || outcome.evaluation === 'جيد جدا') ? '⭐' :
                                       outcome.evaluation === 'جيد' ? '👍' :
                                         outcome.evaluation === 'حسن' ? '👌' :
-                                          outcome.evaluation === 'متوسط' ? '⚠️' : '❌'}
+                                          (outcome.evaluation === 'مقبول' || outcome.evaluation === 'متوسط') ? '⚠️' :
+                                            outcome.evaluation === 'ضعيف' ? '📉' : '❌'}
                                 </span>
                                 <div className="flex flex-col items-start leading-none">
                                   <span className="font-bold text-xs">{outcome.evaluation}</span>

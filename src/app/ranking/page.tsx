@@ -114,23 +114,22 @@ export default function RankingPage() {
                         if (record.attendance === 'متأخر') studentScores[studentId].stats.late++;
                         if (record.attendance === 'تعويض') studentScores[studentId].stats.makeup++;
                     }
-                    // Only count memorization evaluation if NOT in review mode
-                    // (review sessions are excluded from evaluation scoring to avoid unfair zero-point penalty)
-                    if (!record.review && record.memorization && pointsConfig.evaluation) {
+                    // Accumulate both memorization and review points if present
+                    if (record.memorization && pointsConfig.evaluation) {
                         const hifzPoints = pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] ?? 0;
                         studentScores[studentId].pointsBreakdown.hifz += hifzPoints;
                         if (record.memorization === 'ممتاز') studentScores[studentId].stats.excellent++;
                         if (record.memorization === 'جيد') studentScores[studentId].stats.good++;
-                        if (record.memorization === 'متوسط') studentScores[studentId].stats.average++;
+                        if (record.memorization === 'متوسط' || record.memorization === 'مقبول' || record.memorization === 'حسن') studentScores[studentId].stats.average++;
                     }
                     if (record.behavior && pointsConfig.behavior) {
                         const behaviorPoints = pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] ?? 0;
                         studentScores[studentId].pointsBreakdown.behavior += behaviorPoints;
                         if (record.behavior === 'هادئ') studentScores[studentId].stats.calm++;
-                        if (record.behavior === 'متوسط') studentScores[studentId].stats.medium++;
-                        if (record.behavior === 'غير منضبط') studentScores[studentId].stats.undisciplined++;
+                        if (record.behavior === 'متوسط' || record.behavior === 'مقبول') studentScores[studentId].stats.medium++;
+                        if (record.behavior === 'غير منضبط' || record.behavior === 'مشاغب') studentScores[studentId].stats.undisciplined++;
                     }
-                    if (record.review && pointsConfig.review) {
+                    if (record.review && pointsConfig.review?.completed) {
                         studentScores[studentId].pointsBreakdown.hifz += pointsConfig.review.completed;
                         studentScores[studentId].stats.reviewed++;
                     }

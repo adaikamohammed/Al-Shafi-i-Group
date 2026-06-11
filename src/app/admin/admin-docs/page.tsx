@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import { ReceiptDesign } from '@/components/admin/ReceiptDesign';
 import { useToast } from '@/hooks/use-toast';
+import { formatGroupName } from '@/lib/utils';
 
 export default function AdminDocsPage() {
     const {
@@ -421,7 +422,7 @@ export default function AdminDocsPage() {
                                                             </div>
                                                             <div>
                                                                 <div className="font-bold text-sm">{result.fullName}</div>
-                                                                <div className="text-[10px] text-muted-foreground">{result.groupName || (result.type === 'registration' ? 'تسجيل جديد' : 'بدون فوج')}</div>
+                                                                <div className="text-[10px] text-muted-foreground">{formatGroupName(result.groupName, allUsers) || (result.type === 'registration' ? 'تسجيل جديد' : 'بدون فوج')}</div>
                                                             </div>
                                                         </div>
                                                         <ArrowLeft className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all" />

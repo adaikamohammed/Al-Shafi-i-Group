@@ -5,7 +5,7 @@ import { useStudentContext } from '@/context/StudentContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, UserCheck, Shield, UserPlus, TrendingUp, BarChart3, Award, Calendar, ChevronRight, Activity, Target, PieChart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn, isSheikhMenUser, isSheikhWomenUser, isStudentInMenSheikhs, isStudentInWomenUstadhats } from '@/lib/utils';
+import { cn, isSheikhMenUser, isSheikhWomenUser, isStudentInMenSheikhs, isStudentInWomenUstadhats, formatGroupName } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { PORTAL_THEMES } from '@/lib/themes';
@@ -232,7 +232,7 @@ export const ManagementDashboard = () => {
             const groupStudents = students.filter(s => s.groupName === groupName);
 
             return {
-                name: groupName || 'غير محدد',
+                name: formatGroupName(groupName, allUsers) || 'غير محدد',
                 sheikhName: representativeSheikh?.displayName || 'غير محدد',
                 students: groupStudents.length,
                 active: groupStudents.filter(s => s.status === 'نشط').length,
@@ -344,7 +344,7 @@ export const ManagementDashboard = () => {
                         {isSheikh && (
                             <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-100 font-bold flex items-center gap-2">
                                 <Users className="h-4 w-4" />
-                                {user?.group}
+                                {formatGroupName(user?.group, allUsers)}
                             </div>
                         )}
                     </div>
@@ -410,7 +410,7 @@ export const ManagementDashboard = () => {
                         )}>
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-xl font-bold flex items-center justify-between">
-                                    <span>{selectedGroup === 'all' ? 'متوسط الأداء العام' : selectedGroup === 'sheikhs_all' ? 'أفواج المشايخ (شامل)' : selectedGroup === 'ustadhats_all' ? 'أفواج الأستاذات (شامل)' : selectedGroup}</span>
+                                    <span>{selectedGroup === 'all' ? 'متوسط الأداء العام' : selectedGroup === 'sheikhs_all' ? 'أفواج المشايخ (شامل)' : selectedGroup === 'ustadhats_all' ? 'أفواج الأستاذات (شامل)' : formatGroupName(selectedGroup, allUsers)}</span>
                                     <Target className="h-6 w-6 opacity-80" />
                                 </CardTitle>
                                 <CardDescription className="text-white/70">
@@ -481,7 +481,7 @@ export const ManagementDashboard = () => {
                         icon={Shield}
                         color="bg-emerald-500"
                         gradient="from-emerald-500 to-teal-400"
-                        description={user?.group || "فوجك التعليمي"}
+                        description={formatGroupName(user?.group, allUsers) || "فوجك التعليمي"}
                         theme={theme}
                     />
                 )}

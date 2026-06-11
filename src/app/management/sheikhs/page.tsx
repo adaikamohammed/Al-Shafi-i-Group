@@ -64,15 +64,17 @@ export default function SheikhsMonitoringPage() {
                                             if (r.memorization === 'ممتاز') {
                                                 totalEvalPoints += 5;
                                             } else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') {
-                                                totalEvalPoints += 4.5;
+                                                totalEvalPoints += 3.5;
                                             } else if (r.memorization === 'جيد') {
-                                                totalEvalPoints += 4;
-                                            } else if (r.memorization === 'مقبول' || r.memorization === 'حسن') {
-                                                totalEvalPoints += 3;
-                                            } else if (r.memorization === 'ضعيف' || r.memorization === 'متوسط') {
-                                                totalEvalPoints += 2;
+                                                totalEvalPoints += 2.5;
+                                            } else if (r.memorization === 'حسن') {
+                                                totalEvalPoints += 1.5;
+                                            } else if (r.memorization === 'مقبول' || r.memorization === 'متوسط') {
+                                                totalEvalPoints += 1.0;
+                                            } else if (r.memorization === 'ضعيف') {
+                                                totalEvalPoints += 0.5;
                                             } else if (r.memorization === 'لم يحفظ') {
-                                                totalEvalPoints += 1;
+                                                totalEvalPoints += 0;
                                             }
                                         }
                                     });

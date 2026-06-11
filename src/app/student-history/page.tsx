@@ -44,16 +44,17 @@ const getStudentDayColor = (dayData: any, viewType: 'attendance' | 'evaluation' 
         if (evals.some((e: string) => e.includes('ممتاز'))) return hasMultiple ? 'bg-emerald-900 border-emerald-950' : 'bg-emerald-700 border-emerald-800';
         if (evals.some((e: string) => e.includes('جيد جدا'))) return hasMultiple ? 'bg-emerald-700 border-emerald-800' : 'bg-emerald-500 border-emerald-600';
         if (evals.some((e: string) => e.includes('جيد'))) return hasMultiple ? 'bg-amber-600 border-amber-700' : 'bg-amber-400 border-amber-500';
-        if (evals.some((e: string) => e.includes('مقبول'))) return hasMultiple ? 'bg-orange-600 border-orange-700' : 'bg-orange-400 border-orange-500';
+        if (evals.some((e: string) => e.includes('حسن'))) return hasMultiple ? 'bg-yellow-600 border-yellow-700' : 'bg-yellow-400 border-yellow-500';
+        if (evals.some((e: string) => e.includes('مقبول') || e.includes('متوسط'))) return hasMultiple ? 'bg-orange-600 border-orange-700' : 'bg-orange-400 border-orange-500';
         if (evals.some((e: string) => e.includes('ضعيف'))) return hasMultiple ? 'bg-red-700 border-red-800' : 'bg-red-500 border-red-600';
-        return 'bg-emerald-400 border-emerald-500';
+        return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
     } else {
         // Behavior view
         const behaviors = records.map((r: any) => r.behavior).filter(Boolean);
         if (behaviors.length === 0) return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
 
-        if (behaviors.includes('مشاغب')) return hasMultiple ? 'bg-red-700 border-red-800' : 'bg-red-500 border-red-600';
-        if (behaviors.includes('مقبول') || behaviors.includes('عادي')) return hasMultiple ? 'bg-blue-600 border-blue-700' : 'bg-blue-400 border-blue-500';
+        if (behaviors.includes('مشاغب') || behaviors.includes('غير منضبط')) return hasMultiple ? 'bg-red-700 border-red-800' : 'bg-red-500 border-red-600';
+        if (behaviors.includes('مقبول') || behaviors.includes('عادي') || behaviors.includes('متوسط')) return hasMultiple ? 'bg-blue-600 border-blue-700' : 'bg-blue-400 border-blue-500';
         if (behaviors.includes('هادئ')) return hasMultiple ? 'bg-emerald-700 border-emerald-800' : 'bg-emerald-500 border-emerald-600';
         return 'bg-gray-300 border-gray-400';
     }
@@ -753,6 +754,7 @@ function StudentHistoryContent() {
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-emerald-700 border border-emerald-800"></div> ممتاز</span>
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-emerald-500 border border-emerald-600"></div> جيد جداً</span>
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-amber-400 border border-amber-500"></div> جيد</span>
+                                                <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-yellow-400 border border-yellow-500"></div> حسن</span>
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-orange-400 border border-orange-500"></div> مقبول</span>
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-red-500 border border-red-600"></div> ضعيف</span>
                                             </>

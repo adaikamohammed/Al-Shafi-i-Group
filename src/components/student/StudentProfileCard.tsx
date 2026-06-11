@@ -65,8 +65,8 @@ export const StudentProfileCard = memo(({ student, user, rankingData, medalHisto
         if (!stats) return [];
         return [
             { name: 'هادئ', value: stats.calm, color: '#10b981' },
-            { name: 'متوسط', value: stats.medium, color: '#f59e0b' },
-            { name: 'غير منضبط', value: stats.undisciplined, color: '#ef4444' },
+            { name: 'مقبول', value: stats.medium, color: '#f59e0b' },
+            { name: 'مشاغب', value: stats.undisciplined, color: '#ef4444' },
         ];
     }, [stats]);
 

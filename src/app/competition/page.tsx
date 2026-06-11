@@ -16,16 +16,18 @@ import {
     Download, ChevronDown, ChevronUp, SlidersHorizontal
 } from 'lucide-react';
 import { format, parseISO, subDays } from 'date-fns';
+import { formatGroupName } from '@/lib/utils';
 
 // ─── Default scoring values (editable in UI) ────────────────────────────────
 const DEFAULT_PERF: Record<string, number> = {
     'ممتاز': 10,
-    'جيد جداً': 8,
-    'جيد': 6,
-    'حسن': 4,
-    'مقبول': 4,
+    'جيد جداً': 7,
+    'جيد جدا': 7,
+    'جيد': 5,
+    'حسن': 3,
+    'مقبول': 2,
     'متوسط': 2,
-    'ضعيف': 2,
+    'ضعيف': 1,
     'لم يحفظ': 0,
     'غير محفوظ': 0,
 };
@@ -364,14 +366,14 @@ export default function CompetitionPage() {
                             الموسم الدراسي 1447/1448 هـ الموافق لـ 2025/2026 م
                         </div>
                         <div style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: '4pt' }}>
-                            {p.group} — المستوى الأول
+                            {formatGroupName(p.group)} — المستوى الأول
                         </div>
                     </div>
 
                     {/* ── Student info ────────────────────────────────────────── */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6pt', fontSize: '11pt', borderBottom: '1px solid #999', paddingBottom: '6pt' }}>
                         <span><strong>اسم ولقب الطالب :</strong> {p.name}</span>
-                        <span><strong>فوج الشيخ إبراهيم مراد</strong></span>
+                        <span><strong>{formatGroupName(p.group || 'فوج 5')}</strong></span>
                     </div>
 
                     {/* ── Rank ─────────────────────────────────────────────────── */}

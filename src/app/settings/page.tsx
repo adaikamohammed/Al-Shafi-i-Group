@@ -290,9 +290,24 @@ export default function SettingsPage() {
                                     onChange={e => handlePointsChange('evaluation', 'جيد', e.target.value)}
                                 />
                                 <PointInput
-                                    label="تقييم 'ضعيف' (خصم)"
+                                    label="تقييم 'حسن'"
+                                    value={localSettings.points.evaluation['حسن'] ?? 3}
+                                    onChange={e => handlePointsChange('evaluation', 'حسن', e.target.value)}
+                                />
+                                <PointInput
+                                    label="تقييم 'مقبول'"
+                                    value={localSettings.points.evaluation['مقبول'] ?? 2}
+                                    onChange={e => handlePointsChange('evaluation', 'مقبول', e.target.value)}
+                                />
+                                <PointInput
+                                    label="تقييم 'ضعيف'"
                                     value={localSettings.points.evaluation['ضعيف']}
                                     onChange={e => handlePointsChange('evaluation', 'ضعيف', e.target.value)}
+                                />
+                                <PointInput
+                                    label="تقييم 'لم يحفظ'"
+                                    value={localSettings.points.evaluation['لم يحفظ'] ?? 0}
+                                    onChange={e => handlePointsChange('evaluation', 'لم يحفظ', e.target.value)}
                                 />
                                 <PointInput
                                     label="مراجعة الدرس السابق"
@@ -319,19 +334,19 @@ export default function SettingsPage() {
 
                             <CategoryCard title="السلوك والانضباط" description="نقاط السلوك داخل الحلقة.">
                                 <PointInput
-                                    label="سلوك 'هادئ ومنضبط'"
+                                    label="سلوك 'هادئ'"
                                     value={localSettings.points.behavior['هادئ']}
                                     onChange={e => handlePointsChange('behavior', 'هادئ', e.target.value)}
                                 />
                                 <PointInput
-                                    label="سلوك 'متوسط'"
-                                    value={localSettings.points.behavior['متوسط']}
-                                    onChange={e => handlePointsChange('behavior', 'متوسط', e.target.value)}
+                                    label="سلوك 'مقبول'"
+                                    value={localSettings.points.behavior['مقبول'] ?? 1}
+                                    onChange={e => handlePointsChange('behavior', 'مقبول', e.target.value)}
                                 />
                                 <PointInput
-                                    label="سلوك 'غير منضبط' (خصم)"
-                                    value={localSettings.points.behavior['غير منضبط']}
-                                    onChange={e => handlePointsChange('behavior', 'غير منضبط', e.target.value)}
+                                    label="سلوك 'مشاغب'"
+                                    value={localSettings.points.behavior['مشاغب'] ?? 0}
+                                    onChange={e => handlePointsChange('behavior', 'مشاغب', e.target.value)}
                                 />
                             </CategoryCard>
 

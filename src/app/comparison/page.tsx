@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { cn, arabicCompare } from '@/lib/utils';
+import { cn, arabicCompare, formatGroupName } from '@/lib/utils';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
 const calculateAge = (birthDate?: Date) => {
@@ -30,6 +30,7 @@ const COLOR_1 = "#3b82f6"; // Blue
 const COLOR_2 = "#f97316"; // Orange
 
 const StudentCard = ({ student, onSelectStudent, studentList, disabledStudentId, isRecordHolder, color }: { student: Student | null, onSelectStudent: (id: string | null) => void, studentList: Student[], disabledStudentId?: string | null, isRecordHolder?: boolean, color: string }) => {
+    const { allUsers } = useStudentContext();
     const [open, setOpen] = useState(false);
 
     const gradientClass = color === COLOR_1
@@ -58,27 +59,28 @@ const StudentCard = ({ student, onSelectStudent, studentList, disabledStudentId,
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <Command>
                             <CommandInput placeholder="ابحث عن اسم الطالب..." />
-                            <CommandEmpty>لم يتم العثور على طالب.</CommandEmpty>
+                            <CommandEmpty>لم يتم العثور على أي طالب.</CommandEmpty>
                             <CommandGroup className="max-h-[300px] overflow-auto">
-                                {studentList.map((s) => (
-                                    <CommandItem
-                                        key={s.id}
-                                        value={s.fullName}
-                                        disabled={s.id === disabledStudentId}
-                                        onSelect={() => {
-                                            onSelectStudent(s.id === student?.id ? null : s.id);
-                                            setOpen(false);
-                                        }}
-                                    >
-                                        <Check
-                                            className={cn(
-                                                "mr-2 h-4 w-4",
-                                                student?.id === s.id ? "opacity-100" : "opacity-0"
-                                            )}
-                                        />
-                                        {s.fullName}
-                                    </CommandItem>
-                                ))}
+                                {studentList
+                                    .filter((s) => s.id !== disabledStudentId)
+                                    .map((s) => (
+                                        <CommandItem
+                                            key={s.id}
+                                            value={s.fullName}
+                                            onSelect={() => {
+                                                onSelectStudent(s.id);
+                                                setOpen(false);
+                                            }}
+                                        >
+                                            <Check
+                                                className={cn(
+                                                    "mr-2 h-4 w-4 text-primary",
+                                                    student?.id === s.id ? "opacity-100" : "opacity-0"
+                                                )}
+                                            />
+                                            {s.fullName}
+                                        </CommandItem>
+                                    ))}
                             </CommandGroup>
                         </Command>
                     </PopoverContent>
@@ -102,7 +104,7 @@ const StudentCard = ({ student, onSelectStudent, studentList, disabledStudentId,
                             {student.fullName}
                         </h3>
                         <div className="flex flex-wrap justify-center gap-2 mb-4">
-                            <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">{student.groupName || 'بدون فوج'}</Badge>
+                            <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">{formatGroupName(student.groupName, allUsers) || 'بدون فوج'}</Badge>
                             <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">{student.subscriptionTier || 'غير محدد'}</Badge>
                         </div>
                         <div className="flex flex-wrap justify-center gap-4 text-sm bg-white/80 dark:bg-black/30 p-3 rounded-xl w-full border border-primary/10 shadow-sm">
@@ -195,22 +197,22 @@ const ATTENDANCE_POINTS: Record<string, number> = {
 
 const PERFORMANCE_POINTS: Record<string, number> = {
     'ممتاز': 10,
-    'جيد جدا': 8,
-    'جيد جداً': 8,
-    'جيد': 6,
-    'حسن': 5,
-    'متوسط': 4,
-    'مقبول': 3,
+    'جيد جدا': 7,
+    'جيد جداً': 7,
+    'جيد': 5,
+    'حسن': 3,
+    'متوسط': 2,
+    'مقبول': 2,
     'ضعيف': 1,
     'لم يحفظ': 0,
 };
 
 const BEHAVIOR_POINTS: Record<string, number> = {
     'هادئ': 10,
-    'متوسط': 7,
     'مقبول': 5,
-    'غير منضبط': 2,
+    'متوسط': 5, // قيمة قديمة - تُحوّل إلى مقبول
     'مشاغب': 0,
+    'غير منضبط': 0, // قيمة قديمة - تُحوّل إلى مشاغب
 };
 
 export default function ComparisonPage() {
@@ -308,8 +310,8 @@ export default function ComparisonPage() {
                         
                         if (perf === 'ممتاز') stats.excellent++;
                         else if (perf === 'جيد جدا' || perf === 'جيد جداً') stats.veryGood++;
-                        else if (perf === 'جيد' || perf === 'حسن') stats.good++;
-                        else if (perf === 'متوسط' || perf === 'مقبول') stats.acceptable++;
+                        else if (perf === 'جيد') stats.good++;
+                        else if (perf === 'متوسط' || perf === 'مقبول' || perf === 'حسن') stats.acceptable++;
                         else if (perf === 'ضعيف' || perf === 'لم يحفظ') stats.weak++;
                     }
 
@@ -660,7 +662,7 @@ export default function ComparisonPage() {
                                     <div className="h-px w-full bg-slate-200 dark:bg-slate-800 my-4"></div>
                                     <ComparisonStat title="هادئ (10 نقاط)" value1={comparisonData.student1.calm} value2={comparisonData.student2.calm} suffix="مرة" />
                                     <ComparisonStat title="متوسط / مقبول (7/5 نق)" value1={comparisonData.student1.averageBehavior} value2={comparisonData.student2.averageBehavior} suffix="مرة" />
-                                    <ComparisonStat title="مشاغب / غير منضبط (0 نق)" value1={comparisonData.student1.troublemaker} value2={comparisonData.student2.troublemaker} suffix="مرة" higherIsBetter={false} />
+                                    <ComparisonStat title="مشاغب (0 نقطة)" value1={comparisonData.student1.troublemaker} value2={comparisonData.student2.troublemaker} suffix="مرة" higherIsBetter={false} />
                                     
                                     <div className="mt-6 pt-5 border-t border-dashed border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl p-4 text-sm font-mono text-center shadow-inner">
                                         <p className="text-emerald-800 dark:text-emerald-300/70 mb-2 font-bold">المعادلة المستخدمة:</p>

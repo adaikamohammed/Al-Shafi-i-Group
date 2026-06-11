@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Payment, PaymentStatus, Student } from '@/lib/types';
-import { cn, isStudentInMenSheikhs, isStudentInWomenUstadhats } from '@/lib/utils';
+import { cn, isStudentInMenSheikhs, isStudentInWomenUstadhats, formatGroupName } from '@/lib/utils';
 import { GroupSelector } from '@/components/management/GroupSelector';
 
 
@@ -436,7 +436,7 @@ export default function DuesPage() {
             return `
             <div class="group-section">
                 <div class="group-header">
-                    <span class="group-name">🎓 فوج: ${groupName}</span>
+                    <span class="group-name">🎓 فوج: ${formatGroupName(groupName, allUsers)}</span>
                     <div class="group-stats">
                         <span class="stat paid">✅ مدفوع: ${paid.length}</span>
                         ${partial.length > 0 ? `<span class="stat partial">⚡ جزئي: ${partial.length}</span>` : ''}
@@ -766,6 +766,7 @@ export default function DuesPage() {
                                         onSelect={(checked) => handleSelectStudent(student.id, checked)}
                                         isPaidInCurrentQuarter={isStudentPaidInCurrentQuarter(student.id)}
                                         currentQuarter={currentQuarter}
+                                        allUsers={allUsers}
                                     />
                                 )) : (
                                     <TableRow>
@@ -819,6 +820,7 @@ const PaymentRow = React.memo(({
     onSelect,
     isPaidInCurrentQuarter,
     currentQuarter,
+    allUsers,
 }: {
     student: any,
     isSuperAdmin: boolean,
@@ -829,6 +831,7 @@ const PaymentRow = React.memo(({
     onSelect: (checked: boolean) => void,
     isPaidInCurrentQuarter: boolean,
     currentQuarter: number,
+    allUsers: any[],
 }) => {
     const quarterMonthNames: Record<number, string> = {
         1: 'جانفي - مارس',
@@ -865,7 +868,7 @@ const PaymentRow = React.memo(({
                     )}
                 </div>
             </TableCell>
-            {isSuperAdmin && <TableCell><Badge variant="outline" className="font-medium">{(student as any).groupName || 'غير محدد'}</Badge></TableCell>}
+            {isSuperAdmin && <TableCell><Badge variant="outline" className="font-medium">{formatGroupName((student as any).groupName, allUsers) || 'غير محدد'}</Badge></TableCell>}
             <TableCell>
                 <Badge variant={statusVariant[student.status as 'نشط' | 'مطرود'] || 'secondary'} className="font-bold">
                     {student.status}

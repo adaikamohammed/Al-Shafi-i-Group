@@ -118,8 +118,10 @@ export default function StudentReportPage() {
                         stats.totalBehavior++;
                         switch (record.behavior) {
                             case 'هادئ': stats.calm++; break;
-                            case 'متوسط': stats.mediumBehavior++; break;
-                            case 'غير منضبط': stats.undisciplined++; break;
+                            case 'متوسط':
+                            case 'مقبول': stats.mediumBehavior++; break;
+                            case 'غير منضبط':
+                            case 'مشاغب': stats.undisciplined++; break;
                         }
                     }
                     if (record.memorization) {
@@ -127,8 +129,11 @@ export default function StudentReportPage() {
                         switch (record.memorization) {
                             case 'ممتاز': stats.excellent++; break;
                             case 'جيد': stats.good++; break;
-                            case 'متوسط': stats.average++; break;
-                            case 'ضعيف': stats.poor++; break;
+                            case 'متوسط':
+                            case 'مقبول':
+                            case 'حسن': stats.average++; break;
+                            case 'ضعيف':
+                            case 'لم يحفظ': stats.poor++; break;
                         }
                     }
                     if (record.review) {

@@ -117,8 +117,7 @@ export function GroupSelector({ value, onChange, className }: GroupSelectorProps
                                 <SelectItem key={sheikh.uid} value={sheikh.uid} className="cursor-pointer">
                                     <span className="flex items-center gap-2">
                                         <span className={cn("inline-block w-2 h-2 rounded-full", theme.isLight ? "bg-slate-400" : "bg-white/40")} />
-                                        <span>{sheikh.group || 'فوج غير محدد'}</span>
-                                        <span className="text-xs opacity-50 mx-1">({sheikh.displayName})</span>
+                                        <span>{sheikh.group || 'فوج غير محدد'} {sheikh.displayName}</span>
                                     </span>
                                 </SelectItem>
                             ))}
@@ -138,8 +137,7 @@ export function GroupSelector({ value, onChange, className }: GroupSelectorProps
                                 <SelectItem key={sheikh.uid} value={sheikh.uid} className="cursor-pointer">
                                     <span className="flex items-center gap-2">
                                         <span className={cn("inline-block w-2 h-2 rounded-full", theme.isLight ? "bg-slate-400" : "bg-white/40")} />
-                                        <span>{sheikh.group || 'فوج غير محدد'}</span>
-                                        <span className="text-xs opacity-50 mx-1">({sheikh.displayName})</span>
+                                        <span>{sheikh.group || 'فوج غير محدد'} {sheikh.displayName}</span>
                                     </span>
                                 </SelectItem>
                             ))}
@@ -159,8 +157,7 @@ export function GroupSelector({ value, onChange, className }: GroupSelectorProps
                                 <SelectItem key={sheikh.uid} value={sheikh.uid} className="cursor-pointer">
                                     <span className="flex items-center gap-2">
                                         <span className={cn("inline-block w-2 h-2 rounded-full", theme.isLight ? "bg-slate-400" : "bg-white/40")} />
-                                        <span>{sheikh.group || 'فوج غير محدد'}</span>
-                                        <span className="text-xs opacity-50 mx-1">({sheikh.displayName})</span>
+                                        <span>{sheikh.group || 'فوج غير محدد'} {sheikh.displayName}</span>
                                     </span>
                                 </SelectItem>
                             ))}

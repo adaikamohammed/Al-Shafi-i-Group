@@ -63,8 +63,9 @@ const calculatePeriodStats = (
     let memorizationSum = 0;
     let memorizationCount = 0;
 
-    const memorizationScoreMap: { [key: string]: number } = { 'ممتاز': 10, 'جيد جداً': 8, 'جيد': 6, 'متوسط': 4, 'ضعيف': 2, 'لا يوجد': 0 };
-    const behaviorScoreMap: { [key: string]: number } = { 'هادئ': 10, 'متوسط': 5, 'غير منضبط': 0 };
+    const memorizationScoreMap: { [key: string]: number } = { 'ممتاز': 10, 'جيد جداً': 7, 'جيد جدا': 7, 'جيد': 5, 'حسن': 3, 'مقبول': 2, 'متوسط': 2, 'ضعيف': 1, 'لم يحفظ': 0, 'لا يوجد': 0 };
+    // النظام الجديد: هادئ=10، مقبول=5، مشاغب=0 | القيم القديمة مُضمَّنة للتوافق مع البيانات السابقة
+    const behaviorScoreMap: { [key: string]: number } = { 'هادئ': 10, 'مقبول': 5, 'متوسط': 5, 'مشاغب': 0, 'غير منضبط': 0 };
 
     workSessions.forEach(session => {
         const sessionDate = parseISO(session.date);

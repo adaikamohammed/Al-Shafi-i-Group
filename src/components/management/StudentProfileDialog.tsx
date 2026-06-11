@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, subMonths, addMonths } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { X, ChevronLeft, ChevronRight, Calendar, TrendingUp, BookOpen, Users, Clock } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatGroupName } from '@/lib/utils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -181,7 +181,7 @@ export function StudentProfileDialog({ studentId, studentName, studentGroup, dai
                     <div>
                         <h2 className="text-base font-black">{studentName}</h2>
                         <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-                            <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md font-bold">{studentGroup}</span>
+                            <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md font-bold">{formatGroupName(studentGroup)}</span>
                             <span>{stats.total} حصة مسجلة</span>
                         </div>
                     </div>

@@ -16,9 +16,9 @@ import { logActivity } from '@/lib/activityLogger';
 
 const DEFAULT_POINTS_CONFIG: PointsConfig = {
   attendance: { 'حاضر': 5, 'متأخر': 2, 'تعويض': 1.5, 'غائب': -10 },
-  evaluation: { 'ممتاز': 10, 'جيد جداً': 7, 'جيد': 5, 'متوسط': 2, 'ضعيف': -5 },
-  behavior: { 'هادئ': 3, 'متوسط': 0, 'غير منضبط': -10 },
-  review: { 'completed': 1 },
+  evaluation: { 'ممتاز': 10, 'جيد جداً': 7, 'جيد': 5, 'حسن': 3, 'مقبول': 2, 'ضعيف': 1, 'لم يحفظ': 0 },
+  behavior: { 'هادئ': 3, 'مقبول': 1, 'مشاغب': 0 },
+  review: { 'completed': 5 },
   surah: { 'memorized': 20, 'mastered': 50 },
   covenantCompleted: 15,
 };
@@ -257,8 +257,25 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           let allAdminLogs: AdminLog[] = [];
           let finalSettings: AppSettings = DEFAULT_SETTINGS;
 
+          const mergeSettings = (val: any): AppSettings => {
+            if (!val) return DEFAULT_SETTINGS;
+            return {
+              ...DEFAULT_SETTINGS,
+              ...val,
+              points: {
+                ...DEFAULT_SETTINGS.points,
+                ...(val.points || {}),
+                attendance: { ...DEFAULT_SETTINGS.points.attendance, ...(val.points?.attendance || {}) },
+                evaluation: { ...DEFAULT_SETTINGS.points.evaluation, ...(val.points?.evaluation || {}) },
+                behavior: { ...DEFAULT_SETTINGS.points.behavior, ...(val.points?.behavior || {}) },
+                review: { ...DEFAULT_SETTINGS.points.review, ...(val.points?.review || {}) },
+                surah: { ...DEFAULT_SETTINGS.points.surah, ...(val.points?.surah || {}) },
+              }
+            };
+          };
+
           if (usersData[authContextUser.uid]?.settings) {
-            finalSettings = { ...DEFAULT_SETTINGS, ...usersData[authContextUser.uid].settings };
+            finalSettings = mergeSettings(usersData[authContextUser.uid].settings);
           }
 
           accumulatedUserLogs = {};
@@ -456,7 +473,23 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         const val = s.val();
         setActivityLogs(val ? Object.entries(val).map(([id, l]) => ({ id, ...(l as any) })) : []);
       }, handleError);
-      onValue(settingsRef, (s: any) => setSettingsState(s.val() ? { ...DEFAULT_SETTINGS, ...s.val() } : DEFAULT_SETTINGS), handleError);
+      const mergeSettings = (val: any): AppSettings => {
+        if (!val) return DEFAULT_SETTINGS;
+        return {
+          ...DEFAULT_SETTINGS,
+          ...val,
+          points: {
+            ...DEFAULT_SETTINGS.points,
+            ...(val.points || {}),
+            attendance: { ...DEFAULT_SETTINGS.points.attendance, ...(val.points?.attendance || {}) },
+            evaluation: { ...DEFAULT_SETTINGS.points.evaluation, ...(val.points?.evaluation || {}) },
+            behavior: { ...DEFAULT_SETTINGS.points.behavior, ...(val.points?.behavior || {}) },
+            review: { ...DEFAULT_SETTINGS.points.review, ...(val.points?.review || {}) },
+            surah: { ...DEFAULT_SETTINGS.points.surah, ...(val.points?.surah || {}) },
+          }
+        };
+      };
+      onValue(settingsRef, (s: any) => setSettingsState(mergeSettings(s.val())), handleError);
       onValue(weeklyOutcomesRef, (s: any) => {
         setWeeklyOutcomes(s.val() || {});
       }, handleError);
@@ -1668,14 +1701,32 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       sessionsInMonth.forEach(session => {
         (session.records ?? []).forEach(record => {
           if (studentScores[record.studentId]) {
-            studentScores[record.studentId].points += (pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] || 0);
-            studentScores[record.studentId].points += (pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] || 0);
-            studentScores[record.studentId].points += (pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] || 0);
+            let memoLevel = record.memorization;
+            if (memoLevel === 'متوسط') memoLevel = 'مقبول';
+            if (memoLevel === 'جيد جدا') memoLevel = 'جيد جداً';
+
+            let behaviorLevel = record.behavior;
+            if (behaviorLevel === 'متوسط') behaviorLevel = 'مقبول';
+            if (behaviorLevel === 'غير منضبط') behaviorLevel = 'مشاغب';
+
+            if (record.attendance && pointsConfig.attendance) {
+              studentScores[record.studentId].points += (pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] || 0);
+            }
+            if (memoLevel && pointsConfig.evaluation) {
+              studentScores[record.studentId].points += (pointsConfig.evaluation[memoLevel as keyof typeof pointsConfig.evaluation] || 0);
+            }
+            if (behaviorLevel && pointsConfig.behavior) {
+              studentScores[record.studentId].points += (pointsConfig.behavior[behaviorLevel as keyof typeof pointsConfig.behavior] || 0);
+            }
+            if (record.review && pointsConfig.review) {
+              studentScores[record.studentId].points += (pointsConfig.review.completed || 0);
+            }
+
             if (record.attendance === 'غائب') studentScores[record.studentId].stats.absent++;
             if (record.attendance === 'تعويض') studentScores[record.studentId].stats.makeup++;
-            if (record.behavior === 'هادئ') studentScores[record.studentId].stats.calm++;
-            if (record.behavior === 'متوسط') studentScores[record.studentId].stats.medium++;
-            if (record.behavior === 'غير منضبط') studentScores[record.studentId].stats.undisciplined++;
+            if (behaviorLevel === 'هادئ') studentScores[record.studentId].stats.calm++;
+            if (behaviorLevel === 'مقبول') studentScores[record.studentId].stats.medium++;
+            if (behaviorLevel === 'مشاغب') studentScores[record.studentId].stats.undisciplined++;
           }
         });
       });
@@ -1704,7 +1755,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       // Student records in month
       const studentRecordsInMonth = sessionsInMonth.flatMap(s => s.records ?? []).filter(r => r.studentId === student.id);
       const attendanceScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length) / studentRecordsInMonth.length) * 10 : 0;
-      const disciplineScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.behavior === 'هادئ').length * 2 + studentRecordsInMonth.filter(r => r.behavior === 'متوسط').length * 1) / (studentRecordsInMonth.length * 2)) * 10 : 0;
+      const disciplineScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.behavior === 'هادئ').length * 2 + studentRecordsInMonth.filter(r => r.behavior === 'مقبول' || r.behavior === 'متوسط').length * 1) / (studentRecordsInMonth.length * 2)) * 10 : 0;
       const memorizationScore = (masteredCount / 114) * 10; // 114 surahs
 
       const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط' && c.card !== 'بدون');

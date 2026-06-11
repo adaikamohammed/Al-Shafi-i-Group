@@ -17,9 +17,9 @@ import {
 // Default points configurations (in case database values aren't loaded)
 const DEFAULT_POINTS_CONFIG = {
     attendance: { 'حاضر': 5, 'متأخر': 2, 'تعويض': 1.5, 'غائب': -10 },
-    evaluation: { 'ممتاز': 10, 'جيد جداً': 7, 'جيد': 5, 'متوسط': 2, 'ضعيف': -5 },
-    behavior: { 'هادئ': 3, 'متوسط': 0, 'غير منضبط': -10 },
-    review: { 'completed': 1 },
+    evaluation: { 'ممتاز': 10, 'جيد جداً': 7, 'جيد': 5, 'حسن': 3, 'مقبول': 2, 'ضعيف': 1, 'لم يحفظ': 0 },
+    behavior: { 'هادئ': 3, 'مقبول': 1, 'مشاغب': 0 },
+    review: { 'completed': 5 },
     surah: { 'memorized': 20, 'mastered': 50 },
     covenantCompleted: 15,
 };
@@ -558,16 +558,25 @@ export async function GET(request: Request) {
                     // Memorization evaluation points and review points
                     let earnedMemoPoints = 0;
                     let hasMemo = false;
-                    const hasNewMemo = !record.review && record.memorization && pointsConfig.evaluation;
+
+                    let memoLevel = record.memorization;
+                    if (memoLevel === 'متوسط') memoLevel = 'مقبول';
+                    if (memoLevel === 'جيد جدا') memoLevel = 'جيد جداً';
+
+                    let behaviorLevel = record.behavior;
+                    if (behaviorLevel === 'متوسط') behaviorLevel = 'مقبول';
+                    if (behaviorLevel === 'غير منضبط') behaviorLevel = 'مشاغب';
+
+                    const hasNewMemo = memoLevel && pointsConfig.evaluation;
                     const hasReview = record.review && pointsConfig.review;
 
                     if (hasNewMemo) {
-                        const hifzPoints = (pointsConfig.evaluation as any)[record.memorization] ?? 0;
+                        const hifzPoints = (pointsConfig.evaluation as any)[memoLevel] ?? 0;
                         earnedMemoPoints += hifzPoints;
                         hasMemo = true;
-                        if (record.memorization === 'ممتاز') studentScores[studentId].stats.excellent++;
-                        if (record.memorization === 'جيد') studentScores[studentId].stats.good++;
-                        if (record.memorization === 'متوسط') studentScores[studentId].stats.average++;
+                        if (memoLevel === 'ممتاز') studentScores[studentId].stats.excellent++;
+                        if (memoLevel === 'جيد') studentScores[studentId].stats.good++;
+                        if (memoLevel === 'مقبول') studentScores[studentId].stats.average++;
                     }
                     if (hasReview) {
                         earnedMemoPoints += pointsConfig.review.completed;
@@ -583,12 +592,12 @@ export async function GET(request: Request) {
                     }
 
                     // Behavior points
-                    if (record.behavior && pointsConfig.behavior) {
-                        const behaviorPoints = (pointsConfig.behavior as any)[record.behavior] ?? 0;
+                    if (behaviorLevel && pointsConfig.behavior) {
+                        const behaviorPoints = (pointsConfig.behavior as any)[behaviorLevel] ?? 0;
                         studentScores[studentId].pointsBreakdown.behavior += behaviorPoints;
-                        if (record.behavior === 'هادئ') studentScores[studentId].stats.calm++;
-                        if (record.behavior === 'متوسط') studentScores[studentId].stats.medium++;
-                        if (record.behavior === 'غير منضبط') studentScores[studentId].stats.undisciplined++;
+                        if (behaviorLevel === 'هادئ') studentScores[studentId].stats.calm++;
+                        if (behaviorLevel === 'مقبول') studentScores[studentId].stats.medium++;
+                        if (behaviorLevel === 'مشاغب') studentScores[studentId].stats.undisciplined++;
                     }
                 }
             });

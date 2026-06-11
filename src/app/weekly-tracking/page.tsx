@@ -36,8 +36,10 @@ const getAttendanceColor = (status?: string) => {
 const getBehaviorClass = (behavior?: string | null) => {
     switch (behavior) {
         case 'هادئ': return 'border-blue-500';
-        case 'متوسط': return 'border-yellow-500';
-        case 'غير منضبط': return 'border-red-500';
+        case 'مقبول':
+        case 'متوسط': return 'border-yellow-500'; // متوسط = قديمة تُحوّل إلى مقبول
+        case 'مشاغب':
+        case 'غير منضبط': return 'border-red-500'; // غير منضبط = قديمة تُحوّل إلى مشاغب
         default: return 'border-transparent';
     }
 }
@@ -364,8 +366,8 @@ export default function WeeklyFollowUpPage() {
                                 <h4 className="font-semibold mb-2">السلوك (لون الإطار)</h4>
                                 <ul className="space-y-1 text-sm">
                                     <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-blue-500"></div> هادئ</li>
-                                    <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-yellow-500"></div> متوسط</li>
-                                    <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-red-500"></div> غير منضبط</li>
+                                    <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-yellow-500"></div> مقبول</li>
+                                    <li className="flex items-center gap-2"><div className="w-4 h-4 rounded-md border-2 border-red-500"></div> مشاغب</li>
                                 </ul>
                             </div>
                             <div>

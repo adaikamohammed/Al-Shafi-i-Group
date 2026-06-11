@@ -80,12 +80,20 @@ export default function MonitoringPage() {
                                 const isDelayedMemo = record.memorization && record.memorization !== 'لا يوجد' && (record.memorization as string) !== '' && !record.review && record.isDelayed;
                                 const penalty = isDelayedMemo ? 0.8 : 1.0;
 
-                                const evalMap: Record<string, number> = { 'ممتاز': 100, 'جيد جداً': 80, 'جيد': 60, 'متوسط': 40, 'ضعيف': 20 };
-                                const basePoints = evalMap[record.memorization || ''] || 0;
+                                let memoLevel = record.memorization;
+                                if (memoLevel === 'متوسط') memoLevel = 'مقبول';
+                                if (memoLevel === 'جيد جدا') memoLevel = 'جيد جداً';
+
+                                let behaviorLevel = record.behavior;
+                                if (behaviorLevel === 'متوسط') behaviorLevel = 'مقبول';
+                                if (behaviorLevel === 'غير منضبط') behaviorLevel = 'مشاغب';
+
+                                const evalMap: Record<string, number> = { 'ممتاز': 100, 'جيد جداً': 80, 'جيد': 60, 'حسن': 45, 'مقبول': 30, 'ضعيف': 15 };
+                                const basePoints = evalMap[memoLevel || ''] || 0;
                                 totalEvaluationPoints += basePoints * multiplier * penalty;
                                 // Behavior
-                                const behavMap: Record<string, number> = { 'هادئ': 100, 'متوسط': 60, 'غير منضبط': 20 };
-                                totalBehaviorPoints += behavMap[record.behavior || ''] || 0;
+                                const behavMap: Record<string, number> = { 'هادئ': 100, 'مقبول': 60, 'مشاغب': 20 };
+                                totalBehaviorPoints += behavMap[behaviorLevel || ''] || 0;
                             });
                         }
                     });

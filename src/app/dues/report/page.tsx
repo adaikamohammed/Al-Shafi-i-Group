@@ -15,7 +15,7 @@ import {
 import { getYear, getQuarter, parseISO } from 'date-fns';
 import type { PaymentStatus } from '@/lib/types';
 import * as XLSX from 'xlsx';
-import { cn } from '@/lib/utils';
+import { cn, formatGroupName } from '@/lib/utils';
 
 // ── أسماء الفصول ──────────────────────────────────────────────
 const QUARTER_NAMES: Record<number, string> = {
@@ -64,6 +64,7 @@ function GroupCard({
     isSelected: boolean;
     onToggle: () => void;
 }) {
+    const { allUsers } = useStudentContext();
     const [expanded, setExpanded] = useState(false);
 
     const paid = students.filter(s => s.paymentStatus[selectedQuarter]?.status === 'paid');
@@ -107,7 +108,7 @@ function GroupCard({
 
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <h3 className="font-bold text-sm">{groupName}</h3>
+                        <h3 className="font-bold text-sm">{formatGroupName(groupName, allUsers)}</h3>
                         <div className="flex items-center gap-1.5 text-xs flex-wrap">
                             <span className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full">
                                 ✅ {paid.length}
@@ -187,7 +188,7 @@ function StudentSection({ title, students, status, quarter }: {
 
 // ── الصفحة الرئيسية ───────────────────────────────────────────
 export default function DuesReportPage() {
-    const { students, payments, loading, settings } = useStudentContext();
+    const { students, payments, loading, settings, allUsers } = useStudentContext();
     const { isSuperAdmin, isManagement } = useAuth();
 
     const currentYear = getYear(new Date());
@@ -296,7 +297,7 @@ export default function DuesReportPage() {
             return `
             <div class="group-section">
                 <div class="group-header">
-                    <span class="group-name">🎓 فوج: ${gName}</span>
+                    <span class="group-name">🎓 فوج: ${formatGroupName(gName, allUsers)}</span>
                     <div class="group-stats">
                         <span class="stat paid">✅ مدفوع: ${paid.length}</span>
                         <span class="stat exempted">🔵 معفى: ${exempted.length}</span>
@@ -526,7 +527,7 @@ export default function DuesReportPage() {
                                                 : "bg-muted text-muted-foreground border-transparent hover:border-primary/30"
                                     )}
                                 >
-                                    <span>{g}</span>
+                                    <span>{formatGroupName(g, allUsers)}</span>
                                     <span className={cn(
                                         "text-[10px] font-black px-1.5 py-0.5 rounded-full",
                                         selectedGroups.includes(g) ? "bg-white/20" : "bg-emerald-100 text-emerald-700"

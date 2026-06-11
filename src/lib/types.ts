@@ -76,7 +76,7 @@ export interface Student {
 
 export type AttendanceStatus = "حاضر" | "غياب" | "غائب" | "متأخر" | "تعويض" | "";
 export type PerformanceLevel = "ممتاز" | "جيد جدا" | "جيد جداً" | "جيد" | "حسن" | "متوسط" | "مقبول" | "ضعيف" | "لم يحفظ" | "لا يوجد" | "لا يوجد حصيلة" | "";
-export type BehaviorLevel = "هادئ" | "متوسط" | "مقبول" | "غير منضبط" | "مشاغب" | "";
+export type BehaviorLevel = "هادئ" | "مقبول" | "مشاغب" | "";
 export type SessionType = "حصة أساسية" | "حصة أنشطة" | "يوم عطلة" | "حصة تعويضية" | "غياب الشيخ" | "حصة إضافية";
 
 export interface CatchUpEntry {
@@ -277,8 +277,8 @@ export interface Payment {
 
 export interface PointsConfig {
   attendance: { 'حاضر': number; 'متأخر': number; 'تعويض': number; 'غائب': number };
-  evaluation: { 'ممتاز': number; 'جيد جداً': number; 'جيد': number; 'متوسط': number; 'ضعيف': number };
-  behavior: { 'هادئ': number; 'متوسط': number; 'غير منضبط': number };
+  evaluation: { 'ممتاز': number; 'جيد جداً': number; 'جيد': number; 'حسن': number; 'مقبول': number; 'ضعيف': number; 'لم يحفظ': number };
+  behavior: { 'هادئ': number; 'مقبول': number; 'مشاغب': number };
   review: { 'completed': number };
   surah: { 'memorized': number; 'mastered': number };
   covenantCompleted: number; // Bonus for completing an empowerment task

@@ -22,24 +22,25 @@ interface WeeklyOutcomeModalProps {
 }
 
 const PERFORMANCE_MAPPING: Record<string, number> = {
-    'ممتاز': 5,
-    'جيد جداً': 4,
-    'جيد جدا': 4,
-    'جيد': 3,
-    'حسن': 2,
+    'ممتاز': 6,
+    'جيد جداً': 5,
+    'جيد جدا': 5,
+    'جيد': 4,
+    'حسن': 3,
     'مقبول': 2,
-    'متوسط': 1,
+    'متوسط': 2,
     'ضعيف': 1,
     'لم يحفظ': 0,
 };
 
 const REVERSE_MAPPING: PerformanceLevel[] = [
     'لم يحفظ', // 0
-    'متوسط',   // 1
-    'حسن',     // 2
-    'جيد',     // 3
-    'جيد جداً', // 4
-    'ممتاز',   // 5
+    'ضعيف',   // 1
+    'مقبول',   // 2
+    'حسن',     // 3
+    'جيد',     // 4
+    'جيد جداً', // 5
+    'ممتاز',   // 6
 ];
 
 const getDerivedWeeklyEvaluation = (memorizationLevels: (string | undefined)[]): PerformanceLevel => {
@@ -54,12 +55,13 @@ const getDerivedWeeklyEvaluation = (memorizationLevels: (string | undefined)[]):
     return REVERSE_MAPPING[avg] || '' as PerformanceLevel;
 };
 
-const EVALUATION_OPTIONS: PerformanceLevel[] = ['ممتاز', 'جيد جداً', 'جيد', 'حسن', 'متوسط', 'لم يحفظ'];
+const EVALUATION_OPTIONS: PerformanceLevel[] = ['ممتاز', 'جيد جداً', 'جيد', 'حسن', 'مقبول', 'ضعيف', 'لم يحفظ'];
 const NO_SESSION_VALUE = 'لا يوجد حصيلة' as PerformanceLevel;
 
 const normalizeLevel = (level: string | null | undefined): PerformanceLevel => {
     if (!level) return '' as PerformanceLevel;
     if (level === 'جيد جدا') return 'جيد جداً';
+    if (level === 'متوسط') return 'مقبول';
     return level as PerformanceLevel;
 };
 
@@ -69,7 +71,9 @@ const getEvaluationIcon = (level: string | undefined) => {
         case 'جيد جداً': return <CheckCircle2 className="h-4 w-4 text-blue-600" />;
         case 'جيد': return <ThumbsUp className="h-4 w-4 text-cyan-600" />;
         case 'حسن': return <Smile className="h-4 w-4 text-yellow-600" />;
+        case 'مقبول':
         case 'متوسط': return <AlertCircle className="h-4 w-4 text-amber-600" />;
+        case 'ضعيف': return <XCircle className="h-4 w-4 text-orange-600" />;
         case 'لم يحفظ': return <XCircle className="h-4 w-4 text-red-600" />;
         case 'لا يوجد حصيلة': return <CalendarOff className="h-4 w-4 text-slate-400" />;
         case 'غائب':
@@ -84,7 +88,9 @@ const getEvaluationColor = (level: string | undefined) => {
         case 'جيد جداً': return 'bg-blue-50 text-blue-700 border-blue-200';
         case 'جيد': return 'bg-cyan-50 text-cyan-700 border-cyan-200';
         case 'حسن': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+        case 'مقبول':
         case 'متوسط': return 'bg-amber-50 text-amber-700 border-amber-200';
+        case 'ضعيف': return 'bg-orange-50 text-orange-700 border-orange-200';
         case 'لم يحفظ': return 'bg-red-50 text-red-700 border-red-200';
         case 'لا يوجد حصيلة': return 'bg-slate-50 text-slate-400 border-slate-200';
         default: return 'bg-gray-50 text-gray-500 border-gray-200';

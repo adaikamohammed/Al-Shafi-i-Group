@@ -33,20 +33,31 @@ export const useStudentStats = (students: Student[] | null, dailySessions: Recor
             (session.records ?? []).forEach(record => {
                 const studentId = record.studentId;
                 if (studentScores[studentId]) {
+                    let memoLevel = record.memorization;
+                    if (memoLevel === 'متوسط') memoLevel = 'مقبول';
+                    if (memoLevel === 'جيد جدا') memoLevel = 'جيد جداً';
+
+                    let behaviorLevel = record.behavior;
+                    if (behaviorLevel === 'متوسط') behaviorLevel = 'مقبول';
+                    if (behaviorLevel === 'غير منضبط') behaviorLevel = 'مشاغب';
+
                     if (record.attendance && pointsConfig.attendance) {
                         studentScores[studentId].points += (pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] || 0);
                         if (record.attendance === 'حاضر') studentScores[studentId].stats.present++;
                         if (record.attendance === 'غائب') studentScores[studentId].stats.absent++;
                         if (record.attendance === 'تعويض') studentScores[studentId].stats.makeup++;
                     }
-                    if (record.memorization && pointsConfig.evaluation) {
-                        studentScores[studentId].points += (pointsConfig.evaluation[record.memorization as keyof typeof pointsConfig.evaluation] || 0);
+                    if (memoLevel && pointsConfig.evaluation) {
+                        studentScores[studentId].points += (pointsConfig.evaluation[memoLevel as keyof typeof pointsConfig.evaluation] || 0);
                     }
-                    if (record.behavior && pointsConfig.behavior) {
-                        studentScores[studentId].points += (pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] || 0);
-                        if (record.behavior === 'هادئ') studentScores[studentId].stats.calm++;
-                        if (record.behavior === 'متوسط') studentScores[studentId].stats.medium++;
-                        if (record.behavior === 'غير منضبط') studentScores[studentId].stats.undisciplined++;
+                    if (behaviorLevel && pointsConfig.behavior) {
+                        studentScores[studentId].points += (pointsConfig.behavior[behaviorLevel as keyof typeof pointsConfig.behavior] || 0);
+                        if (behaviorLevel === 'هادئ') studentScores[studentId].stats.calm++;
+                        if (behaviorLevel === 'مقبول') studentScores[studentId].stats.medium++;
+                        if (behaviorLevel === 'مشاغب') studentScores[studentId].stats.undisciplined++;
+                    }
+                    if (record.review && pointsConfig.review) {
+                        studentScores[studentId].points += (pointsConfig.review.completed || 0);
                     }
                 }
             });
@@ -94,18 +105,35 @@ export const useStudentStats = (students: Student[] | null, dailySessions: Recor
             sessionsInMonth.forEach(session => {
                 (session.records ?? []).forEach(record => {
                     if (studentScoresInMonth[record.studentId]) {
+                        let memoLevel = record.memorization;
+                        if (memoLevel === 'متوسط') memoLevel = 'مقبول';
+                        if (memoLevel === 'جيد جدا') memoLevel = 'جيد جداً';
+
+                        let behaviorLevel = record.behavior;
+                        if (behaviorLevel === 'متوسط') behaviorLevel = 'مقبول';
+                        if (behaviorLevel === 'غير منضبط') behaviorLevel = 'مشاغب';
+
                         if (record.attendance) {
                             if (record.attendance === 'غائب') studentScoresInMonth[record.studentId].stats.absent++;
                             if (record.attendance === 'تعويض') studentScoresInMonth[record.studentId].stats.makeup++;
                         }
-                        if (record.behavior) {
-                            if (record.behavior === 'هادئ') studentScoresInMonth[record.studentId].stats.calm++;
-                            if (record.behavior === 'متوسط') studentScoresInMonth[record.studentId].stats.medium++;
-                            if (record.behavior === 'غير منضبط') studentScoresInMonth[record.studentId].stats.undisciplined++;
+                        if (behaviorLevel) {
+                            if (behaviorLevel === 'هادئ') studentScoresInMonth[record.studentId].stats.calm++;
+                            if (behaviorLevel === 'مقبول') studentScoresInMonth[record.studentId].stats.medium++;
+                            if (behaviorLevel === 'مشاغب') studentScoresInMonth[record.studentId].stats.undisciplined++;
                         }
-                        studentScoresInMonth[record.studentId].points += (settings.points.attendance[record.attendance as keyof typeof settings.points.attendance] || 0);
-                        studentScoresInMonth[record.studentId].points += (settings.points.evaluation[record.memorization as keyof typeof settings.points.evaluation] || 0);
-                        studentScoresInMonth[record.studentId].points += (settings.points.behavior[record.behavior as keyof typeof settings.points.behavior] || 0);
+                        if (record.attendance) {
+                            studentScoresInMonth[record.studentId].points += (settings.points.attendance[record.attendance as keyof typeof settings.points.attendance] || 0);
+                        }
+                        if (memoLevel) {
+                            studentScoresInMonth[record.studentId].points += (settings.points.evaluation[memoLevel as keyof typeof settings.points.evaluation] || 0);
+                        }
+                        if (behaviorLevel) {
+                            studentScoresInMonth[record.studentId].points += (settings.points.behavior[behaviorLevel as keyof typeof settings.points.behavior] || 0);
+                        }
+                        if (record.review && settings.points.review) {
+                            studentScoresInMonth[record.studentId].points += (settings.points.review.completed || 0);
+                        }
                     }
                 });
             });

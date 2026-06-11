@@ -155,6 +155,7 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                                                 <SelectItem value="ممتاز">🌟 ممتاز</SelectItem>
                                                                 <SelectItem value="جيد جدا">✅ جيد جداً</SelectItem>
                                                                 <SelectItem value="جيد">👍 جيد</SelectItem>
+                                                                <SelectItem value="حسن">😊 حسن</SelectItem>
                                                                 <SelectItem value="مقبول">⚠️ مقبول</SelectItem>
                                                                 <SelectItem value="ضعيف">❌ ضعيف</SelectItem>
                                                                 <SelectItem value="لم يحفظ">🚫 لم يحفظ</SelectItem>
