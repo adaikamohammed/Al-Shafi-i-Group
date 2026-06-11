@@ -1672,6 +1672,189 @@ export default function FairEvaluationPage() {
                         </CardContent>
                     </Card>
                 )}
+
+                {/* 6. Scoring Points Breakdown Guide */}
+                <Card className="rounded-[2.5rem] border border-emerald-500/15 bg-gradient-to-br from-slate-50/80 to-emerald-50/30 dark:from-slate-900/40 dark:to-emerald-950/20 shadow-sm overflow-hidden">
+                    <CardHeader className="p-6 border-b border-emerald-500/10">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-600">
+                                <Star className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-lg font-headline font-black text-slate-800 dark:text-slate-100">
+                                    📊 جدول النقاط والمعايير التفصيلية
+                                </CardTitle>
+                                <CardDescription className="text-xs font-medium mt-0.5">
+                                    توضيح كامل لنظام النقاط المعتمد في تقييم كل طالب — الحضور، الحفظ، السلوك، والمراجعة
+                                </CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+
+                            {/* Attendance Points */}
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 pb-2 border-b border-emerald-500/15">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                    <h4 className="font-headline font-black text-sm text-emerald-700 dark:text-emerald-400">
+                                        🕌 الحضور والمواظبة
+                                    </h4>
+                                </div>
+                                <div className="space-y-2">
+                                    {[
+                                        { label: 'حاضر', points: (pointsConfig?.attendance as any)?.['حاضر'] ?? ATTENDANCE_POINTS['حاضر'], color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400', dot: 'bg-emerald-500' },
+                                        { label: 'تعويض', points: (pointsConfig?.attendance as any)?.['تعويض'] ?? ATTENDANCE_POINTS['تعويض'], color: 'bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400', dot: 'bg-teal-500' },
+                                        { label: 'متأخر', points: (pointsConfig?.attendance as any)?.['متأخر'] ?? ATTENDANCE_POINTS['متأخر'], color: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400', dot: 'bg-amber-500' },
+                                        { label: 'غائب', points: (pointsConfig?.attendance as any)?.['غائب'] ?? 0, color: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400', dot: 'bg-rose-500' },
+                                    ].map((item) => (
+                                        <div key={item.label} className={`flex items-center justify-between px-3 py-2 rounded-xl ${item.color}`}>
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-1.5 h-1.5 rounded-full ${item.dot}`}></div>
+                                                <span className="text-xs font-bold">{item.label}</span>
+                                            </div>
+                                            <span className="text-xs font-black tabular-nums">{item.points} نقطة</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Memorization / Evaluation Points */}
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 pb-2 border-b border-amber-500/15">
+                                    <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                                    <h4 className="font-headline font-black text-sm text-amber-700 dark:text-amber-400">
+                                        📖 جودة الحفظ والتسميع
+                                    </h4>
+                                </div>
+                                <div className="space-y-2">
+                                    {[
+                                        { label: 'ممتاز', points: (pointsConfig?.evaluation as any)?.['ممتاز'] ?? PERFORMANCE_POINTS['ممتاز'], color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400', dot: 'bg-emerald-500' },
+                                        { label: 'جيد جداً', points: (pointsConfig?.evaluation as any)?.['جيد جداً'] ?? PERFORMANCE_POINTS['جيد جداً'], color: 'bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400', dot: 'bg-teal-500' },
+                                        { label: 'جيد', points: (pointsConfig?.evaluation as any)?.['جيد'] ?? PERFORMANCE_POINTS['جيد'], color: 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400', dot: 'bg-sky-500' },
+                                        { label: 'حسن', points: (pointsConfig?.evaluation as any)?.['حسن'] ?? PERFORMANCE_POINTS['حسن'], color: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400', dot: 'bg-blue-500' },
+                                        { label: 'متوسط', points: (pointsConfig?.evaluation as any)?.['متوسط'] ?? PERFORMANCE_POINTS['متوسط'], color: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400', dot: 'bg-amber-500' },
+                                        { label: 'مقبول', points: (pointsConfig?.evaluation as any)?.['مقبول'] ?? PERFORMANCE_POINTS['مقبول'], color: 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400', dot: 'bg-orange-500' },
+                                        { label: 'ضعيف', points: (pointsConfig?.evaluation as any)?.['ضعيف'] ?? PERFORMANCE_POINTS['ضعيف'], color: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400', dot: 'bg-rose-500' },
+                                        { label: 'لم يحفظ', points: (pointsConfig?.evaluation as any)?.['لم يحفظ'] ?? 0, color: 'bg-slate-100 text-slate-500 dark:bg-slate-800/40 dark:text-slate-400', dot: 'bg-slate-400' },
+                                    ].map((item) => (
+                                        <div key={item.label} className={`flex items-center justify-between px-3 py-1.5 rounded-xl ${item.color}`}>
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-1.5 h-1.5 rounded-full ${item.dot}`}></div>
+                                                <span className="text-xs font-bold">{item.label}</span>
+                                            </div>
+                                            <span className="text-xs font-black tabular-nums">{item.points} نقطة</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Behavior Points */}
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 pb-2 border-b border-indigo-500/15">
+                                    <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                                    <h4 className="font-headline font-black text-sm text-indigo-700 dark:text-indigo-400">
+                                        🤝 انضباط السلوك
+                                    </h4>
+                                </div>
+                                <div className="space-y-2">
+                                    {[
+                                        { label: 'هادئ', points: (pointsConfig?.behavior as any)?.['هادئ'] ?? BEHAVIOR_POINTS['هادئ'], color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400', dot: 'bg-emerald-500' },
+                                        { label: 'متوسط', points: (pointsConfig?.behavior as any)?.['متوسط'] ?? BEHAVIOR_POINTS['متوسط'], color: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400', dot: 'bg-amber-500' },
+                                        { label: 'مقبول', points: (pointsConfig?.behavior as any)?.['مقبول'] ?? BEHAVIOR_POINTS['مقبول'], color: 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400', dot: 'bg-orange-500' },
+                                        { label: 'غير منضبط', points: (pointsConfig?.behavior as any)?.['غير منضبط'] ?? BEHAVIOR_POINTS['غير منضبط'], color: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400', dot: 'bg-red-500' },
+                                        { label: 'مشاغب', points: (pointsConfig?.behavior as any)?.['مشاغب'] ?? BEHAVIOR_POINTS['مشاغب'], color: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400', dot: 'bg-rose-500' },
+                                    ].map((item) => (
+                                        <div key={item.label} className={`flex items-center justify-between px-3 py-2 rounded-xl ${item.color}`}>
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-1.5 h-1.5 rounded-full ${item.dot}`}></div>
+                                                <span className="text-xs font-bold">{item.label}</span>
+                                            </div>
+                                            <span className="text-xs font-black tabular-nums">{item.points} نقطة</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-2 p-3 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-500/10 text-xs text-indigo-700 dark:text-indigo-400 font-bold leading-relaxed">
+                                    💡 السلوك <strong>اختياري</strong> في التقييم الأكاديمي ويُحتسب فقط في التقييم الشامل عند توفر تقييم السلوك.
+                                </div>
+                            </div>
+
+                            {/* Review / مراجعة */}
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 pb-2 border-b border-teal-500/15">
+                                    <div className="w-2 h-2 rounded-full bg-teal-500"></div>
+                                    <h4 className="font-headline font-black text-sm text-teal-700 dark:text-teal-400">
+                                        🔄 المراجعة (أوراد المراجعة)
+                                    </h4>
+                                </div>
+                                <div className="space-y-3">
+                                    {/* Review IS counted */}
+                                    <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400">
+                                        <div className="flex items-center gap-2">
+                                            <CheckCircle className="h-3.5 w-3.5 text-teal-600" />
+                                            <span className="text-xs font-bold">أوراد مراجعة</span>
+                                        </div>
+                                        <span className="text-xs font-black tabular-nums">
+                                            {pointsConfig?.review?.completed ?? 1} نقطة ✅
+                                        </span>
+                                    </div>
+
+                                    {/* Mixed session explanation */}
+                                    <div className="p-3 rounded-xl bg-gradient-to-br from-amber-50 to-teal-50 dark:from-amber-950/20 dark:to-teal-950/20 border border-amber-200/50 dark:border-amber-800/30 space-y-2">
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <Info className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                                            <span className="text-xs font-black text-amber-700 dark:text-amber-400">حصص الحفظ + مراجعة معاً</span>
+                                        </div>
+                                        <p className="text-xs text-slate-600 dark:text-slate-400 font-bold leading-relaxed">
+                                            عندما يُسجّل الشيخ <strong>حفظاً ومراجعة</strong> في نفس الحصة، يحصل الطالب على <strong>نقطتَي الحفظ ونقطة المراجعة معاً</strong>.
+                                        </p>
+                                        <div className="flex items-center gap-1.5 p-2 rounded-lg bg-white/60 dark:bg-slate-800/40 border border-teal-200/50">
+                                            <span className="text-xs font-black text-teal-700 dark:text-teal-400">مثال:</span>
+                                            <span className="text-xs font-bold text-slate-600 dark:text-slate-400">ممتاز (10) + مراجعة ({pointsConfig?.review?.completed ?? 1}) = {10 + (pointsConfig?.review?.completed ?? 1)} نقطة</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Note about review-only impact on percentage */}
+                                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 space-y-1">
+                                        <div className="flex items-start gap-1.5">
+                                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                                            <div>
+                                                <span className="text-xs font-black text-slate-700 dark:text-slate-300 block mb-1">تأثير المراجعة المنفردة على النسبة</span>
+                                                <p className="text-xs text-muted-foreground font-bold leading-relaxed">
+                                                    حصة المراجعة المنفردة (بدون حفظ) تُحتسب ضمن إجمالي تقييمات الحفظ. وبما أن نقطتها ({pointsConfig?.review?.completed ?? 1}) أقل من الحد الأقصى للحفظ ({pointsConfig?.evaluation ? Math.max(...Object.values(pointsConfig.evaluation).map(Number)) : 10})، فقد تُخفّض قليلاً نسبة الحفظ المئوية للطالب — وهو سلوك طبيعي ومقصود يعكس أن الحصة لم تكن حصة حفظ كاملة.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        {/* Summary Formula Row */}
+                        <div className="mt-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-500/5 via-teal-500/5 to-indigo-500/5 border border-emerald-500/10">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Sparkles className="h-4 w-4 text-emerald-600" />
+                                <span className="text-sm font-black text-slate-700 dark:text-slate-200">معادلة الحساب النهائي</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+                                <div className="p-3 rounded-xl bg-white/70 dark:bg-slate-800/40 border border-emerald-500/10">
+                                    <p className="text-[10px] text-muted-foreground font-bold mb-1">التقييم الأكاديمي</p>
+                                    <p className="text-xs font-black text-emerald-700 dark:text-emerald-400">(الحضور% + الحفظ%) ÷ 2</p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-white/70 dark:bg-slate-800/40 border border-indigo-500/10">
+                                    <p className="text-[10px] text-muted-foreground font-bold mb-1">التقييم الشامل</p>
+                                    <p className="text-xs font-black text-indigo-700 dark:text-indigo-400">(الحضور% + الحفظ% + السلوك%) ÷ 3</p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-white/70 dark:bg-slate-800/40 border border-amber-500/10">
+                                    <p className="text-[10px] text-muted-foreground font-bold mb-1">ملاحظة الوزن</p>
+                                    <p className="text-xs font-black text-amber-700 dark:text-amber-400">يوم بحصتين = وزن 0.5 لكل حصة</p>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
             </div>
         </TooltipProvider>
     );
