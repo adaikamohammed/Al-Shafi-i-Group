@@ -89,6 +89,20 @@ export interface CatchUpEntry {
   completed: boolean; // حالة الإتمام (عادة true عند الإضافة)
 }
 
+/**
+ * MakeupSession — تعويض فردي لحصة غياب سابقة
+ * يُخزَّن داخل DailyRecord الخاص بالطالب في اليوم الذي جاء فيه للتعويض.
+ * لا يؤثر على نسبة الحضور الإجمالية للمجموعة لأنه منفصل عن نظام الحصص.
+ */
+export interface MakeupSession {
+  id: string;               // معرّف فريد للتعويض
+  makeupForDate: string;    // 'YYYY-MM-DD' — تاريخ الغياب الأصلي الذي يُعوَّض
+  memorization: PerformanceLevel;
+  behavior: BehaviorLevel;
+  review: boolean;
+  savedAt: string;          // ISO timestamp — وقت تسجيل التعويض
+}
+
 export interface DailyRecord {
   sessionId: string; // To link record to a specific session on a given date
   studentId: string;
@@ -97,6 +111,8 @@ export interface DailyRecord {
   review: boolean | null;
   isDelayed?: boolean;
   catchUpRecords?: CatchUpEntry[];
+  /** حصص التعويض الفردية للطالب — مستقلة عن نظام الحصص الجماعية */
+  makeupSessions?: MakeupSession[];
   behavior: BehaviorLevel | null;
   notes?: string;
   surahId?: number;

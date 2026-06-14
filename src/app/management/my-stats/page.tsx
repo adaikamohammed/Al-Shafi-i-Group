@@ -1208,7 +1208,7 @@ export default function MyStatsPage() {
         const getBehPoints = (beh: string) => (pointsConfig?.behavior as any)?.[beh] ?? BEHAVIOR_POINTS[beh] ?? 0;
 
         return groupStudents.map(student => {
-            let present = 0, absent = 0, late = 0, substitute = 0;
+            let present = 0, absent = 0, late = 0, substitute = 0, makeupCount = 0;
             let excellent = 0, veryGood = 0, good = 0, acceptable = 0, weak = 0;
             let scoreSum = 0, scoreCount = 0;
             const allHistory: EnrichedStudentStats['lastSessions'] = [];
@@ -1279,6 +1279,47 @@ export default function MyStatsPage() {
                     behaviorPointsEarned += getBehPoints(rec.behavior) * weight;
                 }
 
+                // Process individual makeup sessions for student metrics
+                if (rec?.makeupSessions && Array.isArray(rec.makeupSessions)) {
+                    makeupCount += rec.makeupSessions.length;
+                    rec.makeupSessions.forEach((makeup: any) => {
+                        const makeupAttPts = getAttPoints('تعويض');
+                        attendancePointsEarned += makeupAttPts;
+
+                        let mkMemoPoints = 0;
+                        let hasMkMemo = false;
+                        const mkMemo = makeup.memorization;
+                        if (mkMemo && mkMemo !== 'لا يوجد' && mkMemo !== '') {
+                            mkMemoPoints += getMemoPoints(mkMemo);
+                            hasMkMemo = true;
+
+                            const scoreVal = EVAL_SCORE[mkMemo] ?? null;
+                            if (scoreVal !== null) { scoreSum += scoreVal; scoreCount++; }
+
+                            if (mkMemo === 'ممتاز') excellent++;
+                            else if (mkMemo === 'جيد جداً' || mkMemo === 'جيد جدا') veryGood++;
+                            else if (mkMemo === 'جيد') good++;
+                            else if (mkMemo === 'مقبول' || mkMemo === 'متوسط' || mkMemo === 'حسن') acceptable++;
+                            else if (mkMemo === 'ضعيف' || mkMemo === 'لم يحفظ') weak++;
+                        }
+                        if (makeup.review && pointsConfig?.review?.completed) {
+                            mkMemoPoints += pointsConfig.review.completed;
+                            hasMkMemo = true;
+                        }
+                        if (hasMkMemo) {
+                            assessedMemorization += weight;
+                            const isGroup8User = student.groupName === 'فوج 8' || student.groupName === 'فوج الشيخ عبد الحق نصيرة' || (student.groupName || '').includes('عبد الحق');
+                            const multiplier = isGroup8User ? (student.memorizationMultiplier ?? 1.0) : 1.0;
+                            memorizationPointsEarned += mkMemoPoints * weight * multiplier;
+                        }
+
+                        if (makeup.behavior && makeup.behavior !== '') {
+                            assessedBehavior += weight;
+                            behaviorPointsEarned += getBehPoints(makeup.behavior) * weight;
+                        }
+                    });
+                }
+
                 allHistory.push({
                     date,
                     attendance:   att,
@@ -1289,7 +1330,7 @@ export default function MyStatsPage() {
             });
 
             const totalSessions  = monthSessions.length;
-            const presentTotal   = present + late + substitute;
+            const presentTotal   = present + late + substitute + makeupCount;
 
             const maxAttPoints = weightedSessions * maxAttendanceVal;
             const maxMemoPoints = assessedMemorization * maxMemorizationVal;

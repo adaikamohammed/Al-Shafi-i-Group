@@ -94,6 +94,27 @@ export default function MonitoringPage() {
                                 // Behavior
                                 const behavMap: Record<string, number> = { 'هادئ': 100, 'مقبول': 60, 'مشاغب': 20 };
                                 totalBehaviorPoints += behavMap[behaviorLevel || ''] || 0;
+
+                                // Process makeup sessions
+                                if (record.makeupSessions && Array.isArray(record.makeupSessions)) {
+                                    record.makeupSessions.forEach((makeup: any) => {
+                                        totalAttendance++;
+                                        if (makeup.review) totalReview++;
+
+                                        let mkMemoLevel = makeup.memorization;
+                                        if (mkMemoLevel === 'متوسط') mkMemoLevel = 'مقبول';
+                                        if (mkMemoLevel === 'جيد جدا') mkMemoLevel = 'جيد جداً';
+
+                                        let mkBehaviorLevel = makeup.behavior;
+                                        if (mkBehaviorLevel === 'متوسط') mkBehaviorLevel = 'مقبول';
+                                        if (mkBehaviorLevel === 'غير منضبط') mkBehaviorLevel = 'مشاغب';
+
+                                        const mkBasePoints = evalMap[mkMemoLevel || ''] || 0;
+                                        totalEvaluationPoints += mkBasePoints * multiplier;
+
+                                        totalBehaviorPoints += behavMap[mkBehaviorLevel || ''] || 0;
+                                    });
+                                }
                             });
                         }
                     });

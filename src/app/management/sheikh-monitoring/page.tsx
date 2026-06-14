@@ -248,6 +248,52 @@ function calculateFairStudentStats({
                 else if (behKey === 'متوسط' || behKey === 'مقبول') st.behaviorOk++;
                 else st.behaviorBad++;
             }
+
+            // حصص التعويض الفردية — لا تؤثر على weightedSessions (نسبة المجموعة)
+            if (r.makeupSessions && Array.isArray(r.makeupSessions)) {
+                r.makeupSessions.forEach((makeup: any) => {
+                    // نقاط حضور التعويض
+                    const mkAttPts = getAttPoints('تعويض') * weight;
+                    st.attendancePointsSum += mkAttPts;
+                    st.attendanceDays++; // يُحتسب كحضور جزئي للطالب فقط
+
+                    // نقاط الحفظ
+                    let mkMemoPoints = 0;
+                    let hasMkMemo = false;
+                    if (!makeup.review && makeup.memorization && makeup.memorization !== 'لا يوجد' && makeup.memorization !== '') {
+                        mkMemoPoints += getMemoPoints(makeup.memorization);
+                        hasMkMemo = true;
+                        const memoKey = makeup.memorization === 'جيد جدا' ? 'جيد جداً' : makeup.memorization;
+                        if (memoKey === 'ممتاز') st.excellent++;
+                        else if (memoKey === 'جيد جداً') st.goodPlus++;
+                        else if (memoKey === 'جيد') st.good++;
+                        else if (memoKey === 'مقبول' || memoKey === 'حسن' || memoKey === 'متوسط') st.acceptable++;
+                        else if (memoKey === 'ضعيف') st.weak++;
+                        else if (memoKey === 'لم يحفظ') st.notMem++;
+                    }
+                    if (makeup.review && pointsConfig?.review?.completed) {
+                        mkMemoPoints += pointsConfig.review.completed;
+                        hasMkMemo = true;
+                    }
+                    if (hasMkMemo) {
+                        st.assessedMemorization += weight;
+                        st.totalEvals++;
+                        const isGroup8User = st.group === 'فوج 8' || st.group === 'فوج الشيخ عبد الحق نصيرة' || st.group.includes('عبد الحق');
+                        const multiplier = isGroup8User ? (st.memorizationMultiplier ?? 1.0) : 1.0;
+                        st.memorizationPointsSum += mkMemoPoints * weight * multiplier;
+                    }
+
+                    // نقاط السلوك
+                    if (makeup.behavior && makeup.behavior !== '') {
+                        st.assessedBehavior += weight;
+                        st.totalBehaviorEvals++;
+                        st.behaviorPointsSum += getBehPoints(makeup.behavior) * weight;
+                        if (makeup.behavior === 'هادئ') st.behaviorCalm++;
+                        else if (makeup.behavior === 'مقبول') st.behaviorOk++;
+                        else st.behaviorBad++;
+                    }
+                });
+            }
         });
     });
 

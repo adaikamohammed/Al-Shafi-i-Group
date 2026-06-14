@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, ArrowLeft, ArrowRight, Calendar, CheckCircle, TrendingUp, User, ShieldAlert, Info, AlertCircle, Bookmark, Award, LayoutDashboard, Link, UserX, Users as UsersIcon } from 'lucide-react';
+import { Loader2, ArrowLeft, ArrowRight, Calendar, CheckCircle, TrendingUp, User, ShieldAlert, Info, AlertCircle, Bookmark, Award, LayoutDashboard, Link, UserX, Users as UsersIcon, RefreshCw } from 'lucide-react';
 import { format, getYear, getDay, startOfYear, addDays, parseISO, getMonth, getDaysInMonth, startOfMonth, endOfMonth, getQuarter, setYear, setMonth, addMonths, subMonths, endOfYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -20,7 +20,7 @@ import { Save, Edit, ClipboardList, Trash2 } from 'lucide-react';
 import { ReceiptDesign } from '@/components/admin/ReceiptDesign';
 
 // Helper function to get color based on student's day data
-const getStudentDayColor = (dayData: any, viewType: 'attendance' | 'evaluation' | 'behavior' = 'attendance') => {
+const getStudentDayColor = (dayData: any, viewType: 'attendance' | 'evaluation' | 'behavior' = 'attendance', dateStr?: string, compensatedDates?: Set<string>) => {
     if (!dayData) return 'bg-gray-100 dark:bg-gray-800/40 border-transparent';
     if (dayData.isHoliday) return 'bg-blue-400 border-blue-500';
     if (dayData.isSheikhAbsentNoSub) return 'bg-rose-400 border-rose-500';
@@ -33,6 +33,10 @@ const getStudentDayColor = (dayData: any, viewType: 'attendance' | 'evaluation' 
 
     if (viewType === 'attendance') {
         const statuses = records.map((r: any) => r.attendance);
+        const isCompensated = dateStr && compensatedDates && compensatedDates.has(dateStr);
+        if (isCompensated) {
+            return 'bg-emerald-100 dark:bg-emerald-950/60 border-emerald-400 dark:border-emerald-700 border-2 text-emerald-800 dark:text-emerald-300';
+        }
         if (statuses.includes('حاضر')) return hasMultiple ? 'bg-emerald-700 border-emerald-800 shadow-inner' : 'bg-emerald-500 border-emerald-600';
         if (statuses.includes('متأخر')) return hasMultiple ? 'bg-amber-500 border-amber-600 shadow-inner' : 'bg-amber-400 border-amber-500';
         if (statuses.includes('غياب') || statuses.includes('غائب')) return hasMultiple ? 'bg-red-700 border-red-800 shadow-inner' : 'bg-red-500 border-red-600';
@@ -60,7 +64,7 @@ const getStudentDayColor = (dayData: any, viewType: 'attendance' | 'evaluation' 
     }
 };
 
-const StudentDayTooltip = ({ day, dayData }: { day: Date, dayData: any }) => {
+const StudentDayTooltip = ({ day, dayData, isCompensated }: { day: Date, dayData: any, isCompensated?: boolean }) => {
     const formattedDate = format(day, 'd MMMM yyyy', { locale: ar });
 
     if (!dayData) {
@@ -70,6 +74,11 @@ const StudentDayTooltip = ({ day, dayData }: { day: Date, dayData: any }) => {
     return (
         <div className="space-y-2 text-right min-w-[180px] p-1">
             <p className="font-black border-b pb-1.5 mb-2 text-center text-primary">{formattedDate}</p>
+            {isCompensated && (
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-1.5 mb-2 text-emerald-700 dark:text-emerald-300 text-center font-bold text-[11px]">
+                    ✓ تم تعويض غياب هذا اليوم!
+                </div>
+            )}
             {dayData.isHoliday && <p className="text-blue-600 font-black flex items-center gap-2 justify-end">يوم عطلة <span className="w-2 h-2 rounded-full bg-blue-500"></span></p>}
             {dayData.isSheikhAbsentNoSub && <p className="text-rose-600 font-black flex items-center gap-2 justify-end">غياب الشيخ (بدون بديل) <span className="w-2 h-2 rounded-full bg-rose-500"></span></p>}
             {dayData.isSheikhAbsentWithSub && <p className="text-purple-600 font-black flex items-center gap-2 justify-end">غياب الشيخ (مع بديل) <span className="w-2 h-2 rounded-full bg-purple-500"></span></p>}
@@ -81,6 +90,20 @@ const StudentDayTooltip = ({ day, dayData }: { day: Date, dayData: any }) => {
                     {record.memorization && <p className="text-xs flex justify-between gap-4"><span className="opacity-60">التقييم:</span> <span className="font-black">{record.memorization}</span></p>}
                     {record.behavior && <p className="text-xs flex justify-between gap-4"><span className="opacity-60">السلوك:</span> <span className="font-black">{record.behavior}</span></p>}
                     {record.notes && <p className="text-[10px] text-muted-foreground mt-1 border-t pt-1 italic select-none">"{record.notes}"</p>}
+
+                    {record.makeupSessions && record.makeupSessions.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-dashed border-muted-foreground/30 text-right">
+                            <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 mb-1 text-center">تعويض الحصص المنجزة في هذا اليوم:</p>
+                            {record.makeupSessions.map((makeup: any, mIdx: number) => (
+                                <div key={mIdx} className="bg-amber-500/10 border border-amber-500/30 rounded p-1 text-[10px] mt-1 space-y-0.5">
+                                    <p className="font-medium text-amber-700 dark:text-amber-300">تعويض لحصة يوم: {makeup.makeupForDate}</p>
+                                    <p className="flex justify-between"><span>التقييم:</span> <span className="font-semibold">{makeup.memorization || 'لا يوجد'}</span></p>
+                                    {makeup.review && <p className="text-emerald-700 dark:text-emerald-300 font-semibold text-center">أوراد مراجعة</p>}
+                                    {makeup.behavior && <p className="flex justify-between"><span>السلوك:</span> <span className="font-semibold">{makeup.behavior}</span></p>}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             ))}
 
@@ -92,7 +115,7 @@ const StudentDayTooltip = ({ day, dayData }: { day: Date, dayData: any }) => {
 };
 
 // Components adapted for student view
-const StudentYearView = ({ year, data, onDayClick, viewType }: { year: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' | 'behavior' }) => {
+const StudentYearView = ({ year, data, onDayClick, viewType, compensatedDates }: { year: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' | 'behavior', compensatedDates: Set<string> }) => {
     const yearStart = startOfYear(new Date(year, 0, 1));
     const daysInYear = getYear(yearStart) % 4 === 0 && (getYear(yearStart) % 100 !== 0 || getYear(yearStart) % 400 === 0) ? 366 : 365;
     const days = Array.from({ length: daysInYear }, (_, i) => addDays(yearStart, i));
@@ -105,14 +128,14 @@ const StudentYearView = ({ year, data, onDayClick, viewType }: { year: number, d
             {days.map(day => {
                 const dateString = format(day, 'yyyy-MM-dd');
                 const dayData = data[dateString];
-                const colorClass = getStudentDayColor(dayData, viewType);
+                const colorClass = getStudentDayColor(dayData, viewType, dateString, compensatedDates);
 
                 return (
                     <Tooltip key={dateString}>
                         <TooltipTrigger asChild>
                             <div className={cn("w-4 h-4 rounded cursor-pointer transition-transform hover:scale-125", colorClass)} onClick={() => onDayClick(day)} />
                         </TooltipTrigger>
-                        <TooltipContent><StudentDayTooltip day={day} dayData={dayData} /></TooltipContent>
+                        <TooltipContent><StudentDayTooltip day={day} dayData={dayData} isCompensated={compensatedDates.has(dateString)} /></TooltipContent>
                     </Tooltip>
                 );
             })}
@@ -120,7 +143,7 @@ const StudentYearView = ({ year, data, onDayClick, viewType }: { year: number, d
     );
 };
 
-const StudentQuarterView = ({ year, quarter, data, onDayClick, viewType }: { year: number, quarter: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' | 'behavior' }) => {
+const StudentQuarterView = ({ year, quarter, data, onDayClick, viewType, compensatedDates }: { year: number, quarter: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' | 'behavior', compensatedDates: Set<string> }) => {
     const startMonthIndex = (quarter - 1) * 3;
     const months = [startMonthIndex, startMonthIndex + 1, startMonthIndex + 2];
 
@@ -144,13 +167,13 @@ const StudentQuarterView = ({ year, quarter, data, onDayClick, viewType }: { yea
                             {days.map(day => {
                                 const dateString = format(day, 'yyyy-MM-dd');
                                 const dayData = data[dateString];
-                                const colorClass = getStudentDayColor(dayData, viewType);
+                                const colorClass = getStudentDayColor(dayData, viewType, dateString, compensatedDates);
                                 return (
                                     <Tooltip key={dateString}>
                                         <TooltipTrigger asChild>
                                             <div className={cn("aspect-square rounded-md cursor-pointer transition-all hover:ring-2 hover:ring-primary/50", colorClass)} onClick={() => onDayClick(day)} />
                                         </TooltipTrigger>
-                                        <TooltipContent><StudentDayTooltip day={day} dayData={dayData} /></TooltipContent>
+                                        <TooltipContent><StudentDayTooltip day={day} dayData={dayData} isCompensated={compensatedDates.has(dateString)} /></TooltipContent>
                                     </Tooltip>
                                 );
                             })}
@@ -162,7 +185,7 @@ const StudentQuarterView = ({ year, quarter, data, onDayClick, viewType }: { yea
     );
 };
 
-const StudentMonthView = ({ year, month, data, onDayClick, viewType }: { year: number, month: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' | 'behavior' }) => {
+const StudentMonthView = ({ year, month, data, onDayClick, viewType, compensatedDates }: { year: number, month: number, data: any, onDayClick: (date: Date) => void, viewType: 'attendance' | 'evaluation' | 'behavior', compensatedDates: Set<string> }) => {
     const monthStart = startOfMonth(new Date(year, month));
     const daysInMonth = getDaysInMonth(monthStart);
     const firstDay = getDay(monthStart);
@@ -179,7 +202,7 @@ const StudentMonthView = ({ year, month, data, onDayClick, viewType }: { year: n
         const day = new Date(year, month, i);
         const dateString = format(day, 'yyyy-MM-dd');
         const dayData = data[dateString];
-        const colorClass = getStudentDayColor(dayData, viewType);
+        const colorClass = getStudentDayColor(dayData, viewType, dateString, compensatedDates);
         dayCells.push(
             <Tooltip key={dateString}>
                 <TooltipTrigger asChild>
@@ -187,7 +210,7 @@ const StudentMonthView = ({ year, month, data, onDayClick, viewType }: { year: n
                         <span className="font-bold text-lg">{i}</span>
                     </div>
                 </TooltipTrigger>
-                <TooltipContent><StudentDayTooltip day={day} dayData={dayData} /></TooltipContent>
+                <TooltipContent><StudentDayTooltip day={day} dayData={dayData} isCompensated={compensatedDates.has(dateString)} /></TooltipContent>
             </Tooltip>
         );
     }
@@ -296,6 +319,23 @@ function StudentHistoryContent() {
         return data;
     }, [dailySessions, selectedStudentId]);
 
+    const compensatedDates = useMemo(() => {
+        const set = new Set<string>();
+        if (!studentData) return set;
+        Object.values(studentData).forEach((day: any) => {
+            (day.records || []).forEach((record: any) => {
+                if (record.makeupSessions && Array.isArray(record.makeupSessions)) {
+                    record.makeupSessions.forEach((makeup: any) => {
+                        if (makeup.makeupForDate) {
+                            set.add(makeup.makeupForDate);
+                        }
+                    });
+                }
+            });
+        });
+        return set;
+    }, [studentData]);
+
     const { stats, statsTitle } = useMemo(() => {
         if (!selectedStudentId || !studentData) return {
             stats: {
@@ -303,6 +343,7 @@ function StudentHistoryContent() {
                 totalPresent: 0,
                 totalAbsent: 0,
                 totalLate: 0,
+                makeupCount: 0,
                 avgEval: '---',
                 sheikhAbsenceNoSub: 0,
                 sheikhAbsenceWithSub: 0,
@@ -355,12 +396,14 @@ function StudentHistoryContent() {
         const presentCount = allRecords.filter((r: any) => r.attendance === 'حاضر').length;
         const lateCount = allRecords.filter((r: any) => r.attendance === 'متأخر').length;
         const absentCount = allRecords.filter((r: any) => r.attendance === 'غياب' || r.attendance === 'غائب').length;
+        const makeupCount = allRecords.reduce((acc: number, r: any) => acc + (r.makeupSessions?.length || 0), 0);
 
         const sheikhAbsenceNoSub = filteredDays.filter(d => d.isSheikhAbsentNoSub).length;
         const sheikhAbsenceWithSub = filteredDays.filter(d => d.isSheikhAbsentWithSub).length;
 
         const totalWorkSessions = presentCount + lateCount + absentCount;
-        const rate = totalWorkSessions > 0 ? ((presentCount + lateCount) / totalWorkSessions) * 100 : 0;
+        // Boost attendance rate by makeup sessions (compensated absences count towards attendance with a weight of 0.3)
+        const rate = totalWorkSessions > 0 ? Math.min(100, ((presentCount + lateCount + (makeupCount * 0.3)) / totalWorkSessions) * 100) : 0;
 
         // Split calculations for session 1 and 2
         const records1 = allRecords.filter((r: any) => r.sessionNumber === 1);
@@ -398,6 +441,7 @@ function StudentHistoryContent() {
                 totalPresent: presentCount,
                 totalAbsent: absentCount,
                 totalLate: lateCount,
+                makeupCount,
                 avgEval: dominantEval,
                 sheikhAbsenceNoSub,
                 sheikhAbsenceWithSub,
@@ -590,7 +634,7 @@ function StudentHistoryContent() {
                                         </div>
                                     </CardHeader>
                                     <CardContent className="p-6">
-                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
                                             <StudentStatWidget
                                                 title="حضور"
                                                 value={stats.totalPresent}
@@ -635,6 +679,13 @@ function StudentHistoryContent() {
                                                 unit="بديل"
                                                 icon={<UsersIcon className="h-5 w-5 text-purple-600" />}
                                                 colorClass="bg-purple-50"
+                                            />
+                                            <StudentStatWidget
+                                                title="التعويض"
+                                                value={stats.makeupCount}
+                                                unit="حصة"
+                                                icon={<RefreshCw className="h-5 w-5 text-amber-500" />}
+                                                colorClass="bg-amber-50"
                                             />
                                             <StudentStatWidget
                                                 title="الانضباط"
@@ -735,9 +786,9 @@ function StudentHistoryContent() {
                                 )}
 
                                 <div className="py-4 overflow-x-auto min-h-[250px] scrollbar-hide">
-                                    {viewMode === 'year' && <StudentYearView year={currentYear} data={studentData} onDayClick={(date) => { setCurrentDate(date); setViewMode('month'); }} viewType={viewType} />}
-                                    {viewMode === 'quarter' && <StudentQuarterView year={currentYear} quarter={currentQuarter} data={studentData} onDayClick={(date) => { setCurrentDate(date); setViewMode('month'); }} viewType={viewType} />}
-                                    {viewMode === 'month' && <StudentMonthView year={currentYear} month={currentMonth} data={studentData} onDayClick={(date) => console.log(date)} viewType={viewType} />}
+                                    {viewMode === 'year' && <StudentYearView year={currentYear} data={studentData} onDayClick={(date) => { setCurrentDate(date); setViewMode('month'); }} viewType={viewType} compensatedDates={compensatedDates} />}
+                                    {viewMode === 'quarter' && <StudentQuarterView year={currentYear} quarter={currentQuarter} data={studentData} onDayClick={(date) => { setCurrentDate(date); setViewMode('month'); }} viewType={viewType} compensatedDates={compensatedDates} />}
+                                    {viewMode === 'month' && <StudentMonthView year={currentYear} month={currentMonth} data={studentData} onDayClick={(date) => console.log(date)} viewType={viewType} compensatedDates={compensatedDates} />}
                                 </div>
 
                                 <div className="mt-10 border-t pt-8">
@@ -748,6 +799,7 @@ function StudentHistoryContent() {
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-emerald-700 border border-emerald-800 shadow-inner"></div> حصتان (حضور)</span>
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-amber-400 border border-amber-500"></div> متأخر</span>
                                                 <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-red-500 border border-red-600"></div> غائب</span>
+                                                <span className="flex items-center gap-2 font-bold text-xs"><div className="w-4 h-4 rounded-md bg-emerald-100 dark:bg-emerald-950/60 border-emerald-400 dark:border-emerald-700 border-2"></div> تم تعويضه</span>
                                             </>
                                         ) : viewType === 'evaluation' ? (
                                             <>

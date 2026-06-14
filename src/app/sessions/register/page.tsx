@@ -204,6 +204,60 @@ function RegisterSessionContent() {
             .filter(item => item !== null);
     }, [isAdmin5, dailySessions, selectedDay]);
 
+    /**
+     * studentAbsenceHistory — قائمة أيام الغياب لكل طالب
+     * تُستخدم لإظهار الخيارات في نافذة تسجيل التعويض.
+     * لا تؤثر على نظام الحصص الجماعية.
+     */
+    const studentAbsenceHistory = useMemo(() => {
+        const result: Record<string, Array<{ date: string; label: string }>> = {};
+        if (!dailySessions) return result;
+
+        Object.entries(dailySessions).forEach(([date, sessionsForDay]) => {
+            if (!sessionsForDay || typeof sessionsForDay !== 'object') return;
+            // تخطّي الحصص المستقبلية واليوم الحالي
+            try {
+                const d = parseISO(date);
+                if (selectedDay && d >= selectedDay) return;
+            } catch { return; }
+
+            Object.values(sessionsForDay as Record<string, any>).forEach((session: any) => {
+                if (!session) return;
+                const sType = session.sessionType;
+                // تخطّي أيام العطل وغياب الشيخ بدون مستخلف
+                if (sType === 'يوم عطلة' || (sType === 'غياب الشيخ' && !session.substituteTeacher)) return;
+
+                const records = Array.isArray(session.records)
+                    ? session.records
+                    : session.records ? Object.values(session.records) : [];
+
+                records.forEach((record: any) => {
+                    if (record.attendance === 'غائب' || record.attendance === 'غياب') {
+                        if (!result[record.studentId]) result[record.studentId] = [];
+                        // منع التكرار لنفس التاريخ
+                        if (!result[record.studentId].some(r => r.date === date)) {
+                            try {
+                                const d = parseISO(date);
+                                result[record.studentId].push({
+                                    date,
+                                    label: format(d, 'EEEE dd/MM/yyyy', { locale: ar })
+                                });
+                            } catch { /* skip invalid dates */ }
+                        }
+                    }
+                });
+            });
+        });
+
+        // ترتيب تنازلي (الأحدث أولاً) والاحتفاظ بآخر 20 غياباً لكل طالب
+        Object.keys(result).forEach(sid => {
+            result[sid].sort((a, b) => b.date.localeCompare(a.date));
+            result[sid] = result[sid].slice(0, 20);
+        });
+
+        return result;
+    }, [dailySessions, selectedDay]);
+
     const DRAFT_KEY = useMemo(() => {
         return selectedDay ? `session_draft_${format(selectedDay, 'yyyy-MM-dd')}_s${sessionToOpen}` : null;
     }, [selectedDay, sessionToOpen]);
@@ -365,7 +419,8 @@ function RegisterSessionContent() {
                             surahId: record.surahId,
                             fromVerse: record.fromVerse,
                             toVerse: record.toVerse,
-                            catchUpRecords: record.catchUpRecords || [] // Load catch-up
+                            catchUpRecords: record.catchUpRecords || [], // Load catch-up
+                            makeupSessions: record.makeupSessions || [] // Load makeup sessions
                         };
                     });
                     setAttendanceRecords(records);
@@ -661,6 +716,7 @@ function RegisterSessionContent() {
                     tasmieFromVerse: isAdmin5 ? data.tasmieFromVerse : null,
                     tasmieToVerse: isAdmin5 ? data.tasmieToVerse : null,
                     catchUpRecords: d.catchUpRecords || [], // Save catch-up records
+                    makeupSessions: d.makeupSessions || [], // حفظ حصص التعويض الفردية
                 };
             }
         });
@@ -884,7 +940,8 @@ function RegisterSessionContent() {
                             surahId: record.surahId,
                             fromVerse: record.fromVerse,
                             toVerse: record.toVerse,
-                            catchUpRecords: record.catchUpRecords || []
+                            catchUpRecords: record.catchUpRecords || [],
+                            makeupSessions: record.makeupSessions || []
                         };
                     });
                     setAttendanceRecords(records);
@@ -1291,6 +1348,7 @@ function RegisterSessionContent() {
                             onUpdateRecord={handleUpdateRecord}
                             sessionType={sessionType}
                             pastWirds={pastWirds}
+                            studentAbsenceHistory={studentAbsenceHistory}
                         />
                     </div>
                 )}

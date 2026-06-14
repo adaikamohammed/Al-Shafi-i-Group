@@ -337,6 +337,53 @@ export default function FairEvaluationPage() {
                         score.behaviorCounts[behKey]++;
                     }
                 }
+
+                // D. حصص التعويض الفردية — لا تؤثر على weightedSessions (نسبة المجموعة)
+                if ((record as any).makeupSessions && Array.isArray((record as any).makeupSessions)) {
+                    ((record as any).makeupSessions as any[]).forEach((makeup: any) => {
+                        // نقاط حضور التعويض (أقل من الحضور الأصلي)
+                        const makeupAttPts = getAttPoints('تعويض');
+                        score.attendanceRate += makeupAttPts;
+                        score.makeupCount++;
+                        if (score.attendanceCounts['تعويض'] !== undefined) {
+                            score.attendanceCounts['تعويض']++;
+                        }
+
+                        // نقاط الحفظ في التعويض
+                        let mkMemoPoints = 0;
+                        let hasMkMemo = false;
+                        const mkMemo = makeup.memorization;
+                        if (mkMemo && mkMemo !== 'لا يوجد' && mkMemo !== '') {
+                            mkMemoPoints += getMemoPoints(mkMemo);
+                            hasMkMemo = true;
+                            const memoKey = mkMemo === 'جيد جدا' ? 'جيد جداً' : mkMemo;
+                            if (score.memorizationCounts[memoKey] !== undefined) {
+                                score.memorizationCounts[memoKey]++;
+                            }
+                        }
+                        if (makeup.review && pointsConfig?.review?.completed) {
+                            mkMemoPoints += pointsConfig.review.completed;
+                            hasMkMemo = true;
+                            score.memorizationCounts['أوراد مراجعة']++;
+                        }
+                        if (hasMkMemo) {
+                            score.assessedMemorization += weight;
+                            const isGroup8User = score.groupName === 'فوج 8' || score.groupName === 'فوج الشيخ عبد الحق نصيرة' || score.groupName.includes('عبد الحق');
+                            const multiplier = isGroup8User ? (score.memorizationMultiplier ?? 1.0) : 1.0;
+                            score.memorizationRate += mkMemoPoints * weight * multiplier;
+                        }
+
+                        // نقاط السلوك في التعويض
+                        if (makeup.behavior && makeup.behavior !== '') {
+                            score.assessedBehavior += weight;
+                            score.behaviorRate += getBehPoints(makeup.behavior) * weight;
+                            const behKey = makeup.behavior;
+                            if (score.behaviorCounts[behKey] !== undefined) {
+                                score.behaviorCounts[behKey]++;
+                            }
+                        }
+                    });
+                }
             });
         });
 
@@ -453,6 +500,35 @@ export default function FairEvaluationPage() {
                     if (record.behavior && record.behavior !== '') {
                         mScore.assessedBehavior += weight;
                         mScore.behaviorRate += getBehPoints(record.behavior) * weight;
+                    }
+
+                    // Process makeup sessions for monthly rankings
+                    if (record.makeupSessions && Array.isArray(record.makeupSessions)) {
+                        record.makeupSessions.forEach((makeup: any) => {
+                            const makeupAttPts = getAttPoints('تعويض');
+                            mScore.attendanceRate += makeupAttPts;
+
+                            let mkMemoPoints = 0;
+                            let hasMkMemo = false;
+                            const mkMemo = makeup.memorization;
+                            if (mkMemo && mkMemo !== 'لا يوجد' && mkMemo !== '') {
+                                mkMemoPoints += getMemoPoints(mkMemo);
+                                hasMkMemo = true;
+                            }
+                            if (makeup.review && pointsConfig?.review?.completed) {
+                                mkMemoPoints += pointsConfig.review.completed;
+                                hasMkMemo = true;
+                            }
+                            if (hasMkMemo) {
+                                mScore.assessedMemorization += weight;
+                                mScore.memorizationRate += mkMemoPoints * weight * multiplier;
+                            }
+
+                            if (makeup.behavior && makeup.behavior !== '') {
+                                mScore.assessedBehavior += weight;
+                                mScore.behaviorRate += getBehPoints(makeup.behavior) * weight;
+                            }
+                        });
                     }
                 });
             });

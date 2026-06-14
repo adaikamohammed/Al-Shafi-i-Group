@@ -59,6 +59,37 @@ export const useStudentStats = (students: Student[] | null, dailySessions: Recor
                     if (record.review && pointsConfig.review) {
                         studentScores[studentId].points += (pointsConfig.review.completed || 0);
                     }
+
+                    // Process individual makeup sessions for student points and commitment statistics
+                    if (record.makeupSessions && Array.isArray(record.makeupSessions)) {
+                        record.makeupSessions.forEach((makeup: any) => {
+                            studentScores[studentId].stats.makeup++;
+
+                            const makeupAttPts = pointsConfig.attendance?.['تعويض'] ?? 1.5;
+                            studentScores[studentId].points += makeupAttPts;
+
+                            let mkMemoLevel = makeup.memorization;
+                            if (mkMemoLevel === 'متوسط') mkMemoLevel = 'مقبول';
+                            if (mkMemoLevel === 'جيد جدا') mkMemoLevel = 'جيد جداً';
+
+                            let mkBehaviorLevel = makeup.behavior;
+                            if (mkBehaviorLevel === 'متوسط') mkBehaviorLevel = 'مقبول';
+                            if (mkBehaviorLevel === 'غير منضبط') mkBehaviorLevel = 'مشاغب';
+
+                            if (mkMemoLevel && pointsConfig.evaluation) {
+                                studentScores[studentId].points += (pointsConfig.evaluation[mkMemoLevel as keyof typeof pointsConfig.evaluation] || 0);
+                            }
+                            if (mkBehaviorLevel && pointsConfig.behavior) {
+                                studentScores[studentId].points += (pointsConfig.behavior[mkBehaviorLevel as keyof typeof pointsConfig.behavior] || 0);
+                                if (mkBehaviorLevel === 'هادئ') studentScores[studentId].stats.calm++;
+                                if (mkBehaviorLevel === 'مقبول') studentScores[studentId].stats.medium++;
+                                if (mkBehaviorLevel === 'مشاغب') studentScores[studentId].stats.undisciplined++;
+                            }
+                            if (makeup.review && pointsConfig.review) {
+                                studentScores[studentId].points += (pointsConfig.review.completed || 0);
+                            }
+                        });
+                    }
                 }
             });
         });
@@ -133,6 +164,37 @@ export const useStudentStats = (students: Student[] | null, dailySessions: Recor
                         }
                         if (record.review && settings.points.review) {
                             studentScoresInMonth[record.studentId].points += (settings.points.review.completed || 0);
+                        }
+
+                        // Process individual makeup sessions for student medal history points
+                        if (record.makeupSessions && Array.isArray(record.makeupSessions)) {
+                            record.makeupSessions.forEach((makeup: any) => {
+                                studentScoresInMonth[record.studentId].stats.makeup++;
+
+                                const makeupAttPts = settings.points.attendance?.['تعويض'] ?? 1.5;
+                                studentScoresInMonth[record.studentId].points += makeupAttPts;
+
+                                let mkMemoLevel = makeup.memorization;
+                                if (mkMemoLevel === 'متوسط') mkMemoLevel = 'مقبول';
+                                if (mkMemoLevel === 'جيد جدا') mkMemoLevel = 'جيد جداً';
+
+                                let mkBehaviorLevel = makeup.behavior;
+                                if (mkBehaviorLevel === 'متوسط') mkBehaviorLevel = 'مقبول';
+                                if (mkBehaviorLevel === 'غير منضبط') mkBehaviorLevel = 'مشاغب';
+
+                                if (mkMemoLevel && settings.points.evaluation) {
+                                    studentScoresInMonth[record.studentId].points += (settings.points.evaluation[mkMemoLevel as keyof typeof settings.points.evaluation] || 0);
+                                }
+                                if (mkBehaviorLevel && settings.points.behavior) {
+                                    studentScoresInMonth[record.studentId].points += (settings.points.behavior[mkBehaviorLevel as keyof typeof settings.points.behavior] || 0);
+                                    if (mkBehaviorLevel === 'هادئ') studentScoresInMonth[record.studentId].stats.calm++;
+                                    if (mkBehaviorLevel === 'مقبول') studentScoresInMonth[record.studentId].stats.medium++;
+                                    if (mkBehaviorLevel === 'مشاغب') studentScoresInMonth[record.studentId].stats.undisciplined++;
+                                }
+                                if (makeup.review && settings.points.review) {
+                                    studentScoresInMonth[record.studentId].points += (settings.points.review.completed || 0);
+                                }
+                            });
                         }
                     }
                 });
