@@ -19,11 +19,11 @@ import { Button } from '@/components/ui/button';
 
 // Constants for fallback points
 const ATTENDANCE_POINTS: Record<string, number> = {
-    'حاضر': 10,
-    'تعويض': 8,
-    'متأخر': 5,
-    'غائب': 0,
-    'غياب': 0
+    'حاضر': 5,
+    'تعويض': 3.5,
+    'متأخر': 2,
+    'غائب': -10,
+    'غياب': -10
 };
 
 const PERFORMANCE_POINTS: Record<string, number> = {
@@ -1866,7 +1866,7 @@ export default function FairEvaluationPage() {
                                             <span className="text-xs font-bold">أوراد مراجعة</span>
                                         </div>
                                         <span className="text-xs font-black tabular-nums">
-                                            {pointsConfig?.review?.completed ?? 5} نقاط ✅
+                                            {pointsConfig?.review?.completed ?? 3} نقاط ✅
                                         </span>
                                     </div>
 
@@ -1881,7 +1881,7 @@ export default function FairEvaluationPage() {
                                         </p>
                                         <div className="flex items-center gap-1.5 p-2 rounded-lg bg-white/60 dark:bg-slate-800/40 border border-teal-200/50">
                                             <span className="text-xs font-black text-teal-700 dark:text-teal-400">مثال:</span>
-                                            <span className="text-xs font-bold text-slate-600 dark:text-slate-400">ممتاز (10) + مراجعة ({pointsConfig?.review?.completed ?? 5}) = {10 + (pointsConfig?.review?.completed ?? 5)} نقاط</span>
+                                            <span className="text-xs font-bold text-slate-600 dark:text-slate-400">ممتاز (10) + مراجعة ({pointsConfig?.review?.completed ?? 3}) = {10 + (pointsConfig?.review?.completed ?? 3)} نقاط</span>
                                         </div>
                                     </div>
 
@@ -1892,7 +1892,7 @@ export default function FairEvaluationPage() {
                                             <div>
                                                 <span className="text-xs font-black text-slate-700 dark:text-slate-300 block mb-1">تأثير المراجعة المنفردة على النسبة</span>
                                                 <p className="text-xs text-muted-foreground font-bold leading-relaxed">
-                                                    حصة المراجعة المنفردة (بدون حفظ) تُحتسب ضمن إجمالي تقييمات الحفظ. وبما أن نقطتها ({pointsConfig?.review?.completed ?? 5}) أقل من الحد الأقصى للحفظ ({pointsConfig?.evaluation ? Math.max(...Object.values(pointsConfig.evaluation).map(Number)) : 10})، فقد تُخفّض قليلاً نسبة الحفظ المئوية للطالب — وهو سلوك طبيعي ومقصود يعكس أن الحصة لم تكن حصة حفظ كاملة.
+                                                    حصة المراجعة المنفردة (بدون حفظ) تُحتسب ضمن إجمالي تقييمات الحفظ. وبما أن نقطتها ({pointsConfig?.review?.completed ?? 3}) أقل من الحد الأقصى للحفظ ({pointsConfig?.evaluation ? Math.max(...Object.values(pointsConfig.evaluation).map(Number)) : 10})، فقد تُخفّض قليلاً نسبة الحفظ المئوية للطالب — وهو سلوك طبيعي ومقصود يعكس أن الحصة لم تكن حصة حفظ كاملة.
                                                 </p>
                                             </div>
                                         </div>

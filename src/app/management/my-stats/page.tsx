@@ -97,11 +97,11 @@ interface EnrichedStudentStats {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const ATTENDANCE_POINTS: Record<string, number> = {
-    'حاضر': 10,
-    'تعويض': 8,
-    'متأخر': 5,
-    'غائب': 0,
-    'غياب': 0
+    'حاضر': 5,
+    'تعويض': 3.5,
+    'متأخر': 2,
+    'غائب': -10,
+    'غياب': -10
 };
 
 const PERFORMANCE_POINTS: Record<string, number> = {

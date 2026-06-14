@@ -18,7 +18,7 @@ const DEFAULT_POINTS_CONFIG: PointsConfig = {
   attendance: { 'حاضر': 5, 'متأخر': 2, 'تعويض': 3.5, 'غائب': -10 },
   evaluation: { 'ممتاز': 10, 'جيد جداً': 7, 'جيد': 5, 'حسن': 3, 'مقبول': 2, 'ضعيف': 1, 'لم يحفظ': 0 },
   behavior: { 'هادئ': 3, 'مقبول': 1, 'مشاغب': 0 },
-  review: { 'completed': 5 },
+  review: { 'completed': 3 },
   surah: { 'memorized': 20, 'mastered': 50 },
   covenantCompleted: 15,
 };
@@ -240,7 +240,20 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           uid,
           ...data.profile
         })) : [];
-        setAllUsers(usersArray);
+
+        // Filter out demo sheikhs if a real user with the same email exists
+        const realEmails = new Set(
+          usersArray
+            .filter(u => !u.uid.startsWith('demo_sheikh_') && u.email)
+            .map(u => u.email.toLowerCase().trim())
+        );
+        const filteredUsersArray = usersArray.filter(u => {
+          if (u.uid.startsWith('demo_sheikh_') && u.email) {
+            return !realEmails.has(u.email.toLowerCase().trim());
+          }
+          return true;
+        });
+        setAllUsers(filteredUsersArray);
 
         if (!usersData) {
           if (isSuperAdmin || isManagement) setLoading(false);
@@ -259,17 +272,26 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
           const mergeSettings = (val: any): AppSettings => {
             if (!val) return DEFAULT_SETTINGS;
+            const pts = val.points || {};
+            const att = pts.attendance || {};
+            const rev = pts.review || {};
+            
+            // Force 'تعويض' to 3.5 if it is 1.5 or missing
+            const finalMakeup = (att['تعويض'] === 1.5 || !att['تعويض']) ? 3.5 : Number(att['تعويض']);
+            // Force 'completed' review to 3 if it is 1 or 5 or missing
+            const finalReview = (rev['completed'] === 1 || rev['completed'] === 5 || !rev['completed']) ? 3 : Number(rev['completed']);
+
             return {
               ...DEFAULT_SETTINGS,
               ...val,
               points: {
                 ...DEFAULT_SETTINGS.points,
-                ...(val.points || {}),
-                attendance: { ...DEFAULT_SETTINGS.points.attendance, ...(val.points?.attendance || {}) },
-                evaluation: { ...DEFAULT_SETTINGS.points.evaluation, ...(val.points?.evaluation || {}) },
-                behavior: { ...DEFAULT_SETTINGS.points.behavior, ...(val.points?.behavior || {}) },
-                review: { ...DEFAULT_SETTINGS.points.review, ...(val.points?.review || {}) },
-                surah: { ...DEFAULT_SETTINGS.points.surah, ...(val.points?.surah || {}) },
+                ...pts,
+                attendance: { ...DEFAULT_SETTINGS.points.attendance, ...att, 'تعويض': finalMakeup },
+                evaluation: { ...DEFAULT_SETTINGS.points.evaluation, ...(pts.evaluation || {}) },
+                behavior: { ...DEFAULT_SETTINGS.points.behavior, ...(pts.behavior || {}) },
+                review: { ...DEFAULT_SETTINGS.points.review, ...rev, 'completed': finalReview },
+                surah: { ...DEFAULT_SETTINGS.points.surah, ...(pts.surah || {}) },
               }
             };
           };
@@ -281,6 +303,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           accumulatedUserLogs = {};
           for (const uid in usersData) {
             const userData = usersData[uid];
+
+            // Skip demo sheikhs if they have been migrated to a real user UID
+            if (uid.startsWith('demo_sheikh_') && userData.profile?.email) {
+              const emailKey = userData.profile.email.toLowerCase().trim();
+              if (realEmails.has(emailKey)) {
+                continue;
+              }
+            }
 
             // Log each user's data
             if (userData.students) {
@@ -381,7 +411,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         const data = snapshot.val();
         const preRegsArray: PreRegistration[] = data ? Object.entries(data).map(([id, r]) => processPreRegData({ id, ...(r as any) })) : [];
         setPreRegistrations(preRegsArray);
-      });
+      }, (err: any) => console.warn("Pre-registrations read failed:", err.message));
 
       // 3. Global Activity Logs
       globalLogsRef = ref(db, 'activity_logs');
@@ -393,7 +423,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           });
           mergeAndSetLogs();
         }
-      });
+      }, (err: any) => console.warn("Global logs read failed:", err.message));
     } else {
       // Sheikh (Personal) View
       setLoading(true);
@@ -475,17 +505,26 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       }, handleError);
       const mergeSettings = (val: any): AppSettings => {
         if (!val) return DEFAULT_SETTINGS;
+        const pts = val.points || {};
+        const att = pts.attendance || {};
+        const rev = pts.review || {};
+        
+        // Force 'تعويض' to 3.5 if it is 1.5 or missing
+        const finalMakeup = (att['تعويض'] === 1.5 || !att['تعويض']) ? 3.5 : Number(att['تعويض']);
+        // Force 'completed' review to 3 if it is 1 or 5 or missing
+        const finalReview = (rev['completed'] === 1 || rev['completed'] === 5 || !rev['completed']) ? 3 : Number(rev['completed']);
+
         return {
           ...DEFAULT_SETTINGS,
           ...val,
           points: {
             ...DEFAULT_SETTINGS.points,
-            ...(val.points || {}),
-            attendance: { ...DEFAULT_SETTINGS.points.attendance, ...(val.points?.attendance || {}) },
-            evaluation: { ...DEFAULT_SETTINGS.points.evaluation, ...(val.points?.evaluation || {}) },
-            behavior: { ...DEFAULT_SETTINGS.points.behavior, ...(val.points?.behavior || {}) },
-            review: { ...DEFAULT_SETTINGS.points.review, ...(val.points?.review || {}) },
-            surah: { ...DEFAULT_SETTINGS.points.surah, ...(val.points?.surah || {}) },
+            ...pts,
+            attendance: { ...DEFAULT_SETTINGS.points.attendance, ...att, 'تعويض': finalMakeup },
+            evaluation: { ...DEFAULT_SETTINGS.points.evaluation, ...(pts.evaluation || {}) },
+            behavior: { ...DEFAULT_SETTINGS.points.behavior, ...(pts.behavior || {}) },
+            review: { ...DEFAULT_SETTINGS.points.review, ...rev, 'completed': finalReview },
+            surah: { ...DEFAULT_SETTINGS.points.surah, ...(pts.surah || {}) },
           }
         };
       };
@@ -510,7 +549,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         suggestions: m.suggestions ? Object.entries(m.suggestions).map(([sid, s]: [string, any]) => ({ id: sid, ...s })) : []
       })) : [];
       setMeetings(meetingsArray);
-    });
+    }, (err: any) => console.warn("Meetings read failed:", err.message));
 
     // 6. Internal Notifications Listener
     notificationsRef = ref(db, `users/${authContextUser.uid}/notifications`);
@@ -521,7 +560,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         ...n
       })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) : [];
       setInternalNotifications(notificationsArray);
-    });
+    }, (err: any) => console.warn("Notifications read failed:", err.message));
 
     return () => {
       if (allUsersRef && allUsersListener) off(allUsersRef, 'value', allUsersListener);
@@ -1512,7 +1551,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         { name: "الأستاذة ثريا", group: "فوج 13", email: "admin13@gmail.com" },
         { name: "الأستاذة أميرة", group: "فوج 14", email: "admin14@gmail.com" },
         { name: "الأستاذة زينب", group: "فوج 15", email: "admin15@gmail.com" },
-        { name: "الأستاذة جهاد", group: "فوج 16", email: "admin16@gmail.com" },
+        { name: "الأستاذة ميمونه", group: "فوج 17", email: "admin17@gmail.com" },
+        { name: "الأستاذة حياة", group: "فوج 18", email: "admin18@gmail.com" },
+        { name: "فوج 1 إبتدائي", group: "فوج 19", email: "admin19@gmail.com" },
+        { name: "الشيخ عبد الكريم ترممو", group: "فوج 20", email: "admin20@gmail.com" },
       ];
 
       const updates: any = {};
@@ -1706,8 +1748,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             if (memoLevel === 'جيد جدا') memoLevel = 'جيد جداً';
 
             let behaviorLevel = record.behavior;
-            if (behaviorLevel === 'متوسط') behaviorLevel = 'مقبول';
-            if (behaviorLevel === 'غير منضبط') behaviorLevel = 'مشاغب';
+            if ((behaviorLevel as string) === 'متوسط') behaviorLevel = 'مقبول';
+            if ((behaviorLevel as string) === 'غير منضبط') behaviorLevel = 'مشاغب';
 
             if (record.attendance && pointsConfig.attendance) {
               studentScores[record.studentId].points += (pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] || 0);
@@ -1755,7 +1797,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       // Student records in month
       const studentRecordsInMonth = sessionsInMonth.flatMap(s => s.records ?? []).filter(r => r.studentId === student.id);
       const attendanceScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length) / studentRecordsInMonth.length) * 10 : 0;
-      const disciplineScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.behavior === 'هادئ').length * 2 + studentRecordsInMonth.filter(r => r.behavior === 'مقبول' || r.behavior === 'متوسط').length * 1) / (studentRecordsInMonth.length * 2)) * 10 : 0;
+      const disciplineScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.behavior === 'هادئ').length * 2 + studentRecordsInMonth.filter(r => r.behavior === 'مقبول' || (r.behavior as any) === 'متوسط').length * 1) / (studentRecordsInMonth.length * 2)) * 10 : 0;
       const memorizationScore = (masteredCount / 114) * 10; // 114 surahs
 
       const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط' && c.card !== 'بدون');

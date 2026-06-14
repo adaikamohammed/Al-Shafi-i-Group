@@ -104,7 +104,7 @@ const StudentCard = ({ student, onSelectStudent, studentList, disabledStudentId,
                             {student.fullName}
                         </h3>
                         <div className="flex flex-wrap justify-center gap-2 mb-4">
-                            <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">{formatGroupName(student.groupName, allUsers) || 'بدون فوج'}</Badge>
+                            <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">{formatGroupName(student.groupName || '', allUsers) || 'بدون فوج'}</Badge>
                             <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">{student.subscriptionTier || 'غير محدد'}</Badge>
                         </div>
                         <div className="flex flex-wrap justify-center gap-4 text-sm bg-white/80 dark:bg-black/30 p-3 rounded-xl w-full border border-primary/10 shadow-sm">
@@ -188,11 +188,11 @@ const ComparisonStat = ({ title, value1, value2, suffix = '', isPercentage = fal
 
 // Points Mappings for Fairness Calculation
 const ATTENDANCE_POINTS: Record<string, number> = {
-    'حاضر': 10,
-    'تعويض': 8,
-    'متأخر': 5,
-    'غائب': 0,
-    'غياب': 0
+    'حاضر': 5,
+    'تعويض': 3.5,
+    'متأخر': 2,
+    'غائب': -10,
+    'غياب': -10
 };
 
 const PERFORMANCE_POINTS: Record<string, number> = {
@@ -322,8 +322,8 @@ export default function ComparisonPage() {
                         stats.behaviorPoints += BEHAVIOR_POINTS[beh] ?? 0;
 
                         if (beh === 'هادئ') stats.calm++;
-                        else if (beh === 'متوسط' || beh === 'مقبول') stats.averageBehavior++;
-                        else if (beh === 'مشاغب' || beh === 'غير منضبط') stats.troublemaker++;
+                        else if ((beh as string) === 'متوسط' || beh === 'مقبول') stats.averageBehavior++;
+                        else if (beh === 'مشاغب' || (beh as string) === 'غير منضبط') stats.troublemaker++;
                     }
                 }
             });

@@ -106,7 +106,7 @@ export function DailyChecklist() {
                 (session.records ?? []).forEach(record => {
                     if (studentStats[record.studentId]) {
                         if (record.attendance === 'غائب') studentStats[record.studentId].absent++;
-                        if (record.behavior === 'غير منضبط' || record.behavior === 'مشاغب') studentStats[record.studentId].undisciplined++;
+                        if ((record.behavior as string) === 'غير منضبط' || record.behavior === 'مشاغب') studentStats[record.studentId].undisciplined++;
                     }
                 })
             });

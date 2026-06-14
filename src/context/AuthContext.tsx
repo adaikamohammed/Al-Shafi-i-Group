@@ -37,6 +37,31 @@ const sheikhInitialData: { [email: string]: { name: string; group: string; role:
   "admin16@gmail.com": { name: "الأستاذة جهاد", group: "فوج 16", role: "sheikh" },
   "admin17@gmail.com": { name: "الأستاذة ميمونه", group: "فوج 17", role: "sheikh" },
   "admin18@gmail.com": { name: "الأستاذة حياة", group: "فوج 18", role: "sheikh" },
+  "admin19@gmail.com": { name: "فوج 1 إبتدائي", group: "فوج 19", role: "sheikh" },
+  "admin20@gmail.com": { name: "الشيخ عبد الكريم ترممو", group: "فوج 20", role: "sheikh" },
+};
+
+const sheikhDemoKeys: { [email: string]: string } = {
+  "admin1@gmail.com": "demo_sheikh_1",
+  "admin2@gmail.com": "demo_sheikh_2",
+  "admin3@gmail.com": "demo_sheikh_3",
+  "admin4@gmail.com": "demo_sheikh_4",
+  "admin5@gmail.com": "demo_sheikh_5",
+  "admin6@gmail.com": "demo_sheikh_6",
+  "admin7@gmail.com": "demo_sheikh_7",
+  "admin8@gmail.com": "demo_sheikh_8",
+  "admin9@gmail.com": "demo_sheikh_9",
+  "admin10@gmail.com": "demo_sheikh_10",
+  "admin11@gmail.com": "demo_sheikh_11",
+  "admin12@gmail.com": "demo_sheikh_12",
+  "admin13@gmail.com": "demo_sheikh_13",
+  "admin14@gmail.com": "demo_sheikh_14",
+  "admin15@gmail.com": "demo_sheikh_15",
+  "admin16@gmail.com": "demo_sheikh_16",
+  "admin17@gmail.com": "demo_sheikh_17",
+  "admin18@gmail.com": "demo_sheikh_18",
+  "admin19@gmail.com": "demo_sheikh_19",
+  "admin20@gmail.com": "demo_sheikh_20",
 };
 
 export interface UpdateProfileData extends Partial<AppUser> {
@@ -71,7 +96,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       if (currentUser) {
         const userRef = ref(db, `users/${currentUser.uid}/profile`);
-        const snapshot = await get(userRef);
+        let snapshot = await get(userRef);
+
+        // Auto-migrate/Initialize user profile and dummy students if they don't exist yet
+        if (!snapshot.exists()) {
+          try {
+            const emailKey = currentUser.email?.toLowerCase().trim() || '';
+            const sheikhInfo = sheikhInitialData[emailKey] || { name: currentUser.displayName || 'مستخدم جديد', group: 'فوج غير محدد', role: 'sheikh' };
+            const displayName = sheikhInfo.name || currentUser.displayName || 'مستخدم جديد';
+
+            // 1. Write profile
+            const profileData = {
+              email: currentUser.email,
+              displayName: displayName,
+              group: sheikhInfo.group,
+              role: sheikhInfo.role,
+              joinDate: format(new Date(), 'yyyy-MM-dd'),
+              isDemo: false
+            };
+            await set(ref(db, `users/${currentUser.uid}/profile`), profileData);
+
+            // 2. Generate 3 dummy students to avoid an empty dashboard
+            const studentsRef = ref(db, `users/${currentUser.uid}/students`);
+            const initialStudents: any = {};
+            for (let i = 1; i <= 3; i++) {
+              const studentId = `student_${currentUser.uid}_${i}`; // Predictable student ID
+              initialStudents[studentId] = {
+                id: studentId,
+                fullName: `طالب ${i} - ${sheikhInfo.group}`,
+                birthDate: new Date(2010, 0, 1).toISOString(),
+                registrationDate: new Date().toISOString(),
+                status: 'نشط',
+                educationalLevel: 'متوسط',
+                subscriptionTier: 'فئة الأصاغر',
+                ownerId: currentUser.uid,
+                groupName: sheikhInfo.group,
+                memorizedSurahsCount: Math.floor(Math.random() * 10),
+                updatedAt: new Date().toISOString(),
+                photoURL: ''
+              };
+            }
+            await set(studentsRef, initialStudents);
+
+            // Re-fetch profile snapshot
+            snapshot = await get(userRef);
+          } catch (e) {
+            console.error("Initialization error:", e);
+          }
+        }
 
         let appUser: AppUser;
         if (snapshot.exists()) {
@@ -155,7 +227,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!email || !password) {
       throw new Error("Email and password must not be empty.");
     }
-    await signInWithEmailAndPassword(auth, email, password);
+    const formattedEmail = email.toLowerCase().trim();
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error: any) {
+      const isSheikhAccount = sheikhInitialData[formattedEmail];
+      if ((error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') &&
+          isSheikhAccount &&
+          password === '123456') {
+        try {
+          console.log("Auto-registering sheikh:", email);
+          await createUserWithEmailAndPassword(auth, email, password);
+          return;
+        } catch (signUpError: any) {
+          console.error("Auto-signup failed:", signUpError);
+          throw error;
+        }
+      }
+      throw error;
+    }
   }
 
   const updateUserProfile = async (data: UpdateProfileData) => {

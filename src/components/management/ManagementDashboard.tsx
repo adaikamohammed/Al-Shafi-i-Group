@@ -232,7 +232,7 @@ export const ManagementDashboard = () => {
             const groupStudents = students.filter(s => s.groupName === groupName);
 
             return {
-                name: formatGroupName(groupName, allUsers) || 'غير محدد',
+                name: formatGroupName(groupName || '', allUsers) || 'غير محدد',
                 sheikhName: representativeSheikh?.displayName || 'غير محدد',
                 students: groupStudents.length,
                 active: groupStudents.filter(s => s.status === 'نشط').length,
@@ -344,7 +344,7 @@ export const ManagementDashboard = () => {
                         {isSheikh && (
                             <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-100 font-bold flex items-center gap-2">
                                 <Users className="h-4 w-4" />
-                                {formatGroupName(user?.group, allUsers)}
+                                {formatGroupName(user?.group || '', allUsers)}
                             </div>
                         )}
                     </div>
@@ -481,7 +481,7 @@ export const ManagementDashboard = () => {
                         icon={Shield}
                         color="bg-emerald-500"
                         gradient="from-emerald-500 to-teal-400"
-                        description={formatGroupName(user?.group, allUsers) || "فوجك التعليمي"}
+                        description={formatGroupName(user?.group || '', allUsers) || "فوجك التعليمي"}
                         theme={theme}
                     />
                 )}

@@ -19,7 +19,7 @@ const DEFAULT_POINTS_CONFIG = {
     attendance: { 'حاضر': 5, 'متأخر': 2, 'تعويض': 3.5, 'غائب': -10 },
     evaluation: { 'ممتاز': 10, 'جيد جداً': 7, 'جيد': 5, 'حسن': 3, 'مقبول': 2, 'ضعيف': 1, 'لم يحفظ': 0 },
     behavior: { 'هادئ': 3, 'مقبول': 1, 'مشاغب': 0 },
-    review: { 'completed': 5 },
+    review: { 'completed': 3 },
     surah: { 'memorized': 20, 'mastered': 50 },
     covenantCompleted: 15,
 };
@@ -100,7 +100,24 @@ export async function GET(request: Request) {
         let pointsConfig = DEFAULT_POINTS_CONFIG;
         for (const uid in usersData) {
             if (usersData[uid]?.settings?.points) {
-                pointsConfig = { ...DEFAULT_POINTS_CONFIG, ...usersData[uid].settings.points };
+                const userPoints = usersData[uid].settings.points;
+                const att = userPoints.attendance || {};
+                const rev = userPoints.review || {};
+
+                // Force 'تعويض' to 3.5 if it is 1.5 or missing
+                const finalMakeup = (att['تعويض'] === 1.5 || !att['تعويض']) ? 3.5 : Number(att['تعويض']);
+                // Force 'completed' review to 3 if it is 1 or 5 or missing
+                const finalReview = (rev['completed'] === 1 || rev['completed'] === 5 || !rev['completed']) ? 3 : Number(rev['completed']);
+
+                pointsConfig = {
+                    ...DEFAULT_POINTS_CONFIG,
+                    ...userPoints,
+                    attendance: { ...DEFAULT_POINTS_CONFIG.attendance, ...att, 'تعويض': finalMakeup },
+                    evaluation: { ...DEFAULT_POINTS_CONFIG.evaluation, ...(userPoints.evaluation || {}) },
+                    behavior: { ...DEFAULT_POINTS_CONFIG.behavior, ...(userPoints.behavior || {}) },
+                    review: { ...DEFAULT_POINTS_CONFIG.review, ...rev, 'completed': finalReview },
+                    surah: { ...DEFAULT_POINTS_CONFIG.surah, ...(userPoints.surah || {}) },
+                };
                 break;
             }
         }

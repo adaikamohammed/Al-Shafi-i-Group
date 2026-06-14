@@ -309,10 +309,10 @@ export default function AdminDocsPage() {
                 matchSheikh = true;
             } else if (filterSheikh === 'sheikhs') {
                 const num = parseInt(log.groupName?.replace(/\D/g, '') || '0');
-                matchSheikh = num >= 1 && num <= 9;
+                matchSheikh = (num >= 1 && num <= 9) || num === 20;
             } else if (filterSheikh === 'ustadhat') {
                 const num = parseInt(log.groupName?.replace(/\D/g, '') || '0');
-                matchSheikh = num >= 10 && num <= 18;
+                matchSheikh = (num >= 10 && num <= 18) || num === 19;
             } else {
                 matchSheikh = log.groupName === filterSheikh;
             }

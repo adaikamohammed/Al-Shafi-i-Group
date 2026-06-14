@@ -38,8 +38,8 @@ export const useStudentStats = (students: Student[] | null, dailySessions: Recor
                     if (memoLevel === 'جيد جدا') memoLevel = 'جيد جداً';
 
                     let behaviorLevel = record.behavior;
-                    if (behaviorLevel === 'متوسط') behaviorLevel = 'مقبول';
-                    if (behaviorLevel === 'غير منضبط') behaviorLevel = 'مشاغب';
+                    if ((behaviorLevel as string) === 'متوسط') behaviorLevel = 'مقبول';
+                    if ((behaviorLevel as string) === 'غير منضبط') behaviorLevel = 'مشاغب';
 
                     if (record.attendance && pointsConfig.attendance) {
                         studentScores[studentId].points += (pointsConfig.attendance[record.attendance as keyof typeof pointsConfig.attendance] || 0);
@@ -73,8 +73,8 @@ export const useStudentStats = (students: Student[] | null, dailySessions: Recor
                             if (mkMemoLevel === 'جيد جدا') mkMemoLevel = 'جيد جداً';
 
                             let mkBehaviorLevel = makeup.behavior;
-                            if (mkBehaviorLevel === 'متوسط') mkBehaviorLevel = 'مقبول';
-                            if (mkBehaviorLevel === 'غير منضبط') mkBehaviorLevel = 'مشاغب';
+                            if ((mkBehaviorLevel as string) === 'متوسط') mkBehaviorLevel = 'مقبول';
+                            if ((mkBehaviorLevel as string) === 'غير منضبط') mkBehaviorLevel = 'مشاغب';
 
                             if (mkMemoLevel && pointsConfig.evaluation) {
                                 studentScores[studentId].points += (pointsConfig.evaluation[mkMemoLevel as keyof typeof pointsConfig.evaluation] || 0);
@@ -141,8 +141,8 @@ export const useStudentStats = (students: Student[] | null, dailySessions: Recor
                         if (memoLevel === 'جيد جدا') memoLevel = 'جيد جداً';
 
                         let behaviorLevel = record.behavior;
-                        if (behaviorLevel === 'متوسط') behaviorLevel = 'مقبول';
-                        if (behaviorLevel === 'غير منضبط') behaviorLevel = 'مشاغب';
+                        if ((behaviorLevel as string) === 'متوسط') behaviorLevel = 'مقبول';
+                        if ((behaviorLevel as string) === 'غير منضبط') behaviorLevel = 'مشاغب';
 
                         if (record.attendance) {
                             if (record.attendance === 'غائب') studentScoresInMonth[record.studentId].stats.absent++;
@@ -179,8 +179,8 @@ export const useStudentStats = (students: Student[] | null, dailySessions: Recor
                                 if (mkMemoLevel === 'جيد جدا') mkMemoLevel = 'جيد جداً';
 
                                 let mkBehaviorLevel = makeup.behavior;
-                                if (mkBehaviorLevel === 'متوسط') mkBehaviorLevel = 'مقبول';
-                                if (mkBehaviorLevel === 'غير منضبط') mkBehaviorLevel = 'مشاغب';
+                                if ((mkBehaviorLevel as string) === 'متوسط') mkBehaviorLevel = 'مقبول';
+                                if ((mkBehaviorLevel as string) === 'غير منضبط') mkBehaviorLevel = 'مشاغب';
 
                                 if (mkMemoLevel && settings.points.evaluation) {
                                     studentScoresInMonth[record.studentId].points += (settings.points.evaluation[mkMemoLevel as keyof typeof settings.points.evaluation] || 0);

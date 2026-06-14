@@ -45,21 +45,21 @@ import { AttendanceHeatmap } from '@/components/management/AttendanceHeatmap';
 const isSheikhGroup = (groupName?: string) => {
     if (!groupName) return false;
     const num = parseInt(groupName.replace(/\D/g, '') || '0');
-    return num >= 1 && num <= 9;
+    return (num >= 1 && num <= 9) || num === 20;
 };
 const isUstadhatGroup = (groupName?: string) => {
     if (!groupName) return false;
     const num = parseInt(groupName.replace(/\D/g, '') || '0');
-    return num >= 10 && num <= 18;
+    return (num >= 10 && num <= 18) || num === 19;
 };
 
 // Constants for fallback points
 const ATTENDANCE_POINTS: Record<string, number> = {
-    'حاضر': 10,
-    'تعويض': 8,
-    'متأخر': 5,
-    'غائب': 0,
-    'غياب': 0
+    'حاضر': 5,
+    'تعويض': 3.5,
+    'متأخر': 2,
+    'غائب': -10,
+    'غياب': -10
 };
 
 const PERFORMANCE_POINTS: Record<string, number> = {
@@ -3859,6 +3859,8 @@ function StudentTrackingView({
         if (num === 16) return "فوج 16 الأستاذة جهاد";
         if (num === 17) return "فوج 17 الأستاذة ميمونه";
         if (num === 18) return "فوج 18 الأستاذة حياة";
+        if (num === 19) return "فوج 19 فوج 1 إبتدائي";
+        if (num === 20) return "فوج 20 الشيخ عبد الكريم ترممو";
 
         return groupName;
     };

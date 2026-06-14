@@ -97,7 +97,7 @@ export default function LeaguePage() {
 
                     if (record.behavior === 'هادئ') {
                         assists += 2;
-                    } else if (record.behavior === 'متوسط' || record.behavior === 'مقبول') {
+                    } else if ((record.behavior as string) === 'متوسط' || record.behavior === 'مقبول') {
                         assists += 1;
                     }
                 }

@@ -126,8 +126,8 @@ export default function RankingPage() {
                         const behaviorPoints = pointsConfig.behavior[record.behavior as keyof typeof pointsConfig.behavior] ?? 0;
                         studentScores[studentId].pointsBreakdown.behavior += behaviorPoints;
                         if (record.behavior === 'هادئ') studentScores[studentId].stats.calm++;
-                        if (record.behavior === 'متوسط' || record.behavior === 'مقبول') studentScores[studentId].stats.medium++;
-                        if (record.behavior === 'غير منضبط' || record.behavior === 'مشاغب') studentScores[studentId].stats.undisciplined++;
+                        if ((record.behavior as string) === 'متوسط' || record.behavior === 'مقبول') studentScores[studentId].stats.medium++;
+                        if ((record.behavior as string) === 'غير منضبط' || record.behavior === 'مشاغب') studentScores[studentId].stats.undisciplined++;
                     }
                     if (record.review && pointsConfig.review?.completed) {
                         studentScores[studentId].pointsBreakdown.hifz += pointsConfig.review.completed;

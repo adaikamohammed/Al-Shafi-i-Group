@@ -83,7 +83,11 @@ const SHEIKHS_LIST = [
     { id: 13, name: "الأستاذة ثريا", email: "admin13@gmail.com", group: "فوج 13" },
     { id: 14, name: "الأستاذة أميرة", email: "admin14@gmail.com", group: "فوج 14" },
     { id: 15, name: "الأستاذة زينب", email: "admin15@gmail.com", group: "فوج 15" },
-    { id: 16, name: "الأستاذة جهاد", email: "admin16@gmail.com", group: "فوج 16" }
+    { id: 16, name: "الأستاذة جهاد", email: "admin16@gmail.com", group: "فوج 16" },
+    { id: 17, name: "الأستاذة ميمونه", email: "admin17@gmail.com", group: "فوج 17" },
+    { id: 18, name: "الأستاذة حياة", email: "admin18@gmail.com", group: "فوج 18" },
+    { id: 19, name: "فوج 1 إبتدائي", email: "admin19@gmail.com", group: "فوج 19" },
+    { id: 20, name: "الشيخ عبد الكريم ترممو", email: "admin20@gmail.com", group: "فوج 20" }
 ];
 
 

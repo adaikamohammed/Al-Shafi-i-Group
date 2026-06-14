@@ -78,8 +78,8 @@ export function isSheikhMenUser(u: any): boolean {
   const emailNum = getAdminNumber(u.email || '');
   const groupNum = getGroupNumber(u.group || '');
   const displayName = u.displayName || '';
-  return (emailNum !== null && emailNum >= 1 && emailNum <= 9) || 
-         (groupNum !== null && groupNum >= 1 && groupNum <= 9) ||
+  return (emailNum !== null && ((emailNum >= 1 && emailNum <= 9) || emailNum === 20)) || 
+         (groupNum !== null && ((groupNum >= 1 && groupNum <= 9) || groupNum === 20)) ||
          displayName.includes('الشيخ');
 }
 
@@ -88,9 +88,9 @@ export function isSheikhWomenUser(u: any): boolean {
   const emailNum = getAdminNumber(u.email || '');
   const groupNum = getGroupNumber(u.group || '');
   const displayName = u.displayName || '';
-  return (emailNum !== null && emailNum >= 10 && emailNum <= 18) || 
-         (groupNum !== null && groupNum >= 10 && groupNum <= 18) ||
-         displayName.includes('الأستاذة');
+  return (emailNum !== null && ((emailNum >= 10 && emailNum <= 18) || emailNum === 19)) || 
+         (groupNum !== null && ((groupNum >= 10 && groupNum <= 18) || groupNum === 19)) ||
+         displayName.includes('الأستاذة') || displayName.includes('إبتدائي');
 }
 
 export function isStudentInMenSheikhs(s: any, allUsers: any[]): boolean {
@@ -99,7 +99,7 @@ export function isStudentInMenSheikhs(s: any, allUsers: any[]): boolean {
     return isSheikhMenUser(ownerUser);
   }
   const groupNum = getGroupNumber(s.groupName || '');
-  return groupNum !== null && groupNum >= 1 && groupNum <= 9;
+  return groupNum !== null && ((groupNum >= 1 && groupNum <= 9) || groupNum === 20);
 }
 
 export function isStudentInWomenUstadhats(s: any, allUsers: any[]): boolean {
@@ -108,7 +108,7 @@ export function isStudentInWomenUstadhats(s: any, allUsers: any[]): boolean {
     return isSheikhWomenUser(ownerUser);
   }
   const groupNum = getGroupNumber(s.groupName || '');
-  return groupNum !== null && groupNum >= 10 && groupNum <= 18;
+  return groupNum !== null && ((groupNum >= 10 && groupNum <= 18) || groupNum === 19);
 }
 
 export const GROUP_SHEIKH_MAPPING: Record<string, string> = {
@@ -130,6 +130,9 @@ export const GROUP_SHEIKH_MAPPING: Record<string, string> = {
   "فوج 16": "الأستاذة جهاد",
   "فوج 17": "الأستاذة ميمونه",
   "فوج 18": "الأستاذة حياة",
+  "فوج 19": "فوج 1 إبتدائي",
+  "فوج 20": "الشيخ عبد الكريم ترممو",
+  "فوج 1 إبتدائي": "",
 };
 
 export function getGroupSheikhName(groupName: string, allUsers?: any[]): string {

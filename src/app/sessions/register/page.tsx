@@ -750,7 +750,21 @@ function RegisterSessionContent() {
         // Pass effectiveOwnerId if it differs from current user (i.e. Admin actions)
         const targetOwner = (effectiveOwnerId && effectiveOwnerId !== user?.uid) ? effectiveOwnerId : undefined;
         console.log('📝 Saving Session:', { effectiveOwnerId, currentUserId: user?.uid, targetOwner, ownerIdParam });
-        await addDailySession(sessionPayload, targetOwner);
+        try {
+            await addDailySession(sessionPayload, targetOwner);
+            toast({
+                title: "✅ تم حفظ الحصة",
+                description: "تم حفظ الحصة وتحديث التقييمات بنجاح.",
+            });
+        } catch (error: any) {
+            console.error('Failed to save session:', error);
+            toast({
+                title: "❌ فشل حفظ الحصة",
+                description: `حدث خطأ أثناء الحفظ (الرجاء التحقق من الصلاحيات): ${error.message || error}`,
+                variant: "destructive"
+            });
+            throw error; // Rethrow to let autoSave and exit loops handle it correctly
+        }
     };
 
     // Save Draft to LocalStorage whenever debounced data changes

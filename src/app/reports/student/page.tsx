@@ -116,7 +116,7 @@ export default function StudentReportPage() {
                     }
                     if (record.behavior) {
                         stats.totalBehavior++;
-                        switch (record.behavior) {
+                        switch (record.behavior as string) {
                             case 'هادئ': stats.calm++; break;
                             case 'متوسط':
                             case 'مقبول': stats.mediumBehavior++; break;

@@ -85,8 +85,8 @@ export default function MonitoringPage() {
                                 if (memoLevel === 'جيد جدا') memoLevel = 'جيد جداً';
 
                                 let behaviorLevel = record.behavior;
-                                if (behaviorLevel === 'متوسط') behaviorLevel = 'مقبول';
-                                if (behaviorLevel === 'غير منضبط') behaviorLevel = 'مشاغب';
+                                if ((behaviorLevel as string) === 'متوسط') behaviorLevel = 'مقبول';
+                                if ((behaviorLevel as string) === 'غير منضبط') behaviorLevel = 'مشاغب';
 
                                 const evalMap: Record<string, number> = { 'ممتاز': 100, 'جيد جداً': 80, 'جيد': 60, 'حسن': 45, 'مقبول': 30, 'ضعيف': 15 };
                                 const basePoints = evalMap[memoLevel || ''] || 0;

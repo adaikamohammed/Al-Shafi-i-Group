@@ -141,12 +141,12 @@ export default function PenaltiesPage() {
             if (selectedGroup === 'sheikhs') {
                 result = result.filter(s => {
                     const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
-                    return num >= 1 && num <= 9;
+                    return (num >= 1 && num <= 9) || num === 20;
                 });
             } else if (selectedGroup === 'ustadhat') {
                 result = result.filter(s => {
                     const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
-                    return num >= 10 && num <= 18;
+                    return (num >= 10 && num <= 18) || num === 19;
                 });
             } else {
                 // Normal filter for admins
@@ -343,10 +343,10 @@ export default function PenaltiesPage() {
             if (selectedGroup !== 'all') {
                 if (selectedGroup === 'sheikhs') {
                     const num = parseInt(student.groupName?.replace(/\D/g, '') || '0');
-                    if (num < 1 || num > 9) return;
+                    if ((num < 1 || num > 9) && num !== 20) return;
                 } else if (selectedGroup === 'ustadhat') {
                     const num = parseInt(student.groupName?.replace(/\D/g, '') || '0');
-                    if (num < 10 || num > 18) return;
+                    if ((num < 10 || num > 18) && num !== 19) return;
                 } else if (student.groupName !== selectedGroup) {
                     return;
                 }
@@ -393,10 +393,10 @@ export default function PenaltiesPage() {
             if (selectedGroup !== 'all') {
                 if (selectedGroup === 'sheikhs') {
                     const num = parseInt(student.groupName?.replace(/\D/g, '') || '0');
-                    if (num < 1 || num > 9) return;
+                    if ((num < 1 || num > 9) && num !== 20) return;
                 } else if (selectedGroup === 'ustadhat') {
                     const num = parseInt(student.groupName?.replace(/\D/g, '') || '0');
-                    if (num < 10 || num > 18) return;
+                    if ((num < 10 || num > 18) && num !== 19) return;
                 } else if (student.groupName !== selectedGroup) {
                     return;
                 }
@@ -430,10 +430,10 @@ export default function PenaltiesPage() {
             if (selectedGroup !== 'all') {
                 if (selectedGroup === 'sheikhs') {
                     const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
-                    if (num < 1 || num > 9) return;
+                    if ((num < 1 || num > 9) && num !== 20) return;
                 } else if (selectedGroup === 'ustadhat') {
                     const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
-                    if (num < 10 || num > 18) return;
+                    if ((num < 10 || num > 18) && num !== 19) return;
                 } else if (s.groupName !== selectedGroup) {
                     return;
                 }

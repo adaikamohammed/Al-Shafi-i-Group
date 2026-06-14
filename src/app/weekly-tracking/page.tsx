@@ -166,12 +166,12 @@ export default function WeeklyFollowUpPage() {
             if (selectedGroup === 'sheikhs') {
                 filtered = filtered.filter(s => {
                     const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
-                    return num >= 1 && num <= 9;
+                    return (num >= 1 && num <= 9) || num === 20;
                 });
             } else if (selectedGroup === 'ustadhat') {
                 filtered = filtered.filter(s => {
                     const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
-                    return num >= 10 && num <= 18;
+                    return (num >= 10 && num <= 18) || num === 19;
                 });
             } else {
                 const sheikh = allUsers.find(u => u.uid === selectedGroup);

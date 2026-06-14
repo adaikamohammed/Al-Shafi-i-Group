@@ -1301,7 +1301,7 @@ export default function DailySessionsPage() {
                   <SelectContent>
                     {allUsers?.filter(u => u.role === 'sheikh').map(sheikh => (
                       <SelectItem key={sheikh.uid} value={sheikh.uid}>
-                        {formatGroupName(sheikh.group, allUsers)}
+                        {formatGroupName(sheikh.group || '', allUsers)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1391,7 +1391,7 @@ export default function DailySessionsPage() {
                               </Avatar>
                               <div className="flex flex-col">
                                 <span>{student.fullName}</span>
-                                <span className="text-xs text-muted-foreground">{formatGroupName(student.groupName, allUsers)}</span>
+                                <span className="text-xs text-muted-foreground">{formatGroupName(student.groupName || '', allUsers)}</span>
                               </div>
                             </div>
                           </td>

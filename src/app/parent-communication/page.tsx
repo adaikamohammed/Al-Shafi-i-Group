@@ -37,7 +37,7 @@ import { format, startOfDay, endOfDay, isWithinInterval, parseISO, startOfWeek, 
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/SearchableSelect';
-import { cn, arabicCompare } from '@/lib/utils';
+import { cn, arabicCompare, formatGroupName } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 import { surahs } from '@/lib/surahs';
@@ -1042,7 +1042,7 @@ export default function ParentCommunicationPage() {
                                             </div>
                                             <div>
                                                 <p className="text-[10px] text-slate-400 font-bold">الحلقة</p>
-                                                <p className="text-sm font-black">{formatGroupName(selectedStudent.groupName, allUsers) || '-'}</p>
+                                                <p className="text-sm font-black">{formatGroupName(selectedStudent.groupName || '', allUsers) || '-'}</p>
                                             </div>
                                         </div>
                                     </div>
