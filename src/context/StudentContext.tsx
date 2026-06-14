@@ -15,7 +15,7 @@ import { sanitizeData } from '@/lib/utils';
 import { logActivity } from '@/lib/activityLogger';
 
 const DEFAULT_POINTS_CONFIG: PointsConfig = {
-  attendance: { 'حاضر': 5, 'متأخر': 2, 'تعويض': 1.5, 'غائب': -10 },
+  attendance: { 'حاضر': 5, 'متأخر': 2, 'تعويض': 3.5, 'غائب': -10 },
   evaluation: { 'ممتاز': 10, 'جيد جداً': 7, 'جيد': 5, 'حسن': 3, 'مقبول': 2, 'ضعيف': 1, 'لم يحفظ': 0 },
   behavior: { 'هادئ': 3, 'مقبول': 1, 'مشاغب': 0 },
   review: { 'completed': 5 },

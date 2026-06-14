@@ -518,16 +518,44 @@ export default function SheikhMonitoringPage() {
         const total = groupStudentCount[group] || 0;
         if (!records.length || !total) return { session, type: session.sessionType, attendance: null, excellent: null, goodPlus: null, good: null, acceptable: null, weak: null, notMemorized: null };
 
+        // Find makeup sessions for this group that compensated for dateStr
+        const groupSessionsMap = groupSessions.get(group);
+        const makeupsForThisDate: Record<string, any> = {};
+        if (groupSessionsMap) {
+            groupSessionsMap.forEach((sessList) => {
+                sessList.forEach(s => {
+                    const recs = s.records || [];
+                    recs.forEach((r: any) => {
+                        if (r.makeupSessions && Array.isArray(r.makeupSessions)) {
+                            r.makeupSessions.forEach((mu: any) => {
+                                if (mu.makeupForDate === dateStr) {
+                                    makeupsForThisDate[r.studentId] = mu;
+                                }
+                            });
+                        }
+                    });
+                });
+            });
+        }
+
         let present = 0, excellent = 0, goodPlus = 0, good = 0, acceptable = 0, weak = 0, notMem = 0;
         records.forEach(r => {
-            if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') present++;
-            if (!r.review) {
-                if (r.memorization === 'ممتاز') excellent++;
-                else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') goodPlus++;
-                else if (r.memorization === 'جيد') good++;
-                else if (r.memorization === 'مقبول' || r.memorization === 'حسن' || r.memorization === 'متوسط') acceptable++;
-                else if (r.memorization === 'ضعيف') weak++;
-                else if (r.memorization === 'لم يحفظ') notMem++;
+            const makeup = makeupsForThisDate[r.studentId];
+            const attendanceStatus = makeup ? 'تعويض' : (r.attendance || 'غائب');
+            const isPresent = attendanceStatus === 'حاضر' || attendanceStatus === 'متأخر' || attendanceStatus === 'تعويض';
+
+            if (isPresent) present++;
+            
+            const memoVal = makeup ? makeup.memorization : (r.review ? null : r.memorization);
+            const isReview = makeup ? !!makeup.review : !!r.review;
+
+            if (isPresent && !isReview) {
+                if (memoVal === 'ممتاز') excellent++;
+                else if (memoVal === 'جيد جدا' || memoVal === 'جيد جداً') goodPlus++;
+                else if (memoVal === 'جيد') good++;
+                else if (memoVal === 'مقبول' || memoVal === 'حسن' || memoVal === 'متوسط') acceptable++;
+                else if (memoVal === 'ضعيف') weak++;
+                else if (memoVal === 'لم يحفظ') notMem++;
             }
         });
         const p = (n: number) => total > 0 ? Math.round((n / total) * 100) : 0;
@@ -5397,6 +5425,22 @@ function StudentScoreDetailModal({
     const dayRecords = useMemo<DayRec[]>(() => {
         const days = eachDayOfInterval({ start: periodStart, end: periodEnd });
         
+        // Find all makeup sessions recorded for this student across all sessions in Firebase
+        const makeupsByTargetDate: Record<string, any> = {};
+        Object.values(dailySessions || {}).forEach((daySess: any) => {
+            Object.values(daySess || {}).forEach((session: any) => {
+                const sessionRecs: any[] = Array.isArray(session.records) ? session.records : session.records ? Object.values(session.records) : [];
+                const myRec = sessionRecs.find((r: any) => r.studentId === student.id);
+                if (myRec?.makeupSessions && Array.isArray(myRec.makeupSessions)) {
+                    myRec.makeupSessions.forEach((mu: any) => {
+                        if (mu.makeupForDate) {
+                            makeupsByTargetDate[mu.makeupForDate] = mu;
+                        }
+                    });
+                }
+            });
+        });
+
         // Group sessions by date for weights
         const sessionsInRange: any[] = [];
         days.forEach(day => {
@@ -5441,12 +5485,33 @@ function StudentScoreDetailModal({
 
                 const sessionRecs: any[] = Array.isArray(session.records) ? session.records : session.records ? Object.values(session.records) : [];
                 const myRec = sessionRecs.find((r: any) => r.studentId === student.id);
-                const mem = myRec?.memorization || null;
-                const beh = myRec?.behavior || null;
-                const isReview = !!myRec?.review;
                 
+                let att = myRec?.attendance || 'غائب';
+                let mem = myRec?.memorization || null;
+                let beh = myRec?.behavior || null;
+                let isReview = !!myRec?.review;
+                let isLate = att === 'متأخر';
+                let isDelayed = !!myRec?.isDelayed;
+
+                // Check if this date was compensated
+                const makeup = makeupsByTargetDate[dateStr];
+                if (makeup) {
+                    att = 'تعويض';
+                    mem = makeup.memorization || null;
+                    beh = makeup.behavior || null;
+                    isReview = !!makeup.review;
+                    isLate = false;
+                    isDelayed = false;
+                }
+
                 let evalGrade = 0;
-                if (myRec) {
+                if (makeup) {
+                    if (isReview && pointsConfig?.review?.completed) {
+                        evalGrade = pointsConfig.review.completed;
+                    } else if (!isReview && mem) {
+                        evalGrade = getMemoPoints(mem);
+                    }
+                } else if (myRec) {
                     if (isReview && pointsConfig?.review?.completed) {
                         evalGrade = pointsConfig.review.completed;
                     } else if (!isReview && mem) {
@@ -5463,13 +5528,13 @@ function StudentScoreDetailModal({
                     date: dateStr,
                     label: format(day, 'EEE d MMM', { locale: ar }),
                     sessionType: sType,
-                    attendance: myRec?.attendance || 'غائب',
+                    attendance: att,
                     memorization: isReview ? `مراجعة: ${mem || ''}` : mem,
                     behavior: beh,
                     isReview, evalGrade, behaviorGrade,
-                    isLate: myRec?.attendance === 'متأخر',
+                    isLate,
                     weight,
-                    isDelayed: !!myRec?.isDelayed
+                    isDelayed
                 });
             });
         });
