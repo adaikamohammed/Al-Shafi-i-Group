@@ -175,6 +175,7 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
                                 alt="QR"
                                 className="w-full h-full"
                                 crossOrigin="anonymous"
+                                loading="lazy"
                             />
                         </div>
                     )}

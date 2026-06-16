@@ -270,6 +270,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           let allAdminLogs: AdminLog[] = [];
           let finalSettings: AppSettings = DEFAULT_SETTINGS;
 
+          // ⚡ Performance: only keep last 120 days of sessions in memory
+          const sessionCutoff = new Date();
+          sessionCutoff.setDate(sessionCutoff.getDate() - 120);
+          const SESSION_CUTOFF_DATE = sessionCutoff.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+
           const mergeSettings = (val: any): AppSettings => {
             if (!val) return DEFAULT_SETTINGS;
             const pts = val.points || {};
@@ -322,6 +327,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
             if (userData.dailySessions) {
               for (const date in userData.dailySessions) {
+                // ⚡ Performance: skip sessions older than 120 days
+                if (date < SESSION_CUTOFF_DATE) continue;
                 if (!allSessions[date]) allSessions[date] = {};
                 const dayVal = userData.dailySessions[date];
                 if (dayVal && typeof dayVal === 'object') {
@@ -462,7 +469,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       onValue(sessionsRef, (s: any) => {
         const val = s.val() || {};
         const normalized: Record<string, Record<string, DailySession>> = {};
+        
+        // ⚡ Performance: only keep last 120 days of sessions in memory
+        const sheikhCutoff = new Date();
+        sheikhCutoff.setDate(sheikhCutoff.getDate() - 120);
+        const SHEIKH_SESSION_CUTOFF = sheikhCutoff.toISOString().split('T')[0];
+
         Object.entries(val).forEach(([date, dayVal]: [string, any]) => {
+          if (date < SHEIKH_SESSION_CUTOFF) return;
           normalized[date] = {};
           if (dayVal && typeof dayVal === 'object') {
             if ('date' in dayVal && ('records' in dayVal || 'sessionType' in dayVal)) {
@@ -471,7 +485,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
               normalized[date][sessionId] = {
                 ...dayVal,
                 id: sessionId,
-                sessionNumber: dayVal.sessionNumber !== undefined ? Number(dayVal.sessionNumber) : 1
+                sessionNumber: dayVal.sessionNumber !== undefined ? Number(dayVal.sessionNumber) : 1,
+                ownerId: authContextUser.uid
               };
             } else {
               // New structure: dictionary of session objects
@@ -480,7 +495,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
                   normalized[date][sessionId] = {
                     ...session,
                     id: session.id || sessionId,
-                    sessionNumber: session.sessionNumber !== undefined ? Number(session.sessionNumber) : (sessionId.endsWith('-s2') ? 2 : 1)
+                    sessionNumber: session.sessionNumber !== undefined ? Number(session.sessionNumber) : (sessionId.endsWith('-s2') ? 2 : 1),
+                    ownerId: authContextUser.uid
                   };
                 }
               });
@@ -588,139 +604,152 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       });
   }, [dailySessions]);
 
-  const commitmentKing = useMemo(() => {
-    if (allSortedSessions.length === 0 || activeStudents.length === 0) return { id: undefined, name: undefined, streak: 0, photoURL: undefined };
+  const combinedKings = useMemo(() => {
+    const emptyKing = { id: undefined, name: undefined, streak: 0, photoURL: undefined };
+    if (allSortedSessions.length === 0 || activeStudents.length === 0) {
+      return { commitmentKing: emptyKing, academicKing: emptyKing, behaviorKing: emptyKing };
+    }
+
     const sortedBasicSessions = allSortedSessions.filter(s => s.sessionType === 'حصة أساسية');
     
-    // Efficiency: O(Sessions * Students) instead of O(Students * Sessions * Records)
-    const stats: Record<string, { current: number; max: number }> = {};
-    activeStudents.forEach(s => stats[s.id] = { current: 0, max: 0 });
+    // Pre-parse student registration dates
+    const studentRegDates = activeStudents.map(s => {
+      let rTime: number | null = null;
+      if (s.registrationDate) {
+        try {
+          const d = s.registrationDate instanceof Date ? s.registrationDate : new Date(s.registrationDate);
+          if (!isNaN(d.getTime())) {
+            const dCopy = new Date(d);
+            dCopy.setHours(0, 0, 0, 0);
+            rTime = dCopy.getTime();
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+      return { id: s.id, student: s, rTime };
+    });
 
-    sortedBasicSessions.forEach(session => {
-      const records = session.records || [];
-      const presentIds = new Set(records.filter(r => r.attendance === 'حاضر').map(r => r.studentId));
+    // Pre-parse session dates and build records sets
+    const sessionDates = sortedBasicSessions.map(session => {
+      let sTime: number | null = null;
+      if (session.date) {
+        try {
+          const d = typeof session.date === 'string' ? parseISO(session.date) : new Date(session.date);
+          if (!isNaN(d.getTime())) {
+            const dCopy = new Date(d);
+            dCopy.setHours(0, 0, 0, 0);
+            sTime = dCopy.getTime();
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
       
-      activeStudents.forEach(student => {
+      const records = session.records || [];
+      const presentIds = new Set<string>();
+      const excellentIds = new Set<string>();
+      const calmIds = new Set<string>();
+      
+      records.forEach(r => {
+        if (r.attendance === 'حاضر') presentIds.add(r.studentId);
+        if (r.memorization === 'ممتاز') excellentIds.add(r.studentId);
+        if (r.behavior === 'هادئ') calmIds.add(r.studentId);
+      });
+
+      return {
+        session,
+        sTime,
+        presentIds,
+        excellentIds,
+        calmIds
+      };
+    });
+
+    // Initialize stats
+    const commitmentStats: Record<string, { current: number; max: number }> = {};
+    const academicStats: Record<string, { current: number; max: number }> = {};
+    const behaviorStats: Record<string, { current: number; max: number }> = {};
+    
+    activeStudents.forEach(s => {
+      commitmentStats[s.id] = { current: 0, max: 0 };
+      academicStats[s.id] = { current: 0, max: 0 };
+      behaviorStats[s.id] = { current: 0, max: 0 };
+    });
+
+    sessionDates.forEach(({ sTime, presentIds, excellentIds, calmIds }) => {
+      studentRegDates.forEach(({ id, rTime }) => {
         // Only count sessions after student joined
-        if (session.date && student.registrationDate) {
-          const sDate = parseISO(session.date);
-          const rDate = new Date(student.registrationDate);
-          sDate.setHours(0, 0, 0, 0);
-          rDate.setHours(0, 0, 0, 0);
-          if (sDate < rDate) return;
+        if (sTime !== null && rTime !== null && sTime < rTime) {
+          return;
         }
-        
-        if (presentIds.has(student.id)) {
-          stats[student.id].current++;
+
+        // Commitment
+        if (presentIds.has(id)) {
+          commitmentStats[id].current++;
         } else {
-          stats[student.id].max = Math.max(stats[student.id].max, stats[student.id].current);
-          stats[student.id].current = 0;
+          commitmentStats[id].max = Math.max(commitmentStats[id].max, commitmentStats[id].current);
+          commitmentStats[id].current = 0;
+        }
+
+        // Academic
+        if (excellentIds.has(id)) {
+          academicStats[id].current++;
+        } else {
+          academicStats[id].max = Math.max(academicStats[id].max, academicStats[id].current);
+          academicStats[id].current = 0;
+        }
+
+        // Behavior
+        if (calmIds.has(id)) {
+          behaviorStats[id].current++;
+        } else {
+          behaviorStats[id].max = Math.max(behaviorStats[id].max, behaviorStats[id].current);
+          behaviorStats[id].current = 0;
         }
       });
     });
 
-    let maxStreak = 0;
-    let winnerId: string | undefined;
-    
-    Object.entries(stats).forEach(([id, s]) => {
-      const finalMax = Math.max(s.max, s.current);
-      if (finalMax > maxStreak) {
-        maxStreak = finalMax;
-        winnerId = id;
+    // Find winners
+    let maxCommitment = 0;
+    let commitmentWinnerId: string | undefined;
+    let maxAcademic = 0;
+    let academicWinnerId: string | undefined;
+    let maxBehavior = 0;
+    let behaviorWinnerId: string | undefined;
+
+    activeStudents.forEach(s => {
+      const cFinal = Math.max(commitmentStats[s.id].max, commitmentStats[s.id].current);
+      if (cFinal > maxCommitment) {
+        maxCommitment = cFinal;
+        commitmentWinnerId = s.id;
+      }
+
+      const aFinal = Math.max(academicStats[s.id].max, academicStats[s.id].current);
+      if (aFinal > maxAcademic) {
+        maxAcademic = aFinal;
+        academicWinnerId = s.id;
+      }
+
+      const bFinal = Math.max(behaviorStats[s.id].max, behaviorStats[s.id].current);
+      if (bFinal > maxBehavior) {
+        maxBehavior = bFinal;
+        behaviorWinnerId = s.id;
       }
     });
 
-    const king = activeStudents.find(s => s.id === winnerId);
-    return { id: king?.id, name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
+    const cKing = activeStudents.find(s => s.id === commitmentWinnerId);
+    const aKing = activeStudents.find(s => s.id === academicWinnerId);
+    const bKing = activeStudents.find(s => s.id === behaviorWinnerId);
+
+    return {
+      commitmentKing: { id: cKing?.id, name: cKing?.fullName, streak: maxCommitment, photoURL: cKing?.photoURL },
+      academicKing: { id: aKing?.id, name: aKing?.fullName, streak: maxAcademic, photoURL: aKing?.photoURL },
+      behaviorKing: { id: bKing?.id, name: bKing?.fullName, streak: maxBehavior, photoURL: bKing?.photoURL }
+    };
   }, [activeStudents, allSortedSessions]);
 
-  const academicKing = useMemo(() => {
-    if (allSortedSessions.length === 0 || activeStudents.length === 0) return { id: undefined, name: undefined, streak: 0, photoURL: undefined };
-    const sortedBasicSessions = allSortedSessions.filter(s => s.sessionType === 'حصة أساسية');
-    
-    const stats: Record<string, { current: number; max: number }> = {};
-    activeStudents.forEach(s => stats[s.id] = { current: 0, max: 0 });
-
-    sortedBasicSessions.forEach(session => {
-      const records = session.records || [];
-      const excellentIds = new Set(records.filter(r => r.memorization === 'ممتاز').map(r => r.studentId));
-      
-      activeStudents.forEach(student => {
-        if (session.date && student.registrationDate) {
-          const sDate = parseISO(session.date);
-          const rDate = new Date(student.registrationDate);
-          sDate.setHours(0, 0, 0, 0);
-          rDate.setHours(0, 0, 0, 0);
-          if (sDate < rDate) return;
-        }
-        
-        if (excellentIds.has(student.id)) {
-          stats[student.id].current++;
-        } else {
-          stats[student.id].max = Math.max(stats[student.id].max, stats[student.id].current);
-          stats[student.id].current = 0;
-        }
-      });
-    });
-
-    let maxStreak = 0;
-    let winnerId: string | undefined;
-    
-    Object.entries(stats).forEach(([id, s]) => {
-      const finalMax = Math.max(s.max, s.current);
-      if (finalMax > maxStreak) {
-        maxStreak = finalMax;
-        winnerId = id;
-      }
-    });
-
-    const king = activeStudents.find(s => s.id === winnerId);
-    return { id: king?.id, name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
-  }, [activeStudents, allSortedSessions]);
-
-  const behaviorKing = useMemo(() => {
-    if (allSortedSessions.length === 0 || activeStudents.length === 0) return { id: undefined, name: undefined, streak: 0, photoURL: undefined };
-    const sortedBasicSessions = allSortedSessions.filter(s => s.sessionType === 'حصة أساسية');
-    
-    const stats: Record<string, { current: number; max: number }> = {};
-    activeStudents.forEach(s => stats[s.id] = { current: 0, max: 0 });
-
-    sortedBasicSessions.forEach(session => {
-      const records = session.records || [];
-      const calmIds = new Set(records.filter(r => r.behavior === 'هادئ').map(r => r.studentId));
-      
-      activeStudents.forEach(student => {
-        if (session.date && student.registrationDate) {
-          const sDate = parseISO(session.date);
-          const rDate = new Date(student.registrationDate);
-          sDate.setHours(0, 0, 0, 0);
-          rDate.setHours(0, 0, 0, 0);
-          if (sDate < rDate) return;
-        }
-        
-        if (calmIds.has(student.id)) {
-          stats[student.id].current++;
-        } else {
-          stats[student.id].max = Math.max(stats[student.id].max, stats[student.id].current);
-          stats[student.id].current = 0;
-        }
-      });
-    });
-
-    let maxStreak = 0;
-    let winnerId: string | undefined;
-    
-    Object.entries(stats).forEach(([id, s]) => {
-      const finalMax = Math.max(s.max, s.current);
-      if (finalMax > maxStreak) {
-        maxStreak = finalMax;
-        winnerId = id;
-      }
-    });
-
-    const king = activeStudents.find(s => s.id === winnerId);
-    return { id: king?.id, name: king?.fullName, streak: maxStreak, photoURL: king?.photoURL };
-  }, [activeStudents, allSortedSessions]);
+  const { commitmentKing, academicKing, behaviorKing } = combinedKings;
 
   const suraGuardian = useMemo(() => {
     if (activeStudents.length === 0 || !surahProgress) {

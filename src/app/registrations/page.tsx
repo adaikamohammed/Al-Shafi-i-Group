@@ -785,31 +785,42 @@ export default function PreRegistrationPage() {
             return matchesSearch && matchesStatus && matchesLevel && matchesGender;
         });
 
-        return filtered.sort((a, b) => {
+        // Pre-parse properties needed for sorting to prevent calling parseISO repeatedly inside the sort loop
+        const mapped = filtered.map(reg => {
+            let sortValue: number = 0;
             if (sortConfig.key === 'pageNumber') {
-                const pageNumA = a.pageNumber ? parseInt(a.pageNumber, 10) : Infinity;
-                const pageNumB = b.pageNumber ? parseInt(b.pageNumber, 10) : Infinity;
-
-                let comparison = 0;
-                if (!isNaN(pageNumA) && !isNaN(pageNumB)) {
-                    comparison = pageNumA - pageNumB;
-                } else if (!isNaN(pageNumA)) {
-                    comparison = -1;
-                } else if (!isNaN(pageNumB)) {
-                    comparison = 1;
+                const pageNum = reg.pageNumber ? parseInt(reg.pageNumber, 10) : NaN;
+                sortValue = isNaN(pageNum) ? Infinity : pageNum;
+            } else {
+                // Default sort: requestedAt date
+                const reqDate = reg.requestedAt;
+                if (reqDate instanceof Date) {
+                    sortValue = reqDate.getTime();
+                } else if (typeof reqDate === 'string') {
+                    try {
+                        const parsed = parseISO(reqDate);
+                        sortValue = isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+                    } catch {
+                        sortValue = 0;
+                    }
                 }
-
-                return sortConfig.direction === 'ascending' ? comparison : -comparison;
             }
-
-            const dateA = a.requestedAt instanceof Date ? a.requestedAt.getTime() : (typeof a.requestedAt === 'string' ? parseISO(a.requestedAt).getTime() : 0);
-            const dateB = b.requestedAt instanceof Date ? b.requestedAt.getTime() : (typeof b.requestedAt === 'string' ? parseISO(b.requestedAt).getTime() : 0);
-
-            if (isNaN(dateA) || isNaN(dateB)) return 0;
-
-            return sortConfig.direction === 'ascending' ? dateB - dateA : dateA - dateB;
+            return { reg, sortValue };
         });
 
+        mapped.sort((a, b) => {
+            if (sortConfig.key === 'pageNumber') {
+                if (a.sortValue === b.sortValue) return 0;
+                if (a.sortValue === Infinity) return 1;
+                if (b.sortValue === Infinity) return -1;
+                return sortConfig.direction === 'ascending' ? a.sortValue - b.sortValue : b.sortValue - a.sortValue;
+            } else {
+                // Date sort (requestedAt)
+                return sortConfig.direction === 'ascending' ? b.sortValue - a.sortValue : a.sortValue - b.sortValue;
+            }
+        });
+
+        return mapped.map(item => item.reg);
     }, [preRegistrations, searchTerm, levelFilter, statusFilter, genderFilter, sortConfig, pendingDeletion]);
 
     // Pagination Logic

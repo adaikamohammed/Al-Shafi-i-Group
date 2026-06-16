@@ -41,6 +41,12 @@ export default function AdminDocsPage() {
     const [filterType, setFilterType] = useState<string>('all');
     const [filterDate, setFilterDate] = useState<string>('');
     const [filterSheikh, setFilterSheikh] = useState<string>('sheikhs');
+    const [visibleLogsCount, setVisibleLogsCount] = useState<number>(20);
+
+    // Reset pagination when filters change
+    useEffect(() => {
+        setVisibleLogsCount(20);
+    }, [filterType, filterDate, filterSheikh]);
 
     // Summon State
     const [summonDate, setSummonDate] = useState('');
@@ -725,59 +731,73 @@ export default function AdminDocsPage() {
                         </Card>
 
                         {/* Logs List - Receipt Style */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 justify-items-center">
-                            {filteredLogs.length > 0 ? filteredLogs.map(log => (
-                                <motion.div
-                                    key={log.id}
-                                    layout
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="relative group"
-                                >
-                                    {/* Receipt Component */}
-                                    <div className="transform scale-[0.85] origin-top transition-transform group-hover:scale-[0.9] shadow-xl">
-                                        <ReceiptDesign
-                                            log={log}
-                                            isHistory={true}
-                                            qrCodeUrl={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/record?id=${log.studentId}`)}`}
-                                        />
-                                    </div>
+                        <div className="space-y-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 justify-items-center">
+                                {filteredLogs.length > 0 ? filteredLogs.slice(0, visibleLogsCount).map(log => (
+                                    <motion.div
+                                        key={log.id}
+                                        layout
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="relative group"
+                                    >
+                                        {/* Receipt Component */}
+                                        <div className="transform scale-[0.85] origin-top transition-transform group-hover:scale-[0.9] shadow-xl">
+                                            <ReceiptDesign
+                                                log={log}
+                                                isHistory={true}
+                                                qrCodeUrl={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/record?id=${log.studentId}`)}`}
+                                            />
+                                        </div>
 
-                                    {/* Overlay Actions */}
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4 rounded-3xl backdrop-blur-[2px]">
-                                        <Button
-                                            variant="secondary"
-                                            size="sm"
-                                            className="font-black gap-2 w-32"
-                                            onClick={() => {
-                                                toast({ title: "معاينة السجل", description: "يمكنك رؤية تفاصيل الوصل في البطاقة." });
-                                            }}
-                                        >
-                                            <FileText className="h-4 w-4" />
-                                            تفاصيل
-                                        </Button>
-
-                                        {(currentUser?.email === 'admin00@gmail.com' || currentUser?.email === 'admin0@gmail.com') && (
+                                        {/* Overlay Actions */}
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4 rounded-3xl backdrop-blur-[2px]">
                                             <Button
-                                                variant="destructive"
+                                                variant="secondary"
                                                 size="sm"
                                                 className="font-black gap-2 w-32"
                                                 onClick={() => {
-                                                    if (confirm('هل أنت متأكد من حذف هذا الوصل؟ سيتم حذفه من سجل الطالب والولي أيضاً.')) {
-                                                        deleteAdminLog(log);
-                                                    }
+                                                    toast({ title: "معاينة السجل", description: "يمكنك رؤية تفاصيل الوصل في البطاقة." });
                                                 }}
                                             >
-                                                <Trash2 className="h-4 w-4" />
-                                                حذف الوصل
+                                                <FileText className="h-4 w-4" />
+                                                تفاصيل
                                             </Button>
-                                        )}
+
+                                            {(currentUser?.email === 'admin00@gmail.com' || currentUser?.email === 'admin0@gmail.com') && (
+                                                <Button
+                                                    variant="destructive"
+                                                    size="sm"
+                                                    className="font-black gap-2 w-32"
+                                                    onClick={() => {
+                                                        if (confirm('هل أنت متأكد من حذف هذا الوصل؟ سيتم حذفه من سجل الطالب والولي أيضاً.')) {
+                                                            deleteAdminLog(log);
+                                                        }
+                                                    }}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                    حذف الوصل
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )) : (
+                                    <div className="col-span-full h-40 flex flex-col items-center justify-center text-muted-foreground bg-white/5 rounded-2xl border border-dashed border-white/10 w-full">
+                                        <ClipboardList className="h-10 w-10 opacity-20 mb-2" />
+                                        <p className="text-sm font-bold opacity-30">لا توجد سجلات مطابقة للبحث</p>
                                     </div>
-                                </motion.div>
-                            )) : (
-                                <div className="col-span-full h-40 flex flex-col items-center justify-center text-muted-foreground bg-white/5 rounded-2xl border border-dashed border-white/10">
-                                    <ClipboardList className="h-10 w-10 opacity-20 mb-2" />
-                                    <p className="text-sm font-bold opacity-30">لا توجد سجلات مطابقة للبحث</p>
+                                )}
+                            </div>
+
+                            {filteredLogs.length > visibleLogsCount && (
+                                <div className="flex justify-center pt-4">
+                                    <Button
+                                        onClick={() => setVisibleLogsCount(prev => prev + 20)}
+                                        variant="outline"
+                                        className="font-bold px-8 border-primary/30 hover:bg-primary/10 rounded-xl gap-2 text-white"
+                                    >
+                                        تحميل المزيد ({filteredLogs.length - visibleLogsCount})
+                                    </Button>
                                 </div>
                             )}
                         </div>

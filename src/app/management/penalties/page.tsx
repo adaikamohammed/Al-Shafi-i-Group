@@ -364,6 +364,7 @@ export default function PenaltiesPage() {
                     }
 
                     const covDate = parseISO(cov.date);
+                    const covTime = covDate.getTime();
                     let include = false;
 
                     if (timeframe === 'today') {
@@ -376,12 +377,12 @@ export default function PenaltiesPage() {
                     }
 
                     if (include) {
-                        logs.push({ student, covenant: cov });
+                        logs.push({ student, covenant: cov, time: covTime });
                     }
                 });
             }
         });
-        return logs.sort((a, b) => parseISO(b.covenant.date).getTime() - parseISO(a.covenant.date).getTime());
+        return logs.sort((a, b) => b.time - a.time);
     }, [students, timeframe, selectedGroup, user, isSuperAdmin, isManagement, statusFilter, customStartDate, customEndDate]);
 
     // Due Penalties (Active)

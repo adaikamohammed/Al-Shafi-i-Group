@@ -1106,7 +1106,7 @@ export default function MyStatsPage() {
             if (!daySessions) return;
             result[dateStr] = {};
             Object.entries(daySessions as Record<string, any>).forEach(([sid, session]) => {
-                result[dateStr][sid] = { ...session, ownerId: session.ownerId || uid, groupName: session.groupName || selectedGroup };
+                result[dateStr][sid] = { ...session, ownerId: uid, groupName: session.groupName || selectedGroup };
             });
         });
         return result;
@@ -1469,7 +1469,10 @@ export default function MyStatsPage() {
     // ── At-risk students (use adapted sessions for sheikhs) ───────────────
     const atRiskStudents = useMemo(() => {
         if (!groupStudents.length || !adaptedDailySessions || !activeSheikh) return [];
-        const computed = computeAtRiskStudents(groupStudents, adaptedDailySessions, [activeSheikh], endOfMonth(statsMonth));
+        const today = new Date();
+        const isCurrentMonth = statsMonth.getMonth() === today.getMonth() && statsMonth.getFullYear() === today.getFullYear();
+        const refDate = isCurrentMonth ? today : endOfMonth(statsMonth);
+        const computed = computeAtRiskStudents(groupStudents, adaptedDailySessions, [activeSheikh], refDate);
         return isSheikh ? computed : computed.filter(s => s.group === selectedGroup);
     }, [groupStudents, adaptedDailySessions, activeSheikh, selectedGroup, statsMonth, isSheikh]);
 

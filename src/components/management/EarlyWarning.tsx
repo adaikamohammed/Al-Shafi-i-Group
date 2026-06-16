@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from 'react';
-import { format, addDays, getDay, subDays } from 'date-fns';
+import { format, addDays, getDay, subDays, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { AlertTriangle, Shield, ShieldAlert, ShieldCheck, ChevronDown, ChevronUp, Filter, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,26 @@ export interface AtRiskStudent {
     consecutiveNotMem: number;
     absenceRate: number;
     recommendation: string;
+    guardianName?: string;
+    phone1?: string;
+    phone2?: string;
+    recentEvaluations?: string[];
+    absentDates?: string[];
+    notMemDates?: string[];
+    recentSessionDetails?: Array<{
+        date: string;
+        attendance: string;
+        memorization?: string;
+        behavior?: string;
+        sessionType?: string;
+    }>;
+    behaviorSummary?: {
+        calm: number;
+        ok: number;
+        naughty: number;
+    };
+    pageNumber?: string;
+    memorizedSurahsCount?: number;
 }
 
 // ─── Risk Computation ─────────────────────────────────────────────────────────
@@ -75,12 +95,35 @@ export function computeAtRiskStudents(
 
         // Track evaluations in order
         const evalSequence: string[] = [];
+        const absentDates: string[] = [];
+        const notMemDates: string[] = [];
+        const recentSessionDetails: Array<{
+            date: string;
+            attendance: string;
+            memorization?: string;
+            behavior?: string;
+            sessionType?: string;
+        }> = [];
+        let calmCount = 0;
+        let okCount = 0;
+        let naughtyCount = 0;
 
         dateRange.forEach(dateStr => {
             if (!groupDates.has(dateStr)) return; // no session for this group
 
             const daySess = (dailySessions as any)[dateStr];
-            if (!daySess) { absences++; return; }
+            if (!daySess) {
+                absences++;
+                absentDates.push(dateStr);
+                recentSessionDetails.push({
+                    date: dateStr,
+                    attendance: 'غائب',
+                    memorization: 'لا يوجد',
+                    behavior: 'لا يوجد',
+                    sessionType: 'حصة أساسية'
+                });
+                return;
+            }
 
             let foundInSession = false;
             Object.values(daySess as Record<string, any>).forEach((session: any) => {
@@ -102,18 +145,52 @@ export function computeAtRiskStudents(
                     appeared = true;
                     if (rec.attendance === 'غائب' || rec.attendance === 'غياب') {
                         absences++;
+                        absentDates.push(dateStr);
                     }
                     if (!rec.review && rec.memorization) {
                         evalSequence.push(rec.memorization);
+                        if (rec.memorization === 'لم يحفظ') {
+                            notMemDates.push(dateStr);
+                        }
                     }
+                    if (rec.behavior) {
+                        if (rec.behavior === 'هادئ') calmCount++;
+                        else if (rec.behavior === 'مقبول' || rec.behavior === 'متوسط') okCount++;
+                        else if (rec.behavior === 'مشاغب' || rec.behavior === 'غير منضبط') naughtyCount++;
+                    }
+                    recentSessionDetails.push({
+                        date: dateStr,
+                        attendance: rec.attendance || 'غير مسجل',
+                        memorization: rec.memorization || 'لا يوجد',
+                        behavior: rec.behavior || 'لا يوجد',
+                        sessionType: sType
+                    });
                 } else {
                     // Student not in records → absent
                     absences++;
+                    absentDates.push(dateStr);
                     foundInSession = true;
+                    recentSessionDetails.push({
+                        date: dateStr,
+                        attendance: 'غائب',
+                        memorization: 'لا يوجد',
+                        behavior: 'لا يوجد',
+                        sessionType: sType
+                    });
                 }
             });
 
-            if (!foundInSession) absences++;
+            if (!foundInSession) {
+                absences++;
+                absentDates.push(dateStr);
+                recentSessionDetails.push({
+                    date: dateStr,
+                    attendance: 'غائب',
+                    memorization: 'لا يوجد',
+                    behavior: 'لا يوجد',
+                    sessionType: 'حصة أساسية'
+                });
+            }
         });
 
         // Calculate consecutive "لم يحفظ"
@@ -177,6 +254,20 @@ export function computeAtRiskStudents(
             consecutiveNotMem: maxNotMemConsecutive,
             absenceRate,
             recommendation,
+            guardianName: student.guardianName || 'غير محدد',
+            phone1: student.phone1 || '',
+            phone2: student.phone2 || '',
+            recentEvaluations: evalSequence,
+            absentDates,
+            notMemDates,
+            recentSessionDetails,
+            behaviorSummary: {
+                calm: calmCount,
+                ok: okCount,
+                naughty: naughtyCount
+            },
+            pageNumber: student.pageNumber,
+            memorizedSurahsCount: student.memorizedSurahsCount
         });
     });
 
@@ -302,7 +393,7 @@ export function EarlyWarningView({ atRiskStudents, sheikhs, onStudentClick }: Ea
                             {isExpanded && (
                                 <div className="px-3 pb-3 border-t border-dashed space-y-2 animate-in fade-in-50 duration-200" style={{ borderColor: 'inherit' }}>
                                     {/* Details */}
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+                                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-2">
                                         <div className="bg-white/80 rounded-lg p-2 text-center border">
                                             <div className="text-lg font-black">{student.absencesLast2Weeks}</div>
                                             <div className="text-[9px] text-muted-foreground">غيابات (أسبوعين)</div>
@@ -319,6 +410,14 @@ export function EarlyWarningView({ atRiskStudents, sheikhs, onStudentClick }: Ea
                                             <div className="text-lg font-black text-amber-600">{student.consecutiveNotMem}</div>
                                             <div className="text-[9px] text-muted-foreground">"لم يحفظ" متتالية</div>
                                         </div>
+                                        <div className="bg-white/80 rounded-lg p-2 text-center border">
+                                            <div className="text-lg font-black text-indigo-600">{student.pageNumber || '—'}</div>
+                                            <div className="text-[9px] text-muted-foreground">الصفحة الحالية</div>
+                                        </div>
+                                        <div className="bg-white/80 rounded-lg p-2 text-center border">
+                                            <div className="text-lg font-black text-teal-600">{student.memorizedSurahsCount || 0}</div>
+                                            <div className="text-[9px] text-muted-foreground">السور المحفوظة</div>
+                                        </div>
                                     </div>
 
                                     {/* Reasons */}
@@ -330,6 +429,128 @@ export function EarlyWarningView({ atRiskStudents, sheikhs, onStudentClick }: Ea
                                                 <span>{r}</span>
                                             </div>
                                         ))}
+                                    </div>
+
+                                    {/* Guardian Info & Quick WhatsApp Contact */}
+                                    <div className="bg-white/80 rounded-lg p-3 border space-y-2">
+                                        <div className="text-[10px] font-bold text-muted-foreground">👤 بيانات الولي والتواصل:</div>
+                                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                            <div className="text-xs space-y-1">
+                                                <div><strong className="text-muted-foreground">اسم الولي:</strong> {student.guardianName || 'غير حدد'}</div>
+                                                <div><strong className="text-muted-foreground">رقم الهاتف:</strong> {student.phone1 || 'غير متوفر'} {student.phone2 ? ` / ${student.phone2}` : ''}</div>
+                                            </div>
+                                            {student.phone1 && (
+                                                <div className="flex gap-2 w-full sm:w-auto">
+                                                    <a
+                                                        href={`https://wa.me/${student.phone1.replace(/\s/g, '').replace(/^0/, '213')}?text=${encodeURIComponent(
+                                                            `السلام عليكم ورحمة الله وبركاته، معكم معلم القرآن من مدرسة الإمام الشافعي بخصوص ابنكم الطالب ${student.name}. أردت التواصل معكم لمتابعة أدائه وسلوكه في الحلقة.`
+                                                        )}`}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-colors w-full sm:w-auto"
+                                                    >
+                                                        <span>💬</span>
+                                                        واتساب الولي
+                                                    </a>
+                                                    <a
+                                                        href={`tel:${student.phone1}`}
+                                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] transition-colors w-full sm:w-auto"
+                                                    >
+                                                        <span>📞</span>
+                                                        اتصال مباشر
+                                                    </a>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Recent Evaluations */}
+                                    {student.recentEvaluations && student.recentEvaluations.length > 0 && (
+                                        <div className="bg-white/80 rounded-lg p-3 border space-y-2">
+                                            <div className="text-[10px] font-bold text-muted-foreground">📈 سجل الحفظ والتقييمات الأخيرة (آخر أسبوعين):</div>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {student.recentEvaluations.map((ev, idx) => {
+                                                    let badgeClass = "bg-gray-100 text-gray-700 border-gray-200";
+                                                    if (ev === 'ممتاز') badgeClass = "bg-green-100 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400";
+                                                    else if (ev === 'جيد جدا' || ev === 'جيد جداً') badgeClass = "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400";
+                                                    else if (ev === 'جيد') badgeClass = "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400";
+                                                    else if (ev === 'مقبول') badgeClass = "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-400";
+                                                    else if (ev === 'لم يحفظ') badgeClass = "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400";
+                                                    return (
+                                                        <span key={idx} className={cn("text-[10px] font-bold px-2 py-0.5 rounded border", badgeClass)}>
+                                                            {ev}
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Timeline table of recent sessions */}
+                                    {student.recentSessionDetails && student.recentSessionDetails.length > 0 && (
+                                        <div className="bg-white/80 rounded-lg p-3 border space-y-2">
+                                            <div className="text-[10px] font-bold text-muted-foreground">📅 تفاصيل الحصص الأخيرة بالتفصيل:</div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-right text-xs border-collapse">
+                                                    <thead>
+                                                        <tr className="border-b text-[9px] text-muted-foreground">
+                                                            <th className="pb-1 font-bold">التاريخ</th>
+                                                            <th className="pb-1 font-bold text-center">نوع الحصة</th>
+                                                            <th className="pb-1 font-bold text-center">الحضور</th>
+                                                            <th className="pb-1 font-bold text-center">تقييم الحفظ</th>
+                                                            <th className="pb-1 font-bold text-center">السلوك</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {student.recentSessionDetails.map((sess, idx) => {
+                                                            let attColor = "text-muted-foreground";
+                                                            if (sess.attendance === 'حاضر') attColor = "text-emerald-600 font-bold";
+                                                            else if (sess.attendance === 'متأخر') attColor = "text-amber-600 font-bold";
+                                                            else if (sess.attendance === 'غياب' || sess.attendance === 'غائب') attColor = "text-rose-600 font-bold";
+                                                            else if (sess.attendance === 'تعويض') attColor = "text-blue-600 font-bold";
+
+                                                            let memColor = "text-muted-foreground";
+                                                            if (sess.memorization === 'ممتاز' || sess.memorization === 'جيد جدا' || sess.memorization === 'جيد جداً') memColor = "text-emerald-600 font-bold";
+                                                            else if (sess.memorization === 'لم يحفظ') memColor = "text-rose-600 font-bold";
+
+                                                            return (
+                                                                <tr key={idx} className="border-b last:border-b-0 border-dashed border-muted/50 hover:bg-muted/30">
+                                                                    <td className="py-1.5 font-semibold font-body text-[11px]">
+                                                                        {(() => {
+                                                                            try {
+                                                                                return format(parseISO(sess.date), 'dd MMM yyyy', { locale: ar });
+                                                                            } catch {
+                                                                                return sess.date;
+                                                                            }
+                                                                        })()}
+                                                                    </td>
+                                                                    <td className="py-1.5 text-center text-[10px] text-muted-foreground font-body">{sess.sessionType}</td>
+                                                                    <td className={cn("py-1.5 text-center", attColor)}>{sess.attendance}</td>
+                                                                    <td className={cn("py-1.5 text-center", memColor)}>{sess.memorization}</td>
+                                                                    <td className="py-1.5 text-center text-[11px]">{sess.behavior}</td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Sheikh Script/Guidance */}
+                                    <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-200/50 space-y-1.5">
+                                        <div className="text-[10px] font-bold text-blue-800">🗣️ إرشاد للتحدث مع الولي:</div>
+                                        <p className="text-xs text-blue-900 leading-relaxed">
+                                            {student.riskLevel === 'high' ? (
+                                                <>
+                                                    تواصل عاجل مع الولي عبر الهاتف أو واتساب. نبّهه أن الطالب في <strong>خطر تراجع المستوى</strong> بسبب {student.reasons.join(' و ')}. اطلب منه تشجيع الطالب ومتابعته يومياً في المنزل لتدارك النقص قبل تفاقم الوضع.
+                                                </>
+                                            ) : (
+                                                <>
+                                                    أرسل تنبيهاً خفيفاً للولي بخصوص {student.reasons.join(' و ')}، مع حثّه على ضرورة انضباط الابن في التسميع والحضور لتجنب التأخر الدراسي والحفاظ على استقراره.
+                                                </>
+                                            )}
+                                        </p>
                                     </div>
 
                                     {/* Recommendation */}
