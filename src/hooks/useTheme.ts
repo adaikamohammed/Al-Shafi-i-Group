@@ -6,26 +6,27 @@ import { PORTAL_THEMES } from '@/lib/themes';
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 function getInitialMode(): ThemeMode {
-  if (typeof window === 'undefined') return 'dark';
+  if (typeof window === 'undefined') return 'light';
 
-  // If user has manually set a mode, respect it
+  // If the user has explicitly saved a mode preference, respect it
   const saved = localStorage.getItem('portal-theme-mode') as ThemeMode | null;
-  if (saved && (saved === 'light' || saved === 'dark' || saved === 'system')) {
-    return saved;
+  if (saved === 'dark' || saved === 'system') return saved;
+  if (saved === 'light') return 'light';
+
+  // If user has previously picked a portal theme, derive from it
+  const savedThemeId = localStorage.getItem('portal-theme-id');
+  if (savedThemeId) {
+    const portalTheme = PORTAL_THEMES[savedThemeId];
+    if (portalTheme && !portalTheme.isLight) return 'dark';
   }
 
-  // Otherwise derive from the saved portal theme
-  const savedThemeId = localStorage.getItem('portal-theme-id') || 'midnight';
-  const portalTheme = PORTAL_THEMES[savedThemeId];
-  if (portalTheme?.isLight) return 'light';
-
-  // Default to system preference
-  return 'system';
+  // ✅ Default: always light (first-time visitors see light mode)
+  return 'light';
 }
 
 export function useTheme() {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => getInitialMode());
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(false);
 
   const applyMode = (mode: ThemeMode) => {
     let resolvedDark: boolean;

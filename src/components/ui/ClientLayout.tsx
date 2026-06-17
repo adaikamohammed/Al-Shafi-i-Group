@@ -3,7 +3,8 @@
 import '../../app/globals.css';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarSeparator, useSidebar } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield, UserPlus, UserCog, Home, PanelRight, PanelLeft, Palette, Check, MoonStar, Sun } from 'lucide-react';
+import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield, UserPlus, UserCog, Home, PanelRight, PanelLeft, Palette, Check, MoonStar, Sun, Bell, X } from 'lucide-react';
+import { useFCM } from '@/hooks/useFCM';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { canAccessPage } from '@/lib/permissions';
 import { useStudentContext } from '@/context/StudentContext';
 import { GlobalSearch } from '@/components/ui/GlobalSearch';
+import { NotificationRegister } from '@/components/ui/NotificationRegister';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 import { PORTAL_THEMES } from '@/lib/themes';
 import { cn } from '@/lib/utils';
@@ -47,7 +49,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   };
 
   // Global Theme Logic
-  const currentThemeId = user?.portalTheme || 'midnight';
+  const currentThemeId = user?.portalTheme || 'classic';
   const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
 
   const filteredNavGroups = useMemo(() => {
@@ -367,6 +369,27 @@ function AppSidebarContent({
 }: any) {
   const { state } = useSidebar();
   const { themeMode, setThemeMode, isDark, syncToPortalTheme } = useTheme();
+  const { permission, requestPermission } = useFCM();
+  const [showNotifBanner, setShowNotifBanner] = useState(false);
+
+  // Auto-show notification banner once, 3s after mount
+  useEffect(() => {
+    if (permission === 'granted') return;
+    const dismissed = localStorage.getItem('notif_banner_dismissed');
+    if (dismissed) return;
+    const timer = setTimeout(() => setShowNotifBanner(true), 3000);
+    return () => clearTimeout(timer);
+  }, [permission]);
+
+  const dismissBanner = () => {
+    setShowNotifBanner(false);
+    localStorage.setItem('notif_banner_dismissed', '1');
+  };
+
+  const enableAndDismiss = async () => {
+    await requestPermission();
+    dismissBanner();
+  };
 
   const handleThemeChange = (themeId: string) => {
     updateUserProfile({ portalTheme: themeId });
@@ -630,6 +653,30 @@ function AppSidebarContent({
             </SidebarMenuButton>
           </SidebarMenuItem>
 
+          {/* Notification Bell with pulsing badge if not enabled */}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={permission === 'granted' ? undefined : () => setShowNotifBanner(true)}
+              tooltip={permission === 'granted' ? 'الإشعارات مفعّلة' : 'تفعيل الإشعارات'}
+              className={cn(
+                "rounded-xl h-10 px-3 transition-all duration-300 relative",
+                permission === 'granted'
+                  ? (theme.isLight ? "text-emerald-600" : "text-emerald-400")
+                  : (theme.isLight ? "text-amber-600 hover:bg-amber-50" : "text-amber-400 hover:bg-amber-500/10")
+              )}
+            >
+              <div className="relative shrink-0">
+                <Bell className="h-4 w-4" />
+                {permission !== 'granted' && (
+                  <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                )}
+              </div>
+              <span className="font-bold text-[11px] group-data-[collapsible=icon]:hidden">
+                {permission === 'granted' ? 'الإشعارات مفعّلة' : 'تفعيل الإشعارات'}
+              </span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={logout}
@@ -659,6 +706,50 @@ function AppSidebarContent({
       <div className="fixed inset-0 bg-[url('/noise.png')] opacity-5 pointer-events-none print:hidden" />
 
       <GlobalSearch students={students ?? []} isOpen={isCommandBarOpen} onOpenChange={setCommandBarOpen} router={router} />
+      <NotificationRegister />
+
+      {/* Auto Notification Banner */}
+      {showNotifBanner && permission !== 'granted' && permission !== 'denied' && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] w-[calc(100%-2rem)] max-w-md animate-in slide-in-from-bottom-4 duration-500">
+          <div className={cn(
+            "rounded-2xl border shadow-2xl p-4 flex items-start gap-4",
+            isDark
+              ? "bg-slate-900 border-amber-500/30 shadow-amber-500/10"
+              : "bg-white border-amber-200 shadow-amber-100"
+          )}>
+            <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+              <Bell className="h-5 w-5 text-amber-500 animate-bounce" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={cn("font-bold text-sm", isDark ? "text-white" : "text-slate-900")}>
+                🔔 فعّل الإشعارات الفورية
+              </p>
+              <p className={cn("text-xs mt-0.5", isDark ? "text-slate-400" : "text-slate-500")}>
+                احصل على تنبيهات تلقائية عند غياب الطلاب أو تراجع مستوى حفظهم — حتى لو أغلقت التطبيق.
+              </p>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={enableAndDismiss}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+                >
+                  تفعيل الآن
+                </button>
+                <button
+                  onClick={dismissBanner}
+                  className={cn("text-xs px-3 py-1.5 rounded-lg transition-colors",
+                    isDark ? "text-slate-400 hover:bg-white/5" : "text-slate-500 hover:bg-slate-100"
+                  )}
+                >
+                  لاحقاً
+                </button>
+              </div>
+            </div>
+            <button onClick={dismissBanner} className="shrink-0 text-slate-400 hover:text-slate-600">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex min-h-screen relative z-10 rtl overflow-x-hidden print:overflow-visible print:h-auto print:min-h-0">
         {isMobile ? (

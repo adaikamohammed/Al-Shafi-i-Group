@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, Save, WandSparkles, ShieldCheck, Info, Trash2, PlusCircle, History, SlidersHorizontal, Goal } from 'lucide-react';
+import { Loader2, Save, WandSparkles, ShieldCheck, Info, Trash2, PlusCircle, History, SlidersHorizontal, Goal, Bell, BellOff, BellRing } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { AppSettings, PointsConfig, Reward, BadgeConfig } from '@/lib/types';
 import { produce } from 'immer';
@@ -21,6 +21,7 @@ import { ref, set, onValue } from 'firebase/database';
 import { useAuth } from '@/context/AuthContext';
 import { ScoringWeights, DEFAULT_WEIGHTS } from '@/components/management/SheikhBadges';
 import { ProtectedPage } from '@/components/ui/ProtectedPage';
+import { useFCM } from '@/hooks/useFCM';
 
 
 type Category = keyof PointsConfig;
@@ -37,6 +38,7 @@ export default function SettingsPage() {
     const [sheikhWeights, setSheikhWeights] = useState<ScoringWeights>(DEFAULT_WEIGHTS);
     const [sheikhGoals, setSheikhGoals] = useState({ attendanceTarget: 85, excellentTarget: 25, commitmentTarget: 90 });
     const [goalsMonth, setGoalsMonth] = useState(format(new Date(), 'yyyy-MM'));
+    const { permission, requestPermission, token } = useFCM();
 
     useEffect(() => {
         if (settings) {
@@ -469,6 +471,81 @@ export default function SettingsPage() {
                                 <div className="space-y-1">
                                     <Label>نسبة التزام الشيخ بتسجيل الحصص (%)</Label>
                                     <Input type="number" value={sheikhGoals.commitmentTarget} onChange={e => handleGoalChange('commitmentTarget', e.target.value)} min={0} max={100} />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* إشعارات الجهاز */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Bell className="h-5 w-5 text-amber-500" />
+                                إشعارات الجهاز (Push Notifications)
+                            </CardTitle>
+                            <CardDescription>
+                                فعّل إشعارات هذا الجهاز لتتلقى تنبيهات فورية عند غياب الطلاب المتكرر أو تراجع مستوى الحفظ، حتى وإن كان التطبيق مغلقاً.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border rounded-xl bg-background">
+                                <div className="flex items-center gap-3">
+                                    {permission === 'granted' ? (
+                                        <div className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                                            <BellRing className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                                        </div>
+                                    ) : permission === 'denied' ? (
+                                        <div className="h-10 w-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                            <BellOff className="h-5 w-5 text-red-500" />
+                                        </div>
+                                    ) : (
+                                        <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                            <Bell className="h-5 w-5 text-slate-400" />
+                                        </div>
+                                    )}
+                                    <div>
+                                        <p className="font-bold text-sm">
+                                            {permission === 'granted' ? '✅ الإشعارات مفعّلة على هذا الجهاز' :
+                                             permission === 'denied' ? '🚫 الإشعارات محجوبة في المتصفح' :
+                                             '🔔 الإشعارات غير مفعّلة بعد'}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                            {permission === 'granted' && token ? `رمز الجهاز: ${token.substring(0, 16)}...` :
+                                             permission === 'denied' ? 'اذهب لإعدادات المتصفح → الموقع → السماح بالإشعارات' :
+                                             'اضغط التفعيل للحصول على تنبيهات فورية على هذا الجهاز'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    {permission !== 'denied' && permission !== 'granted' && (
+                                        <Button
+                                            onClick={requestPermission}
+                                            className="bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl"
+                                        >
+                                            <Bell className="h-4 w-4 ml-2" />
+                                            تفعيل الإشعارات
+                                        </Button>
+                                    )}
+                                    {permission === 'granted' && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                                fetch('/api/notify', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({
+                                                        targetUid: user?.uid,
+                                                        title: '🔔 اختبار الإشعارات',
+                                                        body: 'نجح! ستصلك الإشعارات التلقائية على هذا الجهاز بشكل صحيح.'
+                                                    })
+                                                }).then(() => toast({ title: 'تم إرسال إشعار اختباري!', description: 'تحقق من إشعارات جهازك.' }))
+                                                .catch(() => toast({ title: 'خطأ', description: 'تعذر إرسال الإشعار الاختباري.', variant: 'destructive' }));
+                                            }}
+                                            className="rounded-xl font-bold"
+                                        >
+                                            إرسال اختباري
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>

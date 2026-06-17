@@ -72,7 +72,8 @@ export const useFCM = () => {
                 // Try retrieving token with the service worker registration
                 try {
                     const currentToken = await getToken(msg, {
-                        serviceWorkerRegistration: registration
+                        serviceWorkerRegistration: registration,
+                        vapidKey: 'BEieOH4dlXhLOvF8P66sEkArXTpg9HzXq12bMLNbNxoMnreAZ2Jjojimwv2zYSZe49MYYzIJL4yOqZaIZ7AQiSw'
                     });
                     if (currentToken) {
                         setToken(currentToken);
@@ -91,8 +92,6 @@ export const useFCM = () => {
                             }
                         } catch (dbError: any) {
                             console.error('Failed to save FCM token to database:', dbError);
-                            // Don't show error to user - token is still valid locally
-                            // This might happen if database rules are not properly configured
                         }
 
                         toast({
@@ -132,6 +131,5 @@ export const useFCM = () => {
         }
     };
 
-    // Revised implementation without hardcoded VAPID for now, relying on default instance
     return { permission, requestPermission, token };
 };

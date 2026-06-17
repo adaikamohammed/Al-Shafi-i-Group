@@ -1173,6 +1173,90 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           syncPublicStudentReport(r.studentId);
         }
       });
+
+      // ─── Auto Push Notification: check for 3 consecutive absences or 3 لم يحفظ in 7 days ───
+      // Run in background without blocking session save
+      setTimeout(async () => {
+        try {
+          const allSessionsSnap = await get(ref(db, `users/${ownerId}/dailySessions`));
+          if (!allSessionsSnap.exists()) return;
+          const allSessions = allSessionsSnap.val();
+
+          // Collect last 14 days of records per student
+          const today = new Date();
+          const checkDays: string[] = [];
+          for (let i = 0; i < 14; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            checkDays.push(d.toISOString().split('T')[0]);
+          }
+          const last7Days = checkDays.slice(0, 7);
+
+          records.forEach((r: any) => {
+            if (!r.studentId) return;
+            const studentName = students.find(s => s.id === r.studentId)?.fullName || r.studentId;
+
+            // Build history across 14 days
+            const attendanceHistory: string[] = [];
+            const memHistory: { date: string; value: string }[] = [];
+
+            checkDays.forEach(dateStr => {
+              const daySess = allSessions[dateStr];
+              if (!daySess) return;
+              Object.values(daySess as Record<string, any>).forEach((sess: any) => {
+                if (!sess?.records) return;
+                const sessRecords = Array.isArray(sess.records) ? sess.records : Object.values(sess.records);
+                const rec = (sessRecords as any[]).find((x: any) => x.studentId === r.studentId);
+                if (!rec) return;
+                if (rec.attendance) attendanceHistory.push(rec.attendance);
+                if (rec.memorization && !rec.review) {
+                  memHistory.push({ date: dateStr, value: rec.memorization });
+                }
+              });
+            });
+
+            // Check: 3 consecutive absences
+            let consecutiveAbsences = 0;
+            let maxConsecutive = 0;
+            attendanceHistory.forEach(a => {
+              if (a === 'غائب' || a === 'غياب') {
+                consecutiveAbsences++;
+                maxConsecutive = Math.max(maxConsecutive, consecutiveAbsences);
+              } else {
+                consecutiveAbsences = 0;
+              }
+            });
+
+            // Check: 3 لم يحفظ in last 7 days
+            const notMemLast7 = memHistory.filter(m => last7Days.includes(m.date) && m.value === 'لم يحفظ').length;
+
+            if (maxConsecutive >= 3) {
+              fetch('/api/notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  targetUid: ownerId,
+                  title: `⚠️ تنبيه غياب متكرر`,
+                  body: `الطالب "${studentName}" غاب لـ ${maxConsecutive} حصص متتالية. يُرجى التواصل مع ولي أمره.`
+                })
+              }).catch(console.error);
+            } else if (notMemLast7 >= 3) {
+              fetch('/api/notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  targetUid: ownerId,
+                  title: `📖 تنبيه تراجع الحفظ`,
+                  body: `الطالب "${studentName}" لم يحفظ درسه ${notMemLast7} مرات في الأسبوع الماضي. يُرجى متابعته.`
+                })
+              }).catch(console.error);
+            }
+          });
+        } catch (e) {
+          // Silent fail – don't block UX for notification errors
+          console.warn('Push notification check failed silently:', e);
+        }
+      }, 2000);
     } catch (error) {
       console.error("Error saving session:", error);
       throw error;
