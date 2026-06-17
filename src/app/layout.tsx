@@ -6,16 +6,31 @@ import { Toaster } from '@/components/ui/toaster';
 import { NotificationPrompter } from '@/components/ui/NotificationPrompter';
 
 export const metadata: Metadata = {
-  title: 'مدير مدرسة الشافعي',
-  description: 'إدارة مدرسة الإمام الشافعي القرآنية',
+  title: 'مدرسة الإمام الشافعي',
+  description: 'إدارة مدرسة الإمام الشافعي القرآنية - تكسبت الوادي',
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'الشافعي',
+  },
+  icons: {
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1.0,
-  themeColor: '#808000',
+  themeColor: '#b8860b',
 };
+
 
 export default function RootLayout({
   children,
