@@ -672,7 +672,7 @@ function AppSidebarContent({
                 )}
               </div>
               <span className="font-bold text-[11px] group-data-[collapsible=icon]:hidden">
-                {permission === 'granted' ? 'الإشعارات مفعّلة' : 'تفعيل الإشعارات'}
+                {permission === 'granted' ? 'الإشعارات مفعّلة' : permission === 'denied' ? 'الإشعارات محجوبة' : 'تفعيل الإشعارات'}
               </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -709,7 +709,7 @@ function AppSidebarContent({
       <NotificationRegister />
 
       {/* Auto Notification Banner */}
-      {showNotifBanner && permission !== 'granted' && permission !== 'denied' && (
+      {showNotifBanner && permission !== 'granted' && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] w-[calc(100%-2rem)] max-w-md animate-in slide-in-from-bottom-4 duration-500">
           <div className={cn(
             "rounded-2xl border shadow-2xl p-4 flex items-start gap-4",
@@ -717,32 +717,54 @@ function AppSidebarContent({
               ? "bg-slate-900 border-amber-500/30 shadow-amber-500/10"
               : "bg-white border-amber-200 shadow-amber-100"
           )}>
-            <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-              <Bell className="h-5 w-5 text-amber-500 animate-bounce" />
+            <div className={cn(
+              "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
+              permission === 'denied' ? "bg-red-500/10" : "bg-amber-500/10"
+            )}>
+              <Bell className={cn("h-5 w-5", permission === 'denied' ? "text-red-500" : "text-amber-500 animate-bounce")} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className={cn("font-bold text-sm", isDark ? "text-white" : "text-slate-900")}>
-                🔔 فعّل الإشعارات الفورية
-              </p>
-              <p className={cn("text-xs mt-0.5", isDark ? "text-slate-400" : "text-slate-500")}>
-                احصل على تنبيهات تلقائية عند غياب الطلاب أو تراجع مستوى حفظهم — حتى لو أغلقت التطبيق.
-              </p>
-              <div className="flex gap-2 mt-3">
-                <button
-                  onClick={enableAndDismiss}
-                  className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-colors"
-                >
-                  تفعيل الآن
-                </button>
-                <button
-                  onClick={dismissBanner}
-                  className={cn("text-xs px-3 py-1.5 rounded-lg transition-colors",
-                    isDark ? "text-slate-400 hover:bg-white/5" : "text-slate-500 hover:bg-slate-100"
-                  )}
-                >
-                  لاحقاً
-                </button>
-              </div>
+              {permission === 'denied' ? (
+                <>
+                  <p className={cn("font-bold text-sm", isDark ? "text-white" : "text-slate-900")}>
+                    🚫 الإشعارات محجوبة في المتصفح
+                  </p>
+                  <p className={cn("text-xs mt-1 leading-relaxed", isDark ? "text-slate-400" : "text-slate-500")}>
+                    لتفعيلها يدوياً:
+                  </p>
+                  <ol className={cn("text-xs mt-1 leading-relaxed list-decimal list-inside space-y-0.5", isDark ? "text-slate-300" : "text-slate-600")}>
+                    <li>اضغط على 🔒 أمام رابط الموقع في المتصفح</li>
+                    <li>اختر <strong>الإذونات</strong> أو <strong>Site Settings</strong></li>
+                    <li>غيّر <strong>الإشعارات</strong> من ❌ إلى ✅ <strong>السماح</strong></li>
+                    <li>أعد تحميل الصفحة</li>
+                  </ol>
+                </>
+              ) : (
+                <>
+                  <p className={cn("font-bold text-sm", isDark ? "text-white" : "text-slate-900")}>
+                    🔔 فعّل الإشعارات الفورية
+                  </p>
+                  <p className={cn("text-xs mt-0.5", isDark ? "text-slate-400" : "text-slate-500")}>
+                    احصل على تنبيهات تلقائية عند غياب الطلاب أو تراجع مستوى حفظهم — حتى لو أغلقت التطبيق.
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={enableAndDismiss}
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+                    >
+                      تفعيل الآن
+                    </button>
+                    <button
+                      onClick={dismissBanner}
+                      className={cn("text-xs px-3 py-1.5 rounded-lg transition-colors",
+                        isDark ? "text-slate-400 hover:bg-white/5" : "text-slate-500 hover:bg-slate-100"
+                      )}
+                    >
+                      لاحقاً
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
             <button onClick={dismissBanner} className="shrink-0 text-slate-400 hover:text-slate-600">
               <X className="h-4 w-4" />
