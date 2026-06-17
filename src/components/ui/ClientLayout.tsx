@@ -13,7 +13,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { canAccessPage } from '@/lib/permissions';
 import { useStudentContext } from '@/context/StudentContext';
-import { CommandBar } from '@/components/ui/CommandBar';
+import { GlobalSearch } from '@/components/ui/GlobalSearch';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 import { PORTAL_THEMES } from '@/lib/themes';
 import { cn } from '@/lib/utils';
@@ -103,7 +103,10 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+      if (
+        (e.key === "k" && (e.metaKey || e.ctrlKey)) ||
+        (e.key === "/" && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA")
+      ) {
         e.preventDefault()
         setCommandBarOpen((open) => !open)
       }
@@ -629,7 +632,7 @@ function AppSidebarContent({
       <div className={cn("fixed inset-0 bg-gradient-to-tr transition-all duration-1000 opacity-20 pointer-events-none print:hidden", theme.gradient)} />
       <div className="fixed inset-0 bg-[url('/noise.png')] opacity-5 pointer-events-none print:hidden" />
 
-      <CommandBar students={students ?? []} isOpen={isCommandBarOpen} onOpenChange={setCommandBarOpen} router={router} />
+      <GlobalSearch students={students ?? []} isOpen={isCommandBarOpen} onOpenChange={setCommandBarOpen} router={router} />
 
       <div className="flex min-h-screen relative z-10 rtl overflow-x-hidden print:overflow-visible print:h-auto print:min-h-0">
         {isMobile ? (
