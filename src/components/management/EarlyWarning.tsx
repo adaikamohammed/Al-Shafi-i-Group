@@ -39,6 +39,8 @@ export interface AtRiskStudent {
     };
     pageNumber?: string;
     memorizedSurahsCount?: number;
+    groupAvgAbsenceRate?: number;
+    groupAvgNotMemRate?: number;
 }
 
 // ─── Risk Computation ─────────────────────────────────────────────────────────
@@ -82,6 +84,49 @@ export function computeAtRiskStudents(
     }
 
     // Per-student tracking
+    // ── Pass 1: collect stats for ALL active students to compute group averages ──
+    const groupAbsenceRates = new Map<string, number[]>();
+    const groupNotMemRates = new Map<string, number[]>();
+
+    (students || []).filter(s => s.status === 'نشط').forEach(student => {
+        const grp = (student as any).group || student.groupName || '';
+        const groupDates = groupSessionDates.get(grp);
+        if (!groupDates || groupDates.size === 0) return;
+        let abs = 0; let notMem = 0; let totalSess = 0;
+        dateRange.forEach(dateStr => {
+            if (!groupDates.has(dateStr)) return;
+            totalSess++;
+            const daySess = (dailySessions as any)[dateStr];
+            if (!daySess) { abs++; return; }
+            let found = false;
+            Object.values(daySess as Record<string, any>).forEach((session: any) => {
+                if (found || !session) return;
+                const grpOwner = ownerGroupMap.get(session.ownerId);
+                if (grpOwner !== grp) return;
+                const sType = session.sessionType;
+                if (sType !== 'حصة أساسية' && sType !== 'حصة تعويضية' && sType !== 'حصة إضافية') return;
+                const records: any[] = Array.isArray(session.records) ? session.records : session.records ? Object.values(session.records) : [];
+                const rec = records.find((r: any) => r.studentId === student.id);
+                found = true;
+                if (!rec || rec.attendance === 'غائب' || rec.attendance === 'غياب') abs++;
+                if (rec?.memorization === 'لم يحفظ') notMem++;
+            });
+            if (!found) abs++;
+        });
+        const ar = totalSess > 0 ? Math.round((abs / totalSess) * 100) : 0;
+        const nm = totalSess > 0 ? Math.round((notMem / totalSess) * 100) : 0;
+        if (!groupAbsenceRates.has(grp)) groupAbsenceRates.set(grp, []);
+        if (!groupNotMemRates.has(grp)) groupNotMemRates.set(grp, []);
+        groupAbsenceRates.get(grp)!.push(ar);
+        groupNotMemRates.get(grp)!.push(nm);
+    });
+
+    const getGroupAvg = (map: Map<string, number[]>, grp: string) => {
+        const arr = map.get(grp) || [];
+        return arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+    };
+
+    // ── Pass 2: compute at-risk students ──────────────────────────────────────
     const results: AtRiskStudent[] = [];
 
     (students || []).filter(s => s.status === 'نشط').forEach(student => {
@@ -268,7 +313,9 @@ export function computeAtRiskStudents(
                 naughty: naughtyCount
             },
             pageNumber: student.pageNumber,
-            memorizedSurahsCount: student.memorizedSurahsCount
+            memorizedSurahsCount: student.memorizedSurahsCount,
+            groupAvgAbsenceRate: getGroupAvg(groupAbsenceRates, grp),
+            groupAvgNotMemRate: getGroupAvg(groupNotMemRates, grp),
         });
     });
 
@@ -420,6 +467,42 @@ export function EarlyWarningView({ atRiskStudents, sheikhs, onStudentClick }: Ea
                                             <div className="text-[9px] text-muted-foreground">السور المحفوظة</div>
                                         </div>
                                     </div>
+
+                                    {/* Group Comparison Bars */}
+                                    {(student.groupAvgAbsenceRate !== undefined) && (
+                                        <div className="bg-white/80 rounded-lg p-3 border space-y-2">
+                                            <div className="text-[10px] font-bold text-muted-foreground">📊 مقارنة بمتوسط الفوج:</div>
+                                            {/* Absence rate comparison */}
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between text-[10px]">
+                                                    <span className="font-semibold">نسبة الغياب</span>
+                                                    <span className="font-bold">
+                                                        <span className={student.absenceRate > (student.groupAvgAbsenceRate || 0) ? 'text-rose-600' : 'text-emerald-600'}>
+                                                            {student.absenceRate}%
+                                                        </span>
+                                                        <span className="text-muted-foreground"> / متوسط الفوج: {student.groupAvgAbsenceRate}%</span>
+                                                    </span>
+                                                </div>
+                                                <div className="relative h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                                                    {/* Group avg marker */}
+                                                    <div
+                                                        className="absolute top-0 h-full bg-gray-300 rounded-full"
+                                                        style={{ width: `${Math.min(student.groupAvgAbsenceRate || 0, 100)}%` }}
+                                                    />
+                                                    {/* Student bar */}
+                                                    <div
+                                                        className={cn("absolute top-0 h-full rounded-full opacity-80", student.absenceRate > (student.groupAvgAbsenceRate || 0) ? 'bg-rose-500' : 'bg-emerald-500')}
+                                                        style={{ width: `${Math.min(student.absenceRate, 100)}%` }}
+                                                    />
+                                                </div>
+                                                <div className="text-[9px] text-muted-foreground">
+                                                    {student.absenceRate > (student.groupAvgAbsenceRate || 0)
+                                                        ? `⚠️ أعلى من متوسط الفوج بـ ${student.absenceRate - (student.groupAvgAbsenceRate || 0)}%`
+                                                        : `✅ أقل من متوسط الفوج بـ ${(student.groupAvgAbsenceRate || 0) - student.absenceRate}%`}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Reasons */}
                                     <div className="bg-white/60 rounded-lg p-2 border space-y-1">
