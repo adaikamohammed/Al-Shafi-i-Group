@@ -434,35 +434,74 @@ export function EarlyWarningView({ atRiskStudents, sheikhs, onStudentClick }: Ea
                                     {/* Guardian Info & Quick WhatsApp Contact */}
                                     <div className="bg-white/80 rounded-lg p-3 border space-y-2">
                                         <div className="text-[10px] font-bold text-muted-foreground">👤 بيانات الولي والتواصل:</div>
-                                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                        <div className="flex flex-col gap-2">
                                             <div className="text-xs space-y-1">
-                                                <div><strong className="text-muted-foreground">اسم الولي:</strong> {student.guardianName || 'غير حدد'}</div>
+                                                <div><strong className="text-muted-foreground">اسم الولي:</strong> {student.guardianName || 'غير محدد'}</div>
                                                 <div><strong className="text-muted-foreground">رقم الهاتف:</strong> {student.phone1 || 'غير متوفر'} {student.phone2 ? ` / ${student.phone2}` : ''}</div>
                                             </div>
-                                            {student.phone1 && (
-                                                <div className="flex gap-2 w-full sm:w-auto">
-                                                    <a
-                                                        href={`https://wa.me/${student.phone1.replace(/\s/g, '').replace(/^0/, '213')}?text=${encodeURIComponent(
-                                                            `السلام عليكم ورحمة الله وبركاته، معكم معلم القرآن من مدرسة الإمام الشافعي بخصوص ابنكم الطالب ${student.name}. أردت التواصل معكم لمتابعة أدائه وسلوكه في الحلقة.`
-                                                        )}`}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-colors w-full sm:w-auto"
-                                                    >
-                                                        <span>💬</span>
-                                                        واتساب الولي
-                                                    </a>
-                                                    <a
-                                                        href={`tel:${student.phone1}`}
-                                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] transition-colors w-full sm:w-auto"
-                                                    >
-                                                        <span>📞</span>
-                                                        اتصال مباشر
-                                                    </a>
-                                                </div>
-                                            )}
+                                            {(student.phone1 || student.phone2) && (() => {
+                                                const formatPhone = (p: string) => p.replace(/[\s\-().]/g, '').replace(/^00213/, '213').replace(/^0/, '213');
+                                                const buildMsg = (phone: string) => {
+                                                    const urgency = student.riskLevel === 'high' ? 'عاجل' : 'تنبيه';
+                                                    const statLines = [];
+                                                    if (student.absencesLast2Weeks > 0) statLines.push(`• غاب ${student.absencesLast2Weeks} من ${student.totalSessionsLast2Weeks} حصة (${student.absenceRate}%)`);
+                                                    if (student.consecutiveNotMem > 0) statLines.push(`• لم يحفظ درسه ${student.consecutiveNotMem} مرات متتالية`);
+                                                    return encodeURIComponent(
+                                                        `السلام عليكم ورحمة الله وبركاته،\n` +
+                                                        `معكم معلم القرآن من مدرسة الإمام الشافعي القرآنية.\n\n` +
+                                                        `[${urgency}] بخصوص ابنكم الطالب: ${student.name}\n\n` +
+                                                        `📊 إحصائيات آخر أسبوعين:\n${statLines.join('\n')}\n\n` +
+                                                        `نرجو التواصل ومتابعة الابن في المنزل للحفاظ على مستواه.\nبارك الله فيكم.`
+                                                    );
+                                                };
+                                                return (
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {student.phone1 && (
+                                                            <>
+                                                                <a
+                                                                    href={`https://wa.me/${formatPhone(student.phone1)}?text=${buildMsg(student.phone1)}`}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-colors"
+                                                                >
+                                                                    <span>💬</span>
+                                                                    واتساب (ر1)
+                                                                </a>
+                                                                <a
+                                                                    href={`tel:${student.phone1}`}
+                                                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] transition-colors"
+                                                                >
+                                                                    <span>📞</span>
+                                                                    اتصال (ر1)
+                                                                </a>
+                                                            </>
+                                                        )}
+                                                        {student.phone2 && (
+                                                            <>
+                                                                <a
+                                                                    href={`https://wa.me/${formatPhone(student.phone2)}?text=${buildMsg(student.phone2)}`}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[11px] transition-colors"
+                                                                >
+                                                                    <span>💬</span>
+                                                                    واتساب (ر2)
+                                                                </a>
+                                                                <a
+                                                                    href={`tel:${student.phone2}`}
+                                                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-[11px] transition-colors"
+                                                                >
+                                                                    <span>📞</span>
+                                                                    اتصال (ر2)
+                                                                </a>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
+
 
                                     {/* Recent Evaluations */}
                                     {student.recentEvaluations && student.recentEvaluations.length > 0 && (
