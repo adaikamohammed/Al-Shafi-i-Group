@@ -412,22 +412,15 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           setLoading(false);
         }
       }, (error: any) => {
-        console.error(`Firebase read failed for user list: ${error.message}`);
-        console.error('Error code:', error.code);
-        console.error('Full error:', error);
-
-        // Check if it's a permission error
+        // Silently handle permission errors (expected during logout/role transitions)
         if (error.code === 'PERMISSION_DENIED') {
-          console.warn('⚠️ PERMISSION DENIED - Database rules may not be updated correctly');
-          toast({
-            title: "خطأ في الصلاحيات",
-            description: "يرجى التحقق من قواعد Firebase Database في Console.",
-            variant: "destructive"
-          });
+          console.warn('allUsers: permission denied (expected during auth transitions)');
+        } else {
+          console.warn(`Firebase allUsers read failed: ${error.message}`);
         }
-
         if (isPrivileged) setLoading(false);
       });
+
 
       // 2. Pre-registrations
       preRegsRef = ref(db, 'pre_registrations');
@@ -465,13 +458,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const profileRef = ref(db, `${userPath}/profile`);
 
       const handleError = (error: any) => {
-        console.error(`Firebase granular read failed for user (UID: ${authContextUser.uid}, Role: ${role}): ${error.message}`);
+        // PERMISSION_DENIED is expected during logout/login transitions — use warn not error
         if (error.code === 'PERMISSION_DENIED') {
-          toast({
-            title: "خطأ في الصلاحيات",
-            description: "يرجى تسجيل الخروج والدخول مرة أخرى.",
-            variant: "destructive"
-          });
+          console.warn(`Firebase: permission denied (auth transition) for UID: ${authContextUser.uid}`);
+        } else {
+          console.warn(`Firebase read failed (Role: ${role}): ${error.message}`);
         }
         setLoading(false);
       };
