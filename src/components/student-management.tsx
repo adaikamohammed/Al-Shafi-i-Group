@@ -18,7 +18,6 @@ import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { useRouter } from 'next/navigation';
 import { Student, StudentStatus } from '@/lib/types';
 import { arabicCompare, isStudentInMenSheikhs, isStudentInWomenUstadhats } from '@/lib/utils';
-import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
 // Refactored Components
@@ -82,7 +81,8 @@ export function StudentManagement() {
         setSelectedRows([]);
     }
 
-    const handleExportStudents = () => {
+    const handleExportStudents = async () => {
+        const XLSX = await import('xlsx');
         const dataToExport = filteredStudents.map(s => ({
             "الاسم الكامل": s.fullName,
             "الفوج": s.groupName || 'غير محدد',

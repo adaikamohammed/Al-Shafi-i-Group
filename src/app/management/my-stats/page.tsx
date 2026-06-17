@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { useStudentContext } from '@/context/StudentContext';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -34,11 +35,29 @@ import {
     Legend
 } from 'recharts';
 
-import { AttendanceHeatmap } from '@/components/management/AttendanceHeatmap';
-import { StudentProgressChart } from '@/components/management/StudentProgressChart';
-import { EarlyWarningView, computeAtRiskStudents } from '@/components/management/EarlyWarning';
-import { HonorCardGenerator } from '@/components/management/HonorCardGenerator';
-import { SheikhScoreDetailModal } from '@/components/management/SheikhBadges';
+import { computeAtRiskStudents } from '@/components/management/EarlyWarning';
+
+// ─── Heavy components loaded lazily ──────────────────────────────────────────
+const AttendanceHeatmap = dynamic(
+    () => import('@/components/management/AttendanceHeatmap').then(m => ({ default: m.AttendanceHeatmap })),
+    { ssr: false, loading: () => <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">جاري تحميل الجدول...</div> }
+);
+const StudentProgressChart = dynamic(
+    () => import('@/components/management/StudentProgressChart').then(m => ({ default: m.StudentProgressChart })),
+    { ssr: false, loading: () => <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">جاري تحميل الرسم...</div> }
+);
+const EarlyWarningView = dynamic(
+    () => import('@/components/management/EarlyWarning').then(m => ({ default: m.EarlyWarningView })),
+    { ssr: false, loading: () => <div className="h-24 flex items-center justify-center text-muted-foreground text-sm">جاري تحميل التنبيهات...</div> }
+);
+const HonorCardGenerator = dynamic(
+    () => import('@/components/management/HonorCardGenerator').then(m => ({ default: m.HonorCardGenerator })),
+    { ssr: false, loading: () => <div className="h-24 flex items-center justify-center text-muted-foreground text-sm">جاري تحميل البطاقات...</div> }
+);
+const SheikhScoreDetailModal = dynamic(
+    () => import('@/components/management/SheikhBadges').then(m => ({ default: m.SheikhScoreDetailModal })),
+    { ssr: false }
+);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabId = 'overview' | 'attendance' | 'students' | 'warnings' | 'honor' | 'sheikh_eval' | 'month_comparison';
