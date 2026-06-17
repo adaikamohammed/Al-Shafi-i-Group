@@ -57,6 +57,28 @@ export function SearchableSelect({
             .trim();
     };
 
+    // Memoize/cache normalization values to avoid heavy calls in filter loops
+    const lastSearchRef = React.useRef({ original: "", normalized: "" });
+    const normalizedCacheRef = React.useRef<Record<string, string>>({});
+
+    const getNormalizedSearch = (search: string) => {
+        if (lastSearchRef.current.original === search) {
+            return lastSearchRef.current.normalized;
+        }
+        const normalized = normalize(search);
+        lastSearchRef.current = { original: search, normalized };
+        return normalized;
+    };
+
+    const getNormalizedValue = (val: string) => {
+        let cached = normalizedCacheRef.current[val];
+        if (cached === undefined) {
+            cached = normalize(val);
+            normalizedCacheRef.current[val] = cached;
+        }
+        return cached;
+    };
+
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
@@ -75,8 +97,10 @@ export function SearchableSelect({
             <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
                 <Command
                     className="w-full"
-                    filter={(value, search) => {
-                        return normalize(value).includes(normalize(search)) ? 1 : 0;
+                    filter={(val, search) => {
+                        const normSearch = getNormalizedSearch(search);
+                        const normVal = getNormalizedValue(val);
+                        return normVal.includes(normSearch) ? 1 : 0;
                     }}
                 >
                     <CommandInput placeholder={searchPlaceholder} />

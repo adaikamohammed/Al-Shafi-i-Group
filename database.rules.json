@@ -3,7 +3,7 @@
         ".read": false,
         ".write": false,
         "users": {
-            ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')",
+            ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'sheikh')",
             "$uid": {
                 ".read": "auth != null && (auth.uid === $uid || data.child('profile').child('email').val() === auth.token.email)",
                 ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('profile').child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'management')"

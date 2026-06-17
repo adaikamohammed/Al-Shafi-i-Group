@@ -72,6 +72,7 @@ export interface Student {
   transferHistory?: TransferRecord[];
   memorizationMultiplier?: number;
   hasWhatsApp?: boolean;
+  normalizedFullName?: string;
 }
 
 export type AttendanceStatus = "حاضر" | "غياب" | "غائب" | "متأخر" | "تعويض" | "";
@@ -356,6 +357,7 @@ export interface PreRegistration {
   pageNumber?: string;
   notes?: string;
   photoURL?: string;
+  normalizedFullName?: string;
 }
 
 export interface LeagueStat {

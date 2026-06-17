@@ -109,12 +109,17 @@ export default function DuesPage() {
 
         // Index payments by studentId for O(1) lookup
         const paymentsByStudent = (payments ?? []).reduce((acc, p) => {
-            if (p.date && getYear(parseISO(p.date)) === currentYear) {
-                if (!acc[p.studentId]) acc[p.studentId] = [];
-                acc[p.studentId].push(p);
+            if (p.date) {
+                const parsedDate = parseISO(p.date);
+                const year = getYear(parsedDate);
+                if (year === currentYear) {
+                    const quarter = getQuarter(parsedDate);
+                    if (!acc[p.studentId]) acc[p.studentId] = [];
+                    acc[p.studentId].push({ ...p, quarter });
+                }
             }
             return acc;
-        }, {} as Record<string, Payment[]>);
+        }, {} as Record<string, Array<Payment & { quarter: number }>>);
 
         return students.map(student => {
             const studentPayments = paymentsByStudent[student.id] || [];
@@ -122,7 +127,7 @@ export default function DuesPage() {
             const paymentStatusByQuarter: Record<number, { status: PaymentStatus, paymentId?: string }> = {};
 
             for (let q = 1; q <= 4; q++) {
-                const paymentForQuarter = studentPayments.find(p => p.date && getQuarter(parseISO(p.date)) === q);
+                const paymentForQuarter = studentPayments.find(p => p.quarter === q);
                 if (paymentForQuarter) {
                     paymentStatusByQuarter[q] = { status: paymentForQuarter.status, paymentId: paymentForQuarter.id };
                 } else {
@@ -209,22 +214,17 @@ export default function DuesPage() {
         return Object.values(totalsByQuarter).reduce((sum, q) => sum + q.revenue, 0);
     }, [totalsByQuarter]);
 
-    // --- التحقق إذا كان الطالب دفع أو معفى بالفعل في الفصل الحالي ---
-    const isStudentPaidInCurrentQuarter = React.useCallback((studentId: string): boolean => {
-        return !!(payments ?? []).find(p =>
-            p.studentId === studentId &&
-            p.date &&
-            getQuarter(parseISO(p.date)) === currentQuarter &&
-            getYear(parseISO(p.date)) === currentYear &&
-            (p.status === 'paid' || p.status === 'exempted')
-        );
-    }, [payments, currentQuarter, currentYear]);
-
     // --- Bulk Usage Handlers ---
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
             // يحدد فقط الطلاب الذين لم يُسجّل دفعهم في الفصل الحالي
-            setSelectedStudents(filteredStudents.filter(s => !isStudentPaidInCurrentQuarter(s.id)).map(s => s.id));
+            setSelectedStudents(filteredStudents
+                .filter(s => {
+                    const qStatus = s.paymentStatus[currentQuarter]?.status;
+                    return !(qStatus === 'paid' || qStatus === 'exempted');
+                })
+                .map(s => s.id)
+            );
         } else {
             setSelectedStudents([]);
         }
@@ -232,7 +232,10 @@ export default function DuesPage() {
 
     const handleSelectStudent = (studentId: string, checked: boolean) => {
         // لا يُسمح بتحديد طالب دفع بالفعل في الفصل الحالي
-        if (checked && isStudentPaidInCurrentQuarter(studentId)) return;
+        const student = studentsWithDues.find(s => s.id === studentId);
+        const qStatus = student?.paymentStatus[currentQuarter]?.status;
+        if (checked && (qStatus === 'paid' || qStatus === 'exempted')) return;
+        
         if (checked) {
             setSelectedStudents(prev => [...prev, studentId]);
         } else {
@@ -764,7 +767,7 @@ export default function DuesPage() {
                                         onPaymentAction={handlePaymentAction}
                                         isSelected={selectedStudents.includes(student.id)}
                                         onSelect={(checked) => handleSelectStudent(student.id, checked)}
-                                        isPaidInCurrentQuarter={isStudentPaidInCurrentQuarter(student.id)}
+                                        isPaidInCurrentQuarter={student.paymentStatus[currentQuarter]?.status === 'paid' || student.paymentStatus[currentQuarter]?.status === 'exempted'}
                                         currentQuarter={currentQuarter}
                                         allUsers={allUsers}
                                     />

@@ -89,13 +89,13 @@ export default function AdminDocsPage() {
 
         if (activeTab === 'join') {
             return preRegistrations.filter(r =>
-                normalize(r.fullName).includes(term) ||
+                (r.normalizedFullName || normalize(r.fullName)).includes(term) ||
                 (r.phone1 && r.phone1.includes(term))
             ).slice(0, 10).map(r => ({ ...r, type: 'registration' as const }));
         }
 
         return students.filter(s =>
-            normalize(s.fullName).includes(term) ||
+            (s.normalizedFullName || normalize(s.fullName)).includes(term) ||
             (s.phone1 && s.phone1.includes(term))
         ).slice(0, 10).map(s => ({ ...s, type: 'student' as const }));
     }, [students, preRegistrations, searchTerm, activeTab]);
@@ -106,55 +106,58 @@ export default function AdminDocsPage() {
         return sheikh?.displayName || 'غير محدد';
     }, [selectedStudent, allUsers]);
 
-    // Statistics Calculation (Last 30 days) for Entry Permit
-    const stats30Days = useMemo(() => {
-        if (!selectedStudent || !dailySessions) return { absences: 0, lates: 0, total: 0 };
+    // Consolidated Student Stats & History Calculation (Single Pass & String Comparison)
+    const combinedStudentStats = useMemo(() => {
+        const studentDataResult: any = {};
+        const stats30 = { absences: 0, lates: 0, total: 0 };
+        
+        if (!dailySessions || !selectedStudent?.id) {
+            return {
+                studentData: studentDataResult,
+                stats30Days: stats30,
+                fullStats: { attendanceRate: '0', totalPresent: 0, totalAbsent: 0, totalLate: 0, avgEval: '---', sheikhAbsenceNoSub: 0, sheikhAbsenceWithSub: 0 }
+            };
+        }
 
-        const thirtyDaysAgo = subDays(new Date(), 30);
-        let absences = 0;
-        let lates = 0;
-        let totalCount = 0;
+        const thirtyDaysAgoStr = format(subDays(new Date(), 30), 'yyyy-MM-dd');
 
-        Object.values(dailySessions).forEach(dateGroup => {
-            Object.values(dateGroup).forEach(session => {
-                const sessionDate = new Date(session.date);
-                if (isAfter(sessionDate, thirtyDaysAgo)) {
-                    const record = (session.records || []).find(r => r.studentId === selectedStudent.id);
-                    if (record) {
-                        totalCount++;
-                        if (record.attendance === 'غياب') absences++;
-                        if (record.attendance === 'متأخر') lates++;
-                    }
-                }
-            });
-        });
-        return { absences, lates, total: totalCount };
-    }, [selectedStudent, dailySessions]);
+        let presentCount = 0;
+        let lateCount = 0;
+        let absentCount = 0;
+        let sheikhAbsenceNoSub = 0;
+        let sheikhAbsenceWithSub = 0;
+        const evalCounts: Record<string, number> = {};
+        let hasEvals = false;
 
-    const { absences, lates, total: totalCount } = stats30Days;
-
-    // Full History Data Aggregate (Needed for Sharing)
-    const studentData = useMemo(() => {
-        const data: any = {};
-        if (!dailySessions || !selectedStudent?.id) return data;
-
-        Object.keys(dailySessions).forEach(dateString => {
-            const sessionsOnDay = Object.values(dailySessions[dateString]);
+        Object.entries(dailySessions).forEach(([dateString, daySessions]) => {
+            const sessionsOnDay = Object.values(daySessions as Record<string, any>);
             if (sessionsOnDay.length === 0) return;
 
-            const isHoliday = sessionsOnDay.some(s => s.sessionType === 'يوم عطلة');
-            const isSheikhAbsentNoSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
-            const isSheikhAbsentWithSub = sessionsOnDay.some(s => s.sessionType === 'غياب الشيخ' && s.substituteTeacher);
+            // Compute day-level flags
+            let isHoliday = false;
+            let isSheikhAbsentNoSub = false;
+            let isSheikhAbsentWithSub = false;
 
-            const studentRecords = sessionsOnDay
-                .map(s => {
-                    const record = (s.records || []).find(r => r.studentId === selectedStudent.id);
-                    if (record) return { ...record, sessionType: s.sessionType, sessionNumber: s.sessionNumber || 1 };
-                    return null;
-                })
-                .filter(Boolean);
+            const studentRecords: any[] = [];
+            
+            sessionsOnDay.forEach(s => {
+                if (s.sessionType === 'يوم عطلة') isHoliday = true;
+                if (s.sessionType === 'غياب الشيخ') {
+                    if (s.substituteTeacher) isSheikhAbsentWithSub = true;
+                    else isSheikhAbsentNoSub = true;
+                }
 
-            data[dateString] = {
+                const records: any[] = Array.isArray(s.records)
+                    ? s.records
+                    : s.records ? Object.values(s.records) : [];
+
+                const record = records.find(r => r.studentId === selectedStudent.id);
+                if (record) {
+                    studentRecords.push({ ...record, sessionType: s.sessionType, sessionNumber: s.sessionNumber || 1 });
+                }
+            });
+
+            studentDataResult[dateString] = {
                 id: dateString,
                 isHoliday,
                 isSheikhAbsentNoSub,
@@ -167,43 +170,64 @@ export default function AdminDocsPage() {
                 sessionType: studentRecords[0]?.sessionType || null,
                 sessionNumber: studentRecords[0]?.sessionNumber || null
             };
+
+            // Aggregate full stats
+            studentRecords.forEach(r => {
+                if (r.attendance === 'حاضر') presentCount++;
+                else if (r.attendance === 'متأخر') lateCount++;
+                else if (r.attendance === 'غياب' || r.attendance === 'غائب') absentCount++;
+
+                if (r.memorization) {
+                    evalCounts[r.memorization] = (evalCounts[r.memorization] || 0) + 1;
+                    hasEvals = true;
+                }
+            });
+
+            if (isSheikhAbsentNoSub) sheikhAbsenceNoSub++;
+            if (isSheikhAbsentWithSub) sheikhAbsenceWithSub++;
+
+            // Aggregate last 30 days stats
+            if (dateString >= thirtyDaysAgoStr) {
+                studentRecords.forEach(r => {
+                    stats30.total++;
+                    if (r.attendance === 'غياب') stats30.absences++;
+                    if (r.attendance === 'متأخر') stats30.lates++;
+                });
+            }
         });
-        return data;
-    }, [dailySessions, selectedStudent]);
 
-    // Full History Stats (For Sharing)
-    const fullStats = useMemo(() => {
-        if (!selectedStudent || !studentData) return { attendanceRate: 0, totalPresent: 0, totalAbsent: 0, totalLate: 0, avgEval: '---', sheikhAbsenceNoSub: 0, sheikhAbsenceWithSub: 0 };
-
-        const allRecords = Object.values(studentData).flatMap((d: any) => d.records || []);
-        const presentCount = allRecords.filter((r: any) => r.attendance === 'حاضر').length;
-        const lateCount = allRecords.filter((r: any) => r.attendance === 'متأخر').length;
-        const absentCount = allRecords.filter((r: any) => r.attendance === 'غياب' || r.attendance === 'غائب').length;
-
-        const sheikhAbsenceNoSub = Object.values(studentData).filter((d: any) => d.isSheikhAbsentNoSub).length;
-        const sheikhAbsenceWithSub = Object.values(studentData).filter((d: any) => d.isSheikhAbsentWithSub).length;
+        // Compute dominant evaluation
+        let dominantEval = '---';
+        if (hasEvals) {
+            let maxCount = 0;
+            Object.entries(evalCounts).forEach(([ev, count]) => {
+                if (count > maxCount) {
+                    maxCount = count;
+                    dominantEval = ev;
+                }
+            });
+        }
 
         const totalWorkSessions = presentCount + lateCount + absentCount;
         const rate = totalWorkSessions > 0 ? ((presentCount + lateCount) / totalWorkSessions) * 100 : 0;
 
-        const evals = allRecords.filter((r: any) => r.memorization).map((r: any) => r.memorization);
-        let dominantEval = '---';
-        if (evals.length > 0) {
-            const counts: any = {};
-            evals.forEach(e => counts[e] = (counts[e] || 0) + 1);
-            dominantEval = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
-        }
-
         return {
-            attendanceRate: rate.toFixed(0),
-            totalPresent: presentCount,
-            totalAbsent: absentCount,
-            totalLate: lateCount,
-            avgEval: dominantEval,
-            sheikhAbsenceNoSub,
-            sheikhAbsenceWithSub
+            studentData: studentDataResult,
+            stats30Days: stats30,
+            fullStats: {
+                attendanceRate: rate.toFixed(0),
+                totalPresent: presentCount,
+                totalAbsent: absentCount,
+                totalLate: lateCount,
+                avgEval: dominantEval,
+                sheikhAbsenceNoSub,
+                sheikhAbsenceWithSub
+            }
         };
-    }, [studentData, selectedStudent]);
+    }, [dailySessions, selectedStudent]);
+
+    const { studentData, stats30Days, fullStats } = combinedStudentStats;
+    const { absences, lates, total: totalCount } = stats30Days;
 
     const handlePrint = async () => {
         if (!selectedStudent && !selectedPreRegistration) return;

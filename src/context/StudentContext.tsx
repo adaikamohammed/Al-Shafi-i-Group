@@ -123,6 +123,15 @@ interface StudentContextType {
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
+export const normalizeArabic = (text: string) => {
+  if (!text) return '';
+  return text.toLowerCase()
+    .replace(/[آأإ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .trim();
+};
+
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const { user: authContextUser, loading: authLoading, isSuperAdmin, isManagement, role } = useAuth();
   const isAdmin00 = authContextUser?.email === 'admin00@gmail.com' || authContextUser?.email === 'abdallah.shafii@gmail.com';
@@ -203,22 +212,30 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     let accumulatedUserLogs: Record<string, ActivityLog> = {};
     let accumulatedGlobalLogs: Record<string, ActivityLog> = {};
 
-    const processStudentData = (studentData: any, uid: string, groupName?: string): Student => ({
-      ...studentData,
-      id: studentData.id,
-      ownerId: uid,
-      groupName: groupName || 'غير محدد',
-      birthDate: studentData.birthDate ? parseISO(studentData.birthDate) : new Date(),
-      registrationDate: studentData.registrationDate ? parseISO(studentData.registrationDate) : new Date(),
-      updatedAt: studentData.updatedAt ? parseISO(studentData.updatedAt) : new Date(),
-      covenants: studentData.covenants ? Object.values(studentData.covenants) : [],
-    });
+    const processStudentData = (studentData: any, uid: string, groupName?: string): Student => {
+      const normalizedFullName = normalizeArabic(studentData.fullName || '');
+      return {
+        ...studentData,
+        id: studentData.id,
+        ownerId: uid,
+        groupName: groupName || 'غير محدد',
+        birthDate: studentData.birthDate ? parseISO(studentData.birthDate) : new Date(),
+        registrationDate: studentData.registrationDate ? parseISO(studentData.registrationDate) : new Date(),
+        updatedAt: studentData.updatedAt ? parseISO(studentData.updatedAt) : new Date(),
+        covenants: studentData.covenants ? Object.values(studentData.covenants) : [],
+        normalizedFullName,
+      };
+    };
 
-    const processPreRegData = (preReg: any): PreRegistration => ({
-      ...preReg,
-      requestedAt: preReg.requestedAt && isValid(parseISO(preReg.requestedAt)) ? parseISO(preReg.requestedAt) : preReg.requestedAt,
-      birthDate: preReg.birthDate && isValid(parseISO(preReg.birthDate)) ? parseISO(preReg.birthDate) : preReg.birthDate,
-    });
+    const processPreRegData = (preReg: any): PreRegistration => {
+      const normalizedFullName = normalizeArabic(preReg.fullName || '');
+      return {
+        ...preReg,
+        requestedAt: preReg.requestedAt && isValid(parseISO(preReg.requestedAt)) ? parseISO(preReg.requestedAt) : preReg.requestedAt,
+        birthDate: preReg.birthDate && isValid(parseISO(preReg.birthDate)) ? parseISO(preReg.birthDate) : preReg.birthDate,
+        normalizedFullName,
+      };
+    };
 
     if (isPrivileged) {
       const mergeAndSetLogs = () => {
@@ -551,6 +568,23 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
       // Also listen to profile to keep role/group synced if they change
       onValue(profileRef, () => setLoading(false), handleError);
+
+      // Also fetch allUsers so sheikhs can see group names & parent contact info in EarlyWarning
+      allUsersRef = ref(db, 'users');
+      allUsersListener = onValue(allUsersRef, (snapshot: any) => {
+        const usersData = snapshot.val();
+        const usersArray = usersData
+          ? Object.entries(usersData).map(([uid, data]: [string, any]) => ({ uid, ...data.profile }))
+          : [];
+        // Filter out demo sheikhs if a real user with the same email exists
+        const realEmails = new Set(
+          usersArray.filter(u => !u.uid.startsWith('demo_sheikh_') && u.email).map(u => u.email.toLowerCase().trim())
+        );
+        setAllUsers(usersArray.filter(u => {
+          if (u.uid.startsWith('demo_sheikh_') && u.email) return !realEmails.has(u.email.toLowerCase().trim());
+          return true;
+        }));
+      }, (err: any) => console.warn('Sheikh allUsers read failed:', err.message));
     }
 
     // Common Listeners for all authenticated users
