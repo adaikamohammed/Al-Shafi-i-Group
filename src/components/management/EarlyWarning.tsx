@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { format, addDays, getDay, subDays, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { AlertTriangle, Shield, ShieldAlert, ShieldCheck, ChevronDown, ChevronUp, Filter, Users } from 'lucide-react';
+import { AttendanceCalendar } from '@/components/ui/AttendanceCalendar';
 import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -522,6 +523,14 @@ export function EarlyWarningView({ atRiskStudents, sheikhs, onStudentClick }: Ea
                                                     );
                                                 })}
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {/* Attendance Calendar */}
+                                    {student.recentSessionDetails && student.recentSessionDetails.length > 0 && (
+                                        <div className="bg-white/80 rounded-lg p-3 border space-y-2">
+                                            <div className="text-[10px] font-bold text-muted-foreground">🗓️ جدول الحضور المرئي (آخر أسبوعين):</div>
+                                            <AttendanceCalendar sessions={student.recentSessionDetails} studentName={student.name} />
                                         </div>
                                     )}
 
