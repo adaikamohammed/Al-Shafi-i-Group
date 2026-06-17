@@ -3,13 +3,14 @@
 import '../../app/globals.css';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarSeparator, useSidebar } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield, UserPlus, UserCog, Home, PanelRight, PanelLeft, Palette, Check, MoonStar } from 'lucide-react';
+import { Users, ClipboardList, BarChart3, ArrowRightLeft, Settings, Menu, LogOut, Loader2, Calendar, Award, Gavel, Edit, BookCheck, FileText, HelpCircle, DollarSign, LayoutDashboard, Search, Swords, Shield, UserPlus, UserCog, Home, PanelRight, PanelLeft, Palette, Check, MoonStar, Sun } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/context/AuthContext';
 import { canAccessPage } from '@/lib/permissions';
 import { useStudentContext } from '@/context/StudentContext';
@@ -34,6 +35,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isMobile = useIsMobile();
   const [isCommandBarOpen, setCommandBarOpen] = useState(false);
+  const { themeMode, setThemeMode, isDark } = useTheme();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
 
   const toggleGroup = (groupTitle: string) => {
@@ -364,6 +366,12 @@ function AppSidebarContent({
   updateUserProfile, currentThemeId, pathname, isMobile, setCommandBarOpen, isCommandBarOpen, router, students, children
 }: any) {
   const { state } = useSidebar();
+  const { themeMode, setThemeMode, isDark, syncToPortalTheme } = useTheme();
+
+  const handleThemeChange = (themeId: string) => {
+    updateUserProfile({ portalTheme: themeId });
+    syncToPortalTheme(themeId);
+  };
   const [openGroups, setOpenGroups] = useState<string[]>([]);
 
   // Hover state for collapsed mode
@@ -586,7 +594,7 @@ function AppSidebarContent({
                 {Object.values(PORTAL_THEMES).map((t) => (
                   <DropdownMenuItem
                     key={t.id}
-                    onClick={() => updateUserProfile({ portalTheme: t.id })}
+                    onClick={() => handleThemeChange(t.id)}
                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/10 cursor-pointer mb-1 focus:bg-white/10 focus:text-white"
                   >
                     <div className={cn("h-8 w-8 rounded-lg border border-white/20 shrink-0 shadow-sm", t.preview)} />
@@ -602,6 +610,24 @@ function AppSidebarContent({
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+          </SidebarMenuItem>
+
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
+              tooltip={isDark ? 'تفعيل الوضع الفاتح' : 'تفعيل الوضع الداكن'}
+              className={cn(
+                "rounded-xl h-10 px-3 transition-all duration-300",
+                theme.isLight ? "text-slate-600 hover:bg-slate-100" : "text-white/60 hover:bg-white/5 hover:text-white"
+              )}
+            >
+              {isDark
+                ? <Sun className="h-4 w-4 shrink-0" />
+                : <MoonStar className="h-4 w-4 shrink-0" />}
+              <span className="font-bold text-[11px] group-data-[collapsible=icon]:hidden">
+                {isDark ? 'الوضع الفاتح' : 'الوضع الداكن'}
+              </span>
+            </SidebarMenuButton>
           </SidebarMenuItem>
 
           <SidebarMenuItem>
@@ -626,7 +652,7 @@ function AppSidebarContent({
   return (
     <div className={cn(
       "min-h-screen w-full relative transition-colors duration-700 font-body print:min-h-0 print:h-auto print:overflow-visible",
-      theme.isLight ? "bg-slate-50 text-slate-900" : "bg-slate-950 text-white dark"
+      isDark ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"
     )}>
       {/* Global Theme Gradient */}
       <div className={cn("fixed inset-0 bg-gradient-to-tr transition-all duration-1000 opacity-20 pointer-events-none print:hidden", theme.gradient)} />
