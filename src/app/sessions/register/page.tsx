@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Loader2, Save, FileText, UserCheck, AlertTriangle, ArrowRight, ArrowLeft, Trash2, BookOpen, Smile, RotateCcw, TimerOff, MessageSquare, CheckCircle, Copy, Trophy, Cloud, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Save, FileText, UserCheck, AlertTriangle, ArrowRight, ArrowLeft, Trash2, BookOpen, Smile, RotateCcw, TimerOff, MessageSquare, CheckCircle, Copy, Trophy, Cloud, RefreshCw, ChevronLeft, ChevronRight, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AttendanceList, AttendanceRecord } from '@/components/sessions/AttendanceList';
 import { SessionStatsWidget } from '@/components/sessions/SessionStatsWidget';
@@ -99,6 +99,7 @@ function RegisterSessionContent() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isNavigating, setIsNavigating] = useState(false);
     const [loadedDate, setLoadedDate] = useState<string | null>(null);
+    const [showExplanation, setShowExplanation] = useState(false);
 
     // Swipe navigation refs
     const touchStartX = useRef<number>(0);
@@ -416,6 +417,7 @@ function RegisterSessionContent() {
                             behavior: record.behavior,
                             notes: record.notes,
                             review: record.review,
+                            isDelayed: record.isDelayed || false,
                             surahId: record.surahId,
                             fromVerse: record.fromVerse,
                             toVerse: record.toVerse,
@@ -951,6 +953,7 @@ function RegisterSessionContent() {
                             behavior: record.behavior,
                             notes: record.notes,
                             review: record.review,
+                            isDelayed: record.isDelayed || false,
                             surahId: record.surahId,
                             fromVerse: record.fromVerse,
                             toVerse: record.toVerse,
@@ -1342,6 +1345,64 @@ function RegisterSessionContent() {
                     </div>
                 )}
             </section>
+
+            {/* دليل استخدام خاصية الاستدراك والتعويض */}
+            <div className="bg-card rounded-2xl border shadow-sm overflow-hidden">
+                <button
+                    onClick={() => setShowExplanation(!showExplanation)}
+                    type="button"
+                    className="w-full flex items-center justify-between p-4 font-headline font-bold text-sm text-primary hover:bg-muted/30 transition-colors"
+                >
+                    <div className="flex items-center gap-2">
+                        <HelpCircle className="h-5 w-5 text-primary" />
+                        <span>💡 دليل استخدام خاصيتي الاستدراك والتعويض</span>
+                    </div>
+                    {showExplanation ? (
+                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                    )}
+                </button>
+
+                {showExplanation && (
+                    <div className="p-4 border-t bg-muted/10 space-y-4 text-xs md:text-sm font-body text-foreground animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* الاستدراك */}
+                            <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-4 space-y-2">
+                                <div className="flex items-center gap-2 font-bold text-amber-800">
+                                    <span className="flex items-center justify-center w-5 h-5 bg-amber-100 rounded-full text-xs">1</span>
+                                    <span>خاصية الاستدراك (التسميع المتأخر)</span>
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed text-[11px] md:text-xs">
+                                    تُستخدم عندما لا يتمكن الطالب من استظهار ورده (حفظه الجديد) في يومه المحدد، ويقوم بتسميعه في حصة لاحقة ليلتحق بزملائه.
+                                </p>
+                                <div className="pt-2 border-t border-amber-200/50 flex flex-wrap gap-2 text-[10px] md:text-xs">
+                                    <span className="font-bold text-amber-700 bg-amber-100/60 px-2 py-0.5 rounded-md">العلامة: خصم 20% من الحفظ</span>
+                                    <span className="text-amber-800">يُضرب تقييم الحفظ في معامل عقوبة التأخر (0.8)</span>
+                                </div>
+                            </div>
+
+                            {/* التعويض */}
+                            <div className="bg-teal-50/50 border border-teal-200 rounded-xl p-4 space-y-2">
+                                <div className="flex items-center gap-2 font-bold text-teal-800">
+                                    <span className="flex items-center justify-center w-5 h-5 bg-teal-100 rounded-full text-xs">2</span>
+                                    <span>خاصية التعويض (تعويض غياب سابق)</span>
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed text-[11px] md:text-xs">
+                                    تُستخدم عند حضور الطالب في يوم غير رسمي أو قيامه بتسميع إضافي لتعويض يوم غاب فيه في الماضي (تظهر الأيام المتاحة للتعويض تلقائياً).
+                                </p>
+                                <div className="pt-2 border-t border-teal-200/50 flex flex-wrap gap-2 text-[10px] md:text-xs">
+                                    <span className="font-bold text-teal-700 bg-teal-100/60 px-2 py-0.5 rounded-md">العلامة: +3.5 نقاط حضور</span>
+                                    <span className="text-teal-800">ترفع عقوبة الغياب (-10 نقاط) وتمنح نقاط حضور تعويضية</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground bg-muted/40 p-2.5 rounded-lg border border-dashed text-center">
+                            💡 <strong>ملاحظة:</strong> كلا الخاصيتين مفعلتان لجميع الحسابات لمساعدة الطلاب على تدارك ما فاتهم وتجنب خصم النقاط.
+                        </div>
+                    </div>
+                )}
+            </div>
 
             <main className="bg-card rounded-2xl shadow-sm border min-h-[400px]">
                 {(sessionType === 'يوم عطلة' || (sessionType === 'غياب الشيخ' && !substituteTeacher)) ? (

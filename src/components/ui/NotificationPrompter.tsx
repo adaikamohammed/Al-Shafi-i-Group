@@ -10,6 +10,10 @@ export function NotificationPrompter() {
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
     useEffect(() => {
+        // Prevent showing the prompt if user previously dismissed it
+        const isDismissed = localStorage.getItem('pwa-install-dismissed') === 'true';
+        if (isDismissed) return;
+
         const handler = (e: any) => {
             e.preventDefault();
             setDeferredPrompt(e);
@@ -29,7 +33,13 @@ export function NotificationPrompter() {
         const { outcome } = await deferredPrompt.userChoice;
         if (outcome === 'accepted') {
             setDeferredPrompt(null);
+            localStorage.setItem('pwa-install-dismissed', 'true');
         }
+        setShowPrompt(false);
+    };
+
+    const handleDismiss = () => {
+        localStorage.setItem('pwa-install-dismissed', 'true');
         setShowPrompt(false);
     };
 
@@ -56,7 +66,7 @@ export function NotificationPrompter() {
                     <Button size="sm" variant="secondary" onClick={handleInstallClick} className="font-bold">
                         تثبيت
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => setShowPrompt(false)} className="hover:bg-white/20 text-white">
+                    <Button size="icon" variant="ghost" onClick={handleDismiss} className="hover:bg-white/20 text-white">
                         <X className="h-4 w-4" />
                     </Button>
                 </div>

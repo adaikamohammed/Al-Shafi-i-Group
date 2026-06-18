@@ -83,7 +83,7 @@ export function GlobalSearch({ students, isOpen, onOpenChange, router }: GlobalS
     return (students ?? []).map(student => {
       // Build search keywords string
       const warningText = student.covenants?.map(c => c.text + ' ' + c.type).join(' ') || '';
-      const groupName = student.group || (student as any).groupName || '';
+      const groupName = student.groupName || '';
       
       const keywords = [
         normalizeArabic(student.fullName),
@@ -99,8 +99,8 @@ export function GlobalSearch({ students, isOpen, onOpenChange, router }: GlobalS
         student.pageNumber ? `صفحة ${student.pageNumber}` : ''
       ].filter(Boolean).join(' ');
 
-      // Check if student has active warnings (covenants that are 'ساري')
-      const activeCovenants = student.covenants?.filter(c => c.status === 'ساري') || [];
+      // Check if student has active warnings (covenants that are 'نشط')
+      const activeCovenants = student.covenants?.filter(c => c.status === 'نشط') || [];
 
       return {
         ...student,
@@ -160,7 +160,7 @@ export function GlobalSearch({ students, isOpen, onOpenChange, router }: GlobalS
           <CommandGroup heading="قائمة الطلاب 👨‍🎓">
             {indexedStudents.map((student) => {
               const isActive = student.status === 'نشط';
-              const isSuspended = student.status === 'موقوف';
+              const isSuspended = student.status === 'غائب طويل';
               const isExpelled = student.status === 'مطرود';
 
               return (
