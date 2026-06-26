@@ -48,6 +48,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields: targetUid, title, body' }, { status: 400 });
     }
 
+    // Validate request authorization (Firebase ID token)
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing or invalid Authorization header' }, { status: 401 });
+    }
+    const idToken = authHeader.split('Bearer ')[1];
+    if (!idToken) {
+      return NextResponse.json({ error: 'Unauthorized: Missing token' }, { status: 401 });
+    }
+
+    // Verify token with Firebase Auth REST API (accounts:lookup)
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyCVZOpgoz76g5AQDnPyRTzPB6UoT2YYKL8';
+    const verifyUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`;
+    
+    try {
+      const verifyResponse = await fetch(verifyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken })
+      });
+      
+      if (!verifyResponse.ok) {
+        return NextResponse.json({ error: 'Unauthorized: Invalid ID token' }, { status: 401 });
+      }
+      
+      const verifyData = await verifyResponse.json();
+      if (!verifyData.users || verifyData.users.length === 0) {
+        return NextResponse.json({ error: 'Unauthorized: User not found' }, { status: 401 });
+      }
+    } catch (err) {
+      console.error('Failed to verify token:', err);
+      return NextResponse.json({ error: 'Internal auth verification error' }, { status: 500 });
+    }
+
     const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (!serviceAccountEnv) {
       console.warn('FIREBASE_SERVICE_ACCOUNT environment variable is not configured.');

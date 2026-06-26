@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { ref, set, onValue } from 'firebase/database';
 import { useAuth } from '@/context/AuthContext';
 import { ScoringWeights, DEFAULT_WEIGHTS } from '@/components/management/SheikhBadges';
@@ -529,17 +529,25 @@ export default function SettingsPage() {
                                     {permission === 'granted' && (
                                         <Button
                                             variant="outline"
-                                            onClick={() => {
-                                                fetch('/api/notify', {
-                                                    method: 'POST',
-                                                    headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({
-                                                        targetUid: user?.uid,
-                                                        title: '🔔 اختبار الإشعارات',
-                                                        body: 'نجح! ستصلك الإشعارات التلقائية على هذا الجهاز بشكل صحيح.'
-                                                    })
-                                                }).then(() => toast({ title: 'تم إرسال إشعار اختباري!', description: 'تحقق من إشعارات جهازك.' }))
-                                                .catch(() => toast({ title: 'خطأ', description: 'تعذر إرسال الإشعار الاختباري.', variant: 'destructive' }));
+                                            onClick={async () => {
+                                                try {
+                                                    const idToken = await auth.currentUser?.getIdToken();
+                                                    fetch('/api/notify', {
+                                                        method: 'POST',
+                                                        headers: { 
+                                                            'Content-Type': 'application/json',
+                                                            'Authorization': `Bearer ${idToken || ''}`
+                                                        },
+                                                        body: JSON.stringify({
+                                                            targetUid: user?.uid,
+                                                            title: '🔔 اختبار الإشعارات',
+                                                            body: 'نجح! ستصلك الإشعارات التلقائية على هذا الجهاز بشكل صحيح.'
+                                                        })
+                                                    }).then(() => toast({ title: 'تم إرسال إشعار اختباري!', description: 'تحقق من إشعارات جهازك.' }))
+                                                    .catch(() => toast({ title: 'خطأ', description: 'تعذر إرسال الإشعار الاختباري.', variant: 'destructive' }));
+                                                } catch (tokenErr) {
+                                                    toast({ title: 'خطأ', description: 'تعذر الحصول على رمز الأمان.', variant: 'destructive' });
+                                                }
                                             }}
                                             className="rounded-xl font-bold"
                                         >

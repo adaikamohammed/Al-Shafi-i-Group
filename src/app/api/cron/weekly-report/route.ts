@@ -26,10 +26,19 @@ export async function GET(request: Request) {
     });
   }
 
+  // 1. Validate Cron Secret if configured
+  const authHeader = request.headers.get('Authorization');
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
-    // 1. Authenticate server-side as super admin to satisfy security rules
+    // 2. Authenticate server-side as super admin to satisfy security rules
     if (!auth.currentUser) {
-      await signInWithEmailAndPassword(auth, 'admin00@gmail.com', '123456');
+      const email = process.env.CRON_ADMIN_EMAIL || 'admin00@gmail.com';
+      const password = process.env.CRON_ADMIN_PASSWORD || '123456';
+      await signInWithEmailAndPassword(auth, email, password);
     }
 
     // 2. Fetch all users

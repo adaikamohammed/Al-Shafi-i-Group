@@ -7,7 +7,7 @@ import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMas
 import { isWithinInterval, parseISO, isValid, isAfter, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
-import { db, storage } from '@/lib/firebase';
+import { db, storage, auth } from '@/lib/firebase';
 import { ref, set, push, onValue, off, remove, DatabaseReference, update, get } from 'firebase/database';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
@@ -1230,26 +1230,34 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             // Check: 3 لم يحفظ in last 7 days
             const notMemLast7 = memHistory.filter(m => last7Days.includes(m.date) && m.value === 'لم يحفظ').length;
 
+            const sendNotification = async (payload: any) => {
+              try {
+                const idToken = await auth.currentUser?.getIdToken();
+                await fetch('/api/notify', {
+                  method: 'POST',
+                  headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken || ''}`
+                  },
+                  body: JSON.stringify(payload)
+                });
+              } catch (err) {
+                console.error("Failed to send client notification:", err);
+              }
+            };
+
             if (maxConsecutive >= 3) {
-              fetch('/api/notify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  targetUid: ownerId,
-                  title: `⚠️ تنبيه غياب متكرر`,
-                  body: `الطالب "${studentName}" غاب لـ ${maxConsecutive} حصص متتالية. يُرجى التواصل مع ولي أمره.`
-                })
-              }).catch(console.error);
+              sendNotification({
+                targetUid: ownerId,
+                title: `⚠️ تنبيه غياب متكرر`,
+                body: `الطالب "${studentName}" غاب لـ ${maxConsecutive} حصص متتالية. يُرجى التواصل مع ولي أمره.`
+              });
             } else if (notMemLast7 >= 3) {
-              fetch('/api/notify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  targetUid: ownerId,
-                  title: `📖 تنبيه تراجع الحفظ`,
-                  body: `الطالب "${studentName}" لم يحفظ درسه ${notMemLast7} مرات في الأسبوع الماضي. يُرجى متابعته.`
-                })
-              }).catch(console.error);
+              sendNotification({
+                targetUid: ownerId,
+                title: `📖 تنبيه تراجع الحفظ`,
+                body: `الطالب "${studentName}" لم يحفظ درسه ${notMemLast7} مرات في الأسبوع الماضي. يُرجى متابعته.`
+              });
             }
           });
         } catch (e) {
