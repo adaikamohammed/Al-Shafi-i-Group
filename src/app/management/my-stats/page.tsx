@@ -160,7 +160,6 @@ interface ScoringWeights {
     commitmentBonus: number;
     commitmentBase: number;
     absencePenalty: number;
-    punctualityBonus: number;
 }
 
 const DEFAULT_WEIGHTS: ScoringWeights = {
@@ -172,7 +171,6 @@ const DEFAULT_WEIGHTS: ScoringWeights = {
     commitmentBonus: 40,
     commitmentBase: 30,
     absencePenalty: 20,
-    punctualityBonus: 5
 };
 
 interface BadgeInfo {
@@ -211,20 +209,6 @@ function computeBadges(s: any): BadgeInfo[] {
 
     return badges;
 }
-
-const isSessionPunctual = (session: any): boolean => {
-    if (!session) return true;
-    if (!session.createdAt) return true;
-    try {
-        const sessionDate = new Date(session.date);
-        const createdDate = new Date(session.createdAt);
-        const diffMs = createdDate.getTime() - sessionDate.getTime();
-        const diffHours = diffMs / (1000 * 60 * 60);
-        return diffHours <= 36;
-    } catch (e) {
-        return true;
-    }
-};
 
 const ARABIC_MONTHS = [
     'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
@@ -626,7 +610,6 @@ export default function MyStatsPage() {
                     commitmentBonus: typeof val.commitmentBonus === 'number' ? val.commitmentBonus : DEFAULT_WEIGHTS.commitmentBonus,
                     commitmentBase: typeof val.commitmentBase === 'number' ? val.commitmentBase : DEFAULT_WEIGHTS.commitmentBase,
                     absencePenalty: typeof val.absencePenalty === 'number' ? val.absencePenalty : DEFAULT_WEIGHTS.absencePenalty,
-                    punctualityBonus: typeof val.punctualityBonus === 'number' ? val.punctualityBonus : DEFAULT_WEIGHTS.punctualityBonus,
                 });
             }
         });
@@ -751,7 +734,8 @@ export default function MyStatsPage() {
         const allDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
         const calculatePoints = (data: {
-            sessions: number;
+            basicSessions: number;
+            activitySessions: number;
             avgAttendance: number;
             avgExcellent: number;
             avgGoodPlus: number;
@@ -759,23 +743,22 @@ export default function MyStatsPage() {
             sheikhabsences: number;
             extraSessions: number;
             excCount: number;
-            punctualSessions: number;
         }) => {
-            const sessionPoints = data.sessions * weights.sessionWeight;
-            const attendancePoints = data.sessions > 0 ? Math.round((data.avgAttendance / 100) * weights.attendanceWeight * data.sessions) : 0;
+            const sessionPoints = (data.basicSessions * weights.sessionWeight) + (data.activitySessions * weights.sessionWeight * 0.5);
+            const weightedSessions = data.basicSessions + (data.activitySessions * 0.5);
+            const attendancePoints = weightedSessions > 0 ? Math.round((data.avgAttendance / 100) * weights.attendanceWeight * weightedSessions) : 0;
             const extraSessionBonus = data.extraSessions * weights.extraSessionBonus;
-            const excellenceBonus = data.excCount > 0 ? Math.round((data.avgExcellent / 100) * weights.excellentBonus * data.sessions) : 0;
-            const goodPlusBonus = data.excCount > 0 ? Math.round((data.avgGoodPlus / 100) * weights.goodPlusBonus * data.sessions) : 0;
+            const excellenceBonus = data.excCount > 0 ? Math.round((data.avgExcellent / 100) * weights.excellentBonus * data.basicSessions) : 0;
+            const goodPlusBonus = data.excCount > 0 ? Math.round((data.avgGoodPlus / 100) * weights.goodPlusBonus * data.basicSessions) : 0;
             const excellencePoints = excellenceBonus + goodPlusBonus;
 
-            const commitmentBonus = (data.commitmentRate >= 100 && data.sheikhabsences === 0 && data.sessions > 0) ? weights.commitmentBonus : 0;
+            const totalSessions = data.basicSessions + data.activitySessions;
+            const commitmentBonus = (data.commitmentRate >= 100 && data.sheikhabsences === 0 && totalSessions > 0) ? weights.commitmentBonus : 0;
             const absencePenalty = data.sheikhabsences * weights.absencePenalty;
             const commitmentBase = Math.round((data.commitmentRate / 100) * weights.commitmentBase);
             const commitmentPoints = Math.max(0, commitmentBase + commitmentBonus - absencePenalty);
 
-            const punctualityBonus = data.punctualSessions * weights.punctualityBonus;
-
-            const totalPoints = sessionPoints + attendancePoints + extraSessionBonus + excellencePoints + commitmentPoints + punctualityBonus;
+            const totalPoints = sessionPoints + attendancePoints + extraSessionBonus + excellencePoints + commitmentPoints;
 
             return {
                 totalPoints,
@@ -783,18 +766,16 @@ export default function MyStatsPage() {
                 attendancePoints,
                 extraSessionBonus,
                 excellencePoints,
-                commitmentPoints,
-                punctualityBonus
+                commitmentPoints
             };
         };
 
         const rawScores = sheikhsList.map(sh => {
             let sessions = 0, extraSessions = 0, highAttDays = 0, totalDays = 0;
+            let basicCount = 0, activityCount = 0;
             let attTotal = 0, attCount = 0;
             let excTotal = 0, gpTotal = 0, excCount = 0;
             let sheikhabsences = 0, holidays = 0;
-            let punctualSessions = 0;
-
             allDays.forEach(day => {
                 const dateStr = format(day, 'yyyy-MM-dd');
                 const stats = getDayStatsForScore(sh.group, dateStr);
@@ -805,8 +786,10 @@ export default function MyStatsPage() {
                 if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
                 const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                const isActivity = stats.type === 'حصة أنشطة';
                 if (isReal) {
                     sessions++;
+                    basicCount++;
                     if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
                         extraSessions++;
                     }
@@ -820,9 +803,13 @@ export default function MyStatsPage() {
                         excCount++;
                     }
                     if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
-
-                    if (isSessionPunctual(stats.session)) {
-                        punctualSessions++;
+                } else if (isActivity) {
+                    sessions += 0.5;
+                    activityCount++;
+                    if (stats.attendance !== null) {
+                        attTotal += stats.attendance;
+                        attCount++;
+                        if (stats.attendance >= 90) highAttDays++;
                     }
                 }
             });
@@ -831,18 +818,19 @@ export default function MyStatsPage() {
             const avgAttendance = attCount > 0 ? Math.round(attTotal / attCount) : 0;
             const avgExcellent = excCount > 0 ? Math.round(excTotal / excCount) : 0;
             const avgGoodPlus = excCount > 0 ? Math.round(gpTotal / excCount) : 0;
-            const commitmentRate = workingDays > 0 ? Math.round((sessions / workingDays) * 100) : 0;
+            const weightedSessionsCount = basicCount + activityCount * 0.5;
+            const commitmentRate = workingDays > 0 ? Math.round((weightedSessionsCount / workingDays) * 100) : 0;
 
             const pts = calculatePoints({
-                sessions,
+                basicSessions: basicCount,
+                activitySessions: activityCount,
                 avgAttendance,
                 avgExcellent,
                 avgGoodPlus,
                 commitmentRate,
                 sheikhabsences,
                 extraSessions,
-                excCount,
-                punctualSessions
+                excCount
             });
 
             const base = {
@@ -854,8 +842,7 @@ export default function MyStatsPage() {
                 attendancePoints: pts.attendancePoints,
                 commitmentPoints: pts.commitmentPoints,
                 extraSessionBonus: pts.extraSessionBonus,
-                punctualityBonus: pts.punctualityBonus,
-                totalSessions: sessions,
+                totalSessions: basicCount + activityCount,
                 totalDays,
                 avgAttendance,
                 avgExcellent,
@@ -864,7 +851,6 @@ export default function MyStatsPage() {
                 highAttDays,
                 sheikhabsences,
                 extraSessionsCount: extraSessions,
-                punctualSessionsCount: punctualSessions
             };
 
             return {
@@ -907,7 +893,8 @@ export default function MyStatsPage() {
         const results = [];
 
         const calculatePoints = (data: {
-            sessions: number;
+            basicSessions: number;
+            activitySessions: number;
             avgAttendance: number;
             avgExcellent: number;
             avgGoodPlus: number;
@@ -915,23 +902,22 @@ export default function MyStatsPage() {
             sheikhabsences: number;
             extraSessions: number;
             excCount: number;
-            punctualSessions: number;
         }) => {
-            const sessionPoints = data.sessions * weights.sessionWeight;
-            const attendancePoints = data.sessions > 0 ? Math.round((data.avgAttendance / 100) * weights.attendanceWeight * data.sessions) : 0;
+            const sessionPoints = (data.basicSessions * weights.sessionWeight) + (data.activitySessions * weights.sessionWeight * 0.5);
+            const weightedSessions = data.basicSessions + (data.activitySessions * 0.5);
+            const attendancePoints = weightedSessions > 0 ? Math.round((data.avgAttendance / 100) * weights.attendanceWeight * weightedSessions) : 0;
             const extraSessionBonus = data.extraSessions * weights.extraSessionBonus;
-            const excellenceBonus = data.excCount > 0 ? Math.round((data.avgExcellent / 100) * weights.excellentBonus * data.sessions) : 0;
-            const goodPlusBonus = data.excCount > 0 ? Math.round((data.avgGoodPlus / 100) * weights.goodPlusBonus * data.sessions) : 0;
+            const excellenceBonus = data.excCount > 0 ? Math.round((data.avgExcellent / 100) * weights.excellentBonus * data.basicSessions) : 0;
+            const goodPlusBonus = data.excCount > 0 ? Math.round((data.avgGoodPlus / 100) * weights.goodPlusBonus * data.basicSessions) : 0;
             const excellencePoints = excellenceBonus + goodPlusBonus;
 
-            const commitmentBonus = (data.commitmentRate >= 100 && data.sheikhabsences === 0 && data.sessions > 0) ? weights.commitmentBonus : 0;
+            const totalSessions = data.basicSessions + data.activitySessions;
+            const commitmentBonus = (data.commitmentRate >= 100 && data.sheikhabsences === 0 && totalSessions > 0) ? weights.commitmentBonus : 0;
             const absencePenalty = data.sheikhabsences * weights.absencePenalty;
             const commitmentBase = Math.round((data.commitmentRate / 100) * weights.commitmentBase);
             const commitmentPoints = Math.max(0, commitmentBase + commitmentBonus - absencePenalty);
 
-            const punctualityBonus = data.punctualSessions * weights.punctualityBonus;
-
-            const totalPoints = sessionPoints + attendancePoints + extraSessionBonus + excellencePoints + commitmentPoints + punctualityBonus;
+            const totalPoints = sessionPoints + attendancePoints + extraSessionBonus + excellencePoints + commitmentPoints;
 
             return {
                 totalPoints,
@@ -939,8 +925,7 @@ export default function MyStatsPage() {
                 attendancePoints,
                 extraSessionBonus,
                 excellencePoints,
-                commitmentPoints,
-                punctualityBonus
+                commitmentPoints
             };
         };
 
@@ -951,11 +936,10 @@ export default function MyStatsPage() {
             const allDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
             let sessions = 0, extraSessions = 0, highAttDays = 0, totalDays = 0;
+            let basicCount = 0, activityCount = 0;
             let attTotal = 0, attCount = 0;
             let excTotal = 0, gpTotal = 0, excCount = 0;
             let sheikhabsences = 0, holidays = 0;
-            let punctualSessions = 0;
-
             allDays.forEach(day => {
                 const dateStr = format(day, 'yyyy-MM-dd');
                 const stats = getDayStatsForScore(selectedGroup, dateStr);
@@ -966,8 +950,10 @@ export default function MyStatsPage() {
                 if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
                 const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                const isActivity = stats.type === 'حصة أنشطة';
                 if (isReal) {
                     sessions++;
+                    basicCount++;
                     if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
                         extraSessions++;
                     }
@@ -981,9 +967,13 @@ export default function MyStatsPage() {
                         excCount++;
                     }
                     if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
-
-                    if (isSessionPunctual(stats.session)) {
-                        punctualSessions++;
+                } else if (isActivity) {
+                    sessions += 0.5;
+                    activityCount++;
+                    if (stats.attendance !== null) {
+                        attTotal += stats.attendance;
+                        attCount++;
+                        if (stats.attendance >= 90) highAttDays++;
                     }
                 }
             });
@@ -992,20 +982,21 @@ export default function MyStatsPage() {
             const avgAttendance = attCount > 0 ? Math.round(attTotal / attCount) : 0;
             const avgExcellent = excCount > 0 ? Math.round(excTotal / excCount) : 0;
             const avgGoodPlus = excCount > 0 ? Math.round(gpTotal / excCount) : 0;
-            const commitmentRate = workingDays > 0 ? Math.round((sessions / workingDays) * 100) : 0;
+            const weightedSessionsCount = basicCount + activityCount * 0.5;
+            const commitmentRate = workingDays > 0 ? Math.round((weightedSessionsCount / workingDays) * 100) : 0;
 
-            const hasData = sessions > 0;
+            const hasData = (basicCount + activityCount) > 0;
 
             const pts = calculatePoints({
-                sessions,
+                basicSessions: basicCount,
+                activitySessions: activityCount,
                 avgAttendance,
                 avgExcellent,
                 avgGoodPlus,
                 commitmentRate,
                 sheikhabsences,
                 extraSessions,
-                excCount,
-                punctualSessions
+                excCount
             });
 
             const base = {
@@ -1018,8 +1009,7 @@ export default function MyStatsPage() {
                 attendancePoints: pts.attendancePoints,
                 commitmentPoints: pts.commitmentPoints,
                 extraSessionBonus: pts.extraSessionBonus,
-                punctualityBonus: pts.punctualityBonus,
-                totalSessions: sessions,
+                totalSessions: basicCount + activityCount,
                 totalDays,
                 avgAttendance,
                 avgExcellent,
@@ -1028,7 +1018,6 @@ export default function MyStatsPage() {
                 highAttDays,
                 sheikhabsences,
                 extraSessionsCount: extraSessions,
-                punctualSessionsCount: punctualSessions,
                 hasData
             };
 
@@ -2030,7 +2019,7 @@ ${atRiskStudents.length>0?`<h2>⚠️ طلاب يحتاجون متابعة</h2>
                                                 { label: 'التزام الشيخ وغيابه', val: mySheikhScore.commitmentPoints, max: weights.commitmentBase + weights.commitmentBonus, sub: `التزام: ${mySheikhScore.commitmentRate}% · غياب: ${mySheikhScore.sheikhabsences}`, icon: '🚫', desc: `بونص للالتزام الكامل وعقوبة للغياب` },
                                                 { label: 'جودة وتسميع الفوج', val: mySheikhScore.excellencePoints, max: 24 * weights.excellentBonus, sub: `ممتاز: ${mySheikhScore.avgExcellent}% · ج.جداً: ${mySheikhScore.avgGoodPlus}%`, icon: '⚖️', desc: `نقاط إضافية لطلاب الممتاز والجيد جداً` },
                                                 { label: 'بونص الحصص الإضافية', val: mySheikhScore.extraSessionBonus, max: 40, sub: `${mySheikhScore.extraSessionsCount} حصة إضافية/تعويضية`, icon: '➕', desc: `${weights.extraSessionBonus} نقاط عن كل حصة تعويضية` },
-                                                { label: 'بونص التوثيق السريع', val: mySheikhScore.punctualityBonus, max: 120, sub: `${mySheikhScore.punctualSessionsCount} حصة موثقة سريعاً`, icon: '⚡', desc: `توثيق الحصة خلال 36 ساعة من موعدها` },
+
                                             ].map(item => (
                                                 <Card key={item.label} className="border shadow-sm">
                                                     <CardContent className="p-4 space-y-2.5">
@@ -2316,13 +2305,7 @@ ${atRiskStudents.length>0?`<h2>⚠️ طلاب يحتاجون متابعة</h2>
                                                                                 تحسين تميز الطلاب وزيادة نسبة تقدير "ممتاز" بمقدار <span className="font-bold text-amber-600">{bestMonthOverall.avgExcellent - currentMonthStats.avgExcellent}%</span> (من خلال التشجيع وتكثيف المراجعة).
                                                                             </li>
                                                                         )}
-                                                                        {bestMonthOverall.totalPoints > currentMonthStats.totalPoints && 
-                                                                         bestMonthOverall.totalSessions <= currentMonthStats.totalSessions && 
-                                                                         bestMonthOverall.avgAttendance <= currentMonthStats.avgAttendance && (
-                                                                            <li>
-                                                                                زيادة سرعة توثيق الحصص خلال 36 ساعة لكسب "بونص التوثيق السريع" (+{weights.punctualityBonus} نقاط لكل حصة)، والحد من الغيابات الطارئة للشيخ.
-                                                                            </li>
-                                                                        )}
+
                                                                     </ul>
                                                                 </div>
                                                             </div>

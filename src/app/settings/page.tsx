@@ -436,10 +436,6 @@ export default function SettingsPage() {
                                     <Label>عقوبة غياب الشيخ (خصم)</Label>
                                     <Input type="number" value={sheikhWeights.absencePenalty} onChange={e => handleSheikhWeightChange('absencePenalty', e.target.value)} />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label>بونص التوثيق السريع (خلال 36 ساعة)</Label>
-                                    <Input type="number" value={sheikhWeights.punctualityBonus} onChange={e => handleSheikhWeightChange('punctualityBonus', e.target.value)} />
-                                </div>
                             </div>
                         </CardContent>
                     </Card>

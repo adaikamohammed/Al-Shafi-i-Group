@@ -25,7 +25,6 @@ export interface ScoringWeights {
     commitmentBonus: number;    // bonus points for 100% commitment (default: 40)
     commitmentBase: number;     // base points for commitment (default: 30)
     absencePenalty: number;     // penalty per absence (default: 20)
-    punctualityBonus: number;   // bonus points for punctual documentation (default: 5)
 }
 
 export const DEFAULT_WEIGHTS: ScoringWeights = {
@@ -36,8 +35,7 @@ export const DEFAULT_WEIGHTS: ScoringWeights = {
     goodPlusBonus: 1.5,
     commitmentBonus: 40,
     commitmentBase: 30,
-    absencePenalty: 20,
-    punctualityBonus: 5
+    absencePenalty: 20
 };
 
 interface SheikhScore {
@@ -49,8 +47,10 @@ interface SheikhScore {
     attendancePoints: number;
     commitmentPoints: number;
     extraSessionBonus: number;   // بونص الحصص الإضافية والتعويضية
-    punctualityBonus: number;    // نقاط بونص التوثيق السريع
     totalSessions: number;
+    basicSessions: number;        // عدد الحصص الأساسية/تعويضية/إضافية
+    activitySessions: number;     // عدد حصص الأنشطة
+    holidaySessions: number;      // عدد أيام العطلة
     totalDays: number;
     avgAttendance: number;
     avgExcellent: number;       // % students rated ممتاز
@@ -62,7 +62,6 @@ interface SheikhScore {
     rank: number;
     podiumCounts: { first: number; second: number; third: number };
     extraSessionsCount: number;  // عدد الحصص التعويضية/الإضافية
-    punctualSessionsCount: number; // عدد الحصص الموثقة سريعاً
 }
 
 interface BadgeInfo {
@@ -197,7 +196,6 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                     commitmentBonus: typeof val.commitmentBonus === 'number' ? val.commitmentBonus : DEFAULT_WEIGHTS.commitmentBonus,
                     commitmentBase: typeof val.commitmentBase === 'number' ? val.commitmentBase : DEFAULT_WEIGHTS.commitmentBase,
                     absencePenalty: typeof val.absencePenalty === 'number' ? val.absencePenalty : DEFAULT_WEIGHTS.absencePenalty,
-                    punctualityBonus: typeof val.punctualityBonus === 'number' ? val.punctualityBonus : DEFAULT_WEIGHTS.punctualityBonus,
                 });
             } else {
                 const local = localStorage.getItem('sheikh_scoring_weights');
@@ -294,7 +292,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
     // Explicit grid template columns used dynamically to bypass Tailwind JIT compilation limits
     const gridColumnsStyle = {
         display: 'grid',
-        gridTemplateColumns: '45px 1.8fr 75px 85px 85px 85px 80px',
+        gridTemplateColumns: '45px 1.8fr 210px 85px 85px 85px 80px',
         gap: '8px'
     };
 
@@ -321,9 +319,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
             commitmentRate: number;
             sheikhabsences: number;
             extraSessions: number;
-            excCount: number;
-            punctualSessions: number;
-        }) => {
+            excCount: number;        }) => {
             // 1) نقاط تسجيل الحصص للشيخ (نشاط الشيخ وتوثيقه): weights.sessionWeight نقطة لكل حصة مسجلة للفوج
             const sessionPoints = data.sessions * weights.sessionWeight;
 
@@ -352,9 +348,8 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
             const commitmentPoints = Math.max(0, commitmentBase + commitmentBonus - absencePenalty);
 
             // 6) بونص التوثيق السريع في نفس اليوم: weights.punctualityBonus نقطة عن كل حصة موثقة سريعاً
-            const punctualityBonus = data.punctualSessions * weights.punctualityBonus;
 
-            const totalPoints = sessionPoints + attendancePoints + extraSessionBonus + excellencePoints + commitmentPoints + punctualityBonus;
+            const totalPoints = sessionPoints + attendancePoints + extraSessionBonus + excellencePoints + commitmentPoints;
 
             return {
                 totalPoints,
@@ -363,7 +358,6 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                 extraSessionBonus,
                 excellencePoints,
                 commitmentPoints,
-                punctualityBonus
             };
         };
 
@@ -377,8 +371,6 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                 let attTotal = 0, attCount = 0;
                 let excTotal = 0, gpTotal = 0, excCount = 0;
                 let sheikhabsences = 0, holidays = 0;
-                let punctualSessions = 0;
-
                 mDays.forEach(day => {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const stats = getDayStats(sh.group, dateStr);
@@ -388,6 +380,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                     if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
                     const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                    const isActivity = stats.type === 'حصة أنشطة';
                     if (isReal) {
                         sessions++;
                         if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
@@ -402,9 +395,12 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                             excCount++;
                         }
                         if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
-                        
-                        if (isSessionPunctual(stats.session)) {
-                            punctualSessions++;
+                    } else if (isActivity) {
+                        // حصة أنشطة: تُحسب بوزن 0.8 من حصة عادية
+                        sessions += 0.5;
+                        if (stats.attendance !== null) {
+                            attTotal += stats.attendance;
+                            attCount++;
                         }
                     }
                 });
@@ -423,9 +419,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                     commitmentRate,
                     sheikhabsences,
                     extraSessions,
-                    excCount,
-                    punctualSessions
-                });
+                    excCount,                });
 
                 return {
                     group: sh.group,
@@ -452,11 +446,10 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
         // ─── Current Month Detailed Calculations ───
         const rawScores = sheikhs.map(sh => {
             let sessions = 0, extraSessions = 0, highAttDays = 0, totalDays = 0;
+            let basicCount = 0, activityCount = 0;
             let attTotal = 0, attCount = 0;
             let excTotal = 0, gpTotal = 0, excCount = 0;
             let sheikhabsences = 0, holidays = 0;
-            let punctualSessions = 0;
-
             allDays.forEach(day => {
                 const dateStr = format(day, 'yyyy-MM-dd');
                 const stats = getDayStats(sh.group, dateStr);
@@ -467,8 +460,10 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                 if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
                 const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                const isActivity = stats.type === 'حصة أنشطة';
                 if (isReal) {
                     sessions++;
+                    basicCount++;
                     if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
                         extraSessions++;
                     }
@@ -482,9 +477,14 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                         excCount++;
                     }
                     if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
-
-                    if (isSessionPunctual(stats.session)) {
-                        punctualSessions++;
+                } else if (isActivity) {
+                    // حصة أنشطة: تُحسب بوزن 0.8 من حصة عادية
+                    sessions += 0.5;
+                    activityCount++;
+                    if (stats.attendance !== null) {
+                        attTotal += stats.attendance;
+                        attCount++;
+                        if (stats.attendance >= 90) highAttDays++;
                     }
                 }
             });
@@ -503,9 +503,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                 commitmentRate,
                 sheikhabsences,
                 extraSessions,
-                excCount,
-                punctualSessions
-            });
+                excCount,            });
 
             const base: Omit<SheikhScore, 'badges' | 'rank' | 'podiumCounts'> = {
                 group: sh.group,
@@ -516,8 +514,10 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                 attendancePoints: pts.attendancePoints,
                 commitmentPoints: pts.commitmentPoints,
                 extraSessionBonus: pts.extraSessionBonus,
-                punctualityBonus: pts.punctualityBonus,
                 totalSessions: sessions,
+                basicSessions: basicCount,
+                activitySessions: activityCount,
+                holidaySessions: holidays,
                 totalDays,
                 avgAttendance,
                 avgExcellent,
@@ -525,8 +525,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                 commitmentRate,
                 highAttDays,
                 sheikhabsences,
-                extraSessionsCount: extraSessions,
-                punctualSessionsCount: punctualSessions
+                extraSessionsCount: extraSessions
             };
 
             return {
@@ -558,9 +557,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
             excellencePoints: s.excellencePoints,
             attendancePoints: s.attendancePoints,
             commitmentPoints: s.commitmentPoints,
-            extraSessionBonus: s.extraSessionBonus,
-            punctualityBonus: s.punctualityBonus,
-            totalSessions: s.totalSessions,
+            extraSessionBonus: s.extraSessionBonus,            totalSessions: s.totalSessions,
             totalDays: s.totalDays,
             avgAttendance: s.avgAttendance,
             avgExcellent: s.avgExcellent,
@@ -570,9 +567,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
             sheikhabsences: s.sheikhabsences,
             rank: s.rank,
             podiumCounts: s.podiumCounts,
-            extraSessionsCount: s.extraSessionsCount,
-            punctualSessionsCount: s.punctualSessionsCount,
-            badges: s.badges.map(b => ({
+            extraSessionsCount: s.extraSessionsCount,            badges: s.badges.map(b => ({
                 icon: b.icon,
                 label: b.label,
                 colorClass: b.colorClass,
@@ -599,8 +594,6 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
             let attTotal = 0, attCount = 0;
             let excTotal = 0, gpTotal = 0, excCount = 0;
             let sheikhabsences = 0, holidays = 0;
-            let punctualSessions = 0;
-
             prevDays.forEach(day => {
                 const dateStr = format(day, 'yyyy-MM-dd');
                 const stats = getDayStats(sh.group, dateStr);
@@ -608,13 +601,16 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                 if (stats.type === 'يوم عطلة') { holidays++; return; }
                 if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
                 const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                const isActivity = stats.type === 'حصة أنشطة';
                 if (isReal) {
                     sessions++;
                     if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') extraSessions++;
                     if (stats.attendance !== null) { attTotal += stats.attendance; attCount++; }
                     if (stats.excellent !== null) { excTotal += stats.excellent; excCount++; }
-                    if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
-                    if (isSessionPunctual(stats.session)) punctualSessions++;
+                    if (stats.goodPlus !== null) gpTotal += stats.goodPlus;                } else if (isActivity) {
+                    // حصة أنشطة: تُحسب بوزن 0.8
+                    sessions += 0.5;
+                    if (stats.attendance !== null) { attTotal += stats.attendance; attCount++; }
                 }
             });
 
@@ -631,8 +627,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
             const commitmentBonus = (commitmentRate >= 100 && sheikhabsences === 0 && sessions > 0) ? weights.commitmentBonus : 0;
             const commitmentBase = Math.round((commitmentRate / 100) * weights.commitmentBase);
             const commitmentPoints = Math.max(0, commitmentBase + commitmentBonus - sheikhabsences * weights.absencePenalty);
-            const punctualityBonus = punctualSessions * weights.punctualityBonus;
-            result[sh.group] = sessionPoints + attendancePoints + extraSessionBonus + excellencePoints + commitmentPoints + punctualityBonus;
+            result[sh.group] = sessionPoints + attendancePoints + extraSessionBonus + excellencePoints + commitmentPoints;
         });
         return result;
     }, [sheikhs, getDayStats, selectedDate, weights]);
@@ -650,7 +645,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
     // Phase 6: CSV Export
     const handleExportCSV = () => {
         const monthLabel_ = format(selectedDate, 'MMMM yyyy', { locale: ar });
-        const headers = ['الترتيب', 'الشيخ', 'الفوج', 'الحصص المسجلة', 'حضور الطلاب%', 'ممتاز%', 'التزام الشيخ%', 'غياب الشيخ', 'حصص إضافية', 'حصص موثقة سريعاً', 'نقاط التسجيل', 'نقاط الحضور', 'نقاط الالتزام', 'نقاط التسميع', 'بونص إضافية', 'بونص توثيق', 'المجموع', 'مقارنة الشهر السابق'];
+        const headers = ['الترتيب', 'الشيخ', 'الفوج', 'الحصص المسجلة', 'حضور الطلاب%', 'ممتاز%', 'التزام الشيخ%', 'غياب الشيخ', 'حصص إضافية', 'نقاط التسجيل', 'نقاط الحضور', 'نقاط الالتزام', 'نقاط التسميع', 'بونص إضافية', 'المجموع', 'مقارنة الشهر السابق'];
         const rows = scores.map(s => {
             const prev = prevMonthScores[s.group] ?? 0;
             const diff = prev > 0 ? (s.totalPoints - prev) : 0;
@@ -658,9 +653,9 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
             return [
                 s.rank, s.displayName, s.group,
                 s.totalSessions, s.avgAttendance, s.avgExcellent, s.commitmentRate,
-                s.sheikhabsences, s.extraSessionsCount, s.punctualSessionsCount,
+                s.sheikhabsences, s.extraSessionsCount,
                 s.sessionPoints, s.attendancePoints, s.commitmentPoints, s.excellencePoints,
-                s.extraSessionBonus, s.punctualityBonus, s.totalPoints, diffStr
+                s.extraSessionBonus, s.totalPoints, diffStr
             ];
         });
         const csvContent = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
@@ -935,9 +930,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                             { key: 'absencePenalty' as keyof ScoringWeights, label: '🚫 عقوبة غياب الشيخ (للغياب الواحد)', min: 0, max: 50, step: 5, color: 'rose' },
                             { key: 'extraSessionBonus' as keyof ScoringWeights, label: '➕ بونص الحصة التعويضية/الإضافية', min: 0, max: 20, step: 1, color: 'amber' },
                             { key: 'excellentBonus' as keyof ScoringWeights, label: '⭐ بونص تسميع ممتاز (لكل حصة)', min: 0, max: 10, step: 0.5, color: 'yellow' },
-                            { key: 'goodPlusBonus' as keyof ScoringWeights, label: '🌟 بونص جيد جداً (لكل حصة)', min: 0, max: 5, step: 0.5, color: 'orange' },
-                            { key: 'punctualityBonus' as keyof ScoringWeights, label: '⏱️ بونص التوثيق السريع (للحصة الواحدة)', min: 0, max: 15, step: 1, color: 'teal' },
-                        ] as const).map(({ key, label, min, max, step, color }) => (
+                            { key: 'goodPlusBonus' as keyof ScoringWeights, label: '🌟 بونص جيد جداً (لكل حصة)', min: 0, max: 5, step: 0.5, color: 'orange' },                        ] as const).map(({ key, label, min, max, step, color }) => (
                             <div key={key} className="space-y-1.5">
                                 <div className="flex justify-between items-center">
                                     <label className="text-[11px] font-bold text-slate-700">{label}</label>
@@ -1133,7 +1126,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                             {[
                                 { label: '#', tooltip: 'الترتيب الشهري' },
                                 { label: 'الشيخ والفوج', tooltip: 'اسم الشيخ وفوج التحفيظ' },
-                                { label: 'حصة مسجلة', tooltip: 'عدد الحصص التي درسها وسجلها الشيخ طوال الشهر' },
+                                { label: 'حصص الشهر', tooltip: 'تفصيل أنواع الحصص خلال الشهر' },
                                 { label: 'حضور الطلاب', tooltip: 'متوسط نسبة حضور طلاب الفوج طوال الشهر' },
                                 { label: 'ممتاز للطلاب', tooltip: 'متوسط نسبة تقييم ممتاز لطلاب الفوج في التسميع' },
                                 { label: 'التزام الشيخ بالجدول', tooltip: 'حضور الشيخ لجدوله وحصصه وغياباته' },
@@ -1212,10 +1205,27 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate }: SheikhBadge
                                                 </div>
                                             </div>
 
-                                            {/* Sessions */}
-                                            <div className="flex flex-col justify-center items-center">
-                                                <div className={cn('text-sm font-black', s.totalSessions >= 20 ? 'text-emerald-700' : s.totalSessions >= 15 ? 'text-blue-700' : 'text-gray-600')}>{s.totalSessions}</div>
-                                                <div className="text-[8px] text-muted-foreground">حصة مسجلة</div>
+                                            {/* Sessions breakdown */}
+                                            <div className="flex justify-center items-center gap-1.5">
+                                                {/* أساسية */}
+                                                <div className="flex flex-col items-center bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 min-w-[58px]">
+                                                    <span className={cn('text-sm font-black', s.basicSessions >= 20 ? 'text-emerald-700' : s.basicSessions >= 15 ? 'text-blue-700' : 'text-gray-600')}>
+                                                        {Math.floor(s.basicSessions)}
+                                                    </span>
+                                                    <span className="text-[8px] text-emerald-600 font-bold">أساسية</span>
+                                                </div>
+                                                {/* أنشطة */}
+                                                <div className="flex flex-col items-center bg-purple-50 border border-purple-200 rounded-lg px-2 py-1 min-w-[52px]">
+                                                    <span className={cn('text-sm font-black', s.activitySessions > 0 ? 'text-purple-700' : 'text-gray-300')}>
+                                                        {s.activitySessions}
+                                                    </span>
+                                                    <span className="text-[8px] text-purple-500 font-bold">أنشطة</span>
+                                                </div>
+                                                {/* عطلة */}
+                                                <div className="flex flex-col items-center bg-sky-50 border border-sky-200 rounded-lg px-2 py-1 min-w-[44px]">
+                                                    <span className="text-sm font-black text-sky-500">{s.holidaySessions}</span>
+                                                    <span className="text-[8px] text-sky-500 font-bold">عطلة</span>
+                                                </div>
                                             </div>
 
                                             {/* Attendance (Student) */}
@@ -1439,6 +1449,7 @@ export function SheikhScoreDetailModal({
                 goodPlus = stats.goodPlus;
 
                 const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
+                const isActivityDay = sType === 'حصة أنشطة';
                 if (isReal) {
                     dayPts += weights.sessionWeight;
                     if (stats.attendance !== null) {
@@ -1456,9 +1467,11 @@ export function SheikhScoreDetailModal({
                         goodPlusBonus = Math.round((stats.goodPlus / 100) * weights.goodPlusBonus);
                     }
                     dayPts += (excellenceBonus + goodPlusBonus);
-
-                    if (isSessionPunctual(stats.session)) {
-                        dayPts += weights.punctualityBonus;
+                } else if (isActivityDay) {
+                    // حصة أنشطة: تُحسب بوزن 0.8 من نقطة تسجيل الحصة + حضور الطلاب
+                    dayPts += Math.round(weights.sessionWeight * 0.5);
+                    if (stats.attendance !== null) {
+                        dayPts += Math.round((stats.attendance / 100) * weights.attendanceWeight * 0.5);
                     }
                 } else if (sType === 'غياب الشيخ') {
                     dayPts -= weights.absencePenalty;
@@ -1472,8 +1485,7 @@ export function SheikhScoreDetailModal({
                 attendance,
                 excellent,
                 goodPlus,
-                dayPoints: dayPts,
-                isPunctual: stats ? isSessionPunctual(stats.session) : true
+                dayPoints: dayPts
             });
         });
 
@@ -1570,9 +1582,7 @@ export function SheikhScoreDetailModal({
                                     { label: 'حصة المعلم', val: sheikh.totalSessions.toString(), pts: sheikh.sessionPoints, icon: '📝', colorClass: 'border-blue-150 bg-blue-50/35 text-blue-700' },
                                     { label: 'حضور الطلاب بالفوج', val: `${sheikh.avgAttendance}%`, pts: sheikh.attendancePoints, icon: '👥', colorClass: 'border-emerald-150 bg-emerald-50/35 text-emerald-700' },
                                     { label: 'التزام الشيخ بتسجيل الحصص', val: `${sheikh.commitmentRate}%`, pts: sheikh.commitmentPoints, icon: '🎯', colorClass: 'border-purple-150 bg-purple-50/35 text-purple-700' },
-                                    { label: 'جودة تسميع الطلاب (ممتاز)', val: `${sheikh.avgExcellent}%`, pts: sheikh.excellencePoints, icon: '⭐', colorClass: 'border-amber-150 bg-amber-50/35 text-amber-700' },
-                                    { label: 'انتظام توقيت تسجيل الحصص', val: `${sheikh.totalSessions > 0 ? Math.round((sheikh.punctualSessionsCount / sheikh.totalSessions) * 100) : 100}%`, pts: sheikh.punctualityBonus, icon: '⏱️', colorClass: 'border-rose-150 bg-rose-50/35 text-rose-700' },
-                                ].map((c, i) => (
+                                    { label: 'جودة تسميع الطلاب (ممتاز)', val: `${sheikh.avgExcellent}%`, pts: sheikh.excellencePoints, icon: '⭐', colorClass: 'border-amber-150 bg-amber-50/35 text-amber-700' },                                ].map((c, i) => (
                                     <div key={i} className={cn("border rounded-xl p-3 flex items-center justify-between transition-all hover:shadow-sm", c.colorClass)}>
                                         <div className="flex items-center gap-2">
                                             <span className="text-lg">{c.icon}</span>
@@ -1631,13 +1641,14 @@ export function SheikhScoreDetailModal({
                                 <tbody>
                                     {dayRecords.map((rec, i) => {
                                         const isReal = rec.type === 'حصة أساسية' || rec.type === 'حصة تعويضية' || rec.type === 'حصة إضافية';
+                                        const isActivityRec = rec.type === 'حصة أنشطة';
                                         const isAbsent = rec.type === 'غياب الشيخ';
                                         const isHoliday = rec.type === 'يوم عطلة';
                                         const isNotRegistered = rec.type === 'غير مسجلة';
                                         return (
                                             <tr key={rec.date + i} className={cn(
                                                 'border-b text-center transition-colors hover:bg-slate-50/40',
-                                                isAbsent ? 'bg-rose-50/15' : isHoliday ? 'bg-sky-50/10' : isNotRegistered ? 'bg-slate-100/20' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50/5'
+                                                isAbsent ? 'bg-rose-50/15' : isHoliday ? 'bg-sky-50/10' : isActivityRec ? 'bg-purple-50/20' : isNotRegistered ? 'bg-slate-100/20' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50/5'
                                             )}>
                                                 <td className="p-2 text-right font-bold text-gray-650 whitespace-nowrap pr-4">{rec.label}</td>
                                                 <td className="p-2 text-center">
@@ -1655,7 +1666,7 @@ export function SheikhScoreDetailModal({
                                                     </div>
                                                 </td>
                                                 <td className="p-2 text-center font-bold">
-                                                    {isReal && rec.attendance !== null ? (
+                                                    {(isReal || isActivityRec) && rec.attendance !== null ? (
                                                         <span className={cn('text-[11px]', rec.attendance >= 90 ? 'text-emerald-700' : rec.attendance >= 70 ? 'text-amber-600' : 'text-rose-600')}>
                                                             {rec.attendance}%
                                                         </span>
@@ -1697,7 +1708,6 @@ export function SheikhScoreDetailModal({
                         <span> + التزام وغياب الشيخ ({sheikh.commitmentPoints})</span>
                         <span> + جودة الطلاب ({sheikh.excellencePoints})</span>
                         {sheikh.extraSessionBonus > 0 && <span> + بونص تعويضية ({sheikh.extraSessionBonus})</span>}
-                        {sheikh.punctualityBonus > 0 && <span> + بونص توثيق سريع ({sheikh.punctualityBonus})</span>}
                         <span> = <span className="font-black text-indigo-700">{sheikh.totalPoints} نقطة</span></span>
                     </div>
                     <div className="flex gap-2 shrink-0">

@@ -102,7 +102,8 @@ function calculateFairStudentStats({
                 const sType = session.sessionType;
                 if (sType === 'يوم عطلة' || (sType === 'غياب الشيخ' && !session.substituteTeacher)) return;
                 const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
-                if (!isReal) return;
+                const isActivity = sType === 'حصة أنشطة';
+                if (!isReal && !isActivity) return;
                 sessionsInRange.push(session);
             });
         });
@@ -180,8 +181,10 @@ function calculateFairStudentStats({
             }
         }
 
+        const isActivitySession = session.sessionType === 'حصة أنشطة';
         const dateSessions = sessionsByDate[session.date] || [];
-        const weight = dateSessions.length >= 2 ? 0.5 : 1.0;
+        // حصة أنشطة: وزن 0.5 (نصف حصة أساسية)
+        const weight = isActivitySession ? 0.5 : (dateSessions.length >= 2 ? 0.5 : 1.0);
 
         const records: any[] = Array.isArray(session.records)
             ? session.records
@@ -206,6 +209,9 @@ function calculateFairStudentStats({
                     st.lateDays++;
                 }
             }
+
+            // حصة أنشطة: لا تُحتسب فيها التقييمات الأكاديمية والسلوك
+            if (isActivitySession) return;
 
             let earnedMemoPoints = 0;
             let hasMemo = false;
@@ -5315,6 +5321,11 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                                 <td className="p-1.5 text-center font-black">×5</td>
                                 <td className="p-1.5 text-muted-foreground">هادئ=2 · مقبول=1 · مشاغب=-1 · لم يسجل=0 ← المتوسط × 5</td>
                             </tr>
+                            <tr className="border-b bg-purple-50/30">
+                                <td className="p-1.5 font-bold text-purple-700">🎨 حصة أنشطة</td>
+                                <td className="p-1.5 text-center font-black text-purple-700">×0.5</td>
+                                <td className="p-1.5 text-muted-foreground">حضور فقط بوزن 50% — لا تقييم أكاديمي ولا سلوك يُحتسب</td>
+                            </tr>
                             <tr className="bg-rose-50/30">
                                 <td className="p-1.5 font-bold text-rose-600">⏰ خصم التأخر</td>
                                 <td className="p-1.5 text-center font-black text-rose-600">-2</td>
@@ -5422,6 +5433,7 @@ function StudentScoreDetailModal({
         evalGrade: number; behaviorGrade: number; isLate: boolean;
         weight: number;
         isDelayed: boolean;
+        isActivity: boolean;
     };
 
     const dayRecords = useMemo<DayRec[]>(() => {
@@ -5454,7 +5466,8 @@ function StudentScoreDetailModal({
                 const sType = session.sessionType;
                 if (sType === 'يوم عطلة' || (sType === 'غياب الشيخ' && !session.substituteTeacher)) return;
                 const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
-                if (!isReal) return;
+                const isActivity = sType === 'حصة أنشطة';
+                if (!isReal && !isActivity) return;
                 sessionsInRange.push(session);
             });
         });
@@ -5477,13 +5490,15 @@ function StudentScoreDetailModal({
                 if (!session || processed) return;
                 const sType = session.sessionType;
                 const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
-                if (!isReal) return;
+                const isActivitySess = sType === 'حصة أنشطة';
+                if (!isReal && !isActivitySess) return;
                 const shOwner = sheikhs.find(sh => sh.uids.has(session.ownerId));
                 if (!shOwner || shOwner.group !== student.group) return;
                 processed = true;
 
                 const dateSessions = sessionsByDate[session.date] || [];
-                const weight = dateSessions.length >= 2 ? 0.5 : 1.0;
+                // حصة أنشطة: وزن 0.5 (نصف حصة أساسية)
+                const weight = isActivitySess ? 0.5 : (dateSessions.length >= 2 ? 0.5 : 1.0);
 
                 const sessionRecs: any[] = Array.isArray(session.records) ? session.records : session.records ? Object.values(session.records) : [];
                 const myRec = sessionRecs.find((r: any) => r.studentId === student.id);
@@ -5531,12 +5546,15 @@ function StudentScoreDetailModal({
                     label: format(day, 'EEE d MMM', { locale: ar }),
                     sessionType: sType,
                     attendance: att,
-                    memorization: isReview ? `مراجعة: ${mem || ''}` : mem,
-                    behavior: beh,
-                    isReview, evalGrade, behaviorGrade,
+                    memorization: isActivitySess ? null : (isReview ? `مراجعة: ${mem || ''}` : mem),
+                    behavior: isActivitySess ? null : beh,
+                    isReview: isActivitySess ? false : isReview,
+                    evalGrade: isActivitySess ? 0 : evalGrade,
+                    behaviorGrade: isActivitySess ? 0 : behaviorGrade,
                     isLate,
                     weight,
-                    isDelayed
+                    isDelayed,
+                    isActivity: isActivitySess
                 });
             });
         });
@@ -5558,6 +5576,9 @@ function StudentScoreDetailModal({
             weightedSessions += weight;
             attendancePointsSum += getAttPoints(rec.attendance) * weight;
         }
+
+        // حصة أنشطة: لا تُحتسب فيها التقييمات الأكاديمية والسلوك
+        if (rec.isActivity) return;
 
         const isPresent = rec.attendance === 'حاضر' || rec.attendance === 'تعويض' || rec.attendance === 'متأخر';
         const cleanMem = rec.isReview ? '' : rec.memorization;
