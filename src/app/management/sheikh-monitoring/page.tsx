@@ -1155,7 +1155,7 @@ export default function SheikhMonitoringPage() {
                     />
                 )}
                 {view === 'badges' && (
-                    <SheikhBadges sheikhs={filteredSheikhs} getDayStats={getDayStats} selectedDate={statsMonth} />
+                    <SheikhBadges sheikhs={filteredSheikhs} getDayStats={getDayStats} selectedDate={statsMonth} dailySessions={dailySessions} />
                 )}
                 {view === 'heatmap' && (
                     <AttendanceHeatmap

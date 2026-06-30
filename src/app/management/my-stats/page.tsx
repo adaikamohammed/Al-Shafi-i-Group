@@ -160,6 +160,8 @@ interface ScoringWeights {
     commitmentBonus: number;
     commitmentBase: number;
     absencePenalty: number;
+    punctualityBonus: number;
+    punctualityPenalty: number;
 }
 
 const DEFAULT_WEIGHTS: ScoringWeights = {
@@ -171,6 +173,8 @@ const DEFAULT_WEIGHTS: ScoringWeights = {
     commitmentBonus: 40,
     commitmentBase: 30,
     absencePenalty: 20,
+    punctualityBonus: 3,
+    punctualityPenalty: 2,
 };
 
 interface BadgeInfo {
@@ -610,6 +614,8 @@ export default function MyStatsPage() {
                     commitmentBonus: typeof val.commitmentBonus === 'number' ? val.commitmentBonus : DEFAULT_WEIGHTS.commitmentBonus,
                     commitmentBase: typeof val.commitmentBase === 'number' ? val.commitmentBase : DEFAULT_WEIGHTS.commitmentBase,
                     absencePenalty: typeof val.absencePenalty === 'number' ? val.absencePenalty : DEFAULT_WEIGHTS.absencePenalty,
+                    punctualityBonus: typeof val.punctualityBonus === 'number' ? val.punctualityBonus : DEFAULT_WEIGHTS.punctualityBonus,
+                    punctualityPenalty: typeof val.punctualityPenalty === 'number' ? val.punctualityPenalty : DEFAULT_WEIGHTS.punctualityPenalty,
                 });
             }
         });
@@ -842,7 +848,13 @@ export default function MyStatsPage() {
                 attendancePoints: pts.attendancePoints,
                 commitmentPoints: pts.commitmentPoints,
                 extraSessionBonus: pts.extraSessionBonus,
+                punctualityPoints: 0,   // لا تحسب هنا (تأتي من Firebase أو صفحة الإدارة)
+                punctualSessions: 0,
+                lateSessions: 0,
                 totalSessions: basicCount + activityCount,
+                basicSessions: basicCount,
+                activitySessions: activityCount,
+                holidaySessions: holidays,
                 totalDays,
                 avgAttendance,
                 avgExcellent,

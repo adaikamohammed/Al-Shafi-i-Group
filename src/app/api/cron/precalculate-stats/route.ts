@@ -33,7 +33,8 @@ const DEFAULT_WEIGHTS = {
     commitmentBonus: 40,
     commitmentBase: 30,
     absencePenalty: 20,
-    punctualityBonus: 5
+    punctualityBonus: 3,
+    punctualityPenalty: 2,
 };
 
 const DEFAULT_GOALS = {
@@ -42,16 +43,31 @@ const DEFAULT_GOALS = {
     commitmentTarget: 90
 };
 
-// Check if sheikh document is punctual (documented within 36 hours of the session)
-function isSessionPunctual(session: any): boolean {
-    if (!session || !session.createdAt || !session.date) return false;
+/**
+ * نظام تنقيط التوقيت المتدرج (4 مستويات):
+ * يوم 0     → +punctualityBonus
+ * يوم 1     → +(punctualityBonus - 1)
+ * يوم 2-3   → +1
+ * يوم 4-7   → 0 (محايد)
+ * يوم 8-14  → -1
+ * يوم 15+   → -punctualityPenalty
+ * بدون createdAt → 0 (بيانات قديمة)
+ */
+function getSessionTimingPoints(session: any, weights: typeof DEFAULT_WEIGHTS): number {
+    if (!session || !session.createdAt || !session.date) return 0;
     try {
-        const created = new Date(session.createdAt);
-        const scheduled = new Date(session.date);
-        const diffHours = (created.getTime() - scheduled.getTime()) / (1000 * 60 * 60);
-        return diffHours >= 0 && diffHours <= 36;
+        const sessionDate = new Date(session.date + 'T00:00:00');
+        const createdDate = new Date(session.createdAt);
+        const diffDays = Math.floor((createdDate.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0)  return weights.punctualityBonus;
+        if (diffDays === 0) return weights.punctualityBonus;
+        if (diffDays === 1) return Math.max(1, weights.punctualityBonus - 1);
+        if (diffDays <= 3)  return 1;
+        if (diffDays <= 7)  return 0;
+        if (diffDays <= 14) return -1;
+        return -weights.punctualityPenalty;
     } catch (e) {
-        return false;
+        return 0;
     }
 }
 
@@ -283,7 +299,7 @@ export async function GET(request: Request) {
             sheikhabsences: number;
             extraSessions: number;
             excCount: number;
-            punctualSessions: number;
+            punctualityPoints: number;
         }) => {
             const sessionPoints = data.sessions * weights.sessionWeight;
             const attendancePoints = data.sessions > 0 ? Math.round((data.avgAttendance / 100) * weights.attendanceWeight * data.sessions) : 0;
@@ -295,7 +311,7 @@ export async function GET(request: Request) {
             const absencePenalty = data.sheikhabsences * weights.absencePenalty;
             const commitmentBase = Math.round((data.commitmentRate / 100) * weights.commitmentBase);
             const commitmentPoints = Math.max(0, commitmentBase + commitmentBonus - absencePenalty);
-            const punctualityBonus = data.punctualSessions * weights.punctualityBonus;
+            const punctualityBonus = data.punctualityPoints; // صافي نقاط التوقيت محسوبة مسبقاً
             const totalPoints = sessionPoints + attendancePoints + extraSessionBonus + excellencePoints + commitmentPoints + punctualityBonus;
 
             return {
@@ -358,9 +374,8 @@ export async function GET(request: Request) {
                         }
                         if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
                         
-                        if (isSessionPunctual(stats.session)) {
-                            punctualSessions++;
-                        }
+                        // تنقيط التوقيت المتدرج للحسابات التاريخية (محايد = 0 لعدم توفر createdAt)
+                        // تُحسب بصفر للشهور السابقة لتجنب تأثير السجلات القديمة
                     }
                 });
 
@@ -379,7 +394,7 @@ export async function GET(request: Request) {
                     sheikhabsences,
                     extraSessions,
                     excCount,
-                    punctualSessions
+                    punctualityPoints: 0, // لا createdAt متاح للشهور السابقة
                 });
 
                 return {
@@ -435,9 +450,8 @@ export async function GET(request: Request) {
                     }
                     if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
                     
-                    if (isSessionPunctual(stats.session)) {
-                        punctualSessions++;
-                    }
+                    // تنقيط التوقيت المتدرج لشهر التقرير الحالي
+                    punctualSessions += getSessionTimingPoints(stats.session, weights);
                 }
             });
 
@@ -456,7 +470,7 @@ export async function GET(request: Request) {
                 sheikhabsences,
                 extraSessions,
                 excCount,
-                punctualSessions
+                punctualityPoints: punctualSessions // punctualSessions تراكم نقاط التوقيت (مجموع getSessionTimingPoints)
             });
 
             // Badges logic
