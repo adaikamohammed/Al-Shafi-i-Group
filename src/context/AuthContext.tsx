@@ -39,6 +39,7 @@ const sheikhInitialData: { [email: string]: { name: string; group: string; role:
   "admin18@gmail.com": { name: "الأستاذة حياة", group: "فوج 18", role: "sheikh" },
   "admin19@gmail.com": { name: "فوج 1 إبتدائي", group: "فوج 19", role: "sheikh" },
   "admin20@gmail.com": { name: "الشيخ عبد الكريم ترممو", group: "فوج 20", role: "sheikh" },
+  "admin21@gmail.com": { name: "الشيخ كنيوة عرفات", group: "فوج 21", role: "sheikh" },
 };
 
 const sheikhDemoKeys: { [email: string]: string } = {
@@ -62,6 +63,7 @@ const sheikhDemoKeys: { [email: string]: string } = {
   "admin18@gmail.com": "demo_sheikh_18",
   "admin19@gmail.com": "demo_sheikh_19",
   "admin20@gmail.com": "demo_sheikh_20",
+  "admin21@gmail.com": "demo_sheikh_21",
 };
 
 export interface UpdateProfileData extends Partial<AppUser> {

@@ -166,7 +166,7 @@ export default function WeeklyFollowUpPage() {
             if (selectedGroup === 'sheikhs') {
                 filtered = filtered.filter(s => {
                     const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
-                    return (num >= 1 && num <= 9) || num === 20;
+                    return (num >= 1 && num <= 9) || num === 20 || num === 21;
                 });
             } else if (selectedGroup === 'ustadhat') {
                 filtered = filtered.filter(s => {

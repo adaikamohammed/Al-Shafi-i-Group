@@ -225,7 +225,7 @@ export default function YearlyPerformancePage() {
             selectedIds = allUsers
                 .filter(u => {
                     const num = parseInt(u.group?.replace(/\D/g, '') || '0');
-                    return (num >= 1 && num <= 9) || num === 20;
+                    return (num >= 1 && num <= 9) || num === 20 || num === 21;
                 })
                 .map(u => u.uid);
         } else if (selectedSheikhId === 'ustadhat') {
@@ -250,7 +250,7 @@ export default function YearlyPerformancePage() {
             selectedIds = allUsers
                 .filter(u => {
                     const num = parseInt(u.group?.replace(/\D/g, '') || '0');
-                    return (num >= 1 && num <= 9) || num === 20;
+                    return (num >= 1 && num <= 9) || num === 20 || num === 21;
                 })
                 .map(u => u.uid);
         } else if (selectedSheikhId === 'ustadhat') {

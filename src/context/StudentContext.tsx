@@ -1701,6 +1701,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         { name: "الأستاذة حياة", group: "فوج 18", email: "admin18@gmail.com" },
         { name: "فوج 1 إبتدائي", group: "فوج 19", email: "admin19@gmail.com" },
         { name: "الشيخ عبد الكريم ترممو", group: "فوج 20", email: "admin20@gmail.com" },
+        { name: "الشيخ كنيوة عرفات", group: "فوج 21", email: "admin21@gmail.com" },
       ];
 
       const updates: any = {};

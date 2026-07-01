@@ -78,8 +78,8 @@ export function isSheikhMenUser(u: any): boolean {
   const emailNum = getAdminNumber(u.email || '');
   const groupNum = getGroupNumber(u.group || '');
   const displayName = u.displayName || '';
-  return (emailNum !== null && ((emailNum >= 1 && emailNum <= 9) || emailNum === 20)) || 
-         (groupNum !== null && ((groupNum >= 1 && groupNum <= 9) || groupNum === 20)) ||
+  return (emailNum !== null && ((emailNum >= 1 && emailNum <= 9) || emailNum === 20 || emailNum === 21)) || 
+         (groupNum !== null && ((groupNum >= 1 && groupNum <= 9) || groupNum === 20 || groupNum === 21)) ||
          displayName.includes('الشيخ');
 }
 
@@ -99,7 +99,7 @@ export function isStudentInMenSheikhs(s: any, allUsers: any[]): boolean {
     return isSheikhMenUser(ownerUser);
   }
   const groupNum = getGroupNumber(s.groupName || '');
-  return groupNum !== null && ((groupNum >= 1 && groupNum <= 9) || groupNum === 20);
+  return groupNum !== null && ((groupNum >= 1 && groupNum <= 9) || groupNum === 20 || groupNum === 21);
 }
 
 export function isStudentInWomenUstadhats(s: any, allUsers: any[]): boolean {
@@ -132,6 +132,7 @@ export const GROUP_SHEIKH_MAPPING: Record<string, string> = {
   "فوج 18": "الأستاذة حياة",
   "فوج 19": "فوج 1 إبتدائي",
   "فوج 20": "الشيخ عبد الكريم ترممو",
+  "فوج 21": "الشيخ كنيوة عرفات",
   "فوج 1 إبتدائي": "",
 };
 
