@@ -45,6 +45,7 @@ export const DEFAULT_WEIGHTS: ScoringWeights = {
 interface SheikhScore {
     group: string;
     displayName: string;
+    uids?: Set<string>;
     totalPoints: number;
     sessionPoints: number;
     excellencePoints: number;
@@ -567,6 +568,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate, dailySessions
             const base: Omit<SheikhScore, 'badges' | 'rank' | 'podiumCounts'> = {
                 group: sh.group,
                 displayName: sh.displayName,
+                uids: sh.uids,
                 totalPoints: pts.totalPoints,
                 sessionPoints: pts.sessionPoints,
                 excellencePoints: pts.excellencePoints,
@@ -1493,6 +1495,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate, dailySessions
                     onClose={() => setSelectedSheikhDetail(null)}
                     onExportHonorCard={openHonorCard}
                     weights={weights}
+                    dailySessions={dailySessions}
                 />
             )}
 
@@ -1514,7 +1517,8 @@ export function SheikhScoreDetailModal({
     selectedDate,
     onClose,
     onExportHonorCard,
-    weights
+    weights,
+    dailySessions
 }: {
     sheikh: SheikhScore;
     getDayStats: (group: string, dateStr: string) => any;
@@ -1522,6 +1526,7 @@ export function SheikhScoreDetailModal({
     onClose: () => void;
     onExportHonorCard?: (sheikh: SheikhScore) => void;
     weights: ScoringWeights;
+    dailySessions?: any;
 }) {
     const monthLabel = format(selectedDate, 'MMMM yyyy', { locale: ar });
     const cleanGroup = sheikh.group.replace(/^فوج\s*/, '').trim();
@@ -1544,6 +1549,28 @@ export function SheikhScoreDetailModal({
             let excellent = null;
             let goodPlus = null;
 
+            // Timing points variables
+            let timingPoints = 0;
+            let isPunctual = false;
+            let isLate = false;
+            let delayDays = null;
+            let timingDesc = '';
+
+            // Find session in dailySessions to get timing info
+            let session: any = null;
+            if (dailySessions) {
+                const daySess = dailySessions[dateStr];
+                if (daySess) {
+                    const hasUid = sheikh.uids && typeof sheikh.uids.has === 'function';
+                    const sessions_for_day = Object.values(daySess).filter(
+                        (s: any) => s && s.ownerId && hasUid && sheikh.uids!.has(s.ownerId)
+                    );
+                    if (sessions_for_day.length > 0) {
+                        session = sessions_for_day.find((s: any) => s.sessionNumber === 1) || sessions_for_day[0];
+                    }
+                }
+            }
+
             if (stats) {
                 sType = stats.type;
                 attendance = stats.attendance;
@@ -1552,6 +1579,40 @@ export function SheikhScoreDetailModal({
 
                 const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
                 const isActivityDay = sType === 'حصة أنشطة';
+                
+                // Timing scoring (if session exists and it's a real or activity session)
+                if (session && (isReal || isActivityDay)) {
+                    timingPoints = getSessionTimingPoints(session, weights);
+                    if (timingPoints > 0) {
+                        isPunctual = true;
+                    } else if (timingPoints < 0) {
+                        isLate = true;
+                    }
+                    
+                    if (session.createdAt && session.date) {
+                        try {
+                            const sessionDate = new Date(session.date + 'T00:00:00');
+                            const createdDate = new Date(session.createdAt);
+                            const diffDays = Math.floor((createdDate.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24));
+                            delayDays = diffDays;
+                            
+                            if (diffDays === 0) {
+                                timingDesc = `تسجيل في نفس اليوم (+${timingPoints})`;
+                            } else if (diffDays === 1) {
+                                timingDesc = `تسجيل في اليوم التالي (+${timingPoints})`;
+                            } else if (diffDays <= 3) {
+                                timingDesc = `تسجيل خلال 2-3 أيام (+${timingPoints})`;
+                            } else if (diffDays <= 7) {
+                                timingDesc = `تسجيل خلال 4-7 أيام (0)`;
+                            } else if (diffDays <= 14) {
+                                timingDesc = `تسجيل متأخر (8-14 يوم) (${timingPoints})`;
+                            } else {
+                                timingDesc = `تسجيل متأخر جداً (>14 يوم) (${timingPoints})`;
+                            }
+                        } catch (e) {}
+                    }
+                }
+
                 if (isReal) {
                     dayPts += weights.sessionWeight;
                     if (stats.attendance !== null) {
@@ -1578,6 +1639,9 @@ export function SheikhScoreDetailModal({
                 } else if (sType === 'غياب الشيخ') {
                     dayPts -= weights.absencePenalty;
                 }
+                
+                // Add timing points to the daily points total
+                dayPts += timingPoints;
             }
 
             recs.push({
@@ -1587,12 +1651,17 @@ export function SheikhScoreDetailModal({
                 attendance,
                 excellent,
                 goodPlus,
-                dayPoints: dayPts
+                dayPoints: dayPts,
+                timingPoints,
+                timingDesc,
+                isPunctual,
+                isLate,
+                delayDays
             });
         });
 
         return recs.sort((a, b) => a.date.localeCompare(b.date));
-    }, [sheikh, getDayStats, selectedDate, weights]);
+    }, [sheikh, getDayStats, selectedDate, weights, dailySessions]);
 
     // Local TYPE_CONFIG for rendering session labels in the modal
     const LOCAL_TYPE_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
@@ -1684,7 +1753,19 @@ export function SheikhScoreDetailModal({
                                     { label: 'حصة المعلم', val: sheikh.totalSessions.toString(), pts: sheikh.sessionPoints, icon: '📝', colorClass: 'border-blue-150 bg-blue-50/35 text-blue-700' },
                                     { label: 'حضور الطلاب بالفوج', val: `${sheikh.avgAttendance}%`, pts: sheikh.attendancePoints, icon: '👥', colorClass: 'border-emerald-150 bg-emerald-50/35 text-emerald-700' },
                                     { label: 'التزام الشيخ بتسجيل الحصص', val: `${sheikh.commitmentRate}%`, pts: sheikh.commitmentPoints, icon: '🎯', colorClass: 'border-purple-150 bg-purple-50/35 text-purple-700' },
-                                    { label: 'جودة تسميع الطلاب (ممتاز)', val: `${sheikh.avgExcellent}%`, pts: sheikh.excellencePoints, icon: '⭐', colorClass: 'border-amber-150 bg-amber-50/35 text-amber-700' },                                ].map((c, i) => (
+                                    { label: 'جودة تسميع الطلاب (ممتاز)', val: `${sheikh.avgExcellent}%`, pts: sheikh.excellencePoints, icon: '⭐', colorClass: 'border-amber-150 bg-amber-50/35 text-amber-700' },
+                                    { 
+                                        label: 'بونص سرعة تسجيل الحصص', 
+                                        val: `${sheikh.punctualSessions} مبكرة / ${sheikh.lateSessions} متأخرة`, 
+                                        pts: sheikh.punctualityPoints, 
+                                        icon: '⚡', 
+                                        colorClass: sheikh.punctualityPoints > 0 
+                                            ? 'border-emerald-150 bg-emerald-50/35 text-emerald-700' 
+                                            : sheikh.punctualityPoints < 0 
+                                                ? 'border-rose-150 bg-rose-50/35 text-rose-700' 
+                                                : 'border-slate-150 bg-slate-50/35 text-slate-700' 
+                                    },
+                                ].map((c, i) => (
                                     <div key={i} className={cn("border rounded-xl p-3 flex items-center justify-between transition-all hover:shadow-sm", c.colorClass)}>
                                         <div className="flex items-center gap-2">
                                             <span className="text-lg">{c.icon}</span>
@@ -1694,7 +1775,7 @@ export function SheikhScoreDetailModal({
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <div className="text-xs font-black">{c.pts !== null ? `+${c.pts}` : '—'}</div>
+                                            <div className="text-xs font-black">{c.pts !== null ? (c.pts >= 0 ? `+${c.pts}` : c.pts) : '—'}</div>
                                             <div className="text-[8px] font-semibold text-slate-400">نقطة</div>
                                         </div>
                                     </div>
@@ -1737,6 +1818,7 @@ export function SheikhScoreDetailModal({
                                         <th className="p-2.5 text-center text-emerald-700">حضور الطلاب</th>
                                         <th className="p-2.5 text-center text-amber-600">ممتاز</th>
                                         <th className="p-2.5 text-center text-green-650">ج.جداً</th>
+                                        <th className="p-2.5 text-center text-amber-500 font-bold">بونص التوقيت</th>
                                         <th className="p-2.5 text-center text-indigo-750 font-black">النقاط</th>
                                     </tr>
                                 </thead>
@@ -1788,6 +1870,23 @@ export function SheikhScoreDetailModal({
                                                         </span>
                                                     ) : <span className="text-muted-foreground/30">—</span>}
                                                 </td>
+                                                <td className="p-2 text-center font-bold">
+                                                    {rec.timingDesc ? (
+                                                        <div className="flex flex-col items-center gap-0.5">
+                                                            <span className={cn(
+                                                                'text-[10px] px-1.5 py-0.5 rounded font-black',
+                                                                rec.timingPoints > 0 ? 'bg-emerald-50 text-emerald-700' :
+                                                                rec.timingPoints < 0 ? 'bg-rose-50 text-rose-700' :
+                                                                'bg-slate-100 text-slate-500'
+                                                            )}>
+                                                                {rec.timingPoints > 0 ? `+${rec.timingPoints}` : rec.timingPoints < 0 ? `${rec.timingPoints}` : '0'}
+                                                            </span>
+                                                            <span className="text-[8px] text-muted-foreground whitespace-nowrap" title={rec.timingDesc}>
+                                                                {rec.delayDays === 0 ? 'نفس اليوم' : rec.delayDays === 1 ? 'اليوم التالي' : rec.delayDays <= 3 ? 'خلال 3 أيام' : rec.delayDays <= 7 ? 'خلال أسبوع' : 'متأخر'}
+                                                            </span>
+                                                        </div>
+                                                    ) : <span className="text-muted-foreground/30">—</span>}
+                                                </td>
                                                 <td className="p-2 text-center">
                                                     <span className={cn('font-black text-[11px]', rec.dayPoints > 0 ? 'text-indigo-750' : rec.dayPoints < 0 ? 'text-rose-600' : 'text-gray-300')}>
                                                         {rec.dayPoints > 0 ? `+${rec.dayPoints}` : rec.dayPoints < 0 ? rec.dayPoints : '—'}
@@ -1810,6 +1909,9 @@ export function SheikhScoreDetailModal({
                         <span> + التزام وغياب الشيخ ({sheikh.commitmentPoints})</span>
                         <span> + جودة الطلاب ({sheikh.excellencePoints})</span>
                         {sheikh.extraSessionBonus > 0 && <span> + بونص تعويضية ({sheikh.extraSessionBonus})</span>}
+                        {sheikh.punctualityPoints !== 0 && (
+                            <span> {sheikh.punctualityPoints > 0 ? '+' : ''} سرعة التوثيق ({sheikh.punctualityPoints})</span>
+                        )}
                         <span> = <span className="font-black text-indigo-700">{sheikh.totalPoints} نقطة</span></span>
                     </div>
                     <div className="flex gap-2 shrink-0">
