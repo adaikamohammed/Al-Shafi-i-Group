@@ -97,6 +97,13 @@ interface StudentContextType {
   bulkUpdateSurahStatus: (studentIds: string[], surahIds: number[], targetStatus: 0 | 1 | 2) => Promise<void>;
   addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
   updatePaymentStatus: (paymentId: string, status: PaymentStatus, amount: number) => Promise<void>;
+  bulkAddOrUpdatePayments: (operations: Array<{
+    studentId: string;
+    paymentId?: string;
+    status: PaymentStatus;
+    amount: number;
+    date: string;
+  }>) => Promise<void>;
   saveSettings: (newSettings: AppSettings) => Promise<void>;
   generateDemoData: () => Promise<void>;
   shareStudentRecord: (studentId: string, historyData: any) => Promise<void>;
@@ -1670,6 +1677,49 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     await update(paymentRef, { status, amount });
   }
 
+  const bulkAddOrUpdatePayments = async (operations: Array<{
+    studentId: string;
+    paymentId?: string;
+    status: PaymentStatus;
+    amount: number;
+    date: string;
+  }>) => {
+    if (!authContextUser) throw new Error("User not authenticated");
+
+    const updates: Record<string, any> = {};
+
+    for (const op of operations) {
+      const student = students.find(s => s.id === op.studentId);
+      if (!student) continue;
+
+      const studentOwnerId = student.ownerId;
+      if (!studentOwnerId) continue;
+
+      if (!isPrivileged && authContextUser.uid !== studentOwnerId) {
+        throw new Error("Not authorized to modify payment for this student");
+      }
+
+      if (op.paymentId) {
+        updates[`users/${studentOwnerId}/payments/${op.paymentId}/status`] = op.status;
+        updates[`users/${studentOwnerId}/payments/${op.paymentId}/amount`] = op.amount;
+      } else {
+        const paymentId = uuidv4();
+        const newPayment: Payment = {
+          id: paymentId,
+          studentId: op.studentId,
+          amount: op.amount,
+          date: op.date,
+          status: op.status,
+        };
+        updates[`users/${studentOwnerId}/payments/${paymentId}`] = newPayment;
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await update(ref(db), updates);
+    }
+  };
+
   const saveSettings = async (newSettings: AppSettings) => {
     if (!authContextUser) throw new Error("User not authenticated");
     const settingsRef = ref(db, `users/${authContextUser.uid}/settings`);
@@ -2446,6 +2496,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       bulkUpdateSurahStatus,
       addPayment,
       updatePaymentStatus,
+      bulkAddOrUpdatePayments,
       saveSettings,
       generateDemoData,
       shareStudentRecord,

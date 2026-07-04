@@ -33,7 +33,7 @@ const statusVariant: { [key in 'نشط' | 'مطرود']: "default" | "destructiv
 
 
 export default function DuesPage() {
-    const { students, payments, addPayment, updatePaymentStatus, loading, settings, saveSettings, allUsers, selectedGroup, setSelectedGroup } = useStudentContext();
+    const { students, payments, addPayment, updatePaymentStatus, bulkAddOrUpdatePayments, loading, settings, saveSettings, allUsers, selectedGroup, setSelectedGroup } = useStudentContext();
     const { isSuperAdmin, isManagement } = useAuth();
     const { toast } = useToast();
     const [currentYear, setCurrentYear] = useState(getYear(new Date()));
@@ -183,7 +183,7 @@ export default function DuesPage() {
 
             return nameMatch && quarterMatch && statusMatch && groupMatch;
         });
-    }, [studentsWithDues, searchTerm, quarterFilter, quarterStatusFilter, statusFilter, selectedGroup, isSuperAdmin, isManagement, allUsers]);
+    }, [studentsWithDues, debouncedSearchTerm, quarterFilter, quarterStatusFilter, statusFilter, selectedGroup, isSuperAdmin, isManagement, allUsers]);
 
     const totalsByQuarter = useMemo(() => {
         const quarterTotals: Record<number, { revenue: number, paidCount: number, exemptedCount: number }> = { 1: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 2: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 3: { revenue: 0, paidCount: 0, exemptedCount: 0 }, 4: { revenue: 0, paidCount: 0, exemptedCount: 0 } };
@@ -248,46 +248,58 @@ export default function DuesPage() {
         if (!confirm(`هل أنت متأكد من تحديث حالة المستحقات لـ ${selectedStudents.length} طالب للفصل ${quarter}؟`)) return;
 
         setIsBulkProcessing(true);
-        let successCount = 0;
-        let failCount = 0;
+        const operations: Array<{
+            studentId: string;
+            paymentId?: string;
+            status: PaymentStatus;
+            amount: number;
+            date: string;
+        }> = [];
+
+        for (const studentId of selectedStudents) {
+            const student = students.find(s => s.id === studentId);
+            if (!student) continue;
+
+            const tier = student.subscriptionTier || 'فئة الأصاغر';
+            const amount = prices[tier] || 0;
+            const monthOfQuarter = (quarter - 1) * 3;
+            const paymentDate = new Date(currentYear, monthOfQuarter, 1);
+
+            const existingPayment = (payments ?? []).find(p => p.date && p.studentId === studentId && getQuarter(parseISO(p.date)) === quarter && getYear(parseISO(p.date)) === currentYear);
+
+            if (existingPayment) {
+                if (existingPayment.status === status) continue;
+                operations.push({
+                    studentId,
+                    paymentId: existingPayment.id,
+                    status,
+                    amount: status === 'paid' ? amount : 0,
+                    date: existingPayment.date,
+                });
+            } else {
+                operations.push({
+                    studentId,
+                    status,
+                    amount: status === 'paid' ? amount : 0,
+                    date: paymentDate.toISOString(),
+                });
+            }
+        }
 
         try {
-            for (const studentId of selectedStudents) {
-                const student = students.find(s => s.id === studentId);
-                if (!student) continue;
-
-                const tier = student.subscriptionTier || 'فئة الأصاغر';
-                const amount = prices[tier] || 0;
-                const monthOfQuarter = (quarter - 1) * 3;
-                const paymentDate = new Date(currentYear, monthOfQuarter, 1);
-
-                const existingPayment = (payments ?? []).find(p => p.date && p.studentId === studentId && getQuarter(parseISO(p.date)) === quarter && getYear(parseISO(p.date)) === currentYear);
-
-                try {
-                    if (existingPayment) {
-                        if (existingPayment.status === status) continue;
-                        await updatePaymentStatus(existingPayment.id, status, status === 'paid' ? amount : 0);
-                    } else {
-                        await addPayment({
-                            studentId: studentId,
-                            amount: status === 'paid' ? amount : 0,
-                            date: paymentDate.toISOString(),
-                            status: status,
-                        });
-                    }
-                    successCount++;
-                } catch (e) {
-                    failCount++;
-                }
+            if (operations.length > 0) {
+                await bulkAddOrUpdatePayments(operations);
+                toast({
+                    title: "تم التنفيذ",
+                    description: `تم تحديث ${operations.length} سجل بنجاح.`,
+                });
+            } else {
+                toast({
+                    title: "لا توجد تغييرات",
+                    description: "كل الطلاب المحددين لديهم هذه الحالة بالفعل.",
+                });
             }
-
-            toast({
-                title: "تم التنفيذ",
-                description: `تم تحديث ${successCount} سجل بنجاح. ${failCount > 0 ? `فشل ${failCount}.` : ''}`,
-                variant: failCount > 0 ? "destructive" : "default"
-            });
             setSelectedStudents([]);
-
         } catch (error) {
             toast({
                 title: "خطأ",
@@ -817,6 +829,7 @@ export default function DuesPage() {
 const PaymentRow = React.memo(({
     student,
     isSuperAdmin,
+    isManagement,
     prices,
     onPaymentAction,
     isSelected,
@@ -871,7 +884,7 @@ const PaymentRow = React.memo(({
                     )}
                 </div>
             </TableCell>
-            {isSuperAdmin && <TableCell><Badge variant="outline" className="font-medium">{formatGroupName((student as any).groupName, allUsers) || 'غير محدد'}</Badge></TableCell>}
+            {(isSuperAdmin || isManagement) && <TableCell><Badge variant="outline" className="font-medium">{formatGroupName((student as any).groupName, allUsers) || 'غير محدد'}</Badge></TableCell>}
             <TableCell>
                 <Badge variant={statusVariant[student.status as 'نشط' | 'مطرود'] || 'secondary'} className="font-bold">
                     {student.status}
