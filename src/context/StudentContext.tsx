@@ -1697,17 +1697,21 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         { name: "الأستاذة ثريا", group: "فوج 13", email: "admin13@gmail.com" },
         { name: "الأستاذة أميرة", group: "فوج 14", email: "admin14@gmail.com" },
         { name: "الأستاذة زينب", group: "فوج 15", email: "admin15@gmail.com" },
+        { name: "الأستاذة جهاد", group: "فوج 16", email: "admin16@gmail.com" },
         { name: "الأستاذة ميمونه", group: "فوج 17", email: "admin17@gmail.com" },
         { name: "الأستاذة حياة", group: "فوج 18", email: "admin18@gmail.com" },
         { name: "فوج 1 إبتدائي", group: "فوج 19", email: "admin19@gmail.com" },
         { name: "الشيخ عبد الكريم ترممو", group: "فوج 20", email: "admin20@gmail.com" },
         { name: "الشيخ كنيوة عرفات", group: "فوج 21", email: "admin21@gmail.com" },
+        { name: "الشيخ عبد الرحمان كنيوة", group: "فوج 22", email: "admin22@gmail.com" },
       ];
 
       const updates: any = {};
 
       demoSheikhs.forEach((sheikh, index) => {
-        const fakeUid = `demo_sheikh_${index + 1}`;
+        const emailMatch = sheikh.email.match(/admin(\d+)/);
+        const emailNum = emailMatch ? parseInt(emailMatch[1], 10) : (index + 1);
+        const fakeUid = `demo_sheikh_${emailNum}`;
 
         // 1. Create Profile
         updates[`users/${fakeUid}/profile`] = {

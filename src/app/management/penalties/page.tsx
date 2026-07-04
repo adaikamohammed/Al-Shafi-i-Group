@@ -141,7 +141,7 @@ export default function PenaltiesPage() {
             if (selectedGroup === 'sheikhs') {
                 result = result.filter(s => {
                     const num = parseInt(s.groupName?.replace(/\D/g, '') || '0');
-                    return (num >= 1 && num <= 9) || num === 20 || num === 21;
+                    return (num >= 1 && num <= 9) || num === 20 || num === 21 || num === 22;
                 });
             } else if (selectedGroup === 'ustadhat') {
                 result = result.filter(s => {

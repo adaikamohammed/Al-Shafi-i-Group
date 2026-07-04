@@ -45,7 +45,7 @@ import { AttendanceHeatmap } from '@/components/management/AttendanceHeatmap';
 const isSheikhGroup = (groupName?: string) => {
     if (!groupName) return false;
     const num = parseInt(groupName.replace(/\D/g, '') || '0');
-    return (num >= 1 && num <= 9) || num === 20 || num === 21;
+    return (num >= 1 && num <= 9) || num === 20 || num === 21 || num === 22;
 };
 const isUstadhatGroup = (groupName?: string) => {
     if (!groupName) return false;
@@ -3868,6 +3868,7 @@ function StudentTrackingView({
         if (num === 19) return "فوج 19 فوج 1 إبتدائي";
         if (num === 20) return "فوج 20 الشيخ عبد الكريم ترممو";
         if (num === 21) return "فوج 21 الشيخ كنيوة عرفات";
+        if (num === 22) return "فوج 22 الشيخ عبد الرحمان كنيوة";
 
         return groupName;
     };

@@ -98,7 +98,7 @@ export function GroupSelector({ value, onChange, className }: GroupSelectorProps
                         🏛️ كل المدرسة (عرض شامل)
                     </SelectItem>
                     <SelectItem value="sheikhs_all" className="font-bold cursor-pointer text-indigo-600 dark:text-indigo-400 mb-1">
-                        👨‍🏫 أفواج المشايخ (11 فوجاً)
+                        👨‍🏫 أفواج المشايخ (12 فوجاً)
                     </SelectItem>
                     <SelectItem value="ustadhats_all" className="font-bold cursor-pointer text-pink-600 dark:text-pink-400 mb-2">
                         👩‍🏫 أفواج الأستاذات (10 أفواج)

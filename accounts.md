@@ -58,3 +58,10 @@ password : 123456
 email : admin21@gmail.com
 password : 123456
 
+---
+
+الشيخ عبد الرحمان كنيوة
+email : admin22@gmail.com
+password : 123456
+
+
