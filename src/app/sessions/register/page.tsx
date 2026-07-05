@@ -668,6 +668,7 @@ function RegisterSessionContent() {
 
         // ✅ CRITICAL: قراءة البيانات القديمة من Firebase ودمجها مع الجديدة
         let existingRecords: any[] = [];
+        let existingSessionCreatedAt: string | undefined = undefined;
         try {
             // 🔍 Detect session owner
             let sessionOwnerId = effectiveOwnerId || user?.uid;
@@ -683,10 +684,28 @@ function RegisterSessionContent() {
             const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
             const snapshot = await get(sessionsRef);
             if (snapshot.exists()) {
-                const sessions = snapshot.val();
-                const existingSession = Object.values(sessions).find((s: any) => s.id === id);
-                if (existingSession && (existingSession as any).records) {
-                    existingRecords = (existingSession as any).records;
+                const val = snapshot.val();
+                let sessionsDict: Record<string, any> = {};
+                if (val && typeof val === 'object') {
+                    if ('date' in val && ('records' in val || 'sessionType' in val)) {
+                        const sessionId = val.id || `${dateStr}-s1`;
+                        sessionsDict[sessionId] = {
+                            ...val,
+                            id: sessionId,
+                            sessionNumber: val.sessionNumber !== undefined ? Number(val.sessionNumber) : 1
+                        };
+                    } else {
+                        sessionsDict = val;
+                    }
+                }
+                const existingSession = Object.values(sessionsDict).find((s: any) => s.id === id) as any;
+                if (existingSession) {
+                    if (existingSession.records) {
+                        existingRecords = existingSession.records;
+                    }
+                    if (existingSession.createdAt) {
+                        existingSessionCreatedAt = existingSession.createdAt;
+                    }
                 }
             }
         } catch (error) {
@@ -746,7 +765,8 @@ function RegisterSessionContent() {
             tasmieSurahId: isAdmin5 ? data.tasmieSurahId : null,
             tasmieFromVerse: isAdmin5 ? data.tasmieFromVerse : null,
             tasmieToVerse: isAdmin5 ? data.tasmieToVerse : null,
-            records: recordsArray
+            records: recordsArray,
+            ...(existingSessionCreatedAt ? { createdAt: existingSessionCreatedAt } : {})
         };
 
         // Pass effectiveOwnerId if it differs from current user (i.e. Admin actions)
