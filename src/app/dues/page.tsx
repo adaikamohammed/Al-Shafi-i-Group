@@ -128,10 +128,10 @@ export default function DuesPage() {
 
             for (let q = 1; q <= 4; q++) {
                 const paymentForQuarter = studentPayments.find(p => p.quarter === q);
-                if (paymentForQuarter) {
+                if (paymentForQuarter && paymentForQuarter.status) {
                     paymentStatusByQuarter[q] = { status: paymentForQuarter.status, paymentId: paymentForQuarter.id };
                 } else {
-                    paymentStatusByQuarter[q] = { status: 'unpaid' };
+                    paymentStatusByQuarter[q] = { status: 'unpaid', paymentId: paymentForQuarter?.id };
                 }
             }
 
