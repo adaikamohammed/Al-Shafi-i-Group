@@ -55,7 +55,7 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
         const days = [];
 
         for (let i = 0; i < startDayIndex; i++) {
-            days.push(<div key={`empty-${i}`} className="h-24 md:h-32 bg-muted/5 border rounded-xl m-1 opacity-50" />);
+            days.push(<div key={`empty-${i}`} className="min-h-[6rem] md:min-h-[8rem] h-auto bg-muted/5 border rounded-xl m-1 opacity-50" />);
         }
 
         for (let day = 1; day <= daysInMonth; day++) {
@@ -97,7 +97,7 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                     key={day}
                     onClick={() => onDayClick(day)}
                     className={cn(
-                        "relative flex flex-col justify-between h-24 md:h-32 border rounded-xl m-1 p-2 transition-all cursor-pointer group shadow-sm",
+                        "relative flex flex-col justify-between min-h-[6rem] md:min-h-[8rem] h-auto border rounded-xl m-1 p-2 transition-all cursor-pointer group shadow-sm",
                         statusClass
                     )}
                 >

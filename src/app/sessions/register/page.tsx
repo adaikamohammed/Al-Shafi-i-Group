@@ -37,7 +37,11 @@ function RegisterSessionContent() {
     const ownerIdParam = searchParams.get('ownerId');
 
     const selectedDay = useMemo(() => {
-        if (!dateParam) return new Date();
+        if (!dateParam) {
+            const d = new Date();
+            d.setHours(12, 0, 0, 0);
+            return d;
+        }
         // SAFE PARSING: Parse and Set to NOON
         const d = parse(dateParam, 'yyyy-MM-dd', new Date());
         d.setHours(12, 0, 0, 0);
@@ -648,7 +652,7 @@ function RegisterSessionContent() {
 
         // Race Condition Guard: Ensure we are saving data for the currently loaded day
         // If loadedDate doesn't match dateStr, it means we navigated away but this save (from debounce) fired late.
-        if (loadedDate !== dateStr) {
+        if (loadedDate && loadedDate !== dateStr) {
             console.warn("Save prevented: Race condition detected. Loaded:", loadedDate, "Target:", dateStr);
             return;
         }
@@ -832,10 +836,9 @@ function RegisterSessionContent() {
             } finally {
                 setIsSaving(false);
             }
-        } else if (lastSaved) {
-            toast({ title: "محفوظ", description: "جميع البيانات محفوظة." });
         }
-        router.push('/sessions');
+        const returnUrl = ownerIdParam ? `/sessions?ownerId=${ownerIdParam}` : '/sessions';
+        router.push(returnUrl);
     };
 
     // Navigate to previous/next day
@@ -1022,7 +1025,8 @@ function RegisterSessionContent() {
                 ),
                 duration: 7000,
             });
-            router.push('/sessions');
+            const returnUrl = ownerIdParam ? `/sessions?ownerId=${ownerIdParam}` : '/sessions';
+            router.push(returnUrl);
         } catch (error) {
             console.error("Error saving session:", error);
             toast({ title: "خطأ", description: "حدث خطأ أثناء حفظ البيانات.", variant: "destructive" });
@@ -1064,6 +1068,18 @@ function RegisterSessionContent() {
         }
     }, [isSuperAdmin, isAdmin5, isManagement, ownerIdParam, toast]);
 
+    // Tasmie/Talqin BeforeUnload Guard to prevent data loss
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (isDirty) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [isDirty]);
+
     if (loading) {
         return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
     }
@@ -1077,7 +1093,7 @@ function RegisterSessionContent() {
         >
             <header className="bg-card p-4 rounded-2xl shadow-sm border space-y-3">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => router.push('/sessions')} className="rounded-xl">
+                    <Button variant="ghost" size="icon" onClick={handleReturn} className="rounded-xl">
                         <ArrowRight className="h-5 w-5" />
                     </Button>
                     <div className="flex-1 min-w-0">

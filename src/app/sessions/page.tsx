@@ -537,7 +537,7 @@ export default function DailySessionsPage() {
     };
   }, [dailySessions, isAdminUser, selectedSheikhId, user?.uid, isManagement, isSuperAdmin]);
 
-  // Filter sessions based on selected Group (for Admins) - uses sheikhSessions for admin5
+  // Filter sessions based on selected Sheikh (for Admins) - uses sheikhSessions for admin5
   const filteredGetSessionsForDay = (date: string) => {
     // For admin5 viewing a specific sheikh, use our directly-loaded sessions
     if (isAdmin5 && selectedSheikhId) {
@@ -547,14 +547,13 @@ export default function DailySessionsPage() {
 
     const sessions = getSessionsForDay(date);
 
-    // If a group/sheikh is selected, filter strictly by that group
-    if (isAdminUser && groupSheikhIds.length > 0) {
-      return sessions.filter(s => s.ownerId && groupSheikhIds.includes(s.ownerId));
-    }
-
-    // Strict mode ONLY for full aggregators (management/superAdmin) who haven't selected anything
-    if ((isSuperAdmin || isManagement) && !selectedSheikhId) {
-      return [];
+    // Strict filtering based on selected sheikh ID for privileged admins/management
+    const isPrivilegedAdmin = isSuperAdmin || isManagement || isAdmin00;
+    if (isPrivilegedAdmin) {
+      if (selectedSheikhId) {
+        return sessions.filter(s => s.ownerId === selectedSheikhId);
+      }
+      return []; // Return empty if no sheikh selected to prevent showing aggregated view
     }
 
     // Default: return everything we have (regular sheikhs see their own data only)
