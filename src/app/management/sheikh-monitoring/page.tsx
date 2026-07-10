@@ -521,7 +521,7 @@ export default function SheikhMonitoringPage() {
         if (!session) return null;
 
         const records: any[] = session.records || [];
-        const total = groupStudentCount[group] || 0;
+        const total = records.length;
         if (!records.length || !total) return { session, type: session.sessionType, attendance: null, excellent: null, goodPlus: null, good: null, acceptable: null, weak: null, notMemorized: null };
 
         // Find makeup sessions for this group that compensated for dateStr
@@ -566,7 +566,7 @@ export default function SheikhMonitoringPage() {
         });
         const p = (n: number) => total > 0 ? Math.round((n / total) * 100) : 0;
         return { session, type: session.sessionType, attendance: p(present), excellent: p(excellent), goodPlus: p(goodPlus), good: p(good), acceptable: p(acceptable), weak: p(weak), notMemorized: p(notMem) };
-    }, [groupSessions, groupStudentCount]);
+    }, [groupSessions]);
 
     // ── Monthly analytics per sheikh ───────────────────────────────────────
     const monthlyStats = useMemo<MonthlySheikhStats[]>(() => {

@@ -247,7 +247,7 @@ export async function GET(request: Request) {
             if (!session) return null;
 
             const records: any[] = session.records || [];
-            const total = groupStudentCount[group] || 0;
+            const total = records.length;
             if (!records.length || !total) {
                 return {
                     session,
