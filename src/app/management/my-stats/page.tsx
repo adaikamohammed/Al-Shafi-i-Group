@@ -772,7 +772,7 @@ export default function MyStatsPage() {
 
         const rawScores = sheikhsList.map(sh => {
             let sessions = 0, extraSessions = 0, highAttDays = 0, totalDays = 0;
-            let basicCount = 0, activityCount = 0;
+            let basicCount = 0, activityCount = 0, additionalCount = 0;
             let attTotal = 0, attCount = 0;
             let excTotal = 0, gpTotal = 0, excCount = 0;
             let sheikhabsences = 0, holidays = 0;
@@ -807,20 +807,8 @@ export default function MyStatsPage() {
                         }
                         if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
                     } else if (isExtra) {
-                        sessions += 0.5;
-                        if (stats.type === 'حصة إضافية') {
-                            extraSessions++;
-                        }
-                        if (stats.attendance !== null) {
-                            attTotal += stats.attendance;
-                            attCount++;
-                            if (stats.attendance >= 90) highAttDays++;
-                        }
-                        if (stats.excellent !== null) {
-                            excTotal += stats.excellent;
-                            excCount++;
-                        }
-                        if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
+                        // الحصة الإضافية لا تضيف نقاطاً للشيخ
+                        additionalCount++;
                     } else if (isActivity) {
                         sessions += 0.5;
                         activityCount++;
@@ -874,7 +862,7 @@ export default function MyStatsPage() {
                 commitmentRate,
                 highAttDays,
                 sheikhabsences,
-                extraSessionsCount: extraSessions,
+                extraSessionsCount: additionalCount,
             };
 
             return {
@@ -960,7 +948,7 @@ export default function MyStatsPage() {
             const allDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
             let sessions = 0, extraSessions = 0, highAttDays = 0, totalDays = 0;
-            let basicCount = 0, activityCount = 0;
+            let basicCount = 0, activityCount = 0, additionalCount = 0;
             let attTotal = 0, attCount = 0;
             let excTotal = 0, gpTotal = 0, excCount = 0;
             let sheikhabsences = 0, holidays = 0;
@@ -993,20 +981,8 @@ export default function MyStatsPage() {
                     }
                     if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
                 } else if (isExtra) {
-                    sessions += 0.5;
-                    if (stats.type === 'حصة إضافية') {
-                        extraSessions++;
-                    }
-                    if (stats.attendance !== null) {
-                        attTotal += stats.attendance;
-                        attCount++;
-                        if (stats.attendance >= 90) highAttDays++;
-                    }
-                    if (stats.excellent !== null) {
-                        excTotal += stats.excellent;
-                        excCount++;
-                    }
-                    if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
+                    // الحصة الإضافية لا تضيف نقاطاً للشيخ
+                    additionalCount++;
                 } else if (isActivity) {
                     sessions += 0.5;
                     activityCount++;
@@ -1056,7 +1032,7 @@ export default function MyStatsPage() {
                 commitmentRate,
                 highAttDays,
                 sheikhabsences,
-                extraSessionsCount: extraSessions,
+                extraSessionsCount: additionalCount,
                 hasData
             };
 

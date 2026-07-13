@@ -428,17 +428,7 @@ export function SheikhBadges({ sheikhs, getDayStats, getDayStatsList, selectedDa
                             }
                             if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
                         } else if (isExtra) {
-                            sessions += 0.5;
-                            extraSessions++;
-                            if (stats.attendance !== null) {
-                                attTotal += stats.attendance;
-                                attCount++;
-                            }
-                            if (stats.excellent !== null) {
-                                excTotal += stats.excellent;
-                                excCount++;
-                            }
-                            if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
+                            // الحصة الإضافية لا تضيف درجات للمعلم
                         } else if (isActivity) {
                             // حصة أنشطة: تُحسب بوزن 0.8 من حصة عادية
                             sessions += 0.5;
@@ -493,7 +483,7 @@ export function SheikhBadges({ sheikhs, getDayStats, getDayStatsList, selectedDa
         // ─── Current Month Detailed Calculations ───
         const rawScores = sheikhs.map(sh => {
             let sessions = 0, extraSessions = 0, highAttDays = 0, totalDays = 0;
-            let basicCount = 0, activityCount = 0;
+            let basicCount = 0, activityCount = 0, additionalCount = 0;
             let attTotal = 0, attCount = 0;
             let excTotal = 0, gpTotal = 0, excCount = 0;
             let sheikhabsences = 0, holidays = 0;
@@ -506,7 +496,7 @@ export function SheikhBadges({ sheikhs, getDayStats, getDayStatsList, selectedDa
                     if (!stats) return;
 
                     if (stats.type === 'يوم عطلة') { holidays++; return; }
-                    if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
+                    if (stats.type === 'غياب Sheikh' || stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
                     const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية';
                     const isExtra = stats.type === 'حصة إضافية';
@@ -528,20 +518,8 @@ export function SheikhBadges({ sheikhs, getDayStats, getDayStatsList, selectedDa
                         }
                         if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
                     } else if (isExtra) {
-                        sessions += 0.5;
-                        if (stats.type === 'حصة إضافية') {
-                            extraSessions++;
-                        }
-                        if (stats.attendance !== null) {
-                            attTotal += stats.attendance;
-                            attCount++;
-                            if (stats.attendance >= 90) highAttDays++;
-                        }
-                        if (stats.excellent !== null) {
-                            excTotal += stats.excellent;
-                            excCount++;
-                        }
-                        if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
+                        // الحصة الإضافية لا تضيف نقاطاً للشيخ (وزن 0)
+                        additionalCount++;
                     } else if (isActivity) {
                         // حصة أنشطة: تُحسب بوزن 0.8 من حصة عادية
                         sessions += 0.5;
@@ -571,7 +549,7 @@ export function SheikhBadges({ sheikhs, getDayStats, getDayStatsList, selectedDa
                     sessions_for_day.forEach((session: any) => {
                         if (!session) return;
                         const sType = session.sessionType;
-                        const isReal2 = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية' || sType === 'حصة أنشطة';
+                        const isReal2 = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة أنشطة';
                         if (!isReal2) return;
                         const pts = getSessionTimingPoints(session, weights);
                         punctualityPoints += pts;
@@ -623,7 +601,7 @@ export function SheikhBadges({ sheikhs, getDayStats, getDayStatsList, selectedDa
                 commitmentRate,
                 highAttDays,
                 sheikhabsences,
-                extraSessionsCount: extraSessions
+                extraSessionsCount: additionalCount
             };
 
             return {
