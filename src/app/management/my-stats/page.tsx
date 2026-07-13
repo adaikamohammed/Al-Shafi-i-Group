@@ -673,9 +673,9 @@ export default function MyStatsPage() {
         return map;
     }, [students]);
 
-    const getDayStatsForScore = useCallback((group: string, dateStr: string) => {
+    const getDayStatsListForScore = useCallback((group: string, dateStr: string) => {
         const sh = sheikhsList.find(s => s.group === group);
-        if (!sh) return null;
+        if (!sh) return [];
 
         const ownerUids = sh.uids;
         const sessions: any[] = [];
@@ -689,32 +689,38 @@ export default function MyStatsPage() {
                 }
             });
         }
-        const session = sessions.find(s => s.sessionNumber === 1) || sessions[0] || null;
-        if (!session) return null;
+        if (sessions.length === 0) return [];
 
-        const records: any[] = Array.isArray(session.records)
-            ? session.records
-            : session.records ? Object.values(session.records) : [];
+        return sessions.map(session => {
+            const records: any[] = Array.isArray(session.records)
+                ? session.records
+                : session.records ? Object.values(session.records) : [];
 
-        const total = records.length;
+            const total = records.length;
 
-        if (!records.length || !total) return { session, type: session.sessionType, attendance: null, excellent: null, goodPlus: null, good: null, acceptable: null, weak: null, notMemorized: null };
+            if (!records.length || !total) return { session, type: session.sessionType, attendance: null, excellent: null, goodPlus: null, good: null, acceptable: null, weak: null, notMemorized: null };
 
-        let present = 0, excellent = 0, goodPlus = 0, good = 0, acceptable = 0, weak = 0, notMem = 0;
-        records.forEach(r => {
-            if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') present++;
-            if (!r.review) {
-                if (r.memorization === 'ممتاز') excellent++;
-                else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') goodPlus++;
-                else if (r.memorization === 'جيد') good++;
-                else if (r.memorization === 'مقبول' || r.memorization === 'حسن' || r.memorization === 'متوسط') acceptable++;
-                else if (r.memorization === 'ضعيف') weak++;
-                else if (r.memorization === 'لم يحفظ') notMem++;
-            }
+            let present = 0, excellent = 0, goodPlus = 0, good = 0, acceptable = 0, weak = 0, notMem = 0;
+            records.forEach(r => {
+                if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') present++;
+                if (!r.review) {
+                    if (r.memorization === 'ممتاز') excellent++;
+                    else if (r.memorization === 'جيد جدا' || r.memorization === 'جيد جداً') goodPlus++;
+                    else if (r.memorization === 'جيد') good++;
+                    else if (r.memorization === 'مقبول' || r.memorization === 'حسن' || r.memorization === 'متوسط') acceptable++;
+                    else if (r.memorization === 'ضعيف') weak++;
+                    else if (r.memorization === 'لم يحفظ') notMem++;
+                }
+            });
+            const p = (n: number) => total > 0 ? Math.round((n / total) * 100) : 0;
+            return { session, type: session.sessionType, attendance: p(present), excellent: p(excellent), goodPlus: p(goodPlus), good: p(good), acceptable: p(acceptable), weak: p(weak), notMemorized: p(notMem) };
         });
-        const p = (n: number) => total > 0 ? Math.round((n / total) * 100) : 0;
-        return { session, type: session.sessionType, attendance: p(present), excellent: p(excellent), goodPlus: p(goodPlus), good: p(good), acceptable: p(acceptable), weak: p(weak), notMemorized: p(notMem) };
     }, [dailySessions, sheikhsList]);
+
+    const getDayStatsForScore = useCallback((group: string, dateStr: string) => {
+        const list = getDayStatsListForScore(group, dateStr);
+        return list.length > 0 ? list[0] : null;
+    }, [getDayStatsListForScore]);
 
     const sheikhScores = useMemo(() => {
         if (dbSheikhScores && dbSheikhScores.length > 0) {
@@ -772,40 +778,43 @@ export default function MyStatsPage() {
             let sheikhabsences = 0, holidays = 0;
             allDays.forEach(day => {
                 const dateStr = format(day, 'yyyy-MM-dd');
-                const stats = getDayStatsForScore(sh.group, dateStr);
+                const statsList = getDayStatsListForScore(sh.group, dateStr);
                 totalDays++;
-                if (!stats) return;
+                
+                statsList.forEach((stats: any) => {
+                    if (!stats) return;
 
-                if (stats.type === 'يوم عطلة') { holidays++; return; }
-                if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
+                    if (stats.type === 'يوم عطلة') { holidays++; return; }
+                    if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
-                const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
-                const isActivity = stats.type === 'حصة أنشطة';
-                if (isReal) {
-                    sessions++;
-                    basicCount++;
-                    if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
-                        extraSessions++;
+                    const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                    const isActivity = stats.type === 'حصة أنشطة';
+                    if (isReal) {
+                        sessions++;
+                        basicCount++;
+                        if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
+                            extraSessions++;
+                        }
+                        if (stats.attendance !== null) {
+                            attTotal += stats.attendance;
+                            attCount++;
+                            if (stats.attendance >= 90) highAttDays++;
+                        }
+                        if (stats.excellent !== null) {
+                            excTotal += stats.excellent;
+                            excCount++;
+                        }
+                        if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
+                    } else if (isActivity) {
+                        sessions += 0.5;
+                        activityCount++;
+                        if (stats.attendance !== null) {
+                            attTotal += stats.attendance;
+                            attCount++;
+                            if (stats.attendance >= 90) highAttDays++;
+                        }
                     }
-                    if (stats.attendance !== null) {
-                        attTotal += stats.attendance;
-                        attCount++;
-                        if (stats.attendance >= 90) highAttDays++;
-                    }
-                    if (stats.excellent !== null) {
-                        excTotal += stats.excellent;
-                        excCount++;
-                    }
-                    if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
-                } else if (isActivity) {
-                    sessions += 0.5;
-                    activityCount++;
-                    if (stats.attendance !== null) {
-                        attTotal += stats.attendance;
-                        attCount++;
-                        if (stats.attendance >= 90) highAttDays++;
-                    }
-                }
+                });
             });
 
             const workingDays = totalDays - holidays - sheikhabsences;
@@ -1121,25 +1130,33 @@ export default function MyStatsPage() {
     }, [dailySessions, activeSheikh, isSheikh, user?.uid, selectedGroup]);
 
     // ── getDayStats ────────────────────────────────────────────────────────
-    const getDayStats = useCallback((group: string, dateStr: string) => {
+    // ── getDayStatsList ────────────────────────────────────────────────────
+    const getDayStatsList = useCallback((group: string, dateStr: string) => {
         const sessions = groupSessionsMap.get(dateStr) || [];
-        const session  = sessions[0] || null;
-        if (!session) return null;
+        if (sessions.length === 0) return [];
 
-        const records: any[] = Array.isArray(session.records)
-            ? session.records
-            : session.records ? Object.values(session.records) : [];
+        return sessions.map(session => {
+            const records: any[] = Array.isArray(session.records)
+                ? session.records
+                : session.records ? Object.values(session.records) : [];
 
-        if (!records.length) return { type: session.sessionType, attendance: null, excellent: null };
+            if (!records.length) return { type: session.sessionType, attendance: null, excellent: null };
 
-        let present = 0, excellent = 0;
-        records.forEach((r: any) => {
-            if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') present++;
-            if (!r.review && r.memorization === 'ممتاز') excellent++;
+            let present = 0, excellent = 0;
+            records.forEach((r: any) => {
+                if (r.attendance === 'حاضر' || r.attendance === 'متأخر' || r.attendance === 'تعويض') present++;
+                if (!r.review && r.memorization === 'ممتاز') excellent++;
+            });
+            const p = (n: number) => Math.round((n / records.length) * 100);
+            return { type: session.sessionType, attendance: p(present), excellent: p(excellent) };
         });
-        const p = (n: number) => Math.round((n / records.length) * 100);
-        return { type: session.sessionType, attendance: p(present), excellent: p(excellent) };
     }, [groupSessionsMap]);
+
+    // ── getDayStats ────────────────────────────────────────────────────────
+    const getDayStats = useCallback((group: string, dateStr: string) => {
+        const list = getDayStatsList(group, dateStr);
+        return list.length > 0 ? list[0] : null;
+    }, [getDayStatsList]);
 
     // ── Day detail data (for modal) ────────────────────────────────────────
     const dayDetailData = useMemo((): DayDetailData | null => {

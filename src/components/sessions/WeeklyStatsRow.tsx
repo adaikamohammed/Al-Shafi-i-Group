@@ -27,6 +27,7 @@ type StatKey = 'attendance' | 'excellent' | 'goodPlus' | 'good' | 'acceptable' |
 interface DayStat {
     day: { date: Date; dateStr: string; dayNameShort: string; dayNum: string; isWeekend: boolean };
     sessionType: string | null;
+    label?: string;
     attendance: number | null;
     excellent: number | null;
     goodPlus: number | null;
@@ -86,34 +87,60 @@ export const WeeklyStatsRow = ({
     }, [weekStart]);
 
     const dayStats = useMemo((): DayStat[] => {
-        return weekDays.map(day => {
+        const stats: DayStat[] = [];
+        weekDays.forEach(day => {
             const sessions = getSessionsForDay(day.dateStr);
-            const session1 = sessions.find((s: any) => s.sessionNumber === 1) || sessions[0] || null;
-            const session2 = sessions.find((s: any) => s.sessionNumber === 2) || null;
-            const hasTwoSessions = !!(session1 && session2);
 
-            // Compute effective isWeekend for this day
+            // Compute effective isWeekend for this day if no sessions
             let effectiveIsWeekend = false;
             if (day.isThurFri) {
-                const hasRealSession = session1 && session1.sessionType !== 'يوم عطلة';
+                const hasRealSession = sessions.length > 0 && sessions[0].sessionType !== 'يوم عطلة';
                 effectiveIsWeekend = !hasRealSession;
             }
             const effectiveDay = { ...day, isWeekend: effectiveIsWeekend };
 
-            const base: DayStat = { day: effectiveDay, sessionType: null, attendance: null, excellent: null, goodPlus: null, good: null, acceptable: null, weak: null, notMemorized: null };
-
-            if (!session1 || effectiveIsWeekend) return base;
-
-            const sessionType = session1.sessionType as string;
-            if (sessionType === 'يوم عطلة' || sessionType === 'غياب الشيخ' || sessionType === 'حصة أنشطة') {
-                return { ...base, sessionType };
+            if (sessions.length === 0 || effectiveIsWeekend) {
+                stats.push({
+                    day: effectiveDay,
+                    sessionType: null,
+                    label: day.dayNameShort,
+                    attendance: null,
+                    excellent: null,
+                    goodPlus: null,
+                    good: null,
+                    acceptable: null,
+                    weak: null,
+                    notMemorized: null,
+                });
+                return;
             }
 
-            const totalStudents = students.length;
-            if (totalStudents === 0) return base;
+            sessions.forEach((session: any, sIdx: number) => {
+                const sessionType = session.sessionType as string;
+                const base: DayStat = {
+                    day: effectiveDay,
+                    sessionType,
+                    label: sessions.length > 1 ? `${day.dayNameShort} (ح${sIdx + 1})` : day.dayNameShort,
+                    attendance: null,
+                    excellent: null,
+                    goodPlus: null,
+                    good: null,
+                    acceptable: null,
+                    weak: null,
+                    notMemorized: null,
+                };
 
-            // دالة مساعدة لحساب إحصاءات حصة واحدة
-            const calcSessionStats = (session: any) => {
+                if (sessionType === 'يوم عطلة' || sessionType === 'غياب الشيخ' || sessionType === 'حصة أنشطة') {
+                    stats.push({ ...base, sessionType });
+                    return;
+                }
+
+                const totalStudents = students.length;
+                if (totalStudents === 0) {
+                    stats.push(base);
+                    return;
+                }
+
                 const records: any[] = session?.records || [];
                 let present = 0, excellent = 0, goodPlus = 0, good = 0, acceptable = 0, weak = 0, notMemorized = 0;
                 students.forEach(student => {
@@ -128,42 +155,21 @@ export const WeeklyStatsRow = ({
                     else if (mem === 'ضعيف' || mem === 'متوسط') weak++;
                     else if (mem === 'لم يحفظ') notMemorized++;
                 });
-                return { present, excellent, goodPlus, good, acceptable, weak, notMemorized };
-            };
 
-            const s1Stats = calcSessionStats(session1);
-
-            if (hasTwoSessions) {
-                // عند وجود حصتين: متوسط الحصتين لكل مؤشر
-                const s2Stats = calcSessionStats(session2);
-                const pct = (n1: number, n2: number) => Math.round(((n1 + n2) / (totalStudents * 2)) * 100);
-                return {
-                    day: effectiveDay,
-                    sessionType,
-                    attendance: pct(s1Stats.present, s2Stats.present),
-                    excellent: pct(s1Stats.excellent, s2Stats.excellent),
-                    goodPlus: pct(s1Stats.goodPlus, s2Stats.goodPlus),
-                    good: pct(s1Stats.good, s2Stats.good),
-                    acceptable: pct(s1Stats.acceptable, s2Stats.acceptable),
-                    weak: pct(s1Stats.weak, s2Stats.weak),
-                    notMemorized: pct(s1Stats.notMemorized, s2Stats.notMemorized),
-                };
-            }
-
-            // حصة واحدة: الحساب العادي
-            const pct = (n: number) => Math.round((n / totalStudents) * 100);
-            return {
-                day: effectiveDay,
-                sessionType,
-                attendance: pct(s1Stats.present),
-                excellent: pct(s1Stats.excellent),
-                goodPlus: pct(s1Stats.goodPlus),
-                good: pct(s1Stats.good),
-                acceptable: pct(s1Stats.acceptable),
-                weak: pct(s1Stats.weak),
-                notMemorized: pct(s1Stats.notMemorized),
-            };
+                const pct = (n: number) => Math.round((n / totalStudents) * 100);
+                stats.push({
+                    ...base,
+                    attendance: pct(present),
+                    excellent: pct(excellent),
+                    goodPlus: pct(goodPlus),
+                    good: pct(good),
+                    acceptable: pct(acceptable),
+                    weak: pct(weak),
+                    notMemorized: pct(notMemorized),
+                });
+            });
         });
+        return stats;
     }, [weekDays, getSessionsForDay, students]);
 
     const weeklyAvg = useMemo(() => {
@@ -222,12 +228,12 @@ export const WeeklyStatsRow = ({
                             <th className="sticky right-0 z-10 bg-muted/20 text-right p-1.5 sm:p-2 text-[10px] sm:text-xs font-bold text-muted-foreground border-b border-l min-w-[80px] sm:min-w-[100px]">
                                 المؤشر
                             </th>
-                            {dayStats.map(stat => (
-                                <th key={stat.day.dateStr} className={cn(
+                            {dayStats.map((stat, idx) => (
+                                <th key={stat.day.dateStr + '-' + idx} className={cn(
                                     "border-b border-l p-1 sm:p-2 text-center text-[10px] sm:text-[11px] font-bold min-w-[45px]",
                                     stat.day.isWeekend ? "text-sky-600 bg-sky-50/50" : "text-foreground"
                                 )}>
-                                    <div>{stat.day.dayNameShort}</div>
+                                    <div>{stat.label || stat.day.dayNameShort}</div>
                                     <div className="text-[9px] sm:text-[10px] font-normal text-muted-foreground">{stat.day.dayNum}</div>
                                 </th>
                             ))}
@@ -246,8 +252,8 @@ export const WeeklyStatsRow = ({
                                         <span className="text-[10px] sm:text-[11px]">{row.label}</span>
                                     </div>
                                 </td>
-                                {dayStats.map(stat => (
-                                    <td key={stat.day.dateStr} className={cn(
+                                {dayStats.map((stat, idx) => (
+                                    <td key={stat.day.dateStr + '-' + idx} className={cn(
                                         "border-b border-l p-0.5 sm:p-1 text-center",
                                         isHoliday(stat) ? "bg-sky-50/30" : ""
                                     )}>

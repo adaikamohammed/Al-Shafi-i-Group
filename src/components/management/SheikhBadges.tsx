@@ -83,6 +83,7 @@ interface BadgeInfo {
 interface SheikhBadgesProps {
     sheikhs: { group: string; displayName: string; uids: Set<string> }[];
     getDayStats: (group: string, dateStr: string) => any;
+    getDayStatsList?: (group: string, dateStr: string) => any[];
     selectedDate: Date;
     dailySessions: any; // needed to read createdAt for punctuality scoring
 }
@@ -192,7 +193,7 @@ const getSessionTimingPoints = (session: any, weights: ScoringWeights): number =
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function SheikhBadges({ sheikhs, getDayStats, selectedDate, dailySessions }: SheikhBadgesProps) {
+export function SheikhBadges({ sheikhs, getDayStats, getDayStatsList, selectedDate, dailySessions }: SheikhBadgesProps) {
     const { role } = useAuth();
     const isManagement = role === 'super_admin' || role === 'management';
     const printRef = useRef<HTMLDivElement>(null);
@@ -402,36 +403,38 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate, dailySessions
                 let sheikhabsences = 0, holidays = 0;
                 mDays.forEach(day => {
                     const dateStr = format(day, 'yyyy-MM-dd');
-                    const stats = getDayStats(sh.group, dateStr);
-                    if (!stats) return;
+                    const statsList = getDayStatsList ? getDayStatsList(sh.group, dateStr) : (getDayStats(sh.group, dateStr) ? [getDayStats(sh.group, dateStr)] : []);
+                    statsList.forEach((stats: any) => {
+                        if (!stats) return;
 
-                    if (stats.type === 'يوم عطلة') { holidays++; return; }
-                    if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
+                        if (stats.type === 'يوم عطلة') { holidays++; return; }
+                        if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
-                    const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
-                    const isActivity = stats.type === 'حصة أنشطة';
-                    if (isReal) {
-                        sessions++;
-                        if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
-                            extraSessions++;
+                        const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                        const isActivity = stats.type === 'حصة أنشطة';
+                        if (isReal) {
+                            sessions++;
+                            if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
+                                extraSessions++;
+                            }
+                            if (stats.attendance !== null) {
+                                attTotal += stats.attendance;
+                                attCount++;
+                            }
+                            if (stats.excellent !== null) {
+                                excTotal += stats.excellent;
+                                excCount++;
+                            }
+                            if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
+                        } else if (isActivity) {
+                            // حصة أنشطة: تُحسب بوزن 0.8 من حصة عادية
+                            sessions += 0.5;
+                            if (stats.attendance !== null) {
+                                attTotal += stats.attendance;
+                                attCount++;
+                            }
                         }
-                        if (stats.attendance !== null) {
-                            attTotal += stats.attendance;
-                            attCount++;
-                        }
-                        if (stats.excellent !== null) {
-                            excTotal += stats.excellent;
-                            excCount++;
-                        }
-                        if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
-                    } else if (isActivity) {
-                        // حصة أنشطة: تُحسب بوزن 0.8 من حصة عادية
-                        sessions += 0.5;
-                        if (stats.attendance !== null) {
-                            attTotal += stats.attendance;
-                            attCount++;
-                        }
-                    }
+                    });
                 });
 
                 const workingDays = mDays.length - holidays - sheikhabsences;
@@ -483,41 +486,44 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate, dailySessions
             let sheikhabsences = 0, holidays = 0;
             allDays.forEach(day => {
                 const dateStr = format(day, 'yyyy-MM-dd');
-                const stats = getDayStats(sh.group, dateStr);
+                const statsList = getDayStatsList ? getDayStatsList(sh.group, dateStr) : (getDayStats(sh.group, dateStr) ? [getDayStats(sh.group, dateStr)!] : []);
                 totalDays++;
-                if (!stats) return;
+                
+                statsList.forEach((stats: any) => {
+                    if (!stats) return;
 
-                if (stats.type === 'يوم عطلة') { holidays++; return; }
-                if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
+                    if (stats.type === 'يوم عطلة') { holidays++; return; }
+                    if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
-                const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
-                const isActivity = stats.type === 'حصة أنشطة';
-                if (isReal) {
-                    sessions++;
-                    basicCount++;
-                    if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
-                        extraSessions++;
+                    const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                    const isActivity = stats.type === 'حصة أنشطة';
+                    if (isReal) {
+                        sessions++;
+                        basicCount++;
+                        if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
+                            extraSessions++;
+                        }
+                        if (stats.attendance !== null) {
+                            attTotal += stats.attendance;
+                            attCount++;
+                            if (stats.attendance >= 90) highAttDays++;
+                        }
+                        if (stats.excellent !== null) {
+                            excTotal += stats.excellent;
+                            excCount++;
+                        }
+                        if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
+                    } else if (isActivity) {
+                        // حصة أنشطة: تُحسب بوزن 0.8 من حصة عادية
+                        sessions += 0.5;
+                        activityCount++;
+                        if (stats.attendance !== null) {
+                            attTotal += stats.attendance;
+                            attCount++;
+                            if (stats.attendance >= 90) highAttDays++;
+                        }
                     }
-                    if (stats.attendance !== null) {
-                        attTotal += stats.attendance;
-                        attCount++;
-                        if (stats.attendance >= 90) highAttDays++;
-                    }
-                    if (stats.excellent !== null) {
-                        excTotal += stats.excellent;
-                        excCount++;
-                    }
-                    if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
-                } else if (isActivity) {
-                    // حصة أنشطة: تُحسب بوزن 0.8 من حصة عادية
-                    sessions += 0.5;
-                    activityCount++;
-                    if (stats.attendance !== null) {
-                        attTotal += stats.attendance;
-                        attCount++;
-                        if (stats.attendance >= 90) highAttDays++;
-                    }
-                }
+                });
             });
 
             // ─── حساب نقاط التوقيت من dailySessions ───
@@ -529,21 +535,20 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate, dailySessions
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const daySess = (dailySessions as any)[dateStr];
                     if (!daySess) return;
-                    // الحصل على الجلسة التي تخص هذا الشيخ (session 1 أو أول جلسة متاحة)
+                    // الحصول على جميع جلسات اليوم التي تخص هذا الشيخ
                     const sessions_for_day = Object.values(daySess as Record<string, any>).filter(
                         (s: any) => sh.uids.has(s.ownerId)
                     );
-                    if (!sessions_for_day.length) return;
-                    const session = sessions_for_day.find((s: any) => s.sessionNumber === 1) || sessions_for_day[0];
-                    if (!session) return;
-                    // تحقق من نوع الحصة (أساسية فقط لتنقيط التوقيت)
-                    const sType = session.sessionType;
-                    const isReal2 = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية' || sType === 'حصة أنشطة';
-                    if (!isReal2) return;
-                    const pts = getSessionTimingPoints(session, weights);
-                    punctualityPoints += pts;
-                    if (pts > 0) punctualSessions++;
-                    else if (pts < 0) lateSessions++;
+                    sessions_for_day.forEach((session: any) => {
+                        if (!session) return;
+                        const sType = session.sessionType;
+                        const isReal2 = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية' || sType === 'حصة أنشطة';
+                        if (!isReal2) return;
+                        const pts = getSessionTimingPoints(session, weights);
+                        punctualityPoints += pts;
+                        if (pts > 0) punctualSessions++;
+                        else if (pts < 0) lateSessions++;
+                    });
                 });
             }
 
@@ -605,7 +610,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate, dailySessions
         rawScores.forEach((s, i) => { s.rank = i + 1; });
 
         return rawScores;
-    }, [sheikhs, getDayStats, selectedDate, weights, dailySessions]);
+    }, [sheikhs, getDayStats, getDayStatsList, selectedDate, weights, dailySessions]);
 
     // Sync computed scores to firebase database so they can be viewed by sheikhs
     useEffect(() => {
@@ -1491,6 +1496,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate, dailySessions
                 <SheikhScoreDetailModal
                     sheikh={selectedSheikhDetail}
                     getDayStats={getDayStats}
+                    getDayStatsList={getDayStatsList}
                     selectedDate={selectedDate}
                     onClose={() => setSelectedSheikhDetail(null)}
                     onExportHonorCard={openHonorCard}
@@ -1514,6 +1520,7 @@ export function SheikhBadges({ sheikhs, getDayStats, selectedDate, dailySessions
 export function SheikhScoreDetailModal({
     sheikh,
     getDayStats,
+    getDayStatsList,
     selectedDate,
     onClose,
     onExportHonorCard,
@@ -1522,6 +1529,7 @@ export function SheikhScoreDetailModal({
 }: {
     sheikh: SheikhScore;
     getDayStats: (group: string, dateStr: string) => any;
+    getDayStatsList?: (group: string, dateStr: string) => any[];
     selectedDate: Date;
     onClose: () => void;
     onExportHonorCard?: (sheikh: SheikhScore) => void;
@@ -1540,48 +1548,65 @@ export function SheikhScoreDetailModal({
 
         days.forEach(day => {
             const dateStr = format(day, 'yyyy-MM-dd');
-            const stats = getDayStats(sheikh.group, dateStr);
+            const statsList = getDayStatsList ? getDayStatsList(sheikh.group, dateStr) : (getDayStats(sheikh.group, dateStr) ? [getDayStats(sheikh.group, dateStr)] : []);
             
-            // Calculate daily points breakdown
-            let dayPts = 0;
-            let sType = 'غير مسجلة';
-            let attendance = null;
-            let excellent = null;
-            let goodPlus = null;
+            if (statsList.length === 0) {
+                recs.push({
+                    date: dateStr,
+                    label: format(day, 'EEE d MMM', { locale: ar }),
+                    type: 'غير مسجلة',
+                    attendance: null,
+                    excellent: null,
+                    goodPlus: null,
+                    dayPoints: 0,
+                    timingPoints: 0,
+                    timingDesc: '',
+                    isPunctual: false,
+                    isLate: false,
+                    delayDays: null
+                });
+                return;
+            }
 
-            // Timing points variables
-            let timingPoints = 0;
-            let isPunctual = false;
-            let isLate = false;
-            let delayDays = null;
-            let timingDesc = '';
-
-            // Find session in dailySessions to get timing info
-            let session: any = null;
+            // Find all sessions in dailySessions to get timing info
+            let daySessionsList: any[] = [];
             if (dailySessions) {
                 const daySess = dailySessions[dateStr];
                 if (daySess) {
                     const hasUid = sheikh.uids && typeof sheikh.uids.has === 'function';
-                    const sessions_for_day = Object.values(daySess).filter(
+                    daySessionsList = Object.values(daySess).filter(
                         (s: any) => s && s.ownerId && hasUid && sheikh.uids!.has(s.ownerId)
                     );
-                    if (sessions_for_day.length > 0) {
-                        session = sessions_for_day.find((s: any) => s.sessionNumber === 1) || sessions_for_day[0];
-                    }
                 }
             }
 
-            if (stats) {
-                sType = stats.type;
-                attendance = stats.attendance;
-                excellent = stats.excellent;
-                goodPlus = stats.goodPlus;
+            // Sort daySessionsList by sessionNumber to match statsList order
+            daySessionsList.sort((a, b) => {
+                const numA = a.sessionNumber !== undefined ? Number(a.sessionNumber) : 1;
+                const numB = b.sessionNumber !== undefined ? Number(b.sessionNumber) : 1;
+                return numA - numB;
+            });
+
+            statsList.forEach((stats: any, sIdx: number) => {
+                let dayPts = 0;
+                let sType = stats.type;
+                let attendance = stats.attendance;
+                let excellent = stats.excellent;
+                let goodPlus = stats.goodPlus;
+
+                let timingPoints = 0;
+                let isPunctual = false;
+                let isLate = false;
+                let delayDays = null;
+                let timingDesc = '';
+
+                // Match with corresponding session
+                const session = daySessionsList[sIdx] || daySessionsList[0] || null;
 
                 const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
-                const isActivityDay = sType === 'حصة أنشطة';
-                
-                // Timing scoring (if session exists and it's a real or activity session)
-                if (session && (isReal || isActivityDay)) {
+                const isActivityRec = sType === 'حصة أنشطة';
+
+                if (session && (isReal || isActivityRec)) {
                     timingPoints = getSessionTimingPoints(session, weights);
                     if (timingPoints > 0) {
                         isPunctual = true;
@@ -1630,8 +1655,7 @@ export function SheikhScoreDetailModal({
                         goodPlusBonus = Math.round((stats.goodPlus / 100) * weights.goodPlusBonus);
                     }
                     dayPts += (excellenceBonus + goodPlusBonus);
-                } else if (isActivityDay) {
-                    // حصة أنشطة: تُحسب بوزن 0.8 من نقطة تسجيل الحصة + حضور الطلاب
+                } else if (isActivityRec) {
                     dayPts += Math.round(weights.sessionWeight * 0.5);
                     if (stats.attendance !== null) {
                         dayPts += Math.round((stats.attendance / 100) * weights.attendanceWeight * 0.5);
@@ -1640,28 +1664,35 @@ export function SheikhScoreDetailModal({
                     dayPts -= weights.absencePenalty;
                 }
                 
-                // Add timing points to the daily points total
                 dayPts += timingPoints;
-            }
 
-            recs.push({
-                date: dateStr,
-                label: format(day, 'EEE d MMM', { locale: ar }),
-                type: sType,
-                attendance,
-                excellent,
-                goodPlus,
-                dayPoints: dayPts,
-                timingPoints,
-                timingDesc,
-                isPunctual,
-                isLate,
-                delayDays
+                recs.push({
+                    date: dateStr,
+                    label: format(day, 'EEE d MMM', { locale: ar }) + (statsList.length > 1 ? ` (ح${sIdx + 1})` : ''),
+                    type: sType,
+                    attendance,
+                    excellent,
+                    goodPlus,
+                    dayPoints: dayPts,
+                    timingPoints,
+                    timingDesc,
+                    isPunctual,
+                    isLate,
+                    delayDays,
+                    sessionNumber: statsList.length > 1 ? sIdx + 1 : undefined
+                });
             });
         });
 
-        return recs.sort((a, b) => a.date.localeCompare(b.date));
-    }, [sheikh, getDayStats, selectedDate, weights, dailySessions]);
+        // Sort by date, then by sessionNumber if present
+        return recs.sort((a, b) => {
+            const dateComp = a.date.localeCompare(b.date);
+            if (dateComp !== 0) return dateComp;
+            const numA = a.sessionNumber !== undefined ? a.sessionNumber : 1;
+            const numB = b.sessionNumber !== undefined ? b.sessionNumber : 1;
+            return numA - numB;
+        });
+    }, [sheikh, getDayStats, getDayStatsList, selectedDate, weights, dailySessions]);
 
     // Local TYPE_CONFIG for rendering session labels in the modal
     const LOCAL_TYPE_CONFIG: Record<string, { label: string; bg: string; text: string }> = {

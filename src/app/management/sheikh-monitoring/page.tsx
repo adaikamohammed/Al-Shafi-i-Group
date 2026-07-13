@@ -514,15 +514,10 @@ export default function SheikhMonitoringPage() {
         return map;
     }, [filteredSheikhs, students]);
 
-    // ── Get day stats for one group+date ──────────────────────────────────
-    const getDayStats = useCallback((group: string, dateStr: string): DayStats | null => {
+    // ── Get day stats list for one group+date ─────────────────────────────
+    const getDayStatsList = useCallback((group: string, dateStr: string): DayStats[] => {
         const sessions = groupSessions.get(group)?.get(dateStr) || [];
-        const session = sessions.find(s => s.sessionNumber === 1) || sessions[0] || null;
-        if (!session) return null;
-
-        const records: any[] = session.records || [];
-        const total = records.length;
-        if (!records.length || !total) return { session, type: session.sessionType, attendance: null, excellent: null, goodPlus: null, good: null, acceptable: null, weak: null, notMemorized: null };
+        if (sessions.length === 0) return [];
 
         // Find makeup sessions for this group that compensated for dateStr
         const groupSessionsMap = groupSessions.get(group);
@@ -544,29 +539,43 @@ export default function SheikhMonitoringPage() {
             });
         }
 
-        let present = 0, excellent = 0, goodPlus = 0, good = 0, acceptable = 0, weak = 0, notMem = 0;
-        records.forEach(r => {
-            const makeup = makeupsForThisDate[r.studentId];
-            const attendanceStatus = makeup ? 'تعويض' : (r.attendance || 'غائب');
-            const isPresent = attendanceStatus === 'حاضر' || attendanceStatus === 'متأخر' || attendanceStatus === 'تعويض';
-
-            if (isPresent) present++;
-            
-            const memoVal = makeup ? makeup.memorization : (r.review ? null : r.memorization);
-            const isReview = makeup ? !!makeup.review : !!r.review;
-
-            if (isPresent && !isReview) {
-                if (memoVal === 'ممتاز') excellent++;
-                else if (memoVal === 'جيد جدا' || memoVal === 'جيد جداً') goodPlus++;
-                else if (memoVal === 'جيد') good++;
-                else if (memoVal === 'مقبول' || memoVal === 'حسن' || memoVal === 'متوسط') acceptable++;
-                else if (memoVal === 'ضعيف') weak++;
-                else if (memoVal === 'لم يحفظ') notMem++;
+        return sessions.map(session => {
+            const records: any[] = session.records || [];
+            const total = records.length;
+            if (!records.length || !total) {
+                return { session, type: session.sessionType, attendance: null, excellent: null, goodPlus: null, good: null, acceptable: null, weak: null, notMemorized: null };
             }
+
+            let present = 0, excellent = 0, goodPlus = 0, good = 0, acceptable = 0, weak = 0, notMem = 0;
+            records.forEach(r => {
+                const makeup = makeupsForThisDate[r.studentId];
+                const attendanceStatus = makeup ? 'تعويض' : (r.attendance || 'غائب');
+                const isPresent = attendanceStatus === 'حاضر' || attendanceStatus === 'متأخر' || attendanceStatus === 'تعويض';
+
+                if (isPresent) present++;
+                
+                const memoVal = makeup ? makeup.memorization : (r.review ? null : r.memorization);
+                const isReview = makeup ? !!makeup.review : !!r.review;
+
+                if (isPresent && !isReview) {
+                    if (memoVal === 'ممتاز') excellent++;
+                    else if (memoVal === 'جيد جدا' || memoVal === 'جيد جداً') goodPlus++;
+                    else if (memoVal === 'جيد') good++;
+                    else if (memoVal === 'مقبول' || memoVal === 'حسن' || memoVal === 'متوسط') acceptable++;
+                    else if (memoVal === 'ضعيف') weak++;
+                    else if (memoVal === 'لم يحفظ') notMem++;
+                }
+            });
+            const p = (n: number) => total > 0 ? Math.round((n / total) * 100) : 0;
+            return { session, type: session.sessionType, attendance: p(present), excellent: p(excellent), goodPlus: p(goodPlus), good: p(good), acceptable: p(acceptable), weak: p(weak), notMemorized: p(notMem) };
         });
-        const p = (n: number) => total > 0 ? Math.round((n / total) * 100) : 0;
-        return { session, type: session.sessionType, attendance: p(present), excellent: p(excellent), goodPlus: p(goodPlus), good: p(good), acceptable: p(acceptable), weak: p(weak), notMemorized: p(notMem) };
     }, [groupSessions]);
+
+    // ── Get day stats for one group+date (compatibility fallback) ─────────
+    const getDayStats = useCallback((group: string, dateStr: string): DayStats | null => {
+        const list = getDayStatsList(group, dateStr);
+        return list.length > 0 ? list[0] : null;
+    }, [getDayStatsList]);
 
     // ── Monthly analytics per sheikh ───────────────────────────────────────
     const monthlyStats = useMemo<MonthlySheikhStats[]>(() => {
@@ -1092,7 +1101,7 @@ export default function SheikhMonitoringPage() {
                 )}
 
                 {/* ── Main Content ── */}
-                {view === 'day' && <DayTable sheikhs={filteredSheikhs} getDayStats={getDayStats} dateStr={todayStr} groupSessions={groupSessions} selectedDate={selectedDate} students={students} dailySessions={dailySessions} />}
+                {view === 'day' && <DayTable sheikhs={filteredSheikhs} getDayStats={getDayStats} getDayStatsList={getDayStatsList} dateStr={todayStr} groupSessions={groupSessions} selectedDate={selectedDate} students={students} dailySessions={dailySessions} />}
                 {view === 'week' && (
                     <MatrixTable sheikhs={filteredSheikhs} groupSessions={groupSessions} interval={interval} getDayStats={getDayStats} />
                 )}
@@ -1155,7 +1164,7 @@ export default function SheikhMonitoringPage() {
                     />
                 )}
                 {view === 'badges' && (
-                    <SheikhBadges sheikhs={filteredSheikhs} getDayStats={getDayStats} selectedDate={statsMonth} dailySessions={dailySessions} />
+                    <SheikhBadges sheikhs={filteredSheikhs} getDayStats={getDayStats} getDayStatsList={getDayStatsList} selectedDate={statsMonth} dailySessions={dailySessions} />
                 )}
                 {view === 'heatmap' && (
                     <AttendanceHeatmap
@@ -1363,10 +1372,11 @@ function BehaviorAnalysisView({
 
 // ─── DayTable Component ───────────────────────────────────────────────────────
 function DayTable({
-    sheikhs, getDayStats, dateStr, groupSessions, selectedDate, students, dailySessions
+    sheikhs, getDayStats, getDayStatsList, dateStr, groupSessions, selectedDate, students, dailySessions
 }: {
     sheikhs: GroupSheikhInfo[];
     getDayStats: (g: string, d: string) => DayStats | null;
+    getDayStatsList?: (g: string, d: string) => DayStats[];
     dateStr: string;
     groupSessions: Map<string, Map<string, any[]>>;
     selectedDate: Date;
@@ -2565,35 +2575,59 @@ function DayTable({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredSheikhs.map((sh, idx) => {
-                                        const stats = getDayStats(sh.group, dateStr);
-                                        const cfg = stats?.type ? TYPE_CONFIG[stats.type] : null;
-                                        const isHoliday = !isRealType(stats?.type);
-                                        return (
-                                            <tr key={sh.uid} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }} className="border-b hover:bg-muted/10 transition-colors">
-                                                <td className="sticky right-0 z-10 p-2 sm:p-3 border-l shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]" style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                                                    <div className="font-bold text-xs sm:text-sm leading-tight">{sh.group}</div>
-                                                    <div className="text-[10px] text-muted-foreground truncate max-w-[110px] sm:max-w-none">{sh.displayName}</div>
-                                                </td>
-                                                <td className="p-2 text-center border-l">
-                                                    {stats ? (
-                                                        <span className={cn("inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-lg border", cfg?.bg || 'bg-muted/30 border-border')}>
-                                                            <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", cfg?.dot || 'bg-gray-400')} />
-                                                            <span className={cfg?.text || 'text-muted-foreground'}>{cfg?.label || stats.type}</span>
-                                                        </span>
-                                                    ) : <span className="text-[10px] text-muted-foreground/50 border border-dashed rounded-lg px-2 py-1 inline-block">—</span>}
-                                                </td>
-                                                {EVAL_COLS.map(col => {
-                                                    const val: number | null = stats ? (stats as any)[col.key] : null;
-                                                    const showDash = !stats || isHoliday || val === null;
-                                                    return (
+                                    {filteredSheikhs.flatMap((sh, idx) => {
+                                        const statsList = getDayStatsList ? getDayStatsList(sh.group, dateStr) : (getDayStats(sh.group, dateStr) ? [getDayStats(sh.group, dateStr)!] : []);
+                                        
+                                        if (statsList.length === 0) {
+                                            return [
+                                                <tr key={sh.uid + "-none"} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }} className="border-b hover:bg-muted/10 transition-colors">
+                                                    <td className="sticky right-0 z-10 p-2 sm:p-3 border-l shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]" style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                                                        <div className="font-bold text-xs sm:text-sm leading-tight">{sh.group}</div>
+                                                        <div className="text-[10px] text-muted-foreground truncate max-w-[110px] sm:max-w-none">{sh.displayName}</div>
+                                                    </td>
+                                                    <td className="p-2 text-center border-l">
+                                                        <span className="text-[10px] text-muted-foreground/50 border border-dashed rounded-lg px-2 py-1 inline-block">—</span>
+                                                    </td>
+                                                    {EVAL_COLS.map(col => (
                                                         <td key={col.key} className="p-2 text-center border-l">
-                                                            {showDash ? <span className="text-muted-foreground/30 text-xs">—</span> : <span className={cn('text-xs', col.color(val as number))}>{val}%</span>}
+                                                            <span className="text-muted-foreground/30 text-xs">—</span>
                                                         </td>
-                                                    );
-                                                })}
-                                            </tr>
-                                        );
+                                                    ))}
+                                                </tr>
+                                            ];
+                                        }
+
+                                        return statsList.map((stats, sIdx) => {
+                                            const cfg = stats?.type ? TYPE_CONFIG[stats.type] : null;
+                                            const isHoliday = !isRealType(stats?.type);
+                                            return (
+                                                <tr key={sh.uid + "-" + sIdx} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }} className="border-b hover:bg-muted/10 transition-colors">
+                                                    <td className="sticky right-0 z-10 p-2 sm:p-3 border-l shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]" style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                                                        <div className="font-bold text-xs sm:text-sm leading-tight">
+                                                            {sh.group} {statsList.length > 1 ? `(ح${sIdx + 1})` : ''}
+                                                        </div>
+                                                        <div className="text-[10px] text-muted-foreground truncate max-w-[110px] sm:max-w-none">{sh.displayName}</div>
+                                                    </td>
+                                                    <td className="p-2 text-center border-l">
+                                                        {stats ? (
+                                                            <span className={cn("inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-lg border", cfg?.bg || 'bg-muted/30 border-border')}>
+                                                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", cfg?.dot || 'bg-gray-400')} />
+                                                                <span className={cfg?.text || 'text-muted-foreground'}>{cfg?.label || stats.type}</span>
+                                                            </span>
+                                                        ) : <span className="text-[10px] text-muted-foreground/50 border border-dashed rounded-lg px-2 py-1 inline-block">—</span>}
+                                                    </td>
+                                                    {EVAL_COLS.map(col => {
+                                                        const val: number | null = stats ? (stats as any)[col.key] : null;
+                                                        const showDash = !stats || isHoliday || val === null;
+                                                        return (
+                                                            <td key={col.key} className="p-2 text-center border-l">
+                                                                {showDash ? <span className="text-muted-foreground/30 text-xs">—</span> : <span className={cn('text-xs', col.color(val as number))}>{val}%</span>}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            );
+                                        });
                                     })}
                                 </tbody>
                                 <tfoot>
