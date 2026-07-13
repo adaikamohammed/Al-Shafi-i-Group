@@ -1617,7 +1617,7 @@ export function SheikhScoreDetailModal({
                 // Match with corresponding session
                 const session = daySessionsList[sIdx] || daySessionsList[0] || null;
 
-                const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية' || sType === 'حصة إضافية';
+                const isReal = sType === 'حصة أساسية' || sType === 'حصة تعويضية';
                 const isActivityRec = sType === 'حصة أنشطة';
 
                 if (session && (isReal || isActivityRec)) {
@@ -1653,20 +1653,8 @@ export function SheikhScoreDetailModal({
                 }
 
                 if (sType === 'حصة إضافية') {
-                    // حصة إضافية: نصف وزن الحصة الأساسية في كل شيء ما عدا بونص الحصص الإضافية
-                    let basePts = weights.sessionWeight * 0.5;
-                    if (stats.attendance !== null) {
-                        basePts += (stats.attendance / 100) * weights.attendanceWeight * 0.5;
-                    }
-                    let excellenceBonus = 0;
-                    let goodPlusBonus = 0;
-                    if (stats.excellent !== null) {
-                        excellenceBonus = (stats.excellent / 100) * weights.excellentBonus * 0.5;
-                    }
-                    if (stats.goodPlus !== null) {
-                        goodPlusBonus = (stats.goodPlus / 100) * weights.goodPlusBonus * 0.5;
-                    }
-                    dayPts += Math.round(basePts + excellenceBonus + goodPlusBonus) + weights.extraSessionBonus;
+                    // الحصة الإضافية لا تضيف درجات للمعلم
+                    dayPts = 0;
                 } else if (sType === 'حصة أساسية' || sType === 'حصة تعويضية') {
                     dayPts += weights.sessionWeight;
                     if (stats.attendance !== null) {
