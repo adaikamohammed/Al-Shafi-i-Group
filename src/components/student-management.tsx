@@ -18,7 +18,7 @@ import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { useRouter } from 'next/navigation';
 import { Student, StudentStatus } from '@/lib/types';
 import { arabicCompare, isStudentInMenSheikhs, isStudentInWomenUstadhats } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, getQuarter, getYear, parseISO } from 'date-fns';
 
 // Refactored Components
 import { StudentTable } from './student/StudentTable';
@@ -34,7 +34,7 @@ const educationalLevels = ["روضة", "تحضيري", "1 ابتدائي", "2 ا
 
 export function StudentManagement() {
     const router = useRouter();
-    const { students, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings, addStudent, allUsers, dailyReports, selectedGroup, setSelectedGroup } = useStudentContext();
+    const { students, payments, updateStudent, deleteStudent, loading, deleteAllStudents, deleteMultipleStudents, dailySessions, settings, addStudent, allUsers, dailyReports, selectedGroup, setSelectedGroup } = useStudentContext();
     const { user, isSuperAdmin, isManagement } = useAuth();
     const [isAddStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
     const [isEditStudentDialogOpen, setEditStudentDialogOpen] = useState(false);
@@ -194,6 +194,42 @@ export function StudentManagement() {
         ).length;
     }, [students, selectedGroup, user, isSuperAdmin, isManagement]);
 
+    const currentYear = new Date().getFullYear();
+    const currentQuarter = getQuarter(new Date());
+
+    const quarterNames: Record<number, string> = {
+        1: 'الفصل الأول (جانفي - مارس)',
+        2: 'الفصل الثاني (أفريل - جوان)',
+        3: 'الفصل الثالث (جويلية - سبتمبر)',
+        4: 'الفصل الرابع (أكتوبر - ديسمبر)'
+    };
+
+    const currentQuarterName = quarterNames[currentQuarter] || `الفصل ${currentQuarter}`;
+
+    // Filter active students under user's purview
+    const activeStudentsForDues = useMemo(() => {
+        return allStudents.filter(s => s.status === 'نشط');
+    }, [allStudents]);
+
+    // Check which active students have registered their dues in currentYear & currentQuarter
+    const unregisteredStudents = useMemo(() => {
+        if (!payments || payments.length === 0) return activeStudentsForDues;
+        return activeStudentsForDues.filter(student => {
+            const hasPayment = payments.some(p => {
+                if (p.studentId !== student.id || !p.date) return false;
+                try {
+                    const parsedDate = parseISO(p.date);
+                    return getYear(parsedDate) === currentYear &&
+                           getQuarter(parsedDate) === currentQuarter &&
+                           (p.status === 'paid' || p.status === 'exempted');
+                } catch (e) {
+                    return false;
+                }
+            });
+            return !hasPayment;
+        });
+    }, [activeStudentsForDues, payments, currentYear, currentQuarter]);
+
     if (loading) {
         return <div className="flex items-center justify-center h-full"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
     }
@@ -219,11 +255,44 @@ export function StudentManagement() {
         </Alert>
     );
 
+    const duesAlert = unregisteredStudents.length > 0 && (
+        <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20 border-r-8 border-r-amber-600 shadow-md mb-6">
+            <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <AlertTitle className="text-amber-800 dark:text-amber-300 font-headline font-bold text-lg mr-2">
+                تنبيه هام: تسجيل المستحقات المالية الفصلية
+            </AlertTitle>
+            <AlertDescription className="mr-2 mt-1 font-body">
+                <p className="text-amber-700 dark:text-amber-400 font-semibold text-sm leading-relaxed">
+                    يرجى تسجيل المستحقات المالية لجميع الطلبة في <span className="font-bold underline">{currentQuarterName} لعام {currentYear}</span>.
+                </p>
+                <p className="text-amber-600 dark:text-amber-500 mt-1 text-xs">
+                    حالة التسجيل الحالي للفوج/الطلبة: تم تسوية وضعية <span className="font-bold text-emerald-600 dark:text-emerald-400">{activeStudentsForDues.length - unregisteredStudents.length}</span> من أصل <span className="font-bold">{activeStudentsForDues.length}</span> طالب نشط.
+                    (المتبقي: <span className="font-bold text-red-600 dark:text-red-400">{unregisteredStudents.length}</span> طالب لم يتم تسجيلهم بعد).
+                </p>
+                <p className="text-amber-800 dark:text-amber-400 mt-2 text-xs font-bold bg-amber-100/60 dark:bg-amber-900/30 p-2 rounded-lg border border-amber-200/50 inline-block">
+                    ⚠️ تنبيه: سيبقى هذا الإشعار ظاهراً في لوحة التحكم ولن يختفي حتى يتم تسجيل الوضعية المالية (دفع أو إعفاء) لجميع الطلاب النشطين في هذا الفصل.
+                </p>
+                <div className="mt-3">
+                    <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => router.push('/dues')}
+                        className="bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shadow-sm"
+                    >
+                        💳 انتقل لتسجيل المستحقات الآن
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                    </Button>
+                </div>
+            </AlertDescription>
+        </Alert>
+    );
+
     if (allStudents.length === 0 && !loading) {
         return (
             <div className="space-y-6">
                 <DailyInspiration />
                 {unreadMessagesAlert}
+                {duesAlert}
                 <div className="flex flex-col items-center justify-center py-20 bg-muted/20 rounded-3xl border-2 border-dashed border-muted">
                     <Users className="h-16 w-16 text-muted-foreground/30 mb-4" />
                     <h1 className="text-2xl font-bold mb-2">لا يوجد طلاب بعد</h1>
@@ -249,6 +318,7 @@ export function StudentManagement() {
                 <DailyInspiration />
 
                 {unreadMessagesAlert}
+                {duesAlert}
 
                 {/* Global Dashboard Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">

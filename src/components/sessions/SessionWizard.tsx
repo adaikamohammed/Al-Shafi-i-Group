@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { AttendanceList, AttendanceRecord } from './AttendanceList';
-import { Student } from '@/lib/types';
+import { Student, AttendanceStatus, PerformanceLevel, BehaviorLevel } from '@/lib/types';
 import { Loader2, Save, ArrowRight, ArrowLeft, CheckCircle2, Users, Star, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -27,15 +27,31 @@ export const SessionWizard = ({ isOpen, onClose, sessionNumber, sessionDate, stu
     const [isSaving, setIsSaving] = useState(false);
 
     const handleUpdateRecord = (studentId: string, field: keyof AttendanceRecord, value: any) => {
-        setRecords(prev => ({
-            ...prev,
-            [studentId]: {
-                ...prev[studentId],
+        setRecords(prev => {
+            const current = prev[studentId] || {
                 studentId,
-                attendance: field === 'attendance' ? value : (prev[studentId]?.attendance || 'حاضر'),
-                [field]: value
+                attendance: '' as AttendanceStatus,
+                memorization: '' as PerformanceLevel,
+                behavior: '' as BehaviorLevel,
+                notes: '',
+                review: false
+            };
+            const updated = {
+                ...current,
+                [field]: value,
+                attendance: field === 'attendance' ? value : (current.attendance || 'حاضر'),
+            };
+            if (field === 'attendance' && (value === 'غائب' || value === 'غياب')) {
+                updated.review = false;
+                updated.behavior = '';
+                updated.memorization = '' as PerformanceLevel;
+                updated.isDelayed = false;
             }
-        }));
+            return {
+                ...prev,
+                [studentId]: updated
+            };
+        });
     };
 
     const nextStep = () => setStep(p => Math.min(p + 1, 3));

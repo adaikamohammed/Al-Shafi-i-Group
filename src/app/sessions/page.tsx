@@ -381,9 +381,9 @@ export default function DailySessionsPage() {
                 let sessionModified = false;
                 const newRecords = session.records.map((r: any) => {
                   if (r.attendance === 'غائب' || r.attendance === 'غياب') {
-                    if (r.review !== false || r.behavior) {
+                    if (r.review !== false || r.behavior || (r.memorization && r.memorization !== 'لا يوجد' && r.memorization !== '')) {
                       sessionModified = true;
-                      return { ...r, review: false, behavior: '' };
+                      return { ...r, review: false, behavior: '', memorization: '', isDelayed: false };
                     }
                   }
                   return r;
@@ -400,9 +400,9 @@ export default function DailySessionsPage() {
                 const newRecords = { ...session.records };
                 Object.entries(newRecords).forEach(([idx, r]: [string, any]) => {
                   if (r && (r.attendance === 'غائب' || r.attendance === 'غياب')) {
-                    if (r.review !== false || r.behavior) {
+                    if (r.review !== false || r.behavior || (r.memorization && r.memorization !== 'لا يوجد' && r.memorization !== '')) {
                       sessionModified = true;
-                      newRecords[idx as keyof typeof newRecords] = { ...r, review: false, behavior: '' };
+                      newRecords[idx as keyof typeof newRecords] = { ...r, review: false, behavior: '', memorization: '', isDelayed: false };
                     }
                   }
                 });

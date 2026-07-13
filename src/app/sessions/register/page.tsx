@@ -537,10 +537,12 @@ function RegisterSessionContent() {
                 updatedRecord.memorization = 'لم يحفظ';
             }
 
-            // Clear review and behavior when marking as absent
+            // Clear review, behavior, and memorization when marking as absent
             if (field === 'attendance' && (value === 'غائب' || value === 'غياب')) {
                 updatedRecord.review = false;
                 updatedRecord.behavior = '';
+                updatedRecord.memorization = '' as PerformanceLevel;
+                updatedRecord.isDelayed = false;
             }
 
             return {

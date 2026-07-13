@@ -74,6 +74,10 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
             );
 
             let statusClass = "bg-card hover:bg-accent/50 border-transparent shadow-sm";
+            let hasTwoSessions = false;
+            let color1 = "";
+            let color2 = "";
+            let borderColor = "";
 
             if (sessions.length > 0) {
                 const hasHoliday = sessions.some((s: any) => s.sessionType === 'يوم عطلة');
@@ -81,12 +85,55 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                 const hasAbsentNoSub = sessions.some((s: any) => s.sessionType === 'غياب الشيخ' && !s.substituteTeacher);
                 const hasAbsentWithSub = sessions.some((s: any) => s.sessionType === 'غياب الشيخ' && s.substituteTeacher);
 
-                if (hasHoliday) statusClass = 'bg-sky-500 text-white border-2 border-sky-600 shadow-sky-200';
-                else if (hasActivity) statusClass = 'bg-purple-500 text-white border-2 border-purple-600 shadow-purple-200';
-                else if (hasAbsentNoSub) statusClass = 'bg-rose-500 text-white border-2 border-rose-600 shadow-rose-200';
-                else if (hasAbsentWithSub) statusClass = 'bg-orange-500 text-white border-2 border-orange-600 shadow-orange-200';
-                else if (hasSession2) statusClass = 'bg-gradient-to-br from-emerald-500 to-indigo-600 text-white border-2 border-indigo-700 shadow-[0_4px_15px_rgba(16,185,129,0.35),0_4px_15px_rgba(79,70,229,0.35)]';
-                else statusClass = 'bg-emerald-500 text-white border-2 border-emerald-600 shadow-emerald-200';
+                if (sessions.length === 2) {
+                    hasTwoSessions = true;
+                    const sortedSessions = [...sessions].sort((a, b) => {
+                        const numA = getSessionNum(a);
+                        const numB = getSessionNum(b);
+                        return numA - numB;
+                    });
+                    const s1 = sortedSessions[0];
+                    const s2 = sortedSessions[1];
+
+                    const getColor = (s: any) => {
+                        if (s.sessionType === 'يوم عطلة') return '#0ea5e9'; // sky-500
+                        if (s.sessionType === 'حصة أنشطة') return '#a855f7'; // purple-500
+                        if (s.sessionType === 'غياب الشيخ') {
+                            return s.substituteTeacher ? '#f97316' : '#f43f5e'; // orange-500 : rose-500
+                        }
+                        return '#10b981'; // emerald-500
+                    };
+
+                    const getBorderColor = (s: any) => {
+                        if (s.sessionType === 'يوم عطلة') return '#0284c7'; // sky-600
+                        if (s.sessionType === 'حصة أنشطة') return '#9333ea'; // purple-600
+                        if (s.sessionType === 'غياب الشيخ') {
+                            return s.substituteTeacher ? '#ea580c' : '#e11d48'; // orange-600 : rose-600
+                        }
+                        return '#059669'; // emerald-600
+                    };
+
+                    color1 = getColor(s1);
+                    color2 = getColor(s2);
+                    borderColor = getBorderColor(s2);
+
+                    const isS1Green = s1.sessionType === 'حصة أساسية' || s1.sessionType === 'حصة إضافية' || s1.sessionType === 'حصة تعويضية';
+                    const isS2Green = s2.sessionType === 'حصة أساسية' || s2.sessionType === 'حصة إضافية' || s2.sessionType === 'حصة تعويضية';
+
+                    if (isS1Green && isS2Green) {
+                        color1 = '#10b981'; // normal emerald-500
+                        color2 = '#047857'; // emerald-700 (أغمق قليلاً)
+                        borderColor = '#047857';
+                    }
+
+                    statusClass = 'text-white border-2 shadow-[0_4px_15px_rgba(0,0,0,0.15)]';
+                } else {
+                    if (hasHoliday) statusClass = 'bg-sky-500 text-white border-2 border-sky-600 shadow-sky-200';
+                    else if (hasActivity) statusClass = 'bg-purple-500 text-white border-2 border-purple-600 shadow-purple-200';
+                    else if (hasAbsentNoSub) statusClass = 'bg-rose-500 text-white border-2 border-rose-600 shadow-rose-200';
+                    else if (hasAbsentWithSub) statusClass = 'bg-orange-500 text-white border-2 border-orange-600 shadow-orange-200';
+                    else statusClass = 'bg-emerald-500 text-white border-2 border-emerald-600 shadow-emerald-200';
+                }
             } else if (isPast(dayDate) && !isTodayDate) {
                 statusClass = 'bg-muted/30 border-muted/20 opacity-80';
             }
@@ -100,6 +147,10 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                         "relative flex flex-col justify-between min-h-[6rem] md:min-h-[8rem] h-auto border rounded-xl m-1 p-2 transition-all cursor-pointer group shadow-sm",
                         statusClass
                     )}
+                    style={hasTwoSessions ? {
+                        background: `linear-gradient(135deg, ${color1} 50%, ${color2} 50%)`,
+                        borderColor: borderColor
+                    } : undefined}
                 >
                     {/* رقم اليوم + مؤشر الحصة الإضافية */}
                     <div className="flex justify-between items-start">
