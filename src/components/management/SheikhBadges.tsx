@@ -410,13 +410,26 @@ export function SheikhBadges({ sheikhs, getDayStats, getDayStatsList, selectedDa
                         if (stats.type === 'يوم عطلة') { holidays++; return; }
                         if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
-                        const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                        const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية';
+                        const isExtra = stats.type === 'حصة إضافية';
                         const isActivity = stats.type === 'حصة أنشطة';
                         if (isReal) {
                             sessions++;
-                            if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
+                            if (stats.type === 'حصة تعويضية') {
                                 extraSessions++;
                             }
+                            if (stats.attendance !== null) {
+                                attTotal += stats.attendance;
+                                attCount++;
+                            }
+                            if (stats.excellent !== null) {
+                                excTotal += stats.excellent;
+                                excCount++;
+                            }
+                            if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
+                        } else if (isExtra) {
+                            sessions += 0.5;
+                            extraSessions++;
                             if (stats.attendance !== null) {
                                 attTotal += stats.attendance;
                                 attCount++;
@@ -495,12 +508,28 @@ export function SheikhBadges({ sheikhs, getDayStats, getDayStatsList, selectedDa
                     if (stats.type === 'يوم عطلة') { holidays++; return; }
                     if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
-                    const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                    const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية';
+                    const isExtra = stats.type === 'حصة إضافية';
                     const isActivity = stats.type === 'حصة أنشطة';
                     if (isReal) {
                         sessions++;
                         basicCount++;
-                        if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
+                        if (stats.type === 'حصة تعويضية') {
+                            extraSessions++;
+                        }
+                        if (stats.attendance !== null) {
+                            attTotal += stats.attendance;
+                            attCount++;
+                            if (stats.attendance >= 90) highAttDays++;
+                        }
+                        if (stats.excellent !== null) {
+                            excTotal += stats.excellent;
+                            excCount++;
+                        }
+                        if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
+                    } else if (isExtra) {
+                        sessions += 0.5;
+                        if (stats.type === 'حصة إضافية') {
                             extraSessions++;
                         }
                         if (stats.attendance !== null) {
@@ -1291,6 +1320,13 @@ export function SheikhBadges({ sheikhs, getDayStats, getDayStatsList, selectedDa
                                                     </span>
                                                     <span className="text-[8px] text-emerald-600 font-bold">أساسية</span>
                                                 </div>
+                                                {/* إضافية */}
+                                                <div className="flex flex-col items-center bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-1 min-w-[52px]">
+                                                    <span className={cn('text-sm font-black', s.extraSessionsCount > 0 ? 'text-indigo-700' : 'text-gray-300')}>
+                                                        {s.extraSessionsCount}
+                                                    </span>
+                                                    <span className="text-[8px] text-indigo-500 font-bold">إضافية</span>
+                                                </div>
                                                 {/* أنشطة */}
                                                 <div className="flex flex-col items-center bg-purple-50 border border-purple-200 rounded-lg px-2 py-1 min-w-[52px]">
                                                     <span className={cn('text-sm font-black', s.activitySessions > 0 ? 'text-purple-700' : 'text-gray-300')}>
@@ -1638,12 +1674,27 @@ export function SheikhScoreDetailModal({
                     }
                 }
 
-                if (isReal) {
+                if (sType === 'حصة إضافية') {
+                    // حصة إضافية: نصف وزن الحصة الأساسية في كل شيء ما عدا بونص الحصص الإضافية
+                    let basePts = weights.sessionWeight * 0.5;
+                    if (stats.attendance !== null) {
+                        basePts += (stats.attendance / 100) * weights.attendanceWeight * 0.5;
+                    }
+                    let excellenceBonus = 0;
+                    let goodPlusBonus = 0;
+                    if (stats.excellent !== null) {
+                        excellenceBonus = (stats.excellent / 100) * weights.excellentBonus * 0.5;
+                    }
+                    if (stats.goodPlus !== null) {
+                        goodPlusBonus = (stats.goodPlus / 100) * weights.goodPlusBonus * 0.5;
+                    }
+                    dayPts += Math.round(basePts + excellenceBonus + goodPlusBonus) + weights.extraSessionBonus;
+                } else if (sType === 'حصة أساسية' || sType === 'حصة تعويضية') {
                     dayPts += weights.sessionWeight;
                     if (stats.attendance !== null) {
                         dayPts += Math.round((stats.attendance / 100) * weights.attendanceWeight);
                     }
-                    if (sType === 'حصة تعويضية' || sType === 'حصة إضافية') {
+                    if (sType === 'حصة تعويضية') {
                         dayPts += weights.extraSessionBonus;
                     }
                     let excellenceBonus = 0;

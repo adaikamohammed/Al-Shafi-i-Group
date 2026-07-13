@@ -358,10 +358,11 @@ export async function GET(request: Request) {
                     if (stats.type === 'يوم عطلة') { holidays++; return; }
                     if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
-                    const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                    const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية';
+                    const isExtra = stats.type === 'حصة إضافية';
                     if (isReal) {
                         sessions++;
-                        if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
+                        if (stats.type === 'حصة تعويضية') {
                             extraSessions++;
                         }
                         if (stats.attendance !== null) {
@@ -373,9 +374,18 @@ export async function GET(request: Request) {
                             excCount++;
                         }
                         if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
-                        
-                        // تنقيط التوقيت المتدرج للحسابات التاريخية (محايد = 0 لعدم توفر createdAt)
-                        // تُحسب بصفر للشهور السابقة لتجنب تأثير السجلات القديمة
+                    } else if (isExtra) {
+                        sessions += 0.5;
+                        extraSessions++;
+                        if (stats.attendance !== null) {
+                            attTotal += stats.attendance;
+                            attCount++;
+                        }
+                        if (stats.excellent !== null) {
+                            excTotal += stats.excellent;
+                            excCount++;
+                        }
+                        if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
                     }
                 });
 
@@ -434,10 +444,11 @@ export async function GET(request: Request) {
                 if (stats.type === 'يوم عطلة') { holidays++; return; }
                 if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
-                const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية';
+                const isExtra = stats.type === 'حصة إضافية';
                 if (isReal) {
                     sessions++;
-                    if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
+                    if (stats.type === 'حصة تعويضية') {
                         extraSessions++;
                     }
                     if (stats.attendance !== null) {
@@ -450,7 +461,20 @@ export async function GET(request: Request) {
                     }
                     if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
                     
-                    // تنقيط التوقيت المتدرج لشهر التقرير الحالي
+                    punctualSessions += getSessionTimingPoints(stats.session, weights);
+                } else if (isExtra) {
+                    sessions += 0.5;
+                    extraSessions++;
+                    if (stats.attendance !== null) {
+                        attTotal += stats.attendance;
+                        attCount++;
+                    }
+                    if (stats.excellent !== null) {
+                        excTotal += stats.excellent;
+                        excCount++;
+                    }
+                    if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
+                    
                     punctualSessions += getSessionTimingPoints(stats.session, weights);
                 }
             });

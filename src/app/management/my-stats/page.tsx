@@ -787,12 +787,28 @@ export default function MyStatsPage() {
                     if (stats.type === 'يوم عطلة') { holidays++; return; }
                     if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
-                    const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                    const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية';
+                    const isExtra = stats.type === 'حصة إضافية';
                     const isActivity = stats.type === 'حصة أنشطة';
                     if (isReal) {
                         sessions++;
                         basicCount++;
-                        if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
+                        if (stats.type === 'حصة تعويضية') {
+                            extraSessions++;
+                        }
+                        if (stats.attendance !== null) {
+                            attTotal += stats.attendance;
+                            attCount++;
+                            if (stats.attendance >= 90) highAttDays++;
+                        }
+                        if (stats.excellent !== null) {
+                            excTotal += stats.excellent;
+                            excCount++;
+                        }
+                        if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
+                    } else if (isExtra) {
+                        sessions += 0.5;
+                        if (stats.type === 'حصة إضافية') {
                             extraSessions++;
                         }
                         if (stats.attendance !== null) {
@@ -821,8 +837,7 @@ export default function MyStatsPage() {
             const avgAttendance = attCount > 0 ? Math.round(attTotal / attCount) : 0;
             const avgExcellent = excCount > 0 ? Math.round(excTotal / excCount) : 0;
             const avgGoodPlus = excCount > 0 ? Math.round(gpTotal / excCount) : 0;
-            const weightedSessionsCount = basicCount + activityCount * 0.5;
-            const commitmentRate = workingDays > 0 ? Math.round((weightedSessionsCount / workingDays) * 100) : 0;
+            const commitmentRate = workingDays > 0 ? Math.round((sessions / workingDays) * 100) : 0;
 
             const pts = calculatePoints({
                 basicSessions: basicCount,
@@ -848,7 +863,7 @@ export default function MyStatsPage() {
                 punctualityPoints: 0,   // لا تحسب هنا (تأتي من Firebase أو صفحة الإدارة)
                 punctualSessions: 0,
                 lateSessions: 0,
-                totalSessions: basicCount + activityCount,
+                totalSessions: sessions,
                 basicSessions: basicCount,
                 activitySessions: activityCount,
                 holidaySessions: holidays,
@@ -958,12 +973,28 @@ export default function MyStatsPage() {
                 if (stats.type === 'يوم عطلة') { holidays++; return; }
                 if (stats.type === 'غياب الشيخ') { sheikhabsences++; return; }
 
-                const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية';
+                const isReal = stats.type === 'حصة أساسية' || stats.type === 'حصة تعويضية';
+                const isExtra = stats.type === 'حصة إضافية';
                 const isActivity = stats.type === 'حصة أنشطة';
                 if (isReal) {
                     sessions++;
                     basicCount++;
-                    if (stats.type === 'حصة تعويضية' || stats.type === 'حصة إضافية') {
+                    if (stats.type === 'حصة تعويضية') {
+                        extraSessions++;
+                    }
+                    if (stats.attendance !== null) {
+                        attTotal += stats.attendance;
+                        attCount++;
+                        if (stats.attendance >= 90) highAttDays++;
+                    }
+                    if (stats.excellent !== null) {
+                        excTotal += stats.excellent;
+                        excCount++;
+                    }
+                    if (stats.goodPlus !== null) gpTotal += stats.goodPlus;
+                } else if (isExtra) {
+                    sessions += 0.5;
+                    if (stats.type === 'حصة إضافية') {
                         extraSessions++;
                     }
                     if (stats.attendance !== null) {
@@ -991,8 +1022,7 @@ export default function MyStatsPage() {
             const avgAttendance = attCount > 0 ? Math.round(attTotal / attCount) : 0;
             const avgExcellent = excCount > 0 ? Math.round(excTotal / excCount) : 0;
             const avgGoodPlus = excCount > 0 ? Math.round(gpTotal / excCount) : 0;
-            const weightedSessionsCount = basicCount + activityCount * 0.5;
-            const commitmentRate = workingDays > 0 ? Math.round((weightedSessionsCount / workingDays) * 100) : 0;
+            const commitmentRate = workingDays > 0 ? Math.round((sessions / workingDays) * 100) : 0;
 
             const hasData = (basicCount + activityCount) > 0;
 
@@ -1018,7 +1048,7 @@ export default function MyStatsPage() {
                 attendancePoints: pts.attendancePoints,
                 commitmentPoints: pts.commitmentPoints,
                 extraSessionBonus: pts.extraSessionBonus,
-                totalSessions: basicCount + activityCount,
+                totalSessions: sessions,
                 totalDays,
                 avgAttendance,
                 avgExcellent,
