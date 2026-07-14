@@ -419,6 +419,7 @@ function RegisterSessionContent() {
                             attendance: record.attendance,
                             memorization: record.memorization,
                             behavior: record.behavior,
+                            bonus: record.bonus || '',
                             notes: record.notes,
                             review: record.review,
                             isDelayed: record.isDelayed || false,
@@ -522,6 +523,7 @@ function RegisterSessionContent() {
                 attendance: '' as AttendanceStatus,
                 memorization: '' as PerformanceLevel,
                 behavior: '' as BehaviorLevel,
+                bonus: '',
                 notes: '',
                 review: false
             };
