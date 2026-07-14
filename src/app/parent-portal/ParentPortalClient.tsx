@@ -152,6 +152,17 @@ const ParentPortalContent = ({
                     if (record.review && pointsConfig.review?.completed) {
                         studentScores[record.studentId].points += pointsConfig.review.completed;
                     }
+                    if (record.bonus) {
+                        const BONUS_POINTS: Record<string, number> = {
+                            'مشاركة مميزة': 1,
+                            'تفاعل إيجابي': 1.5,
+                            'انضباط متميز': 2,
+                            'حفظ زائد': 3,
+                            'لا يوجد': 0,
+                            '': 0
+                        };
+                        studentScores[record.studentId].points += BONUS_POINTS[record.bonus] ?? 0;
+                    }
                     if (record.attendance === 'غائب') studentScores[record.studentId].stats.absent++;
                     if (record.attendance === 'تعويض') studentScores[record.studentId].stats.makeup++;
                     if (record.behavior === 'هادئ') studentScores[record.studentId].stats.calm++;

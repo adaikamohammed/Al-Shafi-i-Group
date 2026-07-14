@@ -574,7 +574,7 @@ export async function GET(request: Request) {
                 groupName: student.groupName || 'غير محدد',
                 memorizationMultiplier: student.memorizationMultiplier ?? 1.0,
                 points: 0,
-                pointsBreakdown: { hifz: 0, attendance: 0, behavior: 0 },
+                pointsBreakdown: { hifz: 0, attendance: 0, behavior: 0, bonus: 0 },
                 stats: {
                     present: 0,
                     absent: 0,
@@ -661,6 +661,20 @@ export async function GET(request: Request) {
                         if (behaviorLevel === 'مقبول') studentScores[studentId].stats.medium++;
                         if (behaviorLevel === 'مشاغب') studentScores[studentId].stats.undisciplined++;
                     }
+
+                    // Bonus points
+                    if (record.bonus) {
+                        const BONUS_POINTS: Record<string, number> = {
+                            'مشاركة مميزة': 1,
+                            'تفاعل إيجابي': 1.5,
+                            'انضباط متميز': 2,
+                            'حفظ زائد': 3,
+                            'لا يوجد': 0,
+                            '': 0
+                        };
+                        const bp = BONUS_POINTS[record.bonus] ?? 0;
+                        studentScores[studentId].pointsBreakdown.bonus += bp;
+                    }
                 }
             });
         });
@@ -682,7 +696,7 @@ export async function GET(request: Request) {
                     }
                 });
                 score.stats.commitmentBalance = (score.stats.present + score.stats.makeup) - score.stats.absent;
-                score.points = score.pointsBreakdown.hifz + score.pointsBreakdown.attendance + score.pointsBreakdown.behavior;
+                score.points = score.pointsBreakdown.hifz + score.pointsBreakdown.attendance + score.pointsBreakdown.behavior + score.pointsBreakdown.bonus;
             }
         });
 

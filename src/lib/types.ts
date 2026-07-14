@@ -116,6 +116,7 @@ export interface DailyRecord {
   makeupSessions?: MakeupSession[];
   behavior: BehaviorLevel | null;
   notes?: string;
+  bonus?: string | null;
   surahId?: number;
   fromVerse?: number;
   toVerse?: number;

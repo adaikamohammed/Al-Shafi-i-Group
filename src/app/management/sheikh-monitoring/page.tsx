@@ -156,6 +156,7 @@ function calculateFairStudentStats({
             totalBehaviorEvals: 0,
             avgBehaviorScore: 0,
             overallScore: 0,
+            bonusPointsSum: 0,
             totalSessions: 0,
             weightedSessions: 0,
             assessedMemorization: 0,
@@ -255,6 +256,18 @@ function calculateFairStudentStats({
                 else st.behaviorBad++;
             }
 
+            if (r.bonus) {
+                const BONUS_POINTS: Record<string, number> = {
+                    'مشاركة مميزة': 1,
+                    'تفاعل إيجابي': 1.5,
+                    'انضباط متميز': 2,
+                    'حفظ زائد': 3,
+                    'لا يوجد': 0,
+                    '': 0
+                };
+                st.bonusPointsSum += (BONUS_POINTS[r.bonus] ?? 0) * weight;
+            }
+
             // حصص التعويض الفردية — لا تؤثر على weightedSessions (نسبة المجموعة)
             if (r.makeupSessions && Array.isArray(r.makeupSessions)) {
                 r.makeupSessions.forEach((makeup: any) => {
@@ -323,7 +336,7 @@ function calculateFairStudentStats({
         const behPct = maxBehPoints > 0 ? (st.behaviorPointsSum / maxBehPoints) * 100 : 0;
 
         const academicScore = (attPct + memoPct) / 2;
-        const overallScore = Math.max(0, Math.round(academicScore * 10) / 10);
+        const overallScore = Math.min(100, Math.max(0, Math.round((academicScore + st.bonusPointsSum) * 10) / 10));
 
         const avgEvalScore = st.assessedMemorization > 0 ? Math.round((st.memorizationPointsSum / st.assessedMemorization) * 10) / 10 : 0;
         const avgBehaviorScore = st.assessedBehavior > 0 ? Math.round((st.behaviorPointsSum / st.assessedBehavior) * 10) / 10 : 0;
@@ -4999,6 +5012,7 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                                 <th className="p-2 border-l text-center min-w-[40px] font-bold text-rose-600">ضعيف</th>
                                 <th className="p-2 border-l text-center min-w-[50px] font-bold text-teal-700">السلوك</th>
                                 <th className="p-2 border-l text-center min-w-[55px] font-bold">متوسط التقييم</th>
+                                <th className="p-2 border-l text-center min-w-[50px] font-bold text-purple-700">البونص</th>
                                 <th className="p-2 text-center min-w-[55px] font-bold text-purple-700">النقاط</th>
                             </tr>
                         </thead>
@@ -5078,6 +5092,9 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                                                         s.avgEvalScore >= 1.67 ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"
                                             )}>{s.avgEvalScore.toFixed(1)}</span>
                                         </td>
+                                        <td className="p-2 border-l text-center font-bold text-purple-700 bg-purple-50/30">
+                                            +{s.bonusPointsSum.toFixed(1)}ن
+                                        </td>
                                         <td className="p-2 text-center">
                                             <span className="font-black text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg">{s.overallScore}</span>
                                         </td>
@@ -5085,7 +5102,7 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                                 );
                             })}
                             {searchedRanked.length === 0 && (
-                                <tr><td colSpan={13} className="p-8 text-center text-muted-foreground">لا توجد نتائج مطابقة للبحث</td></tr>
+                                <tr><td colSpan={14} className="p-8 text-center text-muted-foreground">لا توجد نتائج مطابقة للبحث</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -5362,6 +5379,11 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                                 <td className="p-1.5 text-center font-black text-purple-700">×0.5</td>
                                 <td className="p-1.5 text-muted-foreground">حضور فقط بوزن 50% — لا تقييم أكاديمي ولا سلوك يُحتسب</td>
                             </tr>
+                            <tr className="border-b bg-purple-50/20">
+                                <td className="p-1.5 font-bold text-purple-700">⭐ بونص إضافي</td>
+                                <td className="p-1.5 text-center font-black text-purple-700">+1 إلى +3</td>
+                                <td className="p-1.5 text-muted-foreground">مشاركة مميزة (+1) · تفاعل (+1.5) · انضباط (+2) · حفظ زائد (+3) ← تُضاف للتقييم الإجمالي</td>
+                            </tr>
                             <tr className="bg-rose-50/30">
                                 <td className="p-1.5 font-bold text-rose-600">⏰ خصم التأخر</td>
                                 <td className="p-1.5 text-center font-black text-rose-600">-2</td>
@@ -5465,7 +5487,7 @@ function StudentScoreDetailModal({
     type DayRec = {
         date: string; label: string; sessionType: string;
         attendance: string; memorization: string | null;
-        behavior: string | null; isReview: boolean;
+        behavior: string | null; bonus: string | null; isReview: boolean;
         evalGrade: number; behaviorGrade: number; isLate: boolean;
         weight: number;
         isDelayed: boolean;
@@ -5587,6 +5609,7 @@ function StudentScoreDetailModal({
                     isReview: isActivitySess ? false : isReview,
                     evalGrade: isActivitySess ? 0 : evalGrade,
                     behaviorGrade: isActivitySess ? 0 : behaviorGrade,
+                    bonus: isActivitySess ? null : (myRec?.bonus || null),
                     isLate,
                     weight,
                     isDelayed,
@@ -5604,6 +5627,7 @@ function StudentScoreDetailModal({
     let attendancePointsSum = 0;
     let memorizationPointsSum = 0;
     let behaviorPointsSum = 0;
+    let bonusPointsSum = 0;
 
     dayRecords.forEach(rec => {
         const weight = rec.weight;
@@ -5645,6 +5669,18 @@ function StudentScoreDetailModal({
             assessedBehavior += weight;
             behaviorPointsSum += getBehPoints(rec.behavior) * weight;
         }
+
+        if (rec.bonus) {
+            const BONUS_POINTS: Record<string, number> = {
+                'مشاركة مميزة': 1,
+                'تفاعل إيجابي': 1.5,
+                'انضباط متميز': 2,
+                'حفظ زائد': 3,
+                'لا يوجد': 0,
+                '': 0
+            };
+            bonusPointsSum += (BONUS_POINTS[rec.bonus] ?? 0) * weight;
+        }
     });
 
     const maxAttPoints = weightedSessions * maxAttendanceVal;
@@ -5656,7 +5692,7 @@ function StudentScoreDetailModal({
     const behPct = maxBehPoints > 0 ? (behaviorPointsSum / maxBehPoints) * 100 : 0;
 
     const academicScore = (attPct + memoPct) / 2;
-    const score = Math.max(0, Math.round(academicScore * 10) / 10);
+    const score = Math.min(100, Math.max(0, Math.round((academicScore + bonusPointsSum) * 10) / 10));
 
     const isUnclassified = groupRank === 0 || overallRank === 0;
 
@@ -5685,12 +5721,13 @@ function StudentScoreDetailModal({
                     <button onClick={onClose} className="text-white/70 hover:text-white text-2xl font-bold leading-none mt-1">×</button>
                 </div>
                 {/* Score breakdown */}
-                <div className="grid grid-cols-4 gap-0 border-b shrink-0 divide-x divide-border">
+                <div className="grid grid-cols-5 gap-0 border-b shrink-0 divide-x divide-border">
                     {[
                         { label: 'الحضور', val: `${attPct.toFixed(1)}%`, pts: attendancePointsSum, max: maxAttPoints, color: 'text-amber-700' },
                         { label: 'التقييم الأكاديمي', val: `${memoPct.toFixed(1)}%`, pts: memorizationPointsSum, max: maxMemoPoints, color: 'text-emerald-700' },
                         { label: 'السلوك', val: `${behPct.toFixed(1)}%`, pts: behaviorPointsSum, max: maxBehPoints, color: 'text-teal-700' },
-                        { label: 'المعدل العام', val: `${score.toFixed(1)}%`, pts: null, max: null, color: 'text-purple-700' },
+                        { label: 'البونص', val: `+${bonusPointsSum.toFixed(1)}ن`, pts: null, max: null, color: 'text-purple-700' },
+                        { label: 'المعدل العام', val: `${score.toFixed(1)}%`, pts: null, max: null, color: 'text-purple-805' },
                     ].map(c => (
                         <div key={c.label} className="text-center py-2.5 px-1">
                             <div className="text-[10px] text-muted-foreground mb-0.5">{c.label}</div>
@@ -5711,6 +5748,7 @@ function StudentScoreDetailModal({
                                 <th className="p-2 text-center font-bold">الحضور</th>
                                 <th className="p-2 text-center font-bold">التقييم</th>
                                 <th className="p-2 text-center font-bold">السلوك</th>
+                                <th className="p-2 text-center font-bold text-purple-700">البونص</th>
                                 <th className="p-2 text-center font-bold text-purple-700">المساهمة</th>
                             </tr>
                         </thead>
@@ -5731,7 +5769,16 @@ function StudentScoreDetailModal({
                                 }
                                 const dayEvalContrib = isPresent && maxMemoPoints > 0 ? (dayEvalPoints / maxMemoPoints) * 100 : 0;
                                 
-                                const dayTotal = Math.round((dayAttContrib + dayEvalContrib) / 2 * 10) / 10;
+                                const BONUS_POINTS: Record<string, number> = {
+                                    'مشاركة مميزة': 1,
+                                    'تفاعل إيجابي': 1.5,
+                                    'انضباط متميز': 2,
+                                    'حفظ زائد': 3,
+                                    'لا يوجد': 0,
+                                    '': 0
+                                };
+                                const dayBonusPoints = rec.bonus ? (BONUS_POINTS[rec.bonus] ?? 0) * rec.weight : 0;
+                                const dayTotal = Math.round(((dayAttContrib + dayEvalContrib) / 2 + dayBonusPoints) * 10) / 10;
                                 
                                 return (
                                     <tr key={rec.date + i} className={cn('border-b', isAbsent ? 'bg-rose-50/40' : rec.isLate ? 'bg-amber-50/30' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50/20')}>
@@ -5755,6 +5802,13 @@ function StudentScoreDetailModal({
                                             {rec.behavior ? (
                                                 <span className={cn('font-bold', rec.behaviorGrade >= (maxBehaviorVal * 0.75) ? 'text-teal-700' : rec.behaviorGrade >= (maxBehaviorVal * 0.5) ? 'text-blue-600' : 'text-rose-600')}>
                                                     {rec.behavior}<span className="text-[9px] ml-0.5">({rec.behaviorGrade}/{maxBehaviorVal})</span>
+                                                </span>
+                                            ) : <span className="text-muted-foreground/30">—</span>}
+                                        </td>
+                                        <td className="p-1.5 text-center">
+                                            {rec.bonus ? (
+                                                <span className="font-bold text-purple-700 bg-purple-50 px-1 py-0.5 rounded text-[10px]" title={rec.bonus}>
+                                                    {rec.bonus}
                                                 </span>
                                             ) : <span className="text-muted-foreground/30">—</span>}
                                         </td>

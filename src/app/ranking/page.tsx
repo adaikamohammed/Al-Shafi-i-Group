@@ -29,6 +29,7 @@ interface StudentScore {
         hifz: number;
         attendance: number;
         behavior: number;
+        bonus: number;
     };
     stats: {
         present: number;
@@ -96,7 +97,7 @@ export default function RankingPage() {
                 photoURL: student.photoURL,
                 status: student.status,
                 points: 0,
-                pointsBreakdown: { hifz: 0, attendance: 0, behavior: 0 },
+                pointsBreakdown: { hifz: 0, attendance: 0, behavior: 0, bonus: 0 },
                 stats: { present: 0, absent: 0, late: 0, makeup: 0, excellent: 0, good: 0, average: 0, calm: 0, medium: 0, undisciplined: 0, reviewed: 0, commitmentBalance: 0 }
             };
         });
@@ -129,6 +130,18 @@ export default function RankingPage() {
                         if ((record.behavior as string) === 'متوسط' || record.behavior === 'مقبول') studentScores[studentId].stats.medium++;
                         if ((record.behavior as string) === 'غير منضبط' || record.behavior === 'مشاغب') studentScores[studentId].stats.undisciplined++;
                     }
+                    if (record.bonus) {
+                        const BONUS_POINTS: Record<string, number> = {
+                            'مشاركة مميزة': 1,
+                            'تفاعل إيجابي': 1.5,
+                            'انضباط متميز': 2,
+                            'حفظ زائد': 3,
+                            'لا يوجد': 0,
+                            '': 0
+                        };
+                        const bp = BONUS_POINTS[record.bonus] ?? 0;
+                        studentScores[studentId].pointsBreakdown.bonus += bp;
+                    }
                     if (record.review && pointsConfig.review?.completed) {
                         studentScores[studentId].pointsBreakdown.hifz += pointsConfig.review.completed;
                         studentScores[studentId].stats.reviewed++;
@@ -150,7 +163,7 @@ export default function RankingPage() {
                     }
                 })
                 score.stats.commitmentBalance = (score.stats.present + score.stats.makeup) - score.stats.absent;
-                score.points = score.pointsBreakdown.hifz + score.pointsBreakdown.attendance + score.pointsBreakdown.behavior;
+                score.points = score.pointsBreakdown.hifz + score.pointsBreakdown.attendance + score.pointsBreakdown.behavior + score.pointsBreakdown.bonus;
             }
         });
 
@@ -252,6 +265,7 @@ export default function RankingPage() {
                                                     <p>التحصيل: {topStudents[1].pointsBreakdown.hifz.toFixed(1)}</p>
                                                     <p>المواظبة: {topStudents[1].pointsBreakdown.attendance.toFixed(1)}</p>
                                                     <p>السلوك: {topStudents[1].pointsBreakdown.behavior.toFixed(1)}</p>
+                                                    {topStudents[1].pointsBreakdown.bonus > 0 && <p className="text-purple-600 font-bold">البونص: +{topStudents[1].pointsBreakdown.bonus.toFixed(1)}</p>}
                                                 </TooltipContent>
                                             </Tooltip>
                                         </div>
@@ -282,6 +296,7 @@ export default function RankingPage() {
                                                     <p>التحصيل: {topStudents[0].pointsBreakdown.hifz.toFixed(1)}</p>
                                                     <p>المواظبة: {topStudents[0].pointsBreakdown.attendance.toFixed(1)}</p>
                                                     <p>السلوك: {topStudents[0].pointsBreakdown.behavior.toFixed(1)}</p>
+                                                    {topStudents[0].pointsBreakdown.bonus > 0 && <p className="text-purple-600 font-bold">البونص: +{topStudents[0].pointsBreakdown.bonus.toFixed(1)}</p>}
                                                 </TooltipContent>
                                             </Tooltip>
                                         </div>
@@ -304,6 +319,7 @@ export default function RankingPage() {
                                                     <p>التحصيل: {topStudents[2].pointsBreakdown.hifz.toFixed(1)}</p>
                                                     <p>المواظبة: {topStudents[2].pointsBreakdown.attendance.toFixed(1)}</p>
                                                     <p>السلوك: {topStudents[2].pointsBreakdown.behavior.toFixed(1)}</p>
+                                                    {topStudents[2].pointsBreakdown.bonus > 0 && <p className="text-purple-600 font-bold">البونص: +{topStudents[2].pointsBreakdown.bonus.toFixed(1)}</p>}
                                                 </TooltipContent>
                                             </Tooltip>
                                         </div>
@@ -407,7 +423,23 @@ export default function RankingPage() {
                                                                 </TooltipContent>
                                                             </Tooltip>
                                                         </TableCell>
-                                                        <TableCell className="text-center"><Badge variant="default" className="text-base">{student.points.toFixed(1)}</Badge></TableCell>
+                                                        <TableCell className="text-center">
+                                                            <Tooltip>
+                                                                <TooltipTrigger>
+                                                                    <Badge variant="default" className="text-base cursor-help">{student.points.toFixed(1)}</Badge>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <div className="text-xs space-y-1 text-right" dir="rtl">
+                                                                        <p>📚 التحصيل: {student.pointsBreakdown.hifz.toFixed(1)}ن</p>
+                                                                        <p>🎯 المواظبة: {student.pointsBreakdown.attendance.toFixed(1)}ن</p>
+                                                                        <p>🤝 السلوك: {student.pointsBreakdown.behavior.toFixed(1)}ن</p>
+                                                                        {student.pointsBreakdown.bonus > 0 && (
+                                                                            <p className="text-purple-650 font-bold">⭐ البونص: +{student.pointsBreakdown.bonus.toFixed(1)}ن</p>
+                                                                        )}
+                                                                    </div>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TableCell>
                                                     </TableRow>
                                                 )
                                             })}

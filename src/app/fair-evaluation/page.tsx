@@ -46,6 +46,15 @@ const BEHAVIOR_POINTS: Record<string, number> = {
     'غير منضبط': 0, // قيمة قديمة - تُحوّل إلى مشاغب
 };
 
+const BONUS_POINTS: Record<string, number> = {
+    'مشاركة مميزة': 1,
+    'تفاعل إيجابي': 1.5,
+    'انضباط متميز': 2,
+    'حفظ زائد': 3,
+    'لا يوجد': 0,
+    '': 0
+};
+
 interface StudentEvaluationRow {
     id: string;
     name: string;
@@ -76,6 +85,7 @@ interface StudentEvaluationRow {
     attendanceRate: number;
     memorizationRate: number;
     behaviorRate: number;
+    bonusPointsSum: number;
     
     // Final Scores
     academicScore: number;
@@ -256,6 +266,7 @@ export default function FairEvaluationPage() {
                 attendanceRate: 0,
                 memorizationRate: 0,
                 behaviorRate: 0,
+                bonusPointsSum: 0,
                 academicScore: 0,
                 comprehensiveScore: 0,
                 monthlyHistory: [],
@@ -336,6 +347,11 @@ export default function FairEvaluationPage() {
                     if (score.behaviorCounts[behKey] !== undefined) {
                         score.behaviorCounts[behKey]++;
                     }
+                }
+
+                // C.2 Bonus
+                if (record.bonus) {
+                    score.bonusPointsSum += (BONUS_POINTS[record.bonus] ?? 0) * weight;
                 }
 
                 // D. حصص التعويض الفردية — لا تؤثر على weightedSessions (نسبة المجموعة)
@@ -446,6 +462,7 @@ export default function FairEvaluationPage() {
                 attendanceRate: number;
                 memorizationRate: number;
                 behaviorRate: number;
+                bonusPointsSum: number;
                 score: number;
             }> = {};
 
@@ -459,6 +476,7 @@ export default function FairEvaluationPage() {
                     attendanceRate: 0,
                     memorizationRate: 0,
                     behaviorRate: 0,
+                    bonusPointsSum: 0,
                     score: 0
                 };
             });
@@ -500,6 +518,9 @@ export default function FairEvaluationPage() {
                     if (record.behavior && record.behavior !== '') {
                         mScore.assessedBehavior += weight;
                         mScore.behaviorRate += getBehPoints(record.behavior) * weight;
+                    }
+                    if (record.bonus) {
+                        mScore.bonusPointsSum += (BONUS_POINTS[record.bonus] ?? 0) * weight;
                     }
 
                     // Process makeup sessions for monthly rankings
@@ -551,8 +572,8 @@ export default function FairEvaluationPage() {
                 const memoPct = maxMemoPoints > 0 ? (score.memorizationRate / maxMemoPoints) * 100 : 0;
                 const behPct = maxBehPoints > 0 ? (score.behaviorRate / maxBehPoints) * 100 : 0;
 
-                const academic = (attPct + memoPct) / 2;
-                const comprehensive = score.assessedBehavior > 0 ? (attPct + memoPct + behPct) / 3 : academic;
+                const academic = Math.min(100, ((attPct + memoPct) / 2) + score.bonusPointsSum);
+                const comprehensive = Math.min(100, (score.assessedBehavior > 0 ? (attPct + memoPct + behPct) / 3 : ((attPct + memoPct) / 2)) + score.bonusPointsSum);
 
                 let finalScore = 0;
                 if (sortBy === 'comprehensiveScore') finalScore = comprehensive;
@@ -611,8 +632,8 @@ export default function FairEvaluationPage() {
             const memoPct = maxMemoPoints > 0 ? (score.memorizationRate / maxMemoPoints) * 100 : 0;
             const behPct = maxBehPoints > 0 ? (score.behaviorRate / maxBehPoints) * 100 : 0;
 
-            const academic = (attPct + memoPct) / 2;
-            const comprehensive = score.assessedBehavior > 0 ? (attPct + memoPct + behPct) / 3 : academic;
+            const academic = Math.min(100, ((attPct + memoPct) / 2) + score.bonusPointsSum);
+            const comprehensive = Math.min(100, (score.assessedBehavior > 0 ? (attPct + memoPct + behPct) / 3 : ((attPct + memoPct) / 2)) + score.bonusPointsSum);
 
             // Monthly history compilation
             const monthlyHistory = monthsWithSessions.map(m => {
@@ -1393,6 +1414,7 @@ export default function FairEvaluationPage() {
                                         <TableHead className="text-center font-bold">{showTableCounts ? "المواظبة (حضور)" : "المواظبة %"}</TableHead>
                                         <TableHead className="text-center font-bold">{showTableCounts ? "جودة الحفظ (تكرار)" : "جودة الحفظ %"}</TableHead>
                                         <TableHead className="text-center font-bold">{showTableCounts ? "السلوك (تكرار)" : "السلوك %"}</TableHead>
+                                        <TableHead className="text-center font-bold text-purple-700 bg-purple-50/50">البونص</TableHead>
                                         <TableHead className="text-center font-bold text-primary bg-primary/5">الأكاديمي %</TableHead>
                                         <TableHead className="text-center font-bold text-indigo-700 bg-indigo-50/50">الشامل %</TableHead>
                                     </TableRow>
@@ -1544,6 +1566,7 @@ export default function FairEvaluationPage() {
                                                             </div>
                                                         )}
                                                     </TableCell>
+                                                    <TableCell className="text-center font-bold text-sm text-purple-750 bg-purple-50/15">+{s.bonusPointsSum.toFixed(1)}ن</TableCell>
                                                     <TableCell className={cn("text-center font-black text-sm bg-primary/5", sortBy === 'academicScore' && "bg-primary/10 text-primary")}>
                                                         {s.academicScore}%
                                                     </TableCell>
@@ -1553,7 +1576,7 @@ export default function FairEvaluationPage() {
                                                 </TableRow>,
                                                 isExpanded && (
                                                     <TableRow key={`${s.id}-expanded`} className="bg-slate-50/40 dark:bg-slate-900/10 border-t-0">
-                                                        <TableCell colSpan={8} className="p-4 sm:p-6 bg-slate-50/30 dark:bg-slate-900/20">
+                                                        <TableCell colSpan={9} className="p-4 sm:p-6 bg-slate-50/30 dark:bg-slate-900/20">
                                                             <StudentDetailCard student={s} maxSessions={evaluationData.maxSessionsInPeriod} />
                                                         </TableCell>
                                                     </TableRow>
@@ -1562,7 +1585,7 @@ export default function FairEvaluationPage() {
                                         })
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={8} className="text-center h-24 text-muted-foreground">
+                                            <TableCell colSpan={9} className="text-center h-24 text-muted-foreground">
                                                 لا توجد بيانات حضور مسجلة ومستوفية للحد الأدنى في هذه الفترة.
                                             </TableCell>
                                         </TableRow>
@@ -1595,6 +1618,8 @@ export default function FairEvaluationPage() {
                                             <TableHead className="text-center font-bold">{showTableCounts ? "المواظبة (حضور)" : "المواظبة %"}</TableHead>
                                             <TableHead className="text-center font-bold">{showTableCounts ? "جودة الحفظ (تكرار)" : "جودة الحفظ %"}</TableHead>
                                             <TableHead className="text-center font-bold">{showTableCounts ? "السلوك (تكرار)" : "السلوك %"}</TableHead>
+                                         <TableHead className="text-center font-bold text-purple-700 bg-purple-50/50">البونص</TableHead>
+  
                                             <TableHead className="text-center font-bold text-muted-foreground bg-slate-50/50">الأكاديمي %</TableHead>
                                             <TableHead className="text-center font-bold text-muted-foreground bg-slate-50/50">الشامل %</TableHead>
                                         </TableRow>
@@ -1993,7 +2018,7 @@ function StudentDetailCard({ student, maxSessions }: { student: StudentEvaluatio
             )}
 
             {/* Metrics Breakdowns */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Attendance */}
                 <div className="p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 border shadow-sm space-y-3">
                     <div className="flex items-center gap-2 text-emerald-600 border-b pb-2 border-slate-100 dark:border-slate-800">
@@ -2081,6 +2106,23 @@ function StudentDetailCard({ student, maxSessions }: { student: StudentEvaluatio
                             <span className="text-muted-foreground">إجمالي التقييمات:</span>
                             <span className="text-primary">{student.assessedBehavior} مرات</span>
                         </div>
+                    </div>
+                </div>
+
+                {/* Bonus */}
+                <div className="p-4 rounded-2xl bg-purple-50/30 dark:bg-purple-950/10 border border-purple-100 dark:border-purple-900/50 shadow-sm space-y-3">
+                    <div className="flex items-center gap-2 text-purple-650 dark:text-purple-400 border-b pb-2 border-purple-100 dark:border-purple-900/50">
+                        <Sparkles className="h-5 w-5" />
+                        <span className="font-headline font-bold text-sm">البونص والنقاط الإضافية</span>
+                    </div>
+                    <div className="space-y-2 text-xs font-bold font-body">
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">إجمالي نقاط البونص:</span>
+                            <span className="text-purple-700 dark:text-purple-400 font-black">+{student.bonusPointsSum.toFixed(1)} ن</span>
+                        </div>
+                        <p className="text-[10px] text-purple-600/80 dark:text-purple-400/80 leading-relaxed font-normal">
+                            تُضاف نقاط البونص هذه مباشرة للمعدل التقييمي العام (الأكاديمي والشامل) الخاص بالطالب لتحفيزه على التفوق والمشاركة.
+                        </p>
                     </div>
                 </div>
             </div>

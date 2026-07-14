@@ -35,6 +35,7 @@ export interface AttendanceRecord {
     behavior: BehaviorLevel;
     notes: string;
     review: boolean;
+    bonus?: string;
     isDelayed?: boolean;
     surahId?: number;
     fromVerse?: number;
@@ -263,6 +264,19 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                                             <SelectItem value="هادئ">هادئ</SelectItem>
                                                             <SelectItem value="مقبول">مقبول</SelectItem>
                                                             <SelectItem value="مشاغب">مشاغب</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+
+                                                    <Select value={record.bonus || ""} onValueChange={(val) => onUpdateRecord(student.id, 'bonus', val)} dir="rtl">
+                                                        <SelectTrigger className="h-8 md:h-9 text-[10px] md:text-xs font-bold w-[80px] md:w-[100px] border-purple-200 focus:border-purple-400 bg-purple-50/20 text-purple-700">
+                                                            <SelectValue placeholder="بونص" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="لا يوجد">❌ لا يوجد</SelectItem>
+                                                            <SelectItem value="مشاركة مميزة">⭐ مشاركة (+1)</SelectItem>
+                                                            <SelectItem value="تفاعل إيجابي">✨ تفاعل (+1.5)</SelectItem>
+                                                            <SelectItem value="انضباط متميز">🏆 انضباط (+2)</SelectItem>
+                                                            <SelectItem value="حفظ زائد">📚 حفظ زائد (+3)</SelectItem>
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
