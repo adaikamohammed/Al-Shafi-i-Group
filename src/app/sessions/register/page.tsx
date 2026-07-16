@@ -25,16 +25,18 @@ import { ref as dbRef, get } from 'firebase/database';
 
 function RegisterSessionContent() {
     const { user, isSuperAdmin } = useAuth();
-    const { students, dailySessions, loading, getSessionsForDay, addDailySession, deleteDailySession, getSessionById } = useStudentContext();
+    const { students, dailySessions, loading, allUsers, getSessionsForDay, addDailySession, deleteDailySession, getSessionById, updateSheikhGroupSettings, updateStudent } = useStudentContext();
     const { toast } = useToast();
     const router = useRouter();
     const searchParams = useSearchParams();
 
     const isAdmin5 = user?.email === 'admin5@gmail.com';
+    const ownerIdParam = searchParams.get('ownerId');
+
+
 
     const dateParam = searchParams.get('date');
     const sessionNumParam = searchParams.get('session');
-    const ownerIdParam = searchParams.get('ownerId');
 
     const selectedDay = useMemo(() => {
         if (!dateParam) {
@@ -56,6 +58,22 @@ function RegisterSessionContent() {
         }
         return user?.uid;
     }, [isSuperAdmin, isManagement, ownerIdParam, user]);
+
+    const activeSheikhId = effectiveOwnerId || '';
+
+    const activeSheikh = useMemo(() => {
+        return (allUsers || []).find(u => u.uid === activeSheikhId) || null;
+    }, [allUsers, activeSheikhId]);
+
+    const groupMode = useMemo(() => {
+        return activeSheikh?.settings?.groupMemorizationMode || 'not_set';
+    }, [activeSheikh]);
+
+    const groupSurahConfig = useMemo(() => {
+        return activeSheikh?.settings?.groupSurah;
+    }, [activeSheikh]);
+
+    const isUnifiedMode = groupMode === 'unified';
 
     const sessionToOpen = useMemo(() => {
         const rawSession = sessionNumParam === '2' ? 2 : 1;
@@ -464,8 +482,31 @@ function RegisterSessionContent() {
                     // FIX: Stopped defaulting to Holiday on Thu/Fri per user request
                     setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة إضافية');
 
-                    // ✅ الذكاء التلقائي: حساب السورة الحالية من آخر حصة مسجلة
-                    if (isAdmin5 && sessionToOpen === 1) {
+                    if (isUnifiedMode && groupSurahConfig && sessionToOpen === 1) {
+                        const targetSurahId = groupSurahConfig.surahId;
+                        const lastTo = groupSurahConfig.lastTalqinTo || groupSurahConfig.currentVerse || 0;
+                        const lastFrom = groupSurahConfig.lastTalqinFrom || 1;
+
+                        setSurahId(targetSurahId);
+                        setTalqinSurahId(targetSurahId);
+                        
+                        const surahData = surahs.find(s => s.id === targetSurahId);
+                        const total = surahData?.verses || 286;
+
+                        if (lastTo >= total) {
+                            const nextId = (targetSurahId % 114) + 1;
+                            setTalqinSurahId(nextId);
+                            setTalqinFromVerse(1);
+                            setTalqinToVerse(1);
+                        } else {
+                            setTalqinFromVerse(lastTo + 1);
+                            setTalqinToVerse(lastTo + 1);
+                        }
+
+                        setTasmieSurahId(targetSurahId);
+                        setTasmieFromVerse(lastFrom);
+                        setTasmieToVerse(lastTo);
+                    } else if (isAdmin5 && sessionToOpen === 1) {
                         // نحاول أولاً من Firebase مباشرة لضمان أحدث البيانات
                         let sessionsSource: Record<string, Record<string, any>> = dailySessions || {};
 
@@ -654,6 +695,7 @@ function RegisterSessionContent() {
     const performSave = async (data: typeof sessionData): Promise<void> => {
         if (!selectedDay || !user) return;
         const dateStr = format(selectedDay, 'yyyy-MM-dd');
+        let sessionOwnerId: string | undefined = undefined;
 
         // Race Condition Guard: Ensure we are saving data for the currently loaded day
         // If loadedDate doesn't match dateStr, it means we navigated away but this save (from debounce) fired late.
@@ -680,7 +722,7 @@ function RegisterSessionContent() {
         let existingSessionCreatedAt: string | undefined = undefined;
         try {
             // 🔍 Detect session owner
-            let sessionOwnerId = effectiveOwnerId || user?.uid;
+            sessionOwnerId = effectiveOwnerId || user?.uid;
 
             if (!ownerIdParam) {
                 const contextSessions = getSessionsForDay(dateStr);
@@ -736,15 +778,15 @@ function RegisterSessionContent() {
                     ...d,
                     sessionId: id,
                     studentId,
-                    surahId: isAdmin5 ? (data.isCounterStopped ? null : data.talqinSurahId) : (d.surahId || null),
-                    fromVerse: isAdmin5 ? (data.isCounterStopped ? null : data.talqinFromVerse) : (d.fromVerse || null),
-                    toVerse: isAdmin5 ? (data.isCounterStopped ? null : data.talqinToVerse) : (d.toVerse || null),
-                    talqinSurahId: isAdmin5 ? data.talqinSurahId : null,
-                    talqinFromVerse: isAdmin5 ? data.talqinFromVerse : null,
-                    talqinToVerse: isAdmin5 ? data.talqinToVerse : null,
-                    tasmieSurahId: isAdmin5 ? data.tasmieSurahId : null,
-                    tasmieFromVerse: isAdmin5 ? data.tasmieFromVerse : null,
-                    tasmieToVerse: isAdmin5 ? data.tasmieToVerse : null,
+                    surahId: (d.surahId !== undefined && d.surahId !== null && d.surahId !== 0) ? d.surahId : ((isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? (data.isCounterStopped ? null : data.talqinSurahId) : null),
+                    fromVerse: (d.fromVerse !== undefined && d.fromVerse !== null) ? d.fromVerse : ((isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? (data.isCounterStopped ? null : data.talqinFromVerse) : null),
+                    toVerse: (d.toVerse !== undefined && d.toVerse !== null) ? d.toVerse : ((isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? (data.isCounterStopped ? null : data.talqinToVerse) : null),
+                    talqinSurahId: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.talqinSurahId : null,
+                    talqinFromVerse: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.talqinFromVerse : null,
+                    talqinToVerse: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.talqinToVerse : null,
+                    tasmieSurahId: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.tasmieSurahId : null,
+                    tasmieFromVerse: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.tasmieFromVerse : null,
+                    tasmieToVerse: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.tasmieToVerse : null,
                     catchUpRecords: d.catchUpRecords || [], // Save catch-up records
                     makeupSessions: d.makeupSessions || [], // حفظ حصص التعويض الفردية
                 };
@@ -763,17 +805,17 @@ function RegisterSessionContent() {
             substituteTeacher: (data.sessionType === 'غياب الشيخ' && data.substituteTeacher) ? data.substituteTeacher : null,
             activityType: (data.sessionType === 'حصة أنشطة' && data.activityType) ? data.activityType : null,
             activityDescription: (data.sessionType === 'حصة أنشطة' && data.activityDescription) ? data.activityDescription : null,
-            surahId: isAdmin5 ? data.surahId : null,
-            fromVerse: isAdmin5 ? (data.isCounterStopped ? null : data.talqinFromVerse) : null,
-            toVerse: isAdmin5 ? (data.isCounterStopped ? null : data.talqinToVerse) : null,
-            isReview: isAdmin5 ? data.isReview : false,
-            isCounterStopped: isAdmin5 ? data.isCounterStopped : false,
-            talqinSurahId: isAdmin5 ? data.talqinSurahId : null,
-            talqinFromVerse: isAdmin5 ? data.talqinFromVerse : null,
-            talqinToVerse: isAdmin5 ? data.talqinToVerse : null,
-            tasmieSurahId: isAdmin5 ? data.tasmieSurahId : null,
-            tasmieFromVerse: isAdmin5 ? data.tasmieFromVerse : null,
-            tasmieToVerse: isAdmin5 ? data.tasmieToVerse : null,
+            surahId: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.surahId : null,
+            fromVerse: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? (data.isCounterStopped ? null : data.talqinFromVerse) : null,
+            toVerse: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? (data.isCounterStopped ? null : data.talqinToVerse) : null,
+            isReview: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.isReview : false,
+            isCounterStopped: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.isCounterStopped : false,
+            talqinSurahId: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.talqinSurahId : null,
+            talqinFromVerse: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.talqinFromVerse : null,
+            talqinToVerse: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.talqinToVerse : null,
+            tasmieSurahId: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.tasmieSurahId : null,
+            tasmieFromVerse: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.tasmieFromVerse : null,
+            tasmieToVerse: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.tasmieToVerse : null,
             records: recordsArray,
             ...(existingSessionCreatedAt ? { createdAt: existingSessionCreatedAt } : {})
         };
@@ -783,6 +825,17 @@ function RegisterSessionContent() {
         console.log('📝 Saving Session:', { effectiveOwnerId, currentUserId: user?.uid, targetOwner, ownerIdParam });
         try {
             await addDailySession(sessionPayload, targetOwner);
+
+            if ((isUnifiedMode || groupMode === 'hybrid') && sessionOwnerId && data.talqinSurahId && data.talqinToVerse) {
+                await updateSheikhGroupSettings(sessionOwnerId, undefined, {
+                    surahId: data.talqinSurahId,
+                    currentVerse: data.talqinToVerse,
+                    lastTalqinFrom: data.talqinFromVerse,
+                    lastTalqinTo: data.talqinToVerse,
+                    startedAt: groupSurahConfig?.startedAt || new Date().toISOString().split('T')[0]
+                });
+            }
+
             toast({
                 title: "✅ تم حفظ الحصة",
                 description: "تم حفظ الحصة وتحديث التقييمات بنجاح.",
@@ -1073,6 +1126,69 @@ function RegisterSessionContent() {
         }
     }, [isSuperAdmin, isAdmin5, isManagement, ownerIdParam, toast]);
 
+    // ─── حساب آخر نقطة توقف لكل طالب ──────────────────
+    const studentLastProgress = useMemo(() => {
+        const progressMap = new Map<string, { surahId: number; toVerse: number }>();
+        if (!dailySessions || !activeSheikhId) return progressMap;
+
+        // 1. Flatten all sessions for this sheikh
+        const allSessions: any[] = Object.values(dailySessions)
+            .flatMap(day => Object.values(day as Record<string, any>))
+            .filter(s => s && s.ownerId === activeSheikhId);
+
+        // 2. Sort sessions descending (newest first)
+        allSessions.sort((a, b) => {
+            if (a.date === b.date) {
+                return (b.sessionNumber || 1) - (a.sessionNumber || 1);
+            }
+            return b.date.localeCompare(a.date);
+        });
+
+        // 3. Filter only PAST sessions
+        const selectedDateStr = format(selectedDay, 'yyyy-MM-dd');
+        const pastSessions = allSessions.filter(s => {
+            if (s.date < selectedDateStr) return true;
+            if (s.date === selectedDateStr && s.sessionNumber < sessionToOpen) return true;
+            return false;
+        });
+
+        // 4. Fill the map with the latest surah/verse for each student
+        const SESSION_TYPES_WITH_SURAH = ['حصة أساسية', 'حصة تعويضية', 'حصة إضافية'];
+        for (const sess of pastSessions) {
+            if (!SESSION_TYPES_WITH_SURAH.includes(sess.sessionType)) continue;
+            const globalSurah = sess.surahId;
+            const globalToVs = sess.toVerse;
+
+            const recs = Array.isArray(sess.records) 
+                ? sess.records 
+                : sess.records ? Object.values(sess.records) : [];
+
+            for (const rec of recs) {
+                if (progressMap.has(rec.studentId)) continue; // We only want the latest
+                if (!['حاضر', 'متأخر', 'تعويض'].includes(rec.attendance)) continue;
+
+                if (rec.surahId && rec.toVerse) {
+                    progressMap.set(rec.studentId, { surahId: rec.surahId, toVerse: rec.toVerse });
+                } else if (globalSurah && globalToVs) {
+                    progressMap.set(rec.studentId, { surahId: globalSurah, toVerse: globalToVs });
+                }
+            }
+        }
+
+        return progressMap;
+    }, [dailySessions, activeSheikhId, selectedDay, sessionToOpen]);
+
+    const handleUpdateStudentReviewMode = async (studentId: string, isReviewing: boolean) => {
+        try {
+            const student = students.find(s => s.id === studentId);
+            if (student && updateStudent) {
+                await updateStudent(studentId, { isReviewing }, student.ownerId);
+            }
+        } catch (err) {
+            console.error("Failed to update student review mode:", err);
+        }
+    };
+
     // Tasmie/Talqin BeforeUnload Guard to prevent data loss
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -1181,6 +1297,26 @@ function RegisterSessionContent() {
                 )}
             </header>
 
+            {groupMode === 'not_set' && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between gap-4 animate-in fade-in duration-300 rtl" dir="rtl">
+                    <div className="flex items-center gap-3">
+                        <AlertTriangle className="w-5.5 h-5.5 text-amber-600 shrink-0" />
+                        <div className="space-y-0.5 text-right">
+                            <p className="text-xs font-black text-amber-800 dark:text-amber-300">إعداد نمط الحفظ للفوج غير مكتمل</p>
+                            <p className="text-[10px] font-medium text-amber-700/80 dark:text-amber-400/80">لم تقم بتحديد النمط التشغيلي للفوج (موحد أو فردي) بعد. يرجى ضبط الإعدادات لتفعيل التعبئة التلقائية للورد واقتراح الآيات الذكي.</p>
+                        </div>
+                    </div>
+                    <Button
+                        onClick={() => router.push('/management/groups')}
+                        variant="outline"
+                        size="sm"
+                        className="border-amber-500/30 hover:bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold text-[10px] shrink-0"
+                    >
+                        ضبط الإعدادات
+                    </Button>
+                </div>
+            )}
+
             <section className="bg-card p-4 rounded-2xl shadow-sm border space-y-4">
                 {(sessionType === 'حصة أساسية' || sessionType === 'حصة تعويضية' || sessionType === 'حصة إضافية') && (
                     <SessionStatsWidget students={sessionStudents} records={attendanceRecords} />
@@ -1219,7 +1355,7 @@ function RegisterSessionContent() {
                     )}
                 </div>
 
-                {isAdmin5 && (sessionType === 'حصة أساسية' || sessionType === 'حصة تعويضية' || sessionType === 'حصة إضافية') && (
+                {(isUnifiedMode || groupMode === 'hybrid' || isAdmin5) && (sessionType === 'حصة أساسية' || sessionType === 'حصة تعويضية' || sessionType === 'حصة إضافية') && (
                     <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200 space-y-3 animate-in fade-in slide-in-from-top-2 duration-500">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-emerald-800 font-bold">
@@ -1465,6 +1601,9 @@ function RegisterSessionContent() {
                             sessionType={sessionType}
                             pastWirds={pastWirds}
                             studentAbsenceHistory={studentAbsenceHistory}
+                            groupMode={groupMode}
+                            studentLastProgress={studentLastProgress}
+                            onUpdateStudentReviewMode={handleUpdateStudentReviewMode}
                         />
                     </div>
                 )}

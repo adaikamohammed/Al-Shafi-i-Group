@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
-import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry, AdminLog, ActivityLog, Meeting, MeetingSuggestion, InternalNotification, WeeklyOutcome } from '@/lib/types';
+import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry, AdminLog, ActivityLog, Meeting, MeetingSuggestion, InternalNotification, WeeklyOutcome, GroupSurahConfig } from '@/lib/types';
 import { isWithinInterval, parseISO, isValid, isAfter, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -124,6 +124,7 @@ interface StudentContextType {
   markManagementMessageAsRead: (reportId: string, date: string) => Promise<void>;
   moveDailySession: (sessionId: string, date: string, sourceOwnerId: string, targetOwnerId: string) => Promise<void>;
   restoreSessions: (sessions: DailySession[]) => Promise<void>;
+  updateSheikhGroupSettings: (sheikhId: string, mode?: 'unified' | 'individual' | 'hybrid' | 'not_set', targetSurah?: GroupSurahConfig) => Promise<void>;
   selectedGroup: string;
   setSelectedGroup: (group: string) => void;
 }
@@ -262,7 +263,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         const usersData = snapshot.val();
         const usersArray = usersData ? Object.entries(usersData).map(([uid, data]: [string, any]) => ({
           uid,
-          ...data.profile
+          ...data.profile,
+          settings: data.settings
         })) : [];
 
         // Filter out demo sheikhs if a real user with the same email exists
@@ -1726,6 +1728,48 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     await set(settingsRef, newSettings);
   };
 
+  const updateSheikhGroupSettings = async (
+    sheikhId: string,
+    mode?: 'unified' | 'individual' | 'hybrid' | 'not_set',
+    targetSurah?: GroupSurahConfig
+  ) => {
+    if (!authContextUser) throw new Error("User not authenticated");
+    
+    if (authContextUser.uid !== sheikhId && !isPrivileged) {
+      throw new Error("Not authorized to update settings for this sheikh");
+    }
+
+    try {
+      const sheikhSettingsRef = ref(db, `users/${sheikhId}/settings`);
+      const updates: any = {};
+      if (mode !== undefined) updates.groupMemorizationMode = mode;
+      if (targetSurah !== undefined) updates.groupSurah = targetSurah;
+
+      await update(sheikhSettingsRef, sanitizeData(updates));
+      
+      if (authContextUser.uid === sheikhId) {
+        setSettingsState((prev) => ({
+          ...prev,
+          ...(mode !== undefined ? { groupMemorizationMode: mode } : {}),
+          ...(targetSurah !== undefined ? { groupSurah: targetSurah } : {}),
+        }));
+      }
+
+      toast({
+        title: "✅ تم حفظ الإعدادات",
+        description: "تم تحديث إعدادات الفوج والورد بنجاح في النظام.",
+      });
+    } catch (error: any) {
+      console.error("Failed to update sheikh group settings:", error);
+      toast({
+        title: "❌ خطأ في الحفظ",
+        description: error.message || "حدث خطأ أثناء حفظ إعدادات المجموعة.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
   const generateDemoData = async () => {
     if (!isPrivileged) return;
 
@@ -2548,6 +2592,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       markManagementMessageAsRead,
       moveDailySession,
       restoreSessions,
+      updateSheikhGroupSettings,
       weeklyOutcomes,
       saveWeeklyOutcome,
       deleteMultipleDailyReports,

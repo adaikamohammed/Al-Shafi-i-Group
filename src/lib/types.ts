@@ -73,6 +73,8 @@ export interface Student {
   memorizationMultiplier?: number;
   hasWhatsApp?: boolean;
   normalizedFullName?: string;
+  currentSurahId?: number;
+  isReviewing?: boolean;
 }
 
 export type AttendanceStatus = "حاضر" | "غياب" | "غائب" | "متأخر" | "تعويض" | "";
@@ -256,6 +258,7 @@ export interface AppUser {
   educationTimeline?: EducationEvent[];
   portalTheme?: string;
   fcmTokens?: string[];
+  settings?: AppSettings;
 }
 
 export interface EducationEvent {
@@ -319,6 +322,14 @@ export interface BadgeConfig {
   metric: 'totalPoints' | 'masteryScore';
 }
 
+export interface GroupSurahConfig {
+  surahId: number;
+  currentVerse?: number;
+  lastTalqinFrom?: number;
+  lastTalqinTo?: number;
+  startedAt?: string;
+}
+
 export interface AppSettings {
   seasonStartDate?: string; // ISO date string
   prices: {
@@ -328,6 +339,10 @@ export interface AppSettings {
   rewards: Reward[];
   badges: BadgeConfig[];
   registrationFees: { [year: number]: { [quarter: number]: number } };
+  groupMemorizationMode?: 'unified' | 'individual' | 'hybrid' | 'not_set';
+  groupSurah?: GroupSurahConfig;
+  groupMemorizationModes?: Record<string, 'unified' | 'individual' | 'hybrid' | 'not_set'>;
+  groupSurahs?: Record<string, GroupSurahConfig>;
 }
 
 export interface HallOfFameData {

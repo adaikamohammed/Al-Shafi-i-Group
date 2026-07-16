@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/AuthContext';
 import { surahs } from '@/lib/surahs';
 import { CatchUpEntry } from '@/lib/types';
+import { SmartSurahPicker, parseDailyAmount } from './SmartSurahPicker';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,6 +28,17 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+
+const MEMORIZATION_OPTIONS = [
+  { value: "ممتاز", emoji: "🌟", label: "ممتاز", color: "bg-emerald-600 dark:bg-emerald-700 text-white border-transparent" },
+  { value: "جيد جدا", emoji: "✅", label: "جيد جداً", color: "bg-teal-600 dark:bg-teal-750 text-white border-transparent" },
+  { value: "جيد", emoji: "👍", label: "جيد", color: "bg-blue-600 dark:bg-blue-700 text-white border-transparent" },
+  { value: "حسن", emoji: "😊", label: "حسن", color: "bg-sky-500 dark:bg-sky-600 text-white border-transparent" },
+  { value: "مقبول", emoji: "⚠️", label: "مقبول", color: "bg-amber-500 dark:bg-amber-600 text-white border-transparent" },
+  { value: "ضعيف", emoji: "❌", label: "ضعيف", color: "bg-orange-500 dark:bg-orange-600 text-white border-transparent" },
+  { value: "لم يحفظ", emoji: "🚫", label: "لم يحفظ", color: "bg-red-650 dark:bg-red-700 text-white border-transparent" },
+  { value: "لا يوجد", emoji: "➖", label: "لا يوجد", color: "bg-slate-500 dark:bg-slate-600 text-white border-transparent" },
+];
 
 export interface AttendanceRecord {
     studentId: string;
@@ -51,11 +63,24 @@ interface AttendanceListProps {
     viewMode?: 'full' | 'attendance' | 'evaluation';
     sessionType?: string;
     pastWirds?: { date: string, dayName: string, sessionNumber: number, surahId: number, surahName: string, fromVerse: number, toVerse: number, presentStudentIds: string[] }[];
-    /** قائمة أيام الغياب لكل طالب (studentId → [{date, label}]) */
     studentAbsenceHistory?: Record<string, Array<{ date: string; label: string }>>;
+    groupMode?: 'unified' | 'individual' | 'hybrid' | 'not_set';
+    studentLastProgress?: Map<string, { surahId: number; toVerse: number }> | Record<string, { surahId: number; toVerse: number }>;
+    onUpdateStudentReviewMode?: (studentId: string, isReviewing: boolean) => Promise<void>;
 }
 
-export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = 'full', sessionType, pastWirds = [], studentAbsenceHistory = {} }: AttendanceListProps) => {
+export const AttendanceList = ({
+    students,
+    records,
+    onUpdateRecord,
+    viewMode = 'full',
+    sessionType,
+    pastWirds = [],
+    studentAbsenceHistory = {},
+    groupMode = 'individual',
+    studentLastProgress = new Map(),
+    onUpdateStudentReviewMode
+}: AttendanceListProps) => {
     const { user } = useAuth();
     const isAdmin5 = user?.email === 'admin5@gmail.com';
     const isActivitySession = sessionType === 'حصة أنشطة';
@@ -135,6 +160,13 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                     const studentAbsences = studentAbsenceHistory[student.id] || [];
                     const hasAbsenceHistory = studentAbsences.length > 0;
 
+                    const lastProgress = (studentLastProgress instanceof Map)
+                        ? studentLastProgress.get(student.id)
+                        : (studentLastProgress as any)?.[student.id];
+                    const lastSurahId = lastProgress?.surahId;
+                    const lastToVerse = lastProgress?.toVerse;
+                    const dailyAmount = parseDailyAmount(student.dailyMemorizationAmount);
+
                     return (
                         <Card key={student.id} className={cn(
                             "transition-all duration-300 overflow-hidden border shadow-sm hover:shadow-md",
@@ -167,97 +199,148 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                         </div>
                                     </div>
 
-                                    {/* Actions Row */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
-                                        {/* Attendance Buttons - Show in 'attendance' or 'full' mode */}
+                                    {/* Actions Row - Reorganized into Full-Width Stacked Layout */}
+                                    <div className="space-y-4">
+                                        {/* 1. الحضور (Attendance) */}
                                         {(viewMode === 'full' || viewMode === 'attendance') && (
-                                            <div className="flex gap-1 md:gap-2 h-8 md:h-9">
+                                            <div className="flex gap-2 h-9 md:h-10 w-full sm:max-w-md">
                                                 <Button
                                                     type="button"
                                                     size="sm"
                                                     variant={record.attendance === 'حاضر' ? 'default' : 'outline'}
-                                                    className={cn("flex-1 text-[10px] md:text-xs font-bold px-1", record.attendance === 'حاضر' && "bg-emerald-600 hover:bg-emerald-700")}
+                                                    className={cn("flex-1 text-xs font-black rounded-xl", record.attendance === 'حاضر' && "bg-emerald-600 hover:bg-emerald-700")}
                                                     onClick={() => onUpdateRecord(student.id, 'attendance', record.attendance === 'حاضر' ? '' : 'حاضر')}
                                                 >
-                                                    <Check className="h-3 w-3 ml-1" /> حاضر
+                                                    <Check className="h-3.5 w-3.5 ml-1.5 shrink-0" /> حاضر
                                                 </Button>
                                                 <Button
                                                     type="button"
                                                     size="sm"
                                                     variant={record.attendance === 'متأخر' ? 'default' : 'outline'}
-                                                    className={cn("flex-1 text-[10px] md:text-xs font-bold px-1", record.attendance === 'متأخر' && "bg-amber-500 hover:bg-amber-600")}
+                                                    className={cn("flex-1 text-xs font-black rounded-xl", record.attendance === 'متأخر' && "bg-amber-500 hover:bg-amber-600")}
                                                     onClick={() => onUpdateRecord(student.id, 'attendance', record.attendance === 'متأخر' ? '' : 'متأخر')}
                                                 >
-                                                    <Clock className="h-3 w-3 ml-1" /> متأخر
+                                                    <Clock className="h-3.5 w-3.5 ml-1.5 shrink-0" /> متأخر
                                                 </Button>
                                                 <Button
                                                     type="button"
                                                     size="sm"
                                                     variant={record.attendance === 'غياب' ? 'destructive' : 'outline'}
-                                                    className="flex-1 text-[10px] md:text-xs font-bold px-1"
+                                                    className="flex-1 text-xs font-black rounded-xl"
                                                     onClick={() => onUpdateRecord(student.id, 'attendance', record.attendance === 'غياب' ? '' : 'غياب')}
                                                 >
-                                                    <X className="h-3 w-3 ml-1" /> غائب
+                                                    <X className="h-3.5 w-3.5 ml-1.5 shrink-0" /> غائب
                                                 </Button>
                                             </div>
                                         )}
 
-                                        {/* Evaluation (Only if Present/Late) - Show in 'evaluation' or 'full' mode */}
+                                        {/* 2. التقييم اليومي (Memorization Ratings - Only if Present/Late) */}
                                         {(record.attendance === 'حاضر' || record.attendance === 'متأخر') && (viewMode === 'full' || viewMode === 'evaluation') && (
-                                            <div className={cn("space-y-2 md:space-y-3", (viewMode === 'evaluation' || !isActivitySession) ? "col-span-1 md:col-span-1" : "")}>
-                                                <div className="flex flex-wrap gap-1 md:gap-2 items-center">
-                                                    {!isActivitySession && (
-                                                        <>
-                                                            {/* Per-student Review Toggle - prominent button */}
+                                            <div className="space-y-2 border-t pt-3">
+                                                <p className="text-[10px] md:text-xs font-black text-muted-foreground/70 tracking-wider">تقييم الحفظ والتسميع</p>
+                                                {!isActivitySession && (
+                                                    student.isReviewing ? (
+                                                        <div className="bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/30 p-3 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-right w-full">
+                                                            <div className="flex-1">
+                                                                <p className="text-xs font-black text-purple-800 dark:text-purple-300">
+                                                                    🔄 الطالب في أيام مراجعة شاملة لسورة {surahs.find(s => s.id === (record.surahId || student.currentSurahId))?.name || ""}
+                                                                </p>
+                                                                <p className="text-[10px] font-semibold text-purple-650 dark:text-purple-400 mt-0.5 leading-normal">
+                                                                    يراجع الطالب السورة حالياً بدون رصد حفظ جديد. يُرجى رصد حالة "المراجعة" بالأسفل. (ملاحظة: أيام المراجعة الشاملة تمنح الطالب نقاطاً يومية تعادل تقييم "جيد" تلقائياً حمايةً لنقاطه التراكمية).
+                                                                </p>
+                                                            </div>
                                                             <button
                                                                 type="button"
-                                                                onClick={() => {
-                                                                    onUpdateRecord(student.id, 'review', !record.review);
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        if (onUpdateStudentReviewMode) {
+                                                                            await onUpdateStudentReviewMode(student.id, false);
+                                                                        }
+                                                                    } catch (e) {
+                                                                        console.error(e);
+                                                                    }
                                                                 }}
-                                                                className={cn(
-                                                                    "flex items-center gap-1 h-8 md:h-9 px-2 md:px-3 rounded-lg border-2 font-bold text-[10px] md:text-xs transition-all",
-                                                                    record.review
-                                                                        ? "bg-blue-100 border-blue-400 text-blue-800 shadow-sm"
-                                                                        : "bg-muted/30 border-muted-foreground/20 text-muted-foreground hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700"
-                                                                )}
+                                                                className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-black transition-all shadow-sm shrink-0 whitespace-nowrap"
                                                             >
-                                                                <BookOpen className="h-3 w-3 md:h-4 md:w-4" />
-                                                                مراجعة
+                                                                إنهاء المراجعة والانتقال لسورة جديدة
                                                             </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-wrap gap-1.5 w-full">
+                                                            {MEMORIZATION_OPTIONS.map((opt) => {
+                                                                const isSelected = record.memorization === opt.value;
+                                                                return (
+                                                                    <button
+                                                                        key={opt.value}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            const patch: any = { memorization: isSelected ? '' : opt.value };
+                                                                            if (!isSelected && opt.value && !record.attendance) {
+                                                                                patch.attendance = 'حاضر';
+                                                                            }
+                                                                            Object.entries(patch).forEach(([field, val]) => {
+                                                                                onUpdateRecord(student.id, field as any, val);
+                                                                            });
+                                                                        }}
+                                                                        className={cn(
+                                                                            "px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 border shrink-0 hover:scale-[1.02]",
+                                                                            isSelected
+                                                                                ? `${opt.color} shadow-md scale-105`
+                                                                                : "bg-background border-border text-muted-foreground hover:bg-muted/15 hover:text-foreground"
+                                                                        )}
+                                                                    >
+                                                                        <span>{opt.emoji}</span>
+                                                                        <span>{opt.label}</span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )
+                                                )}
+                                            </div>
+                                        )}
 
-                                                            {/* Memorization dropdown — always visible */}
-                                                            <Select value={record.memorization || ""} onValueChange={(val) => onUpdateRecord(student.id, 'memorization', val)} dir="rtl">
-                                                                <SelectTrigger className="h-8 md:h-9 text-[10px] md:text-xs font-bold w-[90px] md:w-[110px]">
-                                                                    <SelectValue placeholder="الحفظ" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="ممتاز">🌟 ممتاز</SelectItem>
-                                                                    <SelectItem value="جيد جدا">✅ جيد جداً</SelectItem>
-                                                                    <SelectItem value="جيد">👍 جيد</SelectItem>
-                                                                    <SelectItem value="حسن">😊 حسن</SelectItem>
-                                                                    <SelectItem value="مقبول">⚠️ مقبول</SelectItem>
-                                                                    <SelectItem value="ضعيف">❌ ضعيف</SelectItem>
-                                                                    <SelectItem value="لم يحفظ">🚫 لم يحفظ</SelectItem>
-                                                                    <SelectItem value="لا يوجد">لا يوجد حفظ</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-
-                                                            {/* Late/delayed memorization checkbox */}
-                                                            {record.memorization && record.memorization !== 'لم يحفظ' && record.memorization !== 'لا يوجد' && record.memorization !== 'لا يوجد حصيلة' && (
-                                                                <label className="flex items-center gap-1.5 cursor-pointer text-[9px] md:text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 md:py-1 rounded-lg shrink-0 select-none">
-                                                                    <Checkbox
-                                                                        checked={!!record.isDelayed}
-                                                                        onCheckedChange={(checked) => onUpdateRecord(student.id, 'isDelayed', !!checked)}
-                                                                        className="h-3.5 w-3.5 border-amber-400 data-[state=checked]:bg-amber-600 data-[state=checked]:text-white"
-                                                                    />
-                                                                    <span>استدراك</span>
-                                                                </label>
+                                        {/* 3. الخيارات الفرعية (المساعدات، السلوك، البونص) */}
+                                        {(record.attendance === 'حاضر' || record.attendance === 'متأخر') && (viewMode === 'full' || viewMode === 'evaluation') && (
+                                            <div className="flex flex-wrap gap-3 items-center pt-2">
+                                                {/* المراجعة والاستدراك */}
+                                                {!isActivitySession && !student.isReviewing && (
+                                                    <div className="flex items-center gap-2 flex-wrap shrink-0">
+                                                        {/* Per-student Review Toggle */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                onUpdateRecord(student.id, 'review', !record.review);
+                                                            }}
+                                                            className={cn(
+                                                                "flex items-center justify-center gap-1.5 h-8 md:h-9 px-3.5 rounded-xl border-2 font-bold text-xs transition-all shrink-0",
+                                                                record.review
+                                                                    ? "bg-blue-100 border-blue-400 text-blue-800 shadow-sm"
+                                                                    : "bg-muted/30 border-muted-foreground/20 text-muted-foreground hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700"
                                                             )}
-                                                        </>
-                                                    )}
+                                                        >
+                                                            <BookOpen className="h-3.5 w-3.5" />
+                                                            مراجعة
+                                                        </button>
 
+                                                        {/* Late/delayed checkbox */}
+                                                        {record.memorization && record.memorization !== 'لم يحفظ' && record.memorization !== 'لا يوجد' && record.memorization !== 'لا يوجد حصيلة' && (
+                                                            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl shrink-0 select-none transition-all hover:bg-amber-100">
+                                                                <Checkbox
+                                                                    checked={!!record.isDelayed}
+                                                                    onCheckedChange={(checked) => onUpdateRecord(student.id, 'isDelayed', !!checked)}
+                                                                    className="h-3.5 w-3.5 border-amber-400 data-[state=checked]:bg-amber-600 data-[state=checked]:text-white"
+                                                                />
+                                                                <span>استدراك ⏳</span>
+                                                            </label>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* السلوك (Behavior) */}
+                                                <div className="w-[120px] md:w-[140px] shrink-0">
                                                     <Select value={record.behavior} onValueChange={(val) => onUpdateRecord(student.id, 'behavior', val)} dir="rtl">
-                                                        <SelectTrigger className="h-8 md:h-9 text-[10px] md:text-xs font-bold w-[80px] md:w-[100px]">
+                                                        <SelectTrigger className="h-8 md:h-9 text-xs font-bold w-full rounded-xl">
                                                             <SelectValue placeholder="السلوك" />
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -266,9 +349,12 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                                             <SelectItem value="مشاغب">مشاغب</SelectItem>
                                                         </SelectContent>
                                                     </Select>
+                                                </div>
 
+                                                {/* البونص (Bonus) */}
+                                                <div className="w-[120px] md:w-[140px] shrink-0">
                                                     <Select value={record.bonus || ""} onValueChange={(val) => onUpdateRecord(student.id, 'bonus', val)} dir="rtl">
-                                                        <SelectTrigger className="h-8 md:h-9 text-[10px] md:text-xs font-bold w-[80px] md:w-[100px] border-purple-200 focus:border-purple-400 bg-purple-50/20 text-purple-700">
+                                                        <SelectTrigger className="h-8 md:h-9 text-xs font-bold w-full border-purple-200 focus:border-purple-400 bg-purple-50/20 text-purple-700 rounded-xl">
                                                             <SelectValue placeholder="بونص" />
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -280,18 +366,60 @@ export const AttendanceList = ({ students, records, onUpdateRecord, viewMode = '
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
+                                            </div>
+                                        )}
 
-                                                <div className="flex gap-2">
-                                                    <Input
-                                                        className="h-8 md:h-9 text-[10px] md:text-xs bg-muted/20"
-                                                        placeholder="ملاحظات..."
-                                                        value={record.notes}
-                                                        onChange={(e) => onUpdateRecord(student.id, 'notes', e.target.value)}
-                                                    />
-                                                </div>
+                                        {/* 4. ملاحظات (Notes) */}
+                                        {(record.attendance === 'حاضر' || record.attendance === 'متأخر') && (viewMode === 'full' || viewMode === 'evaluation') && (
+                                            <div className="w-full pt-1">
+                                                <Input
+                                                    className="h-8 md:h-9 text-xs bg-muted/20 w-full rounded-xl"
+                                                    placeholder="ملاحظات الحصة للتلميذ..."
+                                                    value={record.notes}
+                                                    onChange={(e) => onUpdateRecord(student.id, 'notes', e.target.value)}
+                                                />
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* 5. الورد (السورة والآيات) - SmartSurahPicker */}
+                                    {sessionType !== 'حصة أنشطة' && (record.attendance === 'حاضر' || record.attendance === 'متأخر') && (viewMode === 'full' || viewMode === 'evaluation') && (
+                                        <div className="border-t pt-3 mt-1">
+                                            <p className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-wider mb-2">الورد (السورة والآيات)</p>
+                                            {groupMode === "unified" ? (
+                                                <div className="px-3 py-2 bg-indigo-50/50 rounded-xl border border-indigo-100 text-xs text-indigo-700 font-bold flex items-center gap-1.5 w-fit">
+                                                    <BookOpen className="w-4 h-4 text-indigo-500" />
+                                                    <span>يتبع الورد الموحد للفوج</span>
+                                                </div>
+                                            ) : student.isReviewing || (record.memorization && record.memorization !== "لم يحفظ" && record.memorization !== "لا يوجد" && record.memorization !== "لا يوجد حصيلة") ? (
+                                                <SmartSurahPicker
+                                                    lastSurahId={lastSurahId}
+                                                    lastToVerse={lastToVerse}
+                                                    dailyAmount={dailyAmount}
+                                                    currentSurahId={record.surahId}
+                                                    currentFromVerse={record.fromVerse}
+                                                    currentToVerse={record.toVerse}
+                                                    onChange={(patch) => {
+                                                        Object.entries(patch).forEach(([field, value]) => {
+                                                            onUpdateRecord(student.id, field as any, value);
+                                                        });
+                                                    }}
+                                                    studentId={student.id}
+                                                    isReviewing={student.isReviewing}
+                                                    onToggleReviewMode={(val) => onUpdateStudentReviewMode?.(student.id, val)}
+                                                />
+                                            ) : record.memorization === "لم يحفظ" ? (
+                                                <div className="px-3.5 py-2.5 bg-gray-50 border border-gray-150 rounded-2xl text-xs text-gray-500 font-bold">
+                                                    🚫 لا يوجد ورد تسميع اليوم لأن تقييم الطالب هو "لم يحفظ".
+                                                </div>
+                                            ) : (
+                                                <div className="px-3.5 py-3 bg-amber-50/50 border border-amber-250/50 rounded-2xl flex items-start gap-2.5 text-xs text-amber-800 font-semibold max-w-md">
+                                                    <span className="text-base leading-none">💡</span>
+                                                    <span>لا يمكن رصد وتحديد ورد التسميع والآيات إلا بعد اختيار تقييم الحفظ للطالب أولاً.</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* ── قسم التعويض ────────────────────────────────────── */}
                                     {(viewMode === 'full' || viewMode === 'attendance') && (

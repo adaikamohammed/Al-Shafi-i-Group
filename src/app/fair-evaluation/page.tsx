@@ -16,6 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { GroupSelector } from '@/components/management/GroupSelector';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import { calculateStandardPages } from '@/lib/surahs';
 
 // Constants for fallback points
 const ATTENDANCE_POINTS: Record<string, number> = {
@@ -90,6 +91,7 @@ interface StudentEvaluationRow {
     // Final Scores
     academicScore: number;
     comprehensiveScore: number;
+    maxMemorizationPoints: number;
 
     // Monthly crowning & history
     monthlyHistory: { monthName: string; rank: number | null; score: number }[];
@@ -236,6 +238,7 @@ export default function FairEvaluationPage() {
                 totalSessions: 0,
                 weightedSessions: 0,
                 assessedMemorization: 0,
+                maxMemorizationPoints: 0,
                 assessedBehavior: 0,
                 presentCount: 0,
                 makeupCount: 0,
@@ -332,10 +335,22 @@ export default function FairEvaluationPage() {
 
                 if (hasMemoAssessed) {
                     score.assessedMemorization += weight;
+
+                    const surahId = record.tasmieSurahId || record.surahId || 0;
+                    const from = record.tasmieFromVerse || record.fromVerse || 0;
+                    const to = record.tasmieToVerse || record.toVerse || 0;
+                    const pages = surahId > 0 ? calculateStandardPages(surahId, from, to) : 1.0;
+
+                    let maxMemoSession = maxMemorizationVal;
+                    if (hasReview) {
+                        maxMemoSession += pointsConfig?.review?.completed || 0;
+                    }
+                    score.maxMemorizationPoints += maxMemoSession * weight * pages;
+
                     const isGroup8User = score.groupName === 'فوج 8' || score.groupName === 'فوج الشيخ عبد الحق نصيرة' || score.groupName.includes('عبد الحق');
                     const multiplier = isGroup8User ? (score.memorizationMultiplier ?? 1.0) : 1.0;
                     const penalty = (hasNewMemo && record.isDelayed) ? 0.8 : 1.0;
-                    score.memorizationRate += earnedMemoPoints * weight * multiplier * penalty;
+                    score.memorizationRate += earnedMemoPoints * weight * pages * multiplier * penalty;
                 }
 
                 // C. Behavior
@@ -384,9 +399,21 @@ export default function FairEvaluationPage() {
                         }
                         if (hasMkMemo) {
                             score.assessedMemorization += weight;
+
+                            const surahId = makeup.tasmieSurahId || makeup.surahId || 0;
+                            const from = makeup.tasmieFromVerse || makeup.fromVerse || 0;
+                            const to = makeup.tasmieToVerse || makeup.toVerse || 0;
+                            const pages = surahId > 0 ? calculateStandardPages(surahId, from, to) : 1.0;
+
+                            let maxMemoSession = maxMemorizationVal;
+                            if (makeup.review && pointsConfig?.review?.completed) {
+                                maxMemoSession += pointsConfig.review.completed;
+                            }
+                            score.maxMemorizationPoints += maxMemoSession * weight * pages;
+
                             const isGroup8User = score.groupName === 'فوج 8' || score.groupName === 'فوج الشيخ عبد الحق نصيرة' || score.groupName.includes('عبد الحق');
                             const multiplier = isGroup8User ? (score.memorizationMultiplier ?? 1.0) : 1.0;
-                            score.memorizationRate += mkMemoPoints * weight * multiplier;
+                            score.memorizationRate += mkMemoPoints * weight * pages * multiplier;
                         }
 
                         // نقاط السلوك في التعويض
@@ -458,6 +485,7 @@ export default function FairEvaluationPage() {
                 totalSessions: number;
                 weightedSessions: number;
                 assessedMemorization: number;
+                maxMemorizationPoints: number;
                 assessedBehavior: number;
                 attendanceRate: number;
                 memorizationRate: number;
@@ -472,6 +500,7 @@ export default function FairEvaluationPage() {
                     totalSessions: 0,
                     weightedSessions: 0,
                     assessedMemorization: 0,
+                    maxMemorizationPoints: 0,
                     assessedBehavior: 0,
                     attendanceRate: 0,
                     memorizationRate: 0,
@@ -513,7 +542,19 @@ export default function FairEvaluationPage() {
                     }
                     if (hasMemo) {
                         mScore.assessedMemorization += weight;
-                        mScore.memorizationRate += earnedMemoPoints * weight * multiplier * penalty;
+
+                        const surahId = record.tasmieSurahId || record.surahId || 0;
+                        const from = record.tasmieFromVerse || record.fromVerse || 0;
+                        const to = record.tasmieToVerse || record.toVerse || 0;
+                        const pages = surahId > 0 ? calculateStandardPages(surahId, from, to) : 1.0;
+
+                        let maxMemoSession = maxMemorizationVal;
+                        if (record.review && pointsConfig?.review?.completed) {
+                            maxMemoSession += pointsConfig.review.completed;
+                        }
+                        mScore.maxMemorizationPoints += maxMemoSession * weight * pages;
+
+                        mScore.memorizationRate += earnedMemoPoints * weight * pages * multiplier * penalty;
                     }
                     if (record.behavior && record.behavior !== '') {
                         mScore.assessedBehavior += weight;
@@ -542,7 +583,19 @@ export default function FairEvaluationPage() {
                             }
                             if (hasMkMemo) {
                                 mScore.assessedMemorization += weight;
-                                mScore.memorizationRate += mkMemoPoints * weight * multiplier;
+
+                                const surahId = makeup.tasmieSurahId || makeup.surahId || 0;
+                                const from = makeup.tasmieFromVerse || makeup.fromVerse || 0;
+                                const to = makeup.tasmieToVerse || makeup.toVerse || 0;
+                                const pages = surahId > 0 ? calculateStandardPages(surahId, from, to) : 1.0;
+
+                                let maxMemoSession = maxMemorizationVal;
+                                if (makeup.review && pointsConfig?.review?.completed) {
+                                    maxMemoSession += pointsConfig.review.completed;
+                                }
+                                mScore.maxMemorizationPoints += maxMemoSession * weight * pages;
+
+                                mScore.memorizationRate += mkMemoPoints * weight * pages * multiplier;
                             }
 
                             if (makeup.behavior && makeup.behavior !== '') {
@@ -565,7 +618,7 @@ export default function FairEvaluationPage() {
 
             const mResults = Object.values(mScores).map(score => {
                 const maxAttPoints = score.weightedSessions * maxAttendanceVal;
-                const maxMemoPoints = score.assessedMemorization * maxMemorizationVal;
+                const maxMemoPoints = score.maxMemorizationPoints;
                 const maxBehPoints = score.assessedBehavior * maxBehaviorVal;
 
                 const attPct = maxAttPoints > 0 ? (score.attendanceRate / maxAttPoints) * 100 : 0;
@@ -625,7 +678,7 @@ export default function FairEvaluationPage() {
         // 7. Calculate Final Percentage Scores
         const results = Object.values(scores).map(score => {
             const maxAttPoints = score.weightedSessions * maxAttendanceVal;
-            const maxMemoPoints = score.assessedMemorization * maxMemorizationVal;
+            const maxMemoPoints = score.maxMemorizationPoints;
             const maxBehPoints = score.assessedBehavior * maxBehaviorVal;
 
             const attPct = maxAttPoints > 0 ? (score.attendanceRate / maxAttPoints) * 100 : 0;

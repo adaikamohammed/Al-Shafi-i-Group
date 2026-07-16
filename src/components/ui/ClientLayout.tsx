@@ -21,6 +21,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 import { PORTAL_THEMES } from '@/lib/themes';
 import { cn } from '@/lib/utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { AnimatePresence, motion } from 'framer-motion';
 import { NAV_GROUPS, BOTTOM_NAV_ITEMS } from '@/lib/navigation';
 import { ChevronLeft, ChevronRight, Layers } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -173,7 +174,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
             const isOpen = openGroups.includes(group.title);
 
             return (
-              <SidebarMenuItem key={group.title}>
+              <SidebarMenuItem key={group.title} className="group/menu relative">
                 <Collapsible open={isOpen} onOpenChange={() => toggleGroup(group.title)}>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton
@@ -207,31 +208,62 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
 
-                  <CollapsibleContent className="group-data-[collapsible=icon]:hidden">
-                    <div className="mt-2 space-y-1 pr-2">
-                      {group.items.map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={cn(
-                            "flex items-center gap-3 p-2 pr-4 rounded-xl transition-all cursor-pointer",
-                            theme.isLight
-                              ? "hover:bg-slate-100 text-slate-600"
-                              : "hover:bg-white/5 text-white/70",
-                            pathname === item.href && (theme.isLight
-                              ? "bg-primary/10 text-primary font-bold"
-                              : "bg-primary/20 text-primary font-bold")
-                          )}
-                        >
-                          <item.icon className={cn("h-3.5 w-3.5 shrink-0 mr-1", item.primary && "text-primary")} />
-                          <span className={cn("text-[10px] font-medium font-body", item.primary && "text-primary")}>
-                            {item.label}
-                          </span>
-                        </Link>
-                      ))}
-                    </div>
-                  </CollapsibleContent>
+                  <div className="md:hidden">
+                    <CollapsibleContent>
+                      <div className="mt-2 space-y-1 pr-2">
+                        {group.items.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={cn(
+                              "flex items-center gap-3 p-2 pr-4 rounded-xl transition-all cursor-pointer",
+                              theme.isLight
+                                ? "hover:bg-slate-100 text-slate-600"
+                                : "hover:bg-white/5 text-white/70",
+                              pathname === item.href && (theme.isLight
+                                ? "bg-primary/10 text-primary font-bold"
+                                : "bg-primary/20 text-primary font-bold")
+                            )}
+                          >
+                            <item.icon className={cn("h-3.5 w-3.5 shrink-0 mr-1", item.primary && "text-primary")} />
+                            <span className={cn("text-[10px] font-medium font-body", item.primary && "text-primary")}>
+                              {item.label}
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </div>
                 </Collapsible>
+
+                {/* Popout menu on hover when sidebar is collapsed to icon mode */}
+                <div className="absolute right-full top-0 mr-2 z-[99] hidden md:group-hover/menu:block pointer-events-auto bg-card border rounded-3xl shadow-xl w-60 p-4 border-border/80 animate-in fade-in slide-in-from-right-3 duration-200">
+                  <div className="border-b pb-2 mb-2">
+                    <h4 className="font-headline font-black text-xs text-primary">{group.title}</h4>
+                  </div>
+                  <div className="space-y-1">
+                    {group.items.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",
+                          theme.isLight
+                            ? "hover:bg-slate-100 text-slate-600"
+                            : "hover:bg-white/5 text-white/70",
+                          pathname === item.href && (theme.isLight
+                            ? "bg-primary/10 text-primary font-bold"
+                            : "bg-primary/20 text-primary font-bold")
+                        )}
+                      >
+                        <item.icon className={cn("h-3.5 w-3.5 shrink-0 mr-1", item.primary && "text-primary")} />
+                        <span className={cn("text-[10px] font-medium font-body", item.primary && "text-primary")}>
+                          {item.label}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
               </SidebarMenuItem>
             );
           })}
@@ -432,133 +464,172 @@ function AppSidebarContent({
           </div>
         </Link>
       </SidebarHeader>
-
-      <SidebarContent className="px-2 custom-scrollbar overflow-y-auto py-4">
-        <SidebarMenu className="gap-4">
+      <SidebarContent className="px-2 custom-scrollbar md:overflow-visible overflow-y-auto py-4">
+        <SidebarMenu className="gap-2">
           {filteredNavGroups.map((group: any) => {
             const primaryItem = group.items.find((i: any) => i.primary);
             const mainIcon = primaryItem?.icon || group.items[0]?.icon || Layers;
             const isOpen = openGroups.includes(group.title);
             const isHovered = hoveredGroup === group.title;
+            const hasActive = group.items.some((i: any) => pathname.startsWith(i.href));
 
-            // Determine if we should show the hover menu
-            // Only if sidebar is collapsed AND group is hovered
-            const showHoverMenu = state === 'collapsed' && isHovered;
+            const GROUP_COLORS: Record<string, {
+              activeBg: string; activeText: string; activeShadow: string;
+              idleBg: string; idleText: string; idleIcon: string;
+            }> = {
+              "الميدان التربوي": {
+                activeBg: "bg-emerald-600 dark:bg-emerald-500", activeText: "text-white", activeShadow: "shadow-md shadow-emerald-500/20",
+                idleBg: "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-950/45", idleText: "text-emerald-800 dark:text-emerald-300", idleIcon: "text-emerald-600 dark:text-emerald-400",
+              },
+              "بوصلة المتابعة": {
+                activeBg: "bg-blue-600 dark:bg-blue-500", activeText: "text-white", activeShadow: "shadow-md shadow-blue-500/20",
+                idleBg: "bg-blue-50 text-blue-800 dark:bg-blue-950/20 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/45", idleText: "text-blue-800 dark:text-blue-300", idleIcon: "text-blue-600 dark:text-blue-400",
+              },
+              "سباق التميز": {
+                activeBg: "bg-amber-500 dark:bg-amber-500", activeText: "text-white", activeShadow: "shadow-md shadow-amber-500/20",
+                idleBg: "bg-amber-50 text-amber-800 dark:bg-amber-950/20 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/45", idleText: "text-amber-800 dark:text-amber-300", idleIcon: "text-amber-600 dark:text-amber-400",
+              },
+              "النافذة الإدارية": {
+                activeBg: "bg-violet-600 dark:bg-violet-500", activeText: "text-white", activeShadow: "shadow-md shadow-violet-500/20",
+                idleBg: "bg-violet-50 text-violet-800 dark:bg-violet-950/20 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-950/45", idleText: "text-violet-800 dark:text-violet-300", idleIcon: "text-violet-600 dark:text-violet-400",
+              },
+              "النظام والإعدادات": {
+                activeBg: "bg-slate-700 dark:bg-slate-600", activeText: "text-white", activeShadow: "shadow-md shadow-slate-500/20",
+                idleBg: "bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800/60", idleText: "text-slate-700 dark:text-slate-300", idleIcon: "text-slate-500 dark:text-slate-400",
+              },
+              "الإعدادات": {
+                activeBg: "bg-slate-700 dark:bg-slate-600", activeText: "text-white", activeShadow: "shadow-md shadow-slate-500/20",
+                idleBg: "bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800/60", idleText: "text-slate-700 dark:text-slate-300", idleIcon: "text-slate-500 dark:text-slate-400",
+              },
+              "مركز التحكم": {
+                activeBg: "bg-rose-600 dark:bg-rose-500", activeText: "text-white", activeShadow: "shadow-md shadow-rose-500/20",
+                idleBg: "bg-rose-50 text-rose-800 dark:bg-rose-950/20 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-950/45", idleText: "text-rose-800 dark:text-rose-300", idleIcon: "text-rose-600 dark:text-rose-400",
+              },
+              "إدارة المدارس": {
+                activeBg: "bg-indigo-600 dark:bg-indigo-500", activeText: "text-white", activeShadow: "shadow-md shadow-indigo-500/20",
+                idleBg: "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/20 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-950/45", idleText: "text-indigo-800 dark:text-indigo-300", idleIcon: "text-indigo-600 dark:text-indigo-400",
+              },
+              "حسابي": {
+                activeBg: "bg-slate-700 dark:bg-slate-600", activeText: "text-white", activeShadow: "shadow-md shadow-slate-500/20",
+                idleBg: "bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800/60", idleText: "text-slate-700 dark:text-slate-300", idleIcon: "text-slate-500 dark:text-slate-400",
+              },
+            };
 
+            const gc = GROUP_COLORS[group.title] ?? {
+              activeBg: "bg-primary", activeText: "text-primary-foreground", activeShadow: "shadow-md shadow-primary/20",
+              idleBg: "bg-gray-100 dark:bg-white/8 hover:bg-gray-200 dark:hover:bg-white/12", idleText: "text-gray-700 dark:text-gray-300", idleIcon: "text-gray-500 dark:text-gray-400",
+            };
+
+            const FirstIcon = mainIcon;
+
+            /* ── COLLAPSED MODE ── */
+            if (state === 'collapsed' && !isMobile) {
+              return (
+                <SidebarMenuItem key={group.title}
+                  onMouseEnter={() => setHoveredGroup(group.title)}
+                  onMouseLeave={() => setHoveredGroup(null)}
+                  className="relative py-0.5"
+                >
+                  <SidebarMenuButton
+                    className={cn(
+                      "w-full h-10 rounded-xl flex items-center justify-center transition-all duration-200",
+                      hasActive
+                        ? `${gc.activeBg} ${gc.activeText} ${gc.activeShadow}`
+                        : `${gc.idleBg} ${gc.idleText}`
+                    )}
+                    title={group.title}
+                  >
+                    <FirstIcon className={cn("w-5 h-5 shrink-0", hasActive ? gc.activeText : gc.idleIcon)} />
+                  </SidebarMenuButton>
+
+                  <AnimatePresence>
+                    {isHovered && (
+                      <HoverPopup
+                        group={group}
+                        pathname={pathname}
+                        theme={theme}
+                      />
+                    )}
+                  </AnimatePresence>
+                </SidebarMenuItem>
+              );
+            }
+
+            /* ── EXPANDED/MOBILE MODE ── */
             return (
               <SidebarMenuItem key={group.title}
-                onMouseEnter={() => setHoveredGroup(group.title)}
-                onMouseLeave={() => setHoveredGroup(null)}
-                className="relative"
+                onMouseEnter={!isMobile ? () => setHoveredGroup(group.title) : undefined}
+                onMouseLeave={!isMobile ? () => setHoveredGroup(null) : undefined}
+                className="mb-1 relative group/menu"
               >
-                {state === 'collapsed' ? (
-                  <div className="relative">
-                    <SidebarMenuButton
-                      tooltip={group.title}
+                {/* Group header */}
+                <div
+                  role={isMobile ? "button" : undefined}
+                  tabIndex={isMobile ? 0 : undefined}
+                  onClick={() => isMobile && toggleGroup(group.title)}
+                  className={cn(
+                    "w-full h-10 flex items-center gap-3 px-3 rounded-xl text-xs font-black transition-all duration-200 select-none",
+                    isMobile ? "cursor-pointer" : "cursor-default",
+                    hasActive
+                      ? `${gc.activeBg} ${gc.activeText} ${gc.activeShadow}`
+                      : `${gc.idleBg} ${gc.idleText}`
+                  )}
+                >
+                  <FirstIcon className={cn("w-4 h-4 shrink-0", hasActive ? gc.activeText : gc.idleIcon)} />
+                  <span className="flex-1 text-[11px] font-bold tracking-tight whitespace-nowrap overflow-hidden font-headline">
+                    {group.title}
+                  </span>
+
+                  {/* Chevron indicator — mobile only */}
+                  {isMobile && (
+                    <ChevronLeft
                       className={cn(
-                        "rounded-2xl h-12 w-full flex items-center justify-center transition-all duration-500 border border-transparent shadow-sm hover:scale-[1.02] relative group/btn",
-                        theme.isLight
-                          ? "bg-white text-slate-600 hover:bg-white hover:text-primary hover:border-primary/20 shadow-slate-200/50"
-                          : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white hover:border-white/10"
+                        "w-3.5 h-3.5 shrink-0 transition-transform duration-200",
+                        isOpen ? "rotate-90" : "",
+                        hasActive ? "opacity-80" : "opacity-50"
                       )}
-                    >
-                      <div className={cn(
-                        "p-2 rounded-xl transition-all duration-500 shrink-0 flex items-center justify-center",
-                        "p-1 rounded-lg",
-                        theme.isLight ? "bg-slate-50 group-hover/btn:bg-primary/10" : "bg-white/5 group-hover/btn:bg-white/10"
-                      )}>
-                        {React.createElement(mainIcon, { className: "h-5 w-5" })}
-                      </div>
-                    </SidebarMenuButton>
+                    />
+                  )}
+                </div>
 
-                    {/* Hover Menu for Collapsed State */}
-                    {showHoverMenu && (
-                      <div className={cn(
-                        "absolute right-full top-0 mr-2 w-56 rounded-xl shadow-xl border z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200",
-                        theme.isLight ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-white/10 text-white"
-                      )}>
-                        <div className={cn("px-4 py-3 border-b text-sm font-bold flex items-center gap-2", theme.isLight ? "bg-slate-50/50 border-slate-100" : "bg-white/5 border-white/5")}>
-                          {React.createElement(mainIcon, { className: "h-4 w-4 text-primary" })}
-                          {group.title}
-                        </div>
-                        <div className="p-1">
-                          {group.items.map((item: any) => (
-                            <Link
-                              key={item.href}
-                              href={item.href}
-                              className={cn(
-                                "flex items-center gap-3 p-2 rounded-lg transition-all cursor-pointer text-xs font-medium",
-                                theme.isLight
-                                  ? "hover:bg-slate-100 text-slate-600"
-                                  : "hover:bg-white/5 text-white/70",
-                                pathname === item.href && (theme.isLight
-                                  ? "bg-primary/10 text-primary font-bold"
-                                  : "bg-primary/20 text-primary font-bold")
-                              )}
-                            >
-                              <item.icon className={cn("h-4 w-4 shrink-0 opacity-70", item.primary && "text-primary opacity-100")} />
-                              {item.label}
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                {/* ── Mobile: Collapsible Accordion ── */}
+                {isMobile && isOpen && (
+                  <div className="pt-1 pr-3 pb-1 space-y-0.5">
+                    {group.items.map((item: any) => {
+                      const active = pathname.startsWith(item.href);
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer",
+                            active
+                              ? "bg-primary/10 text-primary border border-primary/20"
+                              : theme.isLight
+                                ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                                : "text-white/70 hover:bg-white/5 hover:text-white"
+                          )}
+                        >
+                          <Icon className={cn("w-4 h-4 shrink-0", active ? "text-primary" : "")} />
+                          <span>{item.label}</span>
+                        </Link>
+                      );
+                    })}
                   </div>
-                ) : (
-                  <Collapsible open={isOpen} onOpenChange={() => toggleGroup(group.title)}>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        className={cn(
-                          "rounded-2xl h-12 w-full flex items-center gap-3 transition-all duration-500 border border-transparent shadow-sm hover:scale-[1.02] relative group/btn px-3",
-                          theme.isLight
-                            ? "bg-white text-slate-600 hover:bg-white hover:text-primary hover:border-primary/20 shadow-slate-200/50"
-                            : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white hover:border-white/10"
-                        )}
-                        tooltip={group.title}
-                      >
-                        <div className={cn(
-                          "p-2 rounded-xl transition-all duration-500 shrink-0 flex items-center justify-center",
-                          theme.isLight ? "bg-slate-50 group-hover/btn:bg-primary/10" : "bg-white/5 group-hover/btn:bg-white/10"
-                        )}>
-                          {React.createElement(mainIcon, { className: "h-5 w-5" })}
-                        </div>
-                        <span className="font-bold text-[11px] tracking-tight whitespace-nowrap overflow-hidden font-headline">
-                          {group.title}
-                        </span>
+                )}
 
-                        {/* Chevron indicator */}
-                        <ChevronLeft className={cn(
-                          "h-4 w-4 mr-auto transition-transform duration-300",
-                          isOpen && "rotate-90"
-                        )} />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-
-                    <CollapsibleContent>
-                      <div className="mt-2 space-y-1 pr-2">
-                        {group.items.map((item: any) => (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className={cn(
-                              "flex items-center gap-3 p-2 pr-4 rounded-xl transition-all cursor-pointer",
-                              theme.isLight
-                                ? "hover:bg-slate-100 text-slate-600"
-                                : "hover:bg-white/5 text-white/70",
-                              pathname === item.href && (theme.isLight
-                                ? "bg-primary/10 text-primary font-bold"
-                                : "bg-primary/20 text-primary font-bold")
-                            )}
-                          >
-                            <item.icon className={cn("h-3.5 w-3.5 shrink-0 mr-1", item.primary && "text-primary")} />
-                            <span className={cn("text-[10px] font-medium font-body", item.primary && "text-primary")}>
-                              {item.label}
-                            </span>
-                          </Link>
-                        ))}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
+                {/* ── Desktop: flyout popup on hover ── */}
+                {!isMobile && (
+                  <AnimatePresence>
+                    {isHovered && (
+                      <HoverPopup
+                        group={group}
+                        pathname={pathname}
+                        theme={theme}
+                      />
+                    )}
+                  </AnimatePresence>
                 )}
               </SidebarMenuItem>
             );
@@ -688,10 +759,6 @@ function AppSidebarContent({
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-
-        <div className="flex justify-end pt-2 group-data-[collapsible=icon]:justify-center">
-          <SidebarTrigger className="hover:bg-white/5 h-8 w-8" />
-        </div>
       </SidebarFooter>
     </div>
   );
@@ -826,6 +893,7 @@ function AppSidebarContent({
             <main className="flex-1 min-h-screen p-6 transition-all duration-300 ease-in-out min-w-0 print:p-0 print:min-h-0">
               <div className="flex justify-between items-center mb-8 print:hidden">
                 <div className="flex items-center gap-4">
+
                   <SidebarTrigger className="h-10 w-10 rounded-xl hover:bg-white/5" />
                   {pathname !== '/home' && (
                     <h2 className="font-headline text-xl font-black text-primary/80 tracking-widest">
@@ -861,5 +929,59 @@ function AppSidebarContent({
         )}
       </div>
     </div>
+  );
+}
+
+function HoverPopup({
+  group,
+  pathname,
+  theme,
+}: {
+  group: any;
+  pathname: string;
+  theme: any;
+}) {
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 8, scale: 0.96 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: 8, scale: 0.96 }}
+      transition={{ duration: 0.15 }}
+      className={cn(
+        "absolute right-full top-0 mr-3 w-56 rounded-2xl shadow-2xl border z-50 overflow-hidden pointer-events-auto",
+        theme.isLight ? "bg-white border-slate-200 text-slate-900 shadow-slate-200/50" : "bg-slate-900 border-white/10 text-white shadow-black/50"
+      )}
+      style={{ filter: "drop-shadow(0 8px 32px rgba(0,0,0,0.18))" }}
+    >
+      <div className={cn("px-4 py-3 border-b text-sm font-bold flex items-center gap-2", theme.isLight ? "bg-slate-50/50 border-slate-100" : "bg-white/5 border-white/5")}>
+        {group.title}
+      </div>
+      <div className="p-1.5 space-y-0.5">
+        {group.items.map((item: any) => {
+          const active = isActive(item.href);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer",
+                active
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                  : theme.isLight
+                    ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    : "text-white/70 hover:bg-white/5 hover:text-white"
+              )}
+            >
+              <Icon className="w-3.5 h-3.5 shrink-0" />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </motion.div>
   );
 }
