@@ -222,34 +222,34 @@ export const AttendanceList = ({
                                     {/* Actions Row - Reorganized into Full-Width Stacked Layout */}
                                     <div className="space-y-4">
                                         {/* 1. الحضور (Attendance) */}
-                                        {(viewMode === 'full' || viewMode === 'attendance') && (
-                                            <div className="flex gap-2 h-9 md:h-10 w-full sm:max-w-md">
+                                                                        {(viewMode === 'full' || viewMode === 'attendance') && (
+                                            <div className="flex gap-1 md:gap-2 h-9 md:h-10 w-full sm:max-w-md">
                                                 <Button
                                                     type="button"
                                                     size="sm"
                                                     variant={record.attendance === 'حاضر' ? 'default' : 'outline'}
-                                                    className={cn("flex-1 text-xs font-black rounded-xl", record.attendance === 'حاضر' && "bg-emerald-600 hover:bg-emerald-700")}
+                                                    className={cn("flex-1 text-[11px] sm:text-xs font-black rounded-xl px-1 sm:px-3", record.attendance === 'حاضر' && "bg-emerald-600 hover:bg-emerald-700")}
                                                     onClick={() => onUpdateRecord(student.id, 'attendance', record.attendance === 'حاضر' ? '' : 'حاضر')}
                                                 >
-                                                    <Check className="h-3.5 w-3.5 ml-1.5 shrink-0" /> حاضر
+                                                    <Check className="h-3.5 w-3.5 ml-1 sm:ml-1.5 shrink-0" /> حاضر
                                                 </Button>
                                                 <Button
                                                     type="button"
                                                     size="sm"
                                                     variant={record.attendance === 'متأخر' ? 'default' : 'outline'}
-                                                    className={cn("flex-1 text-xs font-black rounded-xl", record.attendance === 'متأخر' && "bg-amber-500 hover:bg-amber-600")}
+                                                    className={cn("flex-1 text-[11px] sm:text-xs font-black rounded-xl px-1 sm:px-3", record.attendance === 'متأخر' && "bg-amber-500 hover:bg-amber-600")}
                                                     onClick={() => onUpdateRecord(student.id, 'attendance', record.attendance === 'متأخر' ? '' : 'متأخر')}
                                                 >
-                                                    <Clock className="h-3.5 w-3.5 ml-1.5 shrink-0" /> متأخر
+                                                    <Clock className="h-3.5 w-3.5 ml-1 sm:ml-1.5 shrink-0" /> متأخر
                                                 </Button>
                                                 <Button
                                                     type="button"
                                                     size="sm"
                                                     variant={record.attendance === 'غياب' ? 'destructive' : 'outline'}
-                                                    className="flex-1 text-xs font-black rounded-xl"
+                                                    className={cn("flex-1 text-[11px] sm:text-xs font-black rounded-xl px-1 sm:px-3", record.attendance === 'غياب' && "bg-red-600 hover:bg-red-700")}
                                                     onClick={() => onUpdateRecord(student.id, 'attendance', record.attendance === 'غياب' ? '' : 'غياب')}
                                                 >
-                                                    <X className="h-3.5 w-3.5 ml-1.5 shrink-0" /> غائب
+                                                    <X className="h-3.5 w-3.5 ml-1 sm:ml-1.5 shrink-0" /> غائب
                                                 </Button>
                                             </div>
                                         )}
@@ -360,49 +360,52 @@ export const AttendanceList = ({
                                                         </div>
                                                     )}
 
-                                                    {/* السلوك (Behavior) */}
-                                                    <div className="w-[120px] md:w-[140px] shrink-0">
-                                                        <Select value={record.behavior} onValueChange={(val) => onUpdateRecord(student.id, 'behavior', val)} dir="rtl">
-                                                            <SelectTrigger className="h-8 md:h-9 text-xs font-bold w-full rounded-xl">
-                                                                <SelectValue placeholder="السلوك" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="هادئ">هادئ</SelectItem>
-                                                                <SelectItem value="مقبول">مقبول</SelectItem>
-                                                                <SelectItem value="مشاغب">مشاغب</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
+                                                    {/* السلوك، البونص، الخصم السلوكي - جنبًا إلى جنب في شبكة ثلاثية على الجوال */}
+                                                    <div className="w-full sm:w-auto grid grid-cols-3 gap-1.5 sm:flex sm:items-center sm:gap-3">
+                                                        {/* السلوك (Behavior) */}
+                                                        <div className="w-full sm:w-[120px] md:w-[140px] shrink-0">
+                                                            <Select value={record.behavior} onValueChange={(val) => onUpdateRecord(student.id, 'behavior', val)} dir="rtl">
+                                                                <SelectTrigger className="h-8 md:h-9 text-[10px] sm:text-xs font-bold w-full rounded-xl">
+                                                                    <SelectValue placeholder="السلوك" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="هادئ">هادئ</SelectItem>
+                                                                    <SelectItem value="مقبول">مقبول</SelectItem>
+                                                                    <SelectItem value="مشاغب">مشاغب</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
 
-                                                    {/* البونص (Bonus) */}
-                                                    <div className="w-[120px] md:w-[140px] shrink-0">
-                                                        <Select value={record.bonus || ""} onValueChange={(val) => onUpdateRecord(student.id, 'bonus', val)} dir="rtl">
-                                                            <SelectTrigger className="h-8 md:h-9 text-xs font-bold w-full border-purple-200 focus:border-purple-400 bg-purple-50/20 text-purple-700 rounded-xl">
-                                                                <SelectValue placeholder="بونص" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="لا يوجد">❌ لا يوجد</SelectItem>
-                                                                <SelectItem value="مشاركة مميزة">⭐ مشاركة (+1)</SelectItem>
-                                                                <SelectItem value="تفاعل إيجابي">✨ تفاعل (+1.5)</SelectItem>
-                                                                <SelectItem value="انضباط متميز">🏆 انضباط (+2)</SelectItem>
-                                                                <SelectItem value="حفظ زائد">📚 حفظ زائد (+3)</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
+                                                        {/* البونص (Bonus) */}
+                                                        <div className="w-full sm:w-[120px] md:w-[140px] shrink-0">
+                                                            <Select value={record.bonus || ""} onValueChange={(val) => onUpdateRecord(student.id, 'bonus', val)} dir="rtl">
+                                                                <SelectTrigger className="h-8 md:h-9 text-[10px] sm:text-xs font-bold w-full border-purple-200 focus:border-purple-400 bg-purple-50/20 text-purple-700 rounded-xl">
+                                                                    <SelectValue placeholder="بونص" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="لا يوجد">❌ لا يوجد</SelectItem>
+                                                                    <SelectItem value="مشاركة مميزة">⭐ مشاركة (+1)</SelectItem>
+                                                                    <SelectItem value="تفاعل إيجابي">✨ تفاعل (+1.5)</SelectItem>
+                                                                    <SelectItem value="انضباط متميز">🏆 انضباط (+2)</SelectItem>
+                                                                    <SelectItem value="حفظ زائد">📚 حفظ زائد (+3)</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
 
-                                                    {/* الخصم السلوكي (Deduction) */}
-                                                    <div className="w-[120px] md:w-[140px] shrink-0">
-                                                        <Select value={record.negativeBonus || ""} onValueChange={(val) => onUpdateRecord(student.id, 'negativeBonus', val)} dir="rtl">
-                                                            <SelectTrigger className="h-8 md:h-9 text-xs font-bold w-full border-red-200 focus:border-red-400 bg-red-50/20 text-red-700 rounded-xl">
-                                                                <SelectValue placeholder="خصم سلوكي ⚠️" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="لا يوجد">❌ لا يوجد</SelectItem>
-                                                                <SelectItem value="لباس غير لائق">👕 لباس غير لائق (-1.5)</SelectItem>
-                                                                <SelectItem value="بدون مصحف">📖 بدون مصحف (-1)</SelectItem>
-                                                                <SelectItem value="إهمال المراجعة المنزلية">🏠 إهمال المراجعة (-2)</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
+                                                        {/* الخصم السلوكي (Deduction) */}
+                                                        <div className="w-full sm:w-[120px] md:w-[140px] shrink-0">
+                                                            <Select value={record.negativeBonus || ""} onValueChange={(val) => onUpdateRecord(student.id, 'negativeBonus', val)} dir="rtl">
+                                                                <SelectTrigger className="h-8 md:h-9 text-[10px] sm:text-xs font-bold w-full border-red-200 focus:border-red-400 bg-red-50/20 text-red-700 rounded-xl">
+                                                                    <SelectValue placeholder="خصم سلوكي ⚠️" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="لا يوجد">❌ لا يوجد</SelectItem>
+                                                                    <SelectItem value="لباس غير لائق">👕 لباس غير لائق (-1.5)</SelectItem>
+                                                                    <SelectItem value="بدون مصحف">📖 بدون مصحف (-1)</SelectItem>
+                                                                    <SelectItem value="إهمال المراجعة المنزلية">🏠 إهمال المراجعة (-2)</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
                                                     </div>
                                                 </div>
 
