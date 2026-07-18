@@ -56,6 +56,14 @@ const BONUS_POINTS: Record<string, number> = {
     '': 0
 };
 
+const NEGATIVE_BONUS_POINTS: Record<string, number> = {
+    'لباس غير لائق': -1.5,
+    'بدون مصحف': -1,
+    'إهمال المراجعة المنزلية': -2,
+    'لا يوجد': 0,
+    '': 0
+};
+
 interface StudentEvaluationRow {
     id: string;
     name: string;
@@ -81,6 +89,8 @@ interface StudentEvaluationRow {
     attendanceCounts: Record<string, number>;
     memorizationCounts: Record<string, number>;
     behaviorCounts: Record<string, number>;
+    bonusCounts: Record<string, number>;
+    negativeBonusCounts: Record<string, number>;
 
     // Rates (0 - 100)
     attendanceRate: number;
@@ -266,6 +276,17 @@ export default function FairEvaluationPage() {
                     'مقبول': 0,
                     'مشاغب': 0
                 },
+                bonusCounts: {
+                    'مشاركة مميزة': 0,
+                    'تفاعل إيجابي': 0,
+                    'انضباط متميز': 0,
+                    'حفظ زائد': 0,
+                },
+                negativeBonusCounts: {
+                    'لباس غير لائق': 0,
+                    'بدون مصحف': 0,
+                    'إهمال المراجعة المنزلية': 0,
+                },
                 attendanceRate: 0,
                 memorizationRate: 0,
                 behaviorRate: 0,
@@ -367,6 +388,17 @@ export default function FairEvaluationPage() {
                 // C.2 Bonus
                 if (record.bonus) {
                     score.bonusPointsSum += (BONUS_POINTS[record.bonus] ?? 0) * weight;
+                    if (score.bonusCounts[record.bonus] !== undefined) {
+                        score.bonusCounts[record.bonus]++;
+                    }
+                }
+
+                // C.3 Negative Bonus
+                if (record.negativeBonus) {
+                    score.bonusPointsSum += (NEGATIVE_BONUS_POINTS[record.negativeBonus] ?? 0) * weight;
+                    if (score.negativeBonusCounts[record.negativeBonus] !== undefined) {
+                        score.negativeBonusCounts[record.negativeBonus]++;
+                    }
                 }
 
                 // D. حصص التعويض الفردية — لا تؤثر على weightedSessions (نسبة المجموعة)
@@ -562,6 +594,9 @@ export default function FairEvaluationPage() {
                     }
                     if (record.bonus) {
                         mScore.bonusPointsSum += (BONUS_POINTS[record.bonus] ?? 0) * weight;
+                    }
+                    if (record.negativeBonus) {
+                        mScore.bonusPointsSum += (NEGATIVE_BONUS_POINTS[record.negativeBonus] ?? 0) * weight;
                     }
 
                     // Process makeup sessions for monthly rankings
@@ -972,6 +1007,15 @@ export default function FairEvaluationPage() {
                                             <h4 className="font-bold text-xs text-emerald-900 dark:text-emerald-250 mb-1">4️⃣ تنبيه قلة البيانات (رمز التحذير ⚠️)</h4>
                                             <p className="text-xs text-muted-foreground font-bold leading-normal">
                                                 يظهر رمز ⚠️ بجانب نسبة الحفظ أو السلوك إذا كان عدد التقييمات المسجلة قليلاً جداً مقارنة بإجمالي الحضور، للتنبيه بأن النسبة قد تكون خادعة إحصائياً ولا تعكس الواقع بدقة وتتطلب مزيداً من التقييمات.
+                                            </p>
+                                        </div>
+                                        <div className="bg-white/80 dark:bg-slate-900/40 p-4 rounded-2xl border border-emerald-500/10">
+                                            <h4 className="font-bold text-xs text-emerald-900 dark:text-emerald-250 mb-1">5️⃣ تأثير البونص والخصم السلوكي</h4>
+                                            <p className="text-xs text-muted-foreground font-bold leading-normal">
+                                                <strong>البونص (نقاط إيجابية)</strong>: تمنح عند المشاركة والتميز وتضاف مباشرة لمعدل الطالب العام (+1، +1.5، +2، +3 نقاط).
+                                                <br />
+                                                <strong>الخصومات السلوكية</strong>: ترصد عند التقصير وتخصم مباشرة من معدل الطالب النهائي (-1، -1.5، -2 نقاط).
+                                                تظهر المحصلة الصافية للطلاب في عمود "البونص / الخصم" بلون أحمر للخصم وبنفسجي للبونص.
                                             </p>
                                         </div>
                                     </div>
@@ -1467,7 +1511,7 @@ export default function FairEvaluationPage() {
                                         <TableHead className="text-center font-bold">{showTableCounts ? "المواظبة (حضور)" : "المواظبة %"}</TableHead>
                                         <TableHead className="text-center font-bold">{showTableCounts ? "جودة الحفظ (تكرار)" : "جودة الحفظ %"}</TableHead>
                                         <TableHead className="text-center font-bold">{showTableCounts ? "السلوك (تكرار)" : "السلوك %"}</TableHead>
-                                        <TableHead className="text-center font-bold text-purple-700 bg-purple-50/50">البونص</TableHead>
+                                        <TableHead className="text-center font-bold text-purple-700 bg-purple-50/50">البونص / الخصم</TableHead>
                                         <TableHead className="text-center font-bold text-primary bg-primary/5">الأكاديمي %</TableHead>
                                         <TableHead className="text-center font-bold text-indigo-700 bg-indigo-50/50">الشامل %</TableHead>
                                     </TableRow>
@@ -1619,7 +1663,7 @@ export default function FairEvaluationPage() {
                                                             </div>
                                                         )}
                                                     </TableCell>
-                                                    <TableCell className="text-center font-bold text-sm text-purple-750 bg-purple-50/15">+{s.bonusPointsSum.toFixed(1)}ن</TableCell>
+                                                    <TableCell className={cn("text-center font-bold text-sm", s.bonusPointsSum > 0 ? "text-purple-750 bg-purple-50/15" : s.bonusPointsSum < 0 ? "text-red-750 bg-red-50/15" : "text-muted-foreground/40 bg-slate-50/15")}>{s.bonusPointsSum > 0 ? `+${s.bonusPointsSum.toFixed(1)}ن` : s.bonusPointsSum < 0 ? `${s.bonusPointsSum.toFixed(1)}ن` : '—'}</TableCell>
                                                     <TableCell className={cn("text-center font-black text-sm bg-primary/5", sortBy === 'academicScore' && "bg-primary/10 text-primary")}>
                                                         {s.academicScore}%
                                                     </TableCell>
@@ -1671,7 +1715,7 @@ export default function FairEvaluationPage() {
                                             <TableHead className="text-center font-bold">{showTableCounts ? "المواظبة (حضور)" : "المواظبة %"}</TableHead>
                                             <TableHead className="text-center font-bold">{showTableCounts ? "جودة الحفظ (تكرار)" : "جودة الحفظ %"}</TableHead>
                                             <TableHead className="text-center font-bold">{showTableCounts ? "السلوك (تكرار)" : "السلوك %"}</TableHead>
-                                         <TableHead className="text-center font-bold text-purple-700 bg-purple-50/50">البونص</TableHead>
+                                         <TableHead className="text-center font-bold text-purple-700 bg-purple-50/50">البونص / الخصم</TableHead>
   
                                             <TableHead className="text-center font-bold text-muted-foreground bg-slate-50/50">الأكاديمي %</TableHead>
                                             <TableHead className="text-center font-bold text-muted-foreground bg-slate-50/50">الشامل %</TableHead>
@@ -1805,12 +1849,13 @@ export default function FairEvaluationPage() {
                                                                 </div>
                                                             )}
                                                         </TableCell>
+                                                        <TableCell className={cn("text-center font-bold text-sm", s.bonusPointsSum > 0 ? "text-purple-750 bg-purple-50/15" : s.bonusPointsSum < 0 ? "text-red-750 bg-red-50/15" : "text-muted-foreground/40 bg-slate-50/15")}>{s.bonusPointsSum > 0 ? `+${s.bonusPointsSum.toFixed(1)}ن` : s.bonusPointsSum < 0 ? `${s.bonusPointsSum.toFixed(1)}ن` : '—'}</TableCell>
                                                         <TableCell className="text-center font-bold text-sm bg-slate-50/50">{s.academicScore}%</TableCell>
                                                         <TableCell className="text-center font-bold text-sm bg-slate-50/50">{s.comprehensiveScore}%</TableCell>
                                                     </TableRow>
                                                     {isExpanded && (
                                                         <TableRow className="bg-slate-50/40 dark:bg-slate-900/10 border-t-0">
-                                                            <TableCell colSpan={7} className="p-4 sm:p-6 bg-slate-50/30 dark:bg-slate-900/20">
+                                                            <TableCell colSpan={8} className="p-4 sm:p-6 bg-slate-50/30 dark:bg-slate-900/20">
                                                                 <StudentDetailCard student={s} maxSessions={evaluationData.maxSessionsInPeriod} />
                                                             </TableCell>
                                                         </TableRow>
@@ -2162,20 +2207,51 @@ function StudentDetailCard({ student, maxSessions }: { student: StudentEvaluatio
                     </div>
                 </div>
 
-                {/* Bonus */}
+                {/* Bonus & Deductions */}
                 <div className="p-4 rounded-2xl bg-purple-50/30 dark:bg-purple-950/10 border border-purple-100 dark:border-purple-900/50 shadow-sm space-y-3">
                     <div className="flex items-center gap-2 text-purple-650 dark:text-purple-400 border-b pb-2 border-purple-100 dark:border-purple-900/50">
                         <Sparkles className="h-5 w-5" />
-                        <span className="font-headline font-bold text-sm">البونص والنقاط الإضافية</span>
+                        <span className="font-headline font-bold text-sm">البونص والخصومات السلوكية</span>
                     </div>
                     <div className="space-y-2 text-xs font-bold font-body">
                         <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">إجمالي نقاط البونص:</span>
-                            <span className="text-purple-700 dark:text-purple-400 font-black">+{student.bonusPointsSum.toFixed(1)} ن</span>
+                            <span className="text-muted-foreground">المحصلة (بونص - خصم):</span>
+                            <span className={cn("font-black text-sm", student.bonusPointsSum > 0 ? "text-purple-700 dark:text-purple-400" : student.bonusPointsSum < 0 ? "text-red-700" : "text-muted-foreground")}>
+                                {student.bonusPointsSum > 0 ? `+${student.bonusPointsSum.toFixed(1)} ن` : student.bonusPointsSum < 0 ? `${student.bonusPointsSum.toFixed(1)} ن` : "0 ن"}
+                            </span>
                         </div>
-                        <p className="text-[10px] text-purple-600/80 dark:text-purple-400/80 leading-relaxed font-normal">
-                            تُضاف نقاط البونص هذه مباشرة للمعدل التقييمي العام (الأكاديمي والشامل) الخاص بالطالب لتحفيزه على التفوق والمشاركة.
-                        </p>
+                        
+                        {/* تفاصيل البونص الموجب */}
+                        {Object.values(student.bonusCounts || {}).some(c => c > 0) && (
+                            <div className="border-t pt-1.5 border-purple-100 dark:border-purple-900/50 space-y-1">
+                                <p className="text-[10px] text-purple-750 font-bold mb-1">🎁 البونص الإيجابي الممنوح:</p>
+                                {Object.entries(student.bonusCounts || {}).map(([type, count]) => {
+                                    if (count === 0) return null;
+                                    return (
+                                        <div key={type} className="flex justify-between items-center text-[10px] leading-relaxed">
+                                            <span className="text-muted-foreground">{type}:</span>
+                                            <span className="text-purple-700">{count} مرات</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* تفاصيل الخصم السلوكي */}
+                        {Object.values(student.negativeBonusCounts || {}).some(c => c > 0) && (
+                            <div className="border-t pt-1.5 border-red-100 dark:border-red-900/30 space-y-1">
+                                <p className="text-[10px] text-red-750 font-bold mb-1">⚠️ الخصومات السلوكية المرصودة:</p>
+                                {Object.entries(student.negativeBonusCounts || {}).map(([type, count]) => {
+                                    if (count === 0) return null;
+                                    return (
+                                        <div key={type} className="flex justify-between items-center text-[10px] leading-relaxed">
+                                            <span className="text-muted-foreground">{type}:</span>
+                                            <span className="text-red-700">{count} مرات</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

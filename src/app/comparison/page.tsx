@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStudentContext } from '@/context/StudentContext';
-import { Loader2, AlertTriangle, Swords, User, Calendar, Crown, Check, ChevronsUpDown, Zap, BookOpen, Star, Trophy, Target, Award, Activity } from 'lucide-react';
+import { Loader2, AlertTriangle, Swords, User, Calendar, Crown, Check, ChevronsUpDown, Zap, BookOpen, Star, Trophy, Target, Award, Activity, Sparkles } from 'lucide-react';
 import { format, setMonth, startOfYear, endOfYear, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -16,6 +16,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { cn, arabicCompare, formatGroupName } from '@/lib/utils';
+import { calculateStandardPages } from '@/lib/surahs';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
 const calculateAge = (birthDate?: Date) => {
@@ -153,23 +154,41 @@ const ComparisonStat = ({ title, value1, value2, suffix = '', isPercentage = fal
     const displayV2 = isPercentage ? `${value2.toFixed(1)}%` : `${value2.toLocaleString()} ${suffix}`;
 
     return (
-        <div className={`space-y-3 py-2 ${emphasize ? 'bg-white dark:bg-black/30 p-4 rounded-xl border border-border shadow-sm' : ''}`}>
-            <div className="flex justify-between items-center px-1">
-                <span className={`font-bold text-lg ${isWinner1 ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                    {displayV1}
-                    {isWinner1 && <Crown className="inline-block ml-1 h-4 w-4 text-yellow-500" />}
+        <div className={`space-y-2 py-1.5 ${emphasize ? 'bg-white dark:bg-black/30 p-4 rounded-xl border border-border shadow-sm' : ''}`}>
+            {/* Title on Top for maximum horizontal space */}
+            <div className="flex items-center justify-center gap-1.5 text-center mb-1">
+                {Icon && <Icon className="w-3.5 h-3.5 text-primary shrink-0 opacity-70" />}
+                <span className={cn(
+                    "font-bold text-[10px] sm:text-xs text-slate-550 dark:text-slate-400 leading-tight",
+                    emphasize && "text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-black"
+                )}>
+                    {title}
                 </span>
-                <div className={`flex items-center gap-2 text-slate-700 dark:text-slate-300 font-bold ${emphasize ? 'text-foreground' : ''}`}>
-                    {Icon && <Icon className="w-4 h-4 text-primary" />}
-                    <span>{title}</span>
-                </div>
-                <span className={`font-bold text-lg ${isWinner2 ? 'text-orange-600 dark:text-orange-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                    {isWinner2 && <Crown className="inline-block mr-1 h-4 w-4 text-yellow-500" />}
+            </div>
+
+            {/* Values below title */}
+            <div className="flex justify-between items-center px-1">
+                <span className={cn(
+                    "font-black text-xs sm:text-sm flex items-center gap-1",
+                    isWinner1 ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'
+                )}>
+                    {displayV1}
+                    {isWinner1 && <Crown className="inline-block h-3.5 w-3.5 text-yellow-500 fill-yellow-550" />}
+                </span>
+                <span className={cn(
+                    "font-black text-xs sm:text-sm flex items-center gap-1",
+                    isWinner2 ? 'text-orange-600 dark:text-orange-400' : 'text-slate-500 dark:text-slate-400'
+                )}>
+                    {isWinner2 && <Crown className="inline-block h-3.5 w-3.5 text-yellow-500 fill-yellow-550" />}
                     {displayV2}
                 </span>
             </div>
             
-            <div className={`relative rounded-full overflow-hidden flex bg-slate-200 dark:bg-slate-800 ${emphasize ? 'h-5 shadow-inner' : 'h-3'}`}>
+            {/* Visual comparison bar */}
+            <div className={cn(
+                "relative rounded-full overflow-hidden flex bg-slate-100 dark:bg-slate-800",
+                emphasize ? 'h-4 shadow-inner border border-slate-200/50 dark:border-slate-700/50' : 'h-2'
+            )}>
                 <div 
                     style={{ width: `${width1}%` }} 
                     className="bg-blue-500 h-full transition-all duration-1000 ease-out" 
@@ -215,8 +234,25 @@ const BEHAVIOR_POINTS: Record<string, number> = {
     'غير منضبط': 0, // قيمة قديمة - تُحوّل إلى مشاغب
 };
 
+const BONUS_POINTS: Record<string, number> = {
+    'مشاركة مميزة': 1,
+    'تفاعل إيجابي': 1.5,
+    'انضباط متميز': 2,
+    'حفظ زائد': 3,
+    'لا يوجد': 0,
+    '': 0
+};
+
+const NEGATIVE_BONUS_POINTS: Record<string, number> = {
+    'لباس غير لائق': -1.5,
+    'بدون مصحف': -1,
+    'إهمال المراجعة المنزلية': -2,
+    'لا يوجد': 0,
+    '': 0
+};
+
 export default function ComparisonPage() {
-    const { students, dailySessions, loading, hallOfFame } = useStudentContext();
+    const { students, dailySessions, loading, hallOfFame, settings } = useStudentContext();
 
     const [periodType, setPeriodType] = useState<'month' | 'season' | 'year'>('month');
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
@@ -271,27 +307,58 @@ export default function ComparisonPage() {
             return sessionDate >= startDate && sessionDate <= endDate;
         });
 
-        const getStatsForStudent = (studentId: string) => {
+        const sessionsByDate: Record<string, any[]> = {};
+        sessionsInRange.forEach(session => {
+            if (!sessionsByDate[session.date]) {
+                sessionsByDate[session.date] = [];
+            }
+            sessionsByDate[session.date].push(session);
+        });
+
+        const getStatsForStudent = (studentId: string, studentObj: any) => {
             const stats = { 
                 totalSessions: 0, 
+                weightedSessions: 0,
                 present: 0, absent: 0, late: 0, makeup: 0,
                 attendancePoints: 0,
                 
                 assessedPerformanceSessions: 0,
                 performancePoints: 0,
+                maxPerformancePoints: 0,
                 excellent: 0, veryGood: 0, good: 0, acceptable: 0, weak: 0,
 
                 assessedBehaviorSessions: 0,
                 behaviorPoints: 0,
-                calm: 0, averageBehavior: 0, troublemaker: 0
+                calm: 0, averageBehavior: 0, troublemaker: 0,
+
+                bonusPointsSum: 0,
+                bonusCounts: {
+                    'مشاركة مميزة': 0,
+                    'تفاعل إيجابي': 0,
+                    'انضباط متميز': 0,
+                    'حفظ زائد': 0,
+                } as Record<string, number>,
+                negativeBonusCounts: {
+                    'لباس غير لائق': 0,
+                    'بدون مصحف': 0,
+                    'إهمال المراجعة المنزلية': 0,
+                } as Record<string, number>,
             };
+
+            const pointsConfig = settings?.points;
+            const isGroup8User = studentObj && (studentObj.groupName === 'فوج 8' || studentObj.groupName === 'فوج الشيخ عبد الحق نصيرة' || (studentObj.groupName && studentObj.groupName.includes('عبد الحق')));
+            const multiplier = isGroup8User ? (studentObj?.memorizationMultiplier ?? 1.0) : 1.0;
 
             sessionsInRange.forEach(session => {
                 if (session.sessionType === 'يوم عطلة' || (session.sessionType === 'غياب الشيخ' && !session.substituteTeacher)) return;
 
                 const record = (session.records ?? []).find(r => r.studentId === studentId);
                 if (record) {
+                    const dateSessions = sessionsByDate[session.date] || [];
+                    const weight = dateSessions.length >= 2 ? 0.5 : 1.0;
+
                     stats.totalSessions++;
+                    stats.weightedSessions += weight;
                     
                     // Attendance
                     const att = record.attendance || '';
@@ -300,13 +367,18 @@ export default function ComparisonPage() {
                     else if (att === 'متأخر') stats.late++;
                     else if (att === 'تعويض') stats.makeup++;
                     
-                    stats.attendancePoints += ATTENDANCE_POINTS[att] ?? 0;
+                    stats.attendancePoints += (ATTENDANCE_POINTS[att] ?? 0) * weight;
 
                     // Performance
                     const perf = record.memorization;
-                    if (perf && perf !== 'لا يوجد' && (perf as any) !== '') {
-                        stats.assessedPerformanceSessions++;
-                        stats.performancePoints += PERFORMANCE_POINTS[perf] ?? 0;
+                    let earnedMemoPoints = 0;
+                    let hasMemoAssessed = false;
+                    const hasNewMemo = perf && perf !== 'لا يوجد' && (perf as string) !== '';
+                    const hasReview = record.review && pointsConfig?.review?.completed;
+
+                    if (hasNewMemo) {
+                        earnedMemoPoints += PERFORMANCE_POINTS[perf] ?? 0;
+                        hasMemoAssessed = true;
                         
                         if (perf === 'ممتاز') stats.excellent++;
                         else if (perf === 'جيد جدا' || perf === 'جيد جداً') stats.veryGood++;
@@ -315,43 +387,82 @@ export default function ComparisonPage() {
                         else if (perf === 'ضعيف' || perf === 'لم يحفظ') stats.weak++;
                     }
 
+                    if (hasReview) {
+                        earnedMemoPoints += pointsConfig.review.completed;
+                        hasMemoAssessed = true;
+                    }
+
+                    if (hasMemoAssessed) {
+                        stats.assessedPerformanceSessions += weight;
+                        
+                        const surahId = record.tasmieSurahId || record.surahId || 0;
+                        const from = record.tasmieFromVerse || record.fromVerse || 0;
+                        const to = record.tasmieToVerse || record.toVerse || 0;
+                        const pages = surahId > 0 ? calculateStandardPages(surahId, from, to) : 1.0;
+
+                        let maxMemoSession = 10;
+                        if (hasReview) {
+                            maxMemoSession += pointsConfig?.review?.completed || 0;
+                        }
+                        stats.maxPerformancePoints += maxMemoSession * weight * pages;
+
+                        const penalty = (hasNewMemo && record.isDelayed) ? 0.8 : 1.0;
+                        stats.performancePoints += earnedMemoPoints * weight * pages * multiplier * penalty;
+                    }
+
                     // Behavior
                     const beh = record.behavior;
                     if (beh && (beh as any) !== '') {
-                        stats.assessedBehaviorSessions++;
-                        stats.behaviorPoints += BEHAVIOR_POINTS[beh] ?? 0;
+                        stats.assessedBehaviorSessions += weight;
+                        stats.behaviorPoints += (BEHAVIOR_POINTS[beh] ?? 0) * weight;
 
                         if (beh === 'هادئ') stats.calm++;
                         else if ((beh as string) === 'متوسط' || beh === 'مقبول') stats.averageBehavior++;
                         else if (beh === 'مشاغب' || (beh as string) === 'غير منضبط') stats.troublemaker++;
+                    }
+
+                    // Bonus
+                    if (record.bonus) {
+                        stats.bonusPointsSum += (BONUS_POINTS[record.bonus] ?? 0) * weight;
+                        if (stats.bonusCounts[record.bonus] !== undefined) {
+                            stats.bonusCounts[record.bonus]++;
+                        }
+                    }
+
+                    // Negative Bonus
+                    if (record.negativeBonus) {
+                        stats.bonusPointsSum += (NEGATIVE_BONUS_POINTS[record.negativeBonus] ?? 0) * weight;
+                        if (stats.negativeBonusCounts[record.negativeBonus] !== undefined) {
+                            stats.negativeBonusCounts[record.negativeBonus]++;
+                        }
                     }
                 }
             });
             return stats;
         }
 
-        const s1Stats = getStatsForStudent(student1.id);
-        const s2Stats = getStatsForStudent(student2.id);
+        const s1Stats = getStatsForStudent(student1.id, student1);
+        const s2Stats = getStatsForStudent(student2.id, student2);
         
         // Calculate fair percentage scores (0 to 100)
         const calcRatio = (points: number, maxPoints: number) => maxPoints > 0 ? (points / maxPoints) * 100 : 0;
 
-        const s1AttPct = calcRatio(s1Stats.attendancePoints, s1Stats.totalSessions * 10);
-        const s2AttPct = calcRatio(s2Stats.attendancePoints, s2Stats.totalSessions * 10);
+        const s1AttPct = calcRatio(s1Stats.attendancePoints, s1Stats.weightedSessions * 10);
+        const s2AttPct = calcRatio(s2Stats.attendancePoints, s2Stats.weightedSessions * 10);
 
-        const s1PerfPct = calcRatio(s1Stats.performancePoints, s1Stats.assessedPerformanceSessions * 10);
-        const s2PerfPct = calcRatio(s2Stats.performancePoints, s2Stats.assessedPerformanceSessions * 10);
+        const s1PerfPct = calcRatio(s1Stats.performancePoints, s1Stats.maxPerformancePoints);
+        const s2PerfPct = calcRatio(s2Stats.performancePoints, s2Stats.maxPerformancePoints);
 
         const s1BehPct = calcRatio(s1Stats.behaviorPoints, s1Stats.assessedBehaviorSessions * 10);
         const s2BehPct = calcRatio(s2Stats.behaviorPoints, s2Stats.assessedBehaviorSessions * 10);
 
         // Academic Score (Without Behavior)
-        const score1Academic = (s1AttPct + s1PerfPct) / 2;
-        const score2Academic = (s2AttPct + s2PerfPct) / 2;
+        const score1Academic = Math.min(100, ((s1AttPct + s1PerfPct) / 2) + s1Stats.bonusPointsSum);
+        const score2Academic = Math.min(100, ((s2AttPct + s2PerfPct) / 2) + s2Stats.bonusPointsSum);
 
         // Comprehensive Score (With Behavior)
-        const score1Comprehensive = s1Stats.assessedBehaviorSessions > 0 ? (s1AttPct + s1PerfPct + s1BehPct) / 3 : score1Academic;
-        const score2Comprehensive = s2Stats.assessedBehaviorSessions > 0 ? (s2AttPct + s2PerfPct + s2BehPct) / 3 : score2Academic;
+        const score1Comprehensive = Math.min(100, (s1Stats.assessedBehaviorSessions > 0 ? (s1AttPct + s1PerfPct + s1BehPct) / 3 : ((s1AttPct + s1PerfPct) / 2)) + s1Stats.bonusPointsSum);
+        const score2Comprehensive = Math.min(100, (s2Stats.assessedBehaviorSessions > 0 ? (s2AttPct + s2PerfPct + s2BehPct) / 3 : ((s2AttPct + s2PerfPct) / 2)) + s2Stats.bonusPointsSum);
 
         return {
             student1: s1Stats,
@@ -364,7 +475,7 @@ export default function ComparisonPage() {
             score2Comprehensive: Math.max(0, Math.round(score2Comprehensive * 10) / 10) || 0,
         };
 
-    }, [student1, student2, periodType, selectedMonth, selectedSeason, selectedYear, dailySessions]);
+    }, [student1, student2, periodType, selectedMonth, selectedSeason, selectedYear, dailySessions, settings]);
 
     // Prepare data for Radar Chart
     const radarData = useMemo(() => {
@@ -581,7 +692,7 @@ export default function ComparisonPage() {
                         <p className="text-muted-foreground text-lg font-medium">النسبة المئوية العادلة جنبًا إلى جنب مع التفاصيل والأرقام التي بُنيت عليها.</p>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         
                         {/* Attendance Details Card */}
                         <Card className="border-0 shadow-xl overflow-hidden bg-white dark:bg-slate-900 border-t-4 border-t-blue-500 hover:shadow-[0_15px_40px_-10px_rgba(59,130,246,0.15)] transition-all duration-300 transform hover:-translate-y-1">
@@ -604,16 +715,16 @@ export default function ComparisonPage() {
                                     
                                     <div className="mt-6 pt-5 border-t border-dashed border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20 rounded-xl p-4 text-sm font-mono text-center shadow-inner">
                                         <p className="text-blue-800 dark:text-blue-300/70 mb-2 font-bold">المعادلة المستخدمة:</p>
-                                        <p className="mb-4 bg-white dark:bg-black/40 py-2 px-3 rounded-lg border border-blue-100 dark:border-blue-900 shadow-sm text-slate-700 dark:text-slate-300">النقاط المكتسبة ÷ (الحصص الكلية × 10)</p>
+                                        <p className="mb-4 bg-white dark:bg-black/40 py-2 px-3 rounded-lg border border-blue-100 dark:border-blue-900 shadow-sm text-slate-700 dark:text-slate-300 text-xs">النقاط المكتسبة (مع وزن) ÷ (الحصص الموزونة × 10)</p>
                                         <div className="flex justify-between items-center text-sm font-bold">
-                                            <span className="text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 px-4 py-1.5 rounded-full">{comparisonData.student1.attendancePoints} / {comparisonData.student1.totalSessions * 10}</span>
-                                            <span className="text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40 px-4 py-1.5 rounded-full">{comparisonData.student2.attendancePoints} / {comparisonData.student2.totalSessions * 10}</span>
+                                            <span className="text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 px-3 py-1.5 rounded-full text-xs">{comparisonData.student1.attendancePoints.toFixed(1)} / {(comparisonData.student1.weightedSessions * 10).toFixed(1)}</span>
+                                            <span className="text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40 px-3 py-1.5 rounded-full text-xs">{comparisonData.student2.attendancePoints.toFixed(1)} / {(comparisonData.student2.weightedSessions * 10).toFixed(1)}</span>
                                         </div>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
-
+                        
                         {/* Performance Details Card */}
                         <Card className="border-0 shadow-xl overflow-hidden bg-white dark:bg-slate-900 border-t-4 border-t-amber-500 hover:shadow-[0_15px_40px_-10px_rgba(245,158,11,0.15)] transition-all duration-300 transform hover:-translate-y-1">
                             <CardHeader className="bg-amber-50 dark:bg-amber-950/50 border-b border-amber-100 dark:border-amber-900/50 pb-5">
@@ -636,16 +747,16 @@ export default function ComparisonPage() {
                                     
                                     <div className="mt-6 pt-5 border-t border-dashed border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 rounded-xl p-4 text-sm font-mono text-center shadow-inner">
                                         <p className="text-amber-800 dark:text-amber-300/70 mb-2 font-bold">المعادلة المستخدمة:</p>
-                                        <p className="mb-4 bg-white dark:bg-black/40 py-2 px-3 rounded-lg border border-amber-100 dark:border-amber-900 shadow-sm text-slate-700 dark:text-slate-300">النقاط المكتسبة ÷ (الحصص المقيّمة × 10)</p>
+                                        <p className="mb-4 bg-white dark:bg-black/40 py-2 px-3 rounded-lg border border-amber-100 dark:border-amber-900 shadow-sm text-slate-700 dark:text-slate-300 text-xs">النقاط المكتسبة (مع المعاملات) ÷ مجموع النقاط الأقصى للآيات المقروءة</p>
                                         <div className="flex justify-between items-center text-sm font-bold">
-                                            <span className="text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 px-4 py-1.5 rounded-full">{comparisonData.student1.performancePoints} / {comparisonData.student1.assessedPerformanceSessions * 10}</span>
-                                            <span className="text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40 px-4 py-1.5 rounded-full">{comparisonData.student2.performancePoints} / {comparisonData.student2.assessedPerformanceSessions * 10}</span>
+                                            <span className="text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 px-3 py-1.5 rounded-full text-xs">{comparisonData.student1.performancePoints.toFixed(1)} / {comparisonData.student1.maxPerformancePoints.toFixed(1)}</span>
+                                            <span className="text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40 px-3 py-1.5 rounded-full text-xs">{comparisonData.student2.performancePoints.toFixed(1)} / {comparisonData.student2.maxPerformancePoints.toFixed(1)}</span>
                                         </div>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
-
+                        
                         {/* Behavior Details Card */}
                         <Card className="border-0 shadow-xl overflow-hidden bg-white dark:bg-slate-900 border-t-4 border-t-emerald-500 hover:shadow-[0_15px_40px_-10px_rgba(16,185,129,0.15)] transition-all duration-300 transform hover:-translate-y-1">
                             <CardHeader className="bg-emerald-50 dark:bg-emerald-950/50 border-b border-emerald-100 dark:border-emerald-900/50 pb-5">
@@ -672,6 +783,34 @@ export default function ComparisonPage() {
                                             <span className="text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40 px-4 py-1.5 rounded-full">{comparisonData.student2.behaviorPoints} / {comparisonData.student2.assessedBehaviorSessions * 10}</span>
                                         </div>
                                     </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Bonus & Deductions Details Card */}
+                        <Card className="border-0 shadow-xl overflow-hidden bg-white dark:bg-slate-900 border-t-4 border-t-purple-500 hover:shadow-[0_15px_40px_-10px_rgba(168,85,247,0.15)] transition-all duration-300 transform hover:-translate-y-1">
+                            <CardHeader className="bg-purple-50 dark:bg-purple-950/50 border-b border-purple-100 dark:border-purple-900/50 pb-5">
+                                <CardTitle className="flex items-center gap-2 text-2xl text-purple-700 dark:text-purple-400 font-black">
+                                    <Sparkles className="h-6 w-6" /> البونص والخصومات
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div className="p-6 border-b border-border bg-slate-50 dark:bg-slate-900/50">
+                                    <ComparisonStat title="المحصلة الصافية (بونص - خصم)" value1={comparisonData.student1.bonusPointsSum} value2={comparisonData.student2.bonusPointsSum} suffix="ن" icon={Target} emphasize />
+                                </div>
+                                <div className="p-6 space-y-4">
+                                    <p className="text-xs font-bold text-slate-500 border-b pb-2">🎁 تفاصيل البونص الإيجابي الممنوح:</p>
+                                    <ComparisonStat title="مشاركة مميزة (+1)" value1={comparisonData.student1.bonusCounts['مشاركة مميزة'] || 0} value2={comparisonData.student2.bonusCounts['مشاركة مميزة'] || 0} suffix="مرة" />
+                                    <ComparisonStat title="تفاعل إيجابي (+1.5)" value1={comparisonData.student1.bonusCounts['تفاعل إيجابي'] || 0} value2={comparisonData.student2.bonusCounts['تفاعل إيجابي'] || 0} suffix="مرة" />
+                                    <ComparisonStat title="انضباط متميز (+2)" value1={comparisonData.student1.bonusCounts['انضباط متميز'] || 0} value2={comparisonData.student2.bonusCounts['انضباط متميز'] || 0} suffix="مرة" />
+                                    <ComparisonStat title="حفظ زائد (+3)" value1={comparisonData.student1.bonusCounts['حفظ زائد'] || 0} value2={comparisonData.student2.bonusCounts['حفظ زائد'] || 0} suffix="مرة" />
+                                    
+                                    <div className="h-px w-full bg-slate-200 dark:bg-slate-800 my-4"></div>
+                                    
+                                    <p className="text-xs font-bold text-rose-500 border-b pb-2">⚠️ تفاصيل الخصومات السلوكية:</p>
+                                    <ComparisonStat title="لباس غير لائق (-1.5)" value1={comparisonData.student1.negativeBonusCounts['لباس غير لائق'] || 0} value2={comparisonData.student2.negativeBonusCounts['لباس غير لائق'] || 0} suffix="مرة" higherIsBetter={false} />
+                                    <ComparisonStat title="بدون مصحف (-1)" value1={comparisonData.student1.negativeBonusCounts['بدون مصحف'] || 0} value2={comparisonData.student2.negativeBonusCounts['بدون مصحف'] || 0} suffix="مرة" higherIsBetter={false} />
+                                    <ComparisonStat title="إهمال المراجعة المنزلية (-2)" value1={comparisonData.student1.negativeBonusCounts['إهمال المراجعة المنزلية'] || 0} value2={comparisonData.student2.negativeBonusCounts['إهمال المراجعة المنزلية'] || 0} suffix="مرة" higherIsBetter={false} />
                                 </div>
                             </CardContent>
                         </Card>

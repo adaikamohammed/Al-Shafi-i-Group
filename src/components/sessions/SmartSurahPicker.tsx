@@ -213,28 +213,28 @@ export function SmartSurahPicker({
                     إعادة تعيين ↺
                   </button>
                 </div>
-                {/* أزرار تعديل الآيات */}
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newTo = Math.max(currentFromVerse ?? 1, (currentToVerse ?? 1) - 5);
-                      onChange({ toVerse: newTo });
-                    }}
-                    className="flex-1 py-1 rounded-lg text-[10px] font-black bg-emerald-100 dark:bg-emerald-900/10 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200 transition-colors"
-                  >
-                    ↓ 5 آيات أقل
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newTo = Math.min((currentToVerse ?? 1) + 5, currentSurah?.verses ?? 999);
-                      onChange({ toVerse: newTo });
-                    }}
-                    className="flex-1 py-1 rounded-lg text-[10px] font-black bg-emerald-100 dark:bg-emerald-900/10 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200 transition-colors"
-                  >
-                    ↑ 5 آيات أكثر
-                  </button>
+                {/* تعديل آية النهاية مباشرة */}
+                <div className="flex items-center gap-2 pt-1 justify-between">
+                  <span className="text-[11px] font-bold text-emerald-800">تعديل آية النهاية:</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-emerald-600 font-semibold">إلى آية</span>
+                    <input
+                      type="number"
+                      min={currentFromVerse ?? 1}
+                      max={currentSurah?.verses ?? 999}
+                      value={currentToVerse ?? ""}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        if (!isNaN(val)) {
+                          onChange({ toVerse: val });
+                        }
+                      }}
+                      className="w-16 h-7 text-center text-xs font-bold rounded-lg border border-emerald-250 bg-white text-emerald-900 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                    <span className="text-[10px] text-emerald-500 font-semibold">
+                      / {currentSurah?.verses ?? 999}
+                    </span>
+                  </div>
                 </div>
               </div>
             )
@@ -276,31 +276,29 @@ export function SmartSurahPicker({
                 )}
               </button>
 
-              {/* زر التعديل أو تخصيص */}
+              {/* تعديل آية النهاية مباشرة */}
               {isAutoApplied && (
-                <div className="flex gap-2 px-3 pb-2.5 pt-1">
-                  {/* ± 5 آيات */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newTo = Math.max(nextWird.fromVerse, (currentToVerse ?? nextWird.toVerse) - 5);
-                      onChange({ toVerse: newTo });
-                    }}
-                    className="flex-1 py-1 rounded-lg text-[11px] font-black bg-blue-100/80 text-blue-700 hover:bg-blue-200 transition-colors"
-                  >
-                    ↓ 5 آيات أقل
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const surah = surahs.find((s) => s.id === currentSurahId);
-                      const newTo = Math.min((currentToVerse ?? nextWird.toVerse) + 5, surah?.verses ?? 999);
-                      onChange({ toVerse: newTo });
-                    }}
-                    className="flex-1 py-1 rounded-lg text-[11px] font-black bg-blue-100/80 text-blue-700 hover:bg-blue-200 transition-colors"
-                  >
-                    ↑ 5 آيات أكثر
-                  </button>
+                <div className="flex items-center gap-2 px-3 pb-2.5 pt-1.5 justify-between bg-blue-50/50 border-t border-blue-100">
+                  <span className="text-[11px] font-bold text-blue-800">تعديل آية النهاية:</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-blue-600 font-semibold">إلى آية</span>
+                    <input
+                      type="number"
+                      min={currentFromVerse ?? nextWird.fromVerse}
+                      max={currentSurah?.verses ?? 999}
+                      value={currentToVerse ?? ""}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        if (!isNaN(val)) {
+                          onChange({ toVerse: val });
+                        }
+                      }}
+                      className="w-16 h-7 text-center text-xs font-bold rounded-lg border border-blue-200 bg-white text-blue-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <span className="text-[10px] text-blue-500 font-semibold">
+                      / {currentSurah?.verses ?? 999}
+                    </span>
+                  </div>
                 </div>
               )}
             </>

@@ -450,7 +450,7 @@ export default function GroupsMonitoringPage() {
                                         <>
                                             {/* Table for larger screens */}
                                             <div className="hidden sm:block overflow-x-auto">
-                                                <table className="w-full text-right">
+                                                <table className="w-full text-right min-w-[750px]">
                                                     <thead className="text-[10px] opacity-60 bg-slate-50 dark:bg-white/5 border-b font-black">
                                                         <tr>
                                                             <th className="px-5 py-3 text-center w-12">
@@ -725,7 +725,7 @@ export default function GroupsMonitoringPage() {
                             </CardHeader>
                             <CardContent className="p-0">
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-right">
+                                    <table className="w-full text-right min-w-[650px]">
                                         <thead className="text-[10px] opacity-60 bg-slate-50 dark:bg-white/5 font-black border-b">
                                             <tr>
                                                 <th className="px-6 py-4">اسم الفوج</th>

@@ -180,12 +180,21 @@ export const WeeklyAttendanceTable = ({
     const getMemorizationBadge = (level: string | null) => {
         if (!level) return null;
         switch (level) {
-            case 'ممتاز': return <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-bold border border-emerald-200">ممتاز</span>;
-            case 'جيد جدا': return <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[9px] font-bold border border-green-200">جيد جدا</span>;
-            case 'جيد': return <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-bold border border-blue-200">جيد</span>;
-            case 'مقبول': return <span className="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-[9px] font-bold border border-orange-200">مقبول</span>;
-            case 'ضعيف': return <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded text-[9px] font-bold border border-red-200">ضعيف</span>;
-            case 'لم يحفظ': return <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded text-[9px] border border-gray-200">لم يحفظ</span>;
+            case 'ممتاز': return <span className="bg-emerald-100 text-emerald-700 px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-bold border border-emerald-200">ممتاز</span>;
+            case 'جيد جدا': return (
+                <span className="bg-green-100 text-green-700 px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-bold border border-green-200 block truncate max-w-full">
+                    <span className="hidden sm:inline">جيد جداً</span>
+                    <span className="sm:hidden">ج.جداً</span>
+                </span>
+            );
+            case 'جيد': return <span className="bg-blue-100 text-blue-700 px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-bold border border-blue-200">جيد</span>;
+            case 'مقبول': return <span className="bg-orange-100 text-orange-700 px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-bold border border-orange-200">مقبول</span>;
+            case 'ضعيف': return <span className="bg-red-100 text-red-700 px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-bold border border-red-200">ضعيف</span>;
+            case 'لم يحفظ': return (
+                <span className="bg-gray-100 text-gray-500 px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-bold border border-gray-200 block truncate max-w-full">
+                    لم يحفظ
+                </span>
+            );
             default: return null;
         }
     };
@@ -510,7 +519,12 @@ export const WeeklyAttendanceTable = ({
                                                         isHoliday ? "bg-white/50 text-foreground/80 font-bold" : "bg-emerald-100 text-emerald-700"
                                                     )}>
                                                         {day.isWeekend ? 'عطلة' :
-                                                            isHoliday ? (sessionType === 'يوم عطلة' ? 'عطلة' : sessionType) :
+                                                            isHoliday ? (
+                                                                sessionType === 'يوم عطلة' ? 'عطلة' :
+                                                                sessionType === 'غياب الشيخ' ? 'غياب' :
+                                                                sessionType === 'حصة أنشطة' ? 'أنشطة' :
+                                                                sessionType
+                                                            ) :
                                                                 hasTwoSessions ? 'ص + م' : `حصة ${activeSessionNum}`}
                                                     </span>
                                                 )}

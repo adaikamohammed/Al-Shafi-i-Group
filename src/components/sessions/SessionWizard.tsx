@@ -46,6 +46,8 @@ export const SessionWizard = ({ isOpen, onClose, sessionNumber, sessionDate, stu
                 updated.behavior = '';
                 updated.memorization = '' as PerformanceLevel;
                 updated.isDelayed = false;
+                updated.bonus = '';
+                updated.negativeBonus = '';
             }
             return {
                 ...prev,

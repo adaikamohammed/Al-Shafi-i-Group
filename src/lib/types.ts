@@ -119,6 +119,7 @@ export interface DailyRecord {
   behavior: BehaviorLevel | null;
   notes?: string;
   bonus?: string | null;
+  negativeBonus?: string | null;
   surahId?: number;
   fromVerse?: number;
   toVerse?: number;

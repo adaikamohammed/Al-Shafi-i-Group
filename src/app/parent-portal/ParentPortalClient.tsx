@@ -163,6 +163,16 @@ const ParentPortalContent = ({
                         };
                         studentScores[record.studentId].points += BONUS_POINTS[record.bonus] ?? 0;
                     }
+                    if (record.negativeBonus) {
+                        const NEGATIVE_BONUS_POINTS: Record<string, number> = {
+                            'لباس غير لائق': -1.5,
+                            'بدون مصحف': -1,
+                            'إهمال المراجعة المنزلية': -2,
+                            'لا يوجد': 0,
+                            '': 0
+                        };
+                        studentScores[record.studentId].points += NEGATIVE_BONUS_POINTS[record.negativeBonus] ?? 0;
+                    }
                     if (record.attendance === 'غائب') studentScores[record.studentId].stats.absent++;
                     if (record.attendance === 'تعويض') studentScores[record.studentId].stats.makeup++;
                     if (record.behavior === 'هادئ') studentScores[record.studentId].stats.calm++;

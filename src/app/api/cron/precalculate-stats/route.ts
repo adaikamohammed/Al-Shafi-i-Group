@@ -675,6 +675,19 @@ export async function GET(request: Request) {
                         const bp = BONUS_POINTS[record.bonus] ?? 0;
                         studentScores[studentId].pointsBreakdown.bonus += bp;
                     }
+
+                    // Negative Bonus points (Behavioral Deductions)
+                    if (record.negativeBonus) {
+                        const NEGATIVE_BONUS_POINTS: Record<string, number> = {
+                            'لباس غير لائق': -1.5,
+                            'بدون مصحف': -1,
+                            'إهمال المراجعة المنزلية': -2,
+                            'لا يوجد': 0,
+                            '': 0
+                        };
+                        const nbp = NEGATIVE_BONUS_POINTS[record.negativeBonus] ?? 0;
+                        studentScores[studentId].pointsBreakdown.bonus += nbp;
+                    }
                 }
             });
         });

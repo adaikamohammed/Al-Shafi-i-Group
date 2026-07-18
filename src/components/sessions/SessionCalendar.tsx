@@ -144,7 +144,7 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                     key={day}
                     onClick={() => onDayClick(day)}
                     className={cn(
-                        "relative flex flex-col justify-between min-h-[6rem] md:min-h-[8rem] h-auto border rounded-xl m-1 p-2 transition-all cursor-pointer group shadow-sm",
+                        "relative flex flex-col justify-between min-h-[5.5rem] sm:min-h-[6rem] md:min-h-[8rem] h-auto border rounded-xl m-0.5 sm:m-1 p-1 sm:p-2 transition-all cursor-pointer group shadow-sm",
                         statusClass
                     )}
                     style={hasTwoSessions ? {
@@ -154,17 +154,17 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                 >
                     {/* رقم اليوم + مؤشر الحصة الإضافية */}
                     <div className="flex justify-between items-start">
-                        <span className={cn("text-lg font-bold font-headline select-none", isTodayDate ? "text-primary" : "text-foreground")}>
+                        <span className={cn("text-base sm:text-lg font-bold font-headline select-none", isTodayDate ? "text-primary" : "text-foreground")}>
                             {day}
                         </span>
                         {/* نقطة صغيرة فقط للإشارة لوجود حصة إضافية */}
                         {hasSession2 && (
-                            <span className="w-2 h-2 rounded-full bg-white/80 border border-indigo-300 shrink-0 mt-1" title="يوم بحصتين" />
+                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white/80 border border-indigo-300 shrink-0 mt-1" title="يوم بحصتين" />
                         )}
                     </div>
 
                     {/* Session Badges — نفس المظهر القديم */}
-                    <div className="space-y-1 relative z-10">
+                    <div className="space-y-0.5 sm:space-y-1 relative z-10">
                         {sessions.map((session: any, idx: number) => (
                             <div
                                 key={idx}
@@ -172,11 +172,43 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                                     e.stopPropagation();
                                     onDayClick(day, getSessionNum(session) as 1 | 2);
                                 }}
-                                className="flex items-center justify-center text-xs font-bold text-muted-foreground bg-white/60 hover:bg-white/90 border border-transparent hover:border-primary/30 rounded-lg px-2 py-1.5 truncate transition-all cursor-pointer shadow-sm hover:shadow-md"
+                                className="flex items-center justify-center text-[9px] sm:text-xs font-bold text-muted-foreground bg-white/60 hover:bg-white/90 border border-transparent hover:border-primary/30 rounded-lg px-1 sm:px-2 py-1 sm:py-1.5 truncate transition-all cursor-pointer shadow-sm hover:shadow-md"
                             >
-                                {session.sessionType === 'حصة أساسية'
-                                    ? (getSessionNum(session) === 1 ? 'حصة أساسية' : 'حصة إضافية')
-                                    : session.sessionType}
+                                {session.sessionType === 'حصة أساسية' ? (
+                                    getSessionNum(session) === 1 ? (
+                                        <span className="flex items-center gap-0.5 truncate">
+                                            <span className="text-[10px]">📗</span>
+                                            <span className="hidden sm:inline">حصة أساسية</span>
+                                            <span className="sm:hidden">أساسي</span>
+                                        </span>
+                                    ) : (
+                                        <span className="flex items-center gap-0.5 truncate">
+                                            <span className="text-[10px]">📘</span>
+                                            <span className="hidden sm:inline">حصة إضافية</span>
+                                            <span className="sm:hidden">إضافي</span>
+                                        </span>
+                                    )
+                                ) : session.sessionType === 'يوم عطلة' ? (
+                                    <span className="flex items-center gap-0.5 truncate">
+                                        <span className="text-[10px]">🏖️</span>
+                                        <span className="hidden sm:inline">يوم عطلة</span>
+                                        <span className="sm:hidden">عطلة</span>
+                                    </span>
+                                ) : session.sessionType === 'حصة أنشطة' ? (
+                                    <span className="flex items-center gap-0.5 truncate">
+                                        <span className="text-[10px]">🎨</span>
+                                        <span className="hidden sm:inline">حصة أنشطة</span>
+                                        <span className="sm:hidden">أنشطة</span>
+                                    </span>
+                                ) : session.sessionType === 'غياب الشيخ' ? (
+                                    <span className="flex items-center gap-0.5 truncate">
+                                        <span className="text-[10px]">👤</span>
+                                        <span className="hidden sm:inline">غياب الشيخ</span>
+                                        <span className="sm:hidden">غياب</span>
+                                    </span>
+                                ) : (
+                                    <span className="truncate">{session.sessionType}</span>
+                                )}
                             </div>
                         ))}
 
@@ -187,11 +219,12 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                                     e.stopPropagation();
                                     onDayClick(day, 2);
                                 }}
-                                className="w-full flex items-center justify-center gap-1 text-[11px] font-bold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 border border-white/30 hover:border-white/60 rounded-lg px-2 py-1 transition-all active:scale-95"
+                                className="w-full flex items-center justify-center gap-1 text-[9px] sm:text-[11px] font-bold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 border border-white/30 hover:border-white/60 rounded-lg px-1 sm:px-2 py-0.5 sm:py-1 transition-all active:scale-95"
                                 title="إضافة حصة إضافية"
                             >
-                                <Plus className="h-3 w-3 shrink-0" />
-                                <span>حصة إضافية</span>
+                                <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
+                                <span className="hidden sm:inline">حصة إضافية</span>
+                                <span className="sm:hidden">+ إضافي</span>
                             </button>
                         )}
                     </div>

@@ -268,6 +268,17 @@ function calculateFairStudentStats({
                 st.bonusPointsSum += (BONUS_POINTS[r.bonus] ?? 0) * weight;
             }
 
+            if (r.negativeBonus) {
+                const NEGATIVE_BONUS_POINTS: Record<string, number> = {
+                    'لباس غير لائق': -1.5,
+                    'بدون مصحف': -1,
+                    'إهمال المراجعة المنزلية': -2,
+                    'لا يوجد': 0,
+                    '': 0
+                };
+                st.bonusPointsSum += (NEGATIVE_BONUS_POINTS[r.negativeBonus] ?? 0) * weight;
+            }
+
             // حصص التعويض الفردية — لا تؤثر على weightedSessions (نسبة المجموعة)
             if (r.makeupSessions && Array.isArray(r.makeupSessions)) {
                 r.makeupSessions.forEach((makeup: any) => {
@@ -5092,8 +5103,8 @@ function TopStudentsView({ stats, groupFilter, setGroupFilter, sheikhs, starsMod
                                                         s.avgEvalScore >= 1.67 ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"
                                             )}>{s.avgEvalScore.toFixed(1)}</span>
                                         </td>
-                                        <td className="p-2 border-l text-center font-bold text-purple-700 bg-purple-50/30">
-                                            +{s.bonusPointsSum.toFixed(1)}ن
+                                        <td className={cn("p-2 border-l text-center font-bold", s.bonusPointsSum > 0 ? "text-purple-700 bg-purple-50/30" : s.bonusPointsSum < 0 ? "text-red-700 bg-red-50/30" : "text-muted-foreground")}>
+                                            {s.bonusPointsSum > 0 ? `+${s.bonusPointsSum.toFixed(1)}ن` : s.bonusPointsSum < 0 ? `${s.bonusPointsSum.toFixed(1)}ن` : '—'}
                                         </td>
                                         <td className="p-2 text-center">
                                             <span className="font-black text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg">{s.overallScore}</span>
@@ -5487,7 +5498,7 @@ function StudentScoreDetailModal({
     type DayRec = {
         date: string; label: string; sessionType: string;
         attendance: string; memorization: string | null;
-        behavior: string | null; bonus: string | null; isReview: boolean;
+        behavior: string | null; bonus: string | null; negativeBonus: string | null; isReview: boolean;
         evalGrade: number; behaviorGrade: number; isLate: boolean;
         weight: number;
         isDelayed: boolean;
@@ -5610,6 +5621,7 @@ function StudentScoreDetailModal({
                     evalGrade: isActivitySess ? 0 : evalGrade,
                     behaviorGrade: isActivitySess ? 0 : behaviorGrade,
                     bonus: isActivitySess ? null : (myRec?.bonus || null),
+                    negativeBonus: isActivitySess ? null : (myRec?.negativeBonus || null),
                     isLate,
                     weight,
                     isDelayed,
@@ -5680,6 +5692,17 @@ function StudentScoreDetailModal({
                 '': 0
             };
             bonusPointsSum += (BONUS_POINTS[rec.bonus] ?? 0) * weight;
+        }
+
+        if (rec.negativeBonus) {
+            const NEGATIVE_BONUS_POINTS: Record<string, number> = {
+                'لباس غير لائق': -1.5,
+                'بدون مصحف': -1,
+                'إهمال المراجعة المنزلية': -2,
+                'لا يوجد': 0,
+                '': 0
+            };
+            bonusPointsSum += (NEGATIVE_BONUS_POINTS[rec.negativeBonus] ?? 0) * weight;
         }
     });
 
@@ -5777,7 +5800,15 @@ function StudentScoreDetailModal({
                                     'لا يوجد': 0,
                                     '': 0
                                 };
-                                const dayBonusPoints = rec.bonus ? (BONUS_POINTS[rec.bonus] ?? 0) * rec.weight : 0;
+                                const NEGATIVE_BONUS_POINTS: Record<string, number> = {
+                                    'لباس غير لائق': -1.5,
+                                    'بدون مصحف': -1,
+                                    'إهمال المراجعة المنزلية': -2,
+                                    'لا يوجد': 0,
+                                    '': 0
+                                };
+                                const dayNegBonusPoints = rec.negativeBonus ? (NEGATIVE_BONUS_POINTS[rec.negativeBonus] ?? 0) * rec.weight : 0;
+                                const dayBonusPoints = (rec.bonus ? (BONUS_POINTS[rec.bonus] ?? 0) * rec.weight : 0) + dayNegBonusPoints;
                                 const dayTotal = Math.round(((dayAttContrib + dayEvalContrib) / 2 + dayBonusPoints) * 10) / 10;
                                 
                                 return (
@@ -5806,15 +5837,23 @@ function StudentScoreDetailModal({
                                             ) : <span className="text-muted-foreground/30">—</span>}
                                         </td>
                                         <td className="p-1.5 text-center">
-                                            {rec.bonus ? (
-                                                <span className="font-bold text-purple-700 bg-purple-50 px-1 py-0.5 rounded text-[10px]" title={rec.bonus}>
-                                                    {rec.bonus}
-                                                </span>
-                                            ) : <span className="text-muted-foreground/30">—</span>}
+                                            <div className="flex flex-col gap-0.5 items-center justify-center">
+                                                {rec.bonus && (
+                                                    <span className="font-bold text-purple-700 bg-purple-50 px-1 py-0.5 rounded text-[10px]" title={rec.bonus}>
+                                                        {rec.bonus}
+                                                    </span>
+                                                )}
+                                                {rec.negativeBonus && (
+                                                    <span className="font-bold text-red-700 bg-red-50 px-1 py-0.5 rounded text-[10px]" title={rec.negativeBonus}>
+                                                        {rec.negativeBonus}
+                                                    </span>
+                                                )}
+                                                {!rec.bonus && !rec.negativeBonus && <span className="text-muted-foreground/30">—</span>}
+                                            </div>
                                         </td>
                                         <td className="p-1.5 text-center">
-                                            <span className={cn('font-black', dayTotal > 0 ? 'text-purple-700' : 'text-gray-300')}>
-                                                {dayTotal > 0 ? `+${dayTotal.toFixed(1)}%` : '—'}
+                                            <span className={cn('font-black', dayTotal > 0 ? 'text-purple-700' : dayTotal < 0 ? 'text-red-700' : 'text-gray-300')}>
+                                                {dayTotal > 0 ? `+${dayTotal.toFixed(1)}%` : dayTotal < 0 ? `${dayTotal.toFixed(1)}%` : '—'}
                                             </span>
                                         </td>
                                     </tr>

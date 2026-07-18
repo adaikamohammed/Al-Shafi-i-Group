@@ -575,8 +575,8 @@ function RegisterSessionContent() {
                 attendance: field === 'attendance' ? value : (currentRecord.attendance || 'حاضر')
             };
 
-            // Auto-set evaluation to "لم يحفظ" when marking present in basic session
-            if (field === 'attendance' && value === 'حاضر' && sessionType === 'حصة أساسية' && !updatedRecord.memorization) {
+            // Auto-set evaluation to "لم يحفظ" when marking present or late in basic session
+            if (field === 'attendance' && (value === 'حاضر' || value === 'متأخر') && sessionType === 'حصة أساسية' && !updatedRecord.memorization) {
                 updatedRecord.memorization = 'لم يحفظ';
             }
 
@@ -587,6 +587,7 @@ function RegisterSessionContent() {
                 updatedRecord.memorization = '' as PerformanceLevel;
                 updatedRecord.isDelayed = false;
                 updatedRecord.bonus = '';
+                updatedRecord.negativeBonus = '';
             }
 
             return {
@@ -692,7 +693,7 @@ function RegisterSessionContent() {
     const debouncedSessionData = useDebounce(sessionData, 1500); // Auto-save after 1.5s of inactivity
 
     // Shared Save Logic
-    const performSave = async (data: typeof sessionData): Promise<void> => {
+    const performSave = async (data: typeof sessionData, silent = false): Promise<void> => {
         if (!selectedDay || !user) return;
         const dateStr = format(selectedDay, 'yyyy-MM-dd');
         let sessionOwnerId: string | undefined = undefined;
@@ -836,16 +837,20 @@ function RegisterSessionContent() {
                 });
             }
 
-            toast({
-                title: "✅ تم حفظ الحصة",
-                description: "تم حفظ الحصة وتحديث التقييمات بنجاح.",
-            });
+            if (!silent) {
+                toast({
+                    title: "✅ تم حفظ الحصة",
+                    description: "تم حفظ الحصة وتحديث التقييمات بنجاح.",
+                    duration: 2000,
+                });
+            }
         } catch (error: any) {
             console.error('Failed to save session:', error);
             toast({
                 title: "❌ فشل حفظ الحصة",
                 description: `حدث خطأ أثناء الحفظ (الرجاء التحقق من الصلاحيات): ${error.message || error}`,
-                variant: "destructive"
+                variant: "destructive",
+                duration: 3000,
             });
             throw error; // Rethrow to let autoSave and exit loops handle it correctly
         }
@@ -869,7 +874,7 @@ function RegisterSessionContent() {
         const autoSave = async () => {
             setIsSaving(true);
             try {
-                await performSave(debouncedSessionData);
+                await performSave(debouncedSessionData, true);
                 setLastSaved(new Date());
                 setIsDirty(false);
             } catch (error) {
@@ -886,11 +891,11 @@ function RegisterSessionContent() {
         if (isDirty || isSaving) {
             setIsSaving(true);
             try {
-                await performSave(sessionData); // Force final save
-                toast({ title: "تم الحفظ", description: "تم حفظ التغييرات قبل الخروج." });
+                await performSave(sessionData, true); // Force final save
+                toast({ title: "تم الحفظ", description: "تم حفظ التغييرات قبل الخروج.", duration: 2000 });
             } catch (e) {
                 console.error("Save on exit failed", e);
-                toast({ title: "تنبيه", description: "قد لا تكون بعض التغييرات محفوظة.", variant: "destructive" });
+                toast({ title: "تنبيه", description: "قد لا تكون بعض التغييرات محفوظة.", variant: "destructive", duration: 3000 });
             } finally {
                 setIsSaving(false);
             }
@@ -909,10 +914,10 @@ function RegisterSessionContent() {
             if (isDirty) {
                 setIsSaving(true);
                 try {
-                    await performSave(sessionData);
+                    await performSave(sessionData, true);
                 } catch (e) {
                     console.error("Save before navigate failed", e);
-                    toast({ title: "تنبيه", description: "قد لا تكون بعض التغييرات محفوظة.", variant: "destructive" });
+                    toast({ title: "تنبيه", description: "قد لا تكون بعض التغييرات محفوظة.", variant: "destructive", duration: 3000 });
                 } finally {
                     setIsSaving(false);
                 }
@@ -1064,7 +1069,7 @@ function RegisterSessionContent() {
     const handleManualSaveAndExit = async () => {
         setIsSaving(true);
         try {
-            await performSave(sessionData); // Save immediate state
+            await performSave(sessionData, true); // Save immediate state
             toast({
                 title: "تم الحفظ بنجاح ✅",
                 description: "هل تريد إرسال تقارير الحصة للأولياء عبر واتساب؟",
