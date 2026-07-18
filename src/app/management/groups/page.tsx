@@ -211,17 +211,21 @@ export default function GroupsMonitoringPage() {
 
         setIsUpdatingBatch(true);
         try {
+            const finalSurahId = batchSurahId === -1 ? null : batchSurahId;
             const promises = studentIds.map(id => {
                 const student = students.find(s => s.id === id);
                 if (!student) return Promise.resolve();
-                return updateStudent(id, { currentSurahId: batchSurahId }, student.ownerId);
+                return updateStudent(id, { currentSurahId: finalSurahId as any }, student.ownerId);
             });
             await Promise.all(promises);
             toast({
                 title: "✅ تم التحديث الجماعي",
-                description: `تم تحديث السورة الحالية لعدد ${studentIds.length} طلاب بنجاح.`
+                description: finalSurahId === null
+                    ? `تم إلغاء تحديد السورة لعدد ${studentIds.length} طلاب بنجاح.`
+                    : `تم تحديث السورة الحالية لعدد ${studentIds.length} طلاب بنجاح.`
             });
             setCheckedStudents({});
+            setBatchSurahId(0);
         } catch (error: any) {
             toast({
                 title: "❌ فشل التحديث",
@@ -429,6 +433,7 @@ export default function GroupsMonitoringPage() {
                                             className="bg-background border border-muted-foreground/15 rounded-lg px-2 py-1 text-[11px] font-bold focus:outline-none"
                                         >
                                             <option value={0}>السورة المستهدفة...</option>
+                                            <option value={-1}>إلغاء تحديد السورة (بدون سورة)</option>
                                             {surahs.map(s => (
                                                 <option key={s.id} value={s.id}>{s.name}</option>
                                             ))}
@@ -495,7 +500,7 @@ export default function GroupsMonitoringPage() {
                                                                              }}
                                                                              className="bg-background border border-muted-foreground/15 rounded-lg px-2 py-1 text-xs font-semibold focus:outline-none w-36"
                                                                          >
-                                                                             <option value={0}>اختر السورة...</option>
+                                                                             <option value={0}>بدون سورة مستهدفة</option>
                                                                              {surahs.map(s => (
                                                                                  <option key={s.id} value={s.id}>{s.id}. {s.name}</option>
                                                                              ))}
@@ -508,21 +513,17 @@ export default function GroupsMonitoringPage() {
                                                                              className="h-8 w-8 p-0 hover:bg-emerald-50 hover:text-emerald-600 text-muted-foreground transition-colors rounded-lg mx-auto"
                                                                              disabled={isSavingIndividual[student.id]}
                                                                              onClick={async () => {
-                                                                                 const targetSurahId = individualSurahs[student.id] ?? student.currentSurahId;
-                                                                                 if (!targetSurahId) {
-                                                                                     toast({
-                                                                                         title: "تنبيه",
-                                                                                         description: "الرجاء اختيار السورة المستهدفة أولاً.",
-                                                                                         variant: "destructive"
-                                                                                     });
-                                                                                     return;
-                                                                                 }
+                                                                                 const selectedVal = individualSurahs[student.id];
+                                                                                 const targetSurahId = selectedVal !== undefined ? selectedVal : (student.currentSurahId ?? 0);
+                                                                                 const finalSurahId = targetSurahId === 0 ? null : targetSurahId;
                                                                                  setIsSavingIndividual(prev => ({ ...prev, [student.id]: true }));
                                                                                  try {
-                                                                                     await updateStudent(student.id, { currentSurahId: targetSurahId }, student.ownerId);
+                                                                                     await updateStudent(student.id, { currentSurahId: finalSurahId as any }, student.ownerId);
                                                                                      toast({
                                                                                          title: "✅ تم حفظ السورة",
-                                                                                         description: `تم تحديث السورة المستهدفة للطالب ${student.fullName} بنجاح.`
+                                                                                         description: finalSurahId === null
+                                                               ? `تم إلغاء تحديد السورة للطالب ${student.fullName} بنجاح.`
+                                                               : `تم تحديث السورة المستهدفة للطالب ${student.fullName} بنجاح.`
                                                                                      });
                                                                                  } catch (error: any) {
                                                                                      toast({
@@ -605,7 +606,7 @@ export default function GroupsMonitoringPage() {
                                                                             }}
                                                                             className="flex-1 bg-background border border-muted-foreground/15 rounded-lg px-2 py-1 text-[11px] font-semibold focus:outline-none"
                                                                         >
-                                                                            <option value={0}>اختر السورة...</option>
+                                                                            <option value={0}>بدون سورة مستهدفة</option>
                                                                             {surahs.map(s => (
                                                                                 <option key={s.id} value={s.id}>{s.id}. {s.name}</option>
                                                                             ))}
@@ -617,21 +618,17 @@ export default function GroupsMonitoringPage() {
                                                                             disabled={isSavingIndividual[student.id]}
                                                                             onClick={async (e) => {
                                                                                 e.stopPropagation();
-                                                                                const targetSurahId = individualSurahs[student.id] ?? student.currentSurahId;
-                                                                                if (!targetSurahId) {
-                                                                                    toast({
-                                                                                        title: "تنبيه",
-                                                                                        description: "الرجاء اختيار السورة المستهدفة أولاً.",
-                                                                                        variant: "destructive"
-                                                                                    });
-                                                                                    return;
-                                                                                }
+                                                                                const selectedVal = individualSurahs[student.id];
+                                                                                const targetSurahId = selectedVal !== undefined ? selectedVal : (student.currentSurahId ?? 0);
+                                                                                const finalSurahId = targetSurahId === 0 ? null : targetSurahId;
                                                                                 setIsSavingIndividual(prev => ({ ...prev, [student.id]: true }));
                                                                                 try {
-                                                                                    await updateStudent(student.id, { currentSurahId: targetSurahId }, student.ownerId);
+                                                                                    await updateStudent(student.id, { currentSurahId: finalSurahId as any }, student.ownerId);
                                                                                     toast({
                                                                                         title: "✅ تم حفظ السورة",
-                                                                                        description: `تم تحديث السورة المستهدفة للطالب ${student.fullName} بنجاح.`
+                                                                                        description: finalSurahId === null
+                                                                                            ? `تم إلغاء تحديد السورة للطالب ${student.fullName} بنجاح.`
+                                                                                            : `تم تحديث السورة المستهدفة للطالب ${student.fullName} بنجاح.`
                                                                                     });
                                                                                 } catch (error: any) {
                                                                                     toast({
