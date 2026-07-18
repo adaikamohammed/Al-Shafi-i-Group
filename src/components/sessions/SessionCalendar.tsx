@@ -163,8 +163,8 @@ export const SessionCalendar = ({ currentDate, onDateChange, onDayClick, getSess
                         )}
                     </div>
 
-                    {/* Session Badges — نفس المظهر القديم */}
-                    <div className="space-y-0.5 sm:space-y-1 relative z-10">
+                    {/* Session Badges — مخفية على الجوال لمنع تمدد الخلايا */}
+                    <div className="hidden sm:block space-y-0.5 sm:space-y-1 relative z-10">
                         {sessions.map((session: any, idx: number) => (
                             <div
                                 key={idx}

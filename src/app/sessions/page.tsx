@@ -226,13 +226,34 @@ export default function DailySessionsPage() {
     const sessionsRef = dbRef(db, `users/${selectedSheikhId}/dailySessions`);
     const unsubscribe = onValue(sessionsRef, (snapshot: any) => {
       const data = snapshot.val() || {};
-      // Inject ownerId into each session so filters work correctly
       const normalized: Record<string, Record<string, any>> = {};
-      Object.entries(data).forEach(([date, sessions]) => {
+      
+      Object.entries(data).forEach(([date, dayVal]: [string, any]) => {
         normalized[date] = {};
-        Object.entries(sessions as Record<string, any>).forEach(([sessionId, session]) => {
-          normalized[date][sessionId] = { ...session, ownerId: selectedSheikhId };
-        });
+        if (dayVal && typeof dayVal === 'object') {
+          if ('date' in dayVal && ('records' in dayVal || 'sessionType' in dayVal)) {
+            // Structure template: single session object directly under the date key
+            const sessionId = dayVal.id || `${date}-s1`;
+            normalized[date][sessionId] = {
+              ...dayVal,
+              id: sessionId,
+              sessionNumber: dayVal.sessionNumber !== undefined ? Number(dayVal.sessionNumber) : 1,
+              ownerId: selectedSheikhId
+            };
+          } else {
+            // Nested template: dictionary of session objects
+            Object.entries(dayVal).forEach(([sessionId, session]: [string, any]) => {
+              if (session && typeof session === 'object' && 'date' in session) {
+                normalized[date][sessionId] = {
+                  ...session,
+                  id: session.id || sessionId,
+                  sessionNumber: session.sessionNumber !== undefined ? Number(session.sessionNumber) : (sessionId.endsWith('-s2') ? 2 : 1),
+                  ownerId: selectedSheikhId
+                };
+              }
+            });
+          }
+        }
       });
       
       setSheikhSessions(normalized);
