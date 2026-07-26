@@ -953,8 +953,8 @@ function HoverPopup({
       exit={{ opacity: 0, x: 8, scale: 0.96 }}
       transition={{ duration: 0.15 }}
       className={cn(
-        "absolute right-full top-0 mr-3 rounded-2xl shadow-2xl border z-50 overflow-hidden pointer-events-auto max-h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar backdrop-blur-md",
-        isMultiColumn ? "w-[460px] md:w-[490px]" : "w-56",
+        "absolute right-full mr-3 rounded-2xl shadow-2xl border z-50 overflow-hidden pointer-events-auto max-h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar backdrop-blur-md pb-2",
+        isMultiColumn ? "top-[-140px] w-[460px] md:w-[490px]" : "top-0 w-56",
         theme.isLight ? "bg-white/95 border-slate-200 text-slate-900 shadow-slate-200/50" : "bg-slate-900/95 border-white/10 text-white shadow-black/50"
       )}
       style={{ filter: "drop-shadow(0 12px 40px rgba(0,0,0,0.22))" }}
@@ -972,7 +972,7 @@ function HoverPopup({
       </div>
 
       {isMultiColumn ? (
-        <div className="p-2.5 grid grid-cols-2 gap-3 divide-x divide-x-reverse divide-slate-100 dark:divide-white/5">
+        <div className="p-2.5 pb-4 grid grid-cols-2 gap-3 divide-x divide-x-reverse divide-slate-100 dark:divide-white/5">
           {/* Column 1 */}
           <div className="space-y-1">
             {group.title === 'النافذة الإدارية' && (
@@ -1034,7 +1034,7 @@ function HoverPopup({
           </div>
         </div>
       ) : (
-        <div className="p-1.5 space-y-0.5">
+        <div className="p-1.5 pb-3 space-y-0.5">
           {group.items.map((item: any) => {
             const active = isActive(item.href);
             const Icon = item.icon;
@@ -1058,17 +1058,6 @@ function HoverPopup({
           })}
         </div>
       )}
-
-      {/* End of list confirmation footer */}
-      <div className={cn(
-        "px-4 py-2 border-t text-[10px] font-black flex items-center justify-center gap-1.5 shrink-0 font-headline",
-        theme.isLight
-          ? "bg-emerald-50/90 border-emerald-100 text-emerald-700"
-          : "bg-emerald-950/40 border-emerald-500/20 text-emerald-300"
-      )}>
-        <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-        <span>نهاية القائمة — جميع الصفحات ({group.items.length}) ظاهرة بالكامل ✓</span>
-      </div>
     </motion.div>
   );
 }
