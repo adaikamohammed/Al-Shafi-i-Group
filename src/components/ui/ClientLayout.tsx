@@ -1058,6 +1058,17 @@ function HoverPopup({
           })}
         </div>
       )}
+
+      {/* End of list confirmation footer */}
+      <div className={cn(
+        "px-4 py-2 border-t text-[10px] font-black flex items-center justify-center gap-1.5 shrink-0 font-headline",
+        theme.isLight
+          ? "bg-emerald-50/90 border-emerald-100 text-emerald-700"
+          : "bg-emerald-950/40 border-emerald-500/20 text-emerald-300"
+      )}>
+        <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+        <span>نهاية القائمة — جميع الصفحات ({group.items.length}) ظاهرة بالكامل ✓</span>
+      </div>
     </motion.div>
   );
 }
