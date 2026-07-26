@@ -564,12 +564,11 @@ function AppSidebarContent({
               >
                 {/* Group header */}
                 <div
-                  role={isMobile ? "button" : undefined}
-                  tabIndex={isMobile ? 0 : undefined}
-                  onClick={() => isMobile && toggleGroup(group.title)}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => toggleGroup(group.title)}
                   className={cn(
-                    "w-full h-10 flex items-center gap-3 px-3 rounded-xl text-xs font-black transition-all duration-200 select-none",
-                    isMobile ? "cursor-pointer" : "cursor-default",
+                    "w-full h-10 flex items-center gap-3 px-3 rounded-xl text-xs font-black transition-all duration-200 select-none cursor-pointer",
                     hasActive
                       ? `${gc.activeBg} ${gc.activeText} ${gc.activeShadow}`
                       : `${gc.idleBg} ${gc.idleText}`
@@ -580,21 +579,19 @@ function AppSidebarContent({
                     {group.title}
                   </span>
 
-                  {/* Chevron indicator — mobile only */}
-                  {isMobile && (
-                    <ChevronLeft
-                      className={cn(
-                        "w-3.5 h-3.5 shrink-0 transition-transform duration-200",
-                        isOpen ? "rotate-90" : "",
-                        hasActive ? "opacity-80" : "opacity-50"
-                      )}
-                    />
-                  )}
+                  {/* Chevron indicator */}
+                  <ChevronLeft
+                    className={cn(
+                      "w-3.5 h-3.5 shrink-0 transition-transform duration-200",
+                      isOpen ? "-rotate-90" : "",
+                      hasActive ? "opacity-80" : "opacity-50"
+                    )}
+                  />
                 </div>
 
-                {/* ── Mobile: Collapsible Accordion ── */}
-                {isMobile && isOpen && (
-                  <div className="pt-1 pr-3 pb-1 space-y-0.5">
+                {/* ── Collapsible Accordion (Mobile & Desktop) ── */}
+                {isOpen && (
+                  <div className="pt-1 pr-3 pb-1 space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-200">
                     {group.items.map((item: any) => {
                       const active = pathname.startsWith(item.href);
                       const Icon = item.icon;
@@ -603,9 +600,9 @@ function AppSidebarContent({
                           key={item.href}
                           href={item.href}
                           className={cn(
-                            "flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer",
+                            "flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer",
                             active
-                              ? "bg-primary/10 text-primary border border-primary/20"
+                              ? "bg-primary/10 text-primary border border-primary/20 font-extrabold"
                               : theme.isLight
                                 ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                                 : "text-white/70 hover:bg-white/5 hover:text-white"
@@ -619,8 +616,8 @@ function AppSidebarContent({
                   </div>
                 )}
 
-                {/* ── Desktop: flyout popup on hover ── */}
-                {!isMobile && (
+                {/* ── Desktop: flyout popup on hover when accordion is closed ── */}
+                {!isMobile && !isOpen && (
                   <AnimatePresence>
                     {isHovered && (
                       <HoverPopup
@@ -944,6 +941,11 @@ function HoverPopup({
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
+  const isMultiColumn = group.items.length > 8;
+  const half = Math.ceil(group.items.length / 2);
+  const col1 = group.items.slice(0, half);
+  const col2 = group.items.slice(half);
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 8, scale: 0.96 }}
@@ -951,37 +953,111 @@ function HoverPopup({
       exit={{ opacity: 0, x: 8, scale: 0.96 }}
       transition={{ duration: 0.15 }}
       className={cn(
-        "absolute right-full top-0 mr-3 w-56 rounded-2xl shadow-2xl border z-50 overflow-hidden pointer-events-auto",
-        theme.isLight ? "bg-white border-slate-200 text-slate-900 shadow-slate-200/50" : "bg-slate-900 border-white/10 text-white shadow-black/50"
+        "absolute right-full top-0 mr-3 rounded-2xl shadow-2xl border z-50 overflow-hidden pointer-events-auto max-h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar backdrop-blur-md",
+        isMultiColumn ? "w-[460px] md:w-[490px]" : "w-56",
+        theme.isLight ? "bg-white/95 border-slate-200 text-slate-900 shadow-slate-200/50" : "bg-slate-900/95 border-white/10 text-white shadow-black/50"
       )}
-      style={{ filter: "drop-shadow(0 8px 32px rgba(0,0,0,0.18))" }}
+      style={{ filter: "drop-shadow(0 12px 40px rgba(0,0,0,0.22))" }}
     >
-      <div className={cn("px-4 py-3 border-b text-sm font-bold flex items-center gap-2", theme.isLight ? "bg-slate-50/50 border-slate-100" : "bg-white/5 border-white/5")}>
-        {group.title}
+      <div className={cn("px-4 py-3 border-b text-xs font-black flex items-center justify-between gap-2 font-headline tracking-wide", theme.isLight ? "bg-slate-50/80 border-slate-100 text-slate-900" : "bg-white/5 border-white/5 text-white")}>
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+          <span>{group.title}</span>
+        </div>
+        {isMultiColumn && (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+            {group.items.length} صفحة
+          </span>
+        )}
       </div>
-      <div className="p-1.5 space-y-0.5">
-        {group.items.map((item: any) => {
-          const active = isActive(item.href);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer",
-                active
-                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
-                  : theme.isLight
-                    ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                    : "text-white/70 hover:bg-white/5 hover:text-white"
-              )}
-            >
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </div>
+
+      {isMultiColumn ? (
+        <div className="p-2.5 grid grid-cols-2 gap-3 divide-x divide-x-reverse divide-slate-100 dark:divide-white/5">
+          {/* Column 1 */}
+          <div className="space-y-1">
+            {group.title === 'النافذة الإدارية' && (
+              <div className="px-2 py-1 text-[10px] font-black text-primary/80 uppercase tracking-widest border-b border-primary/10 mb-1">
+                الرقابة والعمليات
+              </div>
+            )}
+            {col1.map((item: any) => {
+              const active = isActive(item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer group/link",
+                    active
+                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                      : theme.isLight
+                        ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        : "text-white/70 hover:bg-white/10 hover:text-white"
+                  )}
+                >
+                  <Icon className={cn("w-3.5 h-3.5 shrink-0 transition-transform group-hover/link:scale-110", active ? "text-primary-foreground" : "opacity-80")} />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Column 2 */}
+          <div className="space-y-1 pr-3">
+            {group.title === 'النافذة الإدارية' && (
+              <div className="px-2 py-1 text-[10px] font-black text-primary/80 uppercase tracking-widest border-b border-primary/10 mb-1">
+                المالية والخدمات
+              </div>
+            )}
+            {col2.map((item: any) => {
+              const active = isActive(item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer group/link",
+                    active
+                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                      : theme.isLight
+                        ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        : "text-white/70 hover:bg-white/10 hover:text-white"
+                  )}
+                >
+                  <Icon className={cn("w-3.5 h-3.5 shrink-0 transition-transform group-hover/link:scale-110", active ? "text-primary-foreground" : "opacity-80")} />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="p-1.5 space-y-0.5">
+          {group.items.map((item: any) => {
+            const active = isActive(item.href);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer",
+                  active
+                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                    : theme.isLight
+                      ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      : "text-white/70 hover:bg-white/5 hover:text-white"
+                )}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </motion.div>
   );
 }
