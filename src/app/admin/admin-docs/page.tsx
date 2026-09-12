@@ -11,12 +11,13 @@ import { Search, Printer, User, ClipboardList, ArrowLeft, Edit, Calendar, Clock,
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, subDays, isAfter } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Student, AdminLog, PreRegistration } from '@/lib/types';
+import { Student, AdminLog, PreRegistration, Covenant } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import { ReceiptDesign } from '@/components/admin/ReceiptDesign';
 import { useToast } from '@/hooks/use-toast';
-import { formatGroupName } from '@/lib/utils';
+import { formatGroupName, sanitizeData } from '@/lib/utils';
+import { getDatabase, ref, update } from 'firebase/database';
 
 export default function AdminDocsPage() {
     const {
@@ -301,7 +302,7 @@ export default function AdminDocsPage() {
             studentName: selectedStudent?.fullName || selectedPreRegistration?.fullName || 'Unknown',
             type: logType,
             date: format(new Date(), 'yyyy-MM-dd'),
-            sheikhName: selectedSheikhName, // Still relevant if we can map it, otherwise generic
+            sheikhName: selectedSheikhName,
             groupName: selectedStudent?.groupName || 'تسجيل جديد',
             details: {
                 ...details,
@@ -310,6 +311,43 @@ export default function AdminDocsPage() {
                 guardianPhone: selectedStudent?.phone1 || selectedPreRegistration?.phone1
             }
         });
+
+        // ربط إذن الدخول بصفحة إدارة العقوبات: تسجيل عقوبة تلقائية
+        if (activeTab === 'entry' && selectedStudent) {
+            try {
+                const db = getDatabase();
+                const covenantId = `cov_${Date.now()}`;
+                const newCovenant: Covenant = {
+                    id: covenantId,
+                    type: 'إجراء تأديبي',
+                    text: entryAbsenceReason || 'غياب غير مبرر',
+                    status: 'نشط',
+                    card: 'بدون',
+                    date: new Date().toISOString(),
+                    absenceDays: parseInt(entryAbsenceDays) || 0,
+                    writtenPenalty: entryPunishment || '',
+                    isCompensated: false,
+                    commitmentType: 'غياب',
+                };
+                const existingCovenants: Covenant[] = selectedStudent.covenants || [];
+                const updatedCovenants = [...existingCovenants, newCovenant].map(c => sanitizeData(c));
+                await update(
+                    ref(db, `users/${selectedStudent.ownerId}/students/${selectedStudent.id}`),
+                    { covenants: updatedCovenants }
+                );
+                toast({
+                    title: '✅ تم تسجيل العقوبة',
+                    description: `تم إضافة العقوبة إلى سجل ${selectedStudent.fullName} في صفحة إدارة العقوبات.`,
+                });
+            } catch (err) {
+                console.error('Error registering penalty from entry permit:', err);
+                toast({
+                    title: '⚠️ تنبيه',
+                    description: 'تم طباعة الوصل لكن فشل تسجيل العقوبة تلقائياً.',
+                    variant: 'destructive',
+                });
+            }
+        }
 
         // Trigger print
         window.print();
@@ -861,7 +899,7 @@ export default function AdminDocsPage() {
                     #printable-receipt, #printable-receipt * { 
                         visibility: visible; 
                         height: auto;
-                        font-weight: 800 !important;
+                        font-weight: 700 !important;
                     }
                     #printable-receipt {
                         position: fixed;
@@ -870,7 +908,7 @@ export default function AdminDocsPage() {
                         width: 79mm !important;
                         min-width: 79mm !important;
                         max-width: 79mm !important;
-                        padding: 0 5mm 0 5mm !important;
+                        padding: 3mm 4mm !important;
                         margin: 0 !important;
                         box-shadow: none !important;
                         border: none !important;
@@ -884,25 +922,24 @@ export default function AdminDocsPage() {
                         box-sizing: border-box !important;
                     }
                     #printable-receipt h2 { 
-                        font-size: 20px !important;
-                        font-weight: 1000 !important; 
-                        margin-bottom: 2mm !important;
+                        font-size: 13px !important;
+                        font-weight: 900 !important; 
+                        margin-bottom: 1mm !important;
                         line-height: 1.2 !important;
                     }
                     #printable-receipt p, #printable-receipt span {
-                        font-size: 15px !important;
-                        line-height: 1.4 !important;
+                        font-size: 10px !important;
+                        line-height: 1.3 !important;
                         color: black !important;
                     }
                     .receipt-field-label {
-                        font-size: 14px !important;
-                        margin-bottom: 0.5mm !important;
-                        font-weight: 1000 !important;
+                        font-size: 9px !important;
+                        font-weight: 700 !important;
                         color: black !important;
                     }
                     .receipt-field-value {
-                        font-size: 19px !important;
-                        font-weight: 1000 !important;
+                        font-size: 10px !important;
+                        font-weight: 900 !important;
                         color: black !important;
                     }
 

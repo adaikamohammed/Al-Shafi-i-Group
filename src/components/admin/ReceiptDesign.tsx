@@ -15,8 +15,25 @@ interface ReceiptDesignProps {
     isHistory?: boolean;
 }
 
+/** سطر حقل واحد: عنوان غامق صغير | قيمة غامقة */
+const FieldRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="flex flex-row items-baseline justify-between border-b border-black/10 py-[2px] gap-2 last:border-0">
+        <span className="text-[10px] font-bold text-black shrink-0">{label}</span>
+        <span className="text-[11px] font-black text-black text-left">{value || '......'}</span>
+    </div>
+);
+
 export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, className, isHistory }) => {
     const { type, studentName, sheikhName, details, timestamp } = log;
+
+    const typeLabel: Record<string, string> = {
+        summon: 'استدعاء ولي أمر',
+        exit: 'إذن خروج استثنائي',
+        absence: 'إشعار غياب مسبق',
+        payment: 'وصل استلام مبلغ',
+        entry: 'إذن دخول للحلقة',
+        join: 'طالب جديد',
+    };
 
     return (
         <div
@@ -28,148 +45,104 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
             )}
             dir="rtl"
         >
-            {/* Receipt Header */}
-            <div className="receipt-header border-b-2 border-black pt-0 mt-0">
-                <div className="flex flex-col items-center">
-                    <h2 className="receipt-title text-black font-black">
-                        {type === 'summon' && 'استدعاء ولي أمر'}
-                        {type === 'exit' && 'إذن خروج استثنائي'}
-                        {type === 'absence' && 'إشعار غياب مسبق'}
-                        {type === 'payment' && 'وصل استلام مبلغ'}
-                        {type === 'entry' && 'إذن دخول للحلقة'}
-                        {type === 'join' && 'طالب جديد'}
-                    </h2>
-                    <p className="text-[14px] font-[1000] text-black">المدرسة القرآنية للإمام الشافعي - حي تكسبت / الوادي</p>
-                </div>
+            {/* Header */}
+            <div className="receipt-header">
+                <h2 className="text-[15px] font-black text-black leading-tight font-headline">
+                    {typeLabel[type as string] || type}
+                </h2>
+                <p className="text-[9px] font-bold text-black mt-0.5">
+                    المدرسة القرآنية للإمام الشافعي - حي تكسبت / الوادي
+                </p>
             </div>
 
-            <div className="receipt-body pt-1">
-                {/* Student Info */}
-                <div className="grid grid-cols-2 gap-1 border-b-2 border-black pb-1 mb-1">
-                    <div className="receipt-field">
-                        <span className="receipt-field-label text-black text-[14px] font-black">الطالب</span>
-                        <span className="receipt-field-value text-black font-black">{studentName || '......'}</span>
-                    </div>
-                    <div className="receipt-field">
-                        <span className="receipt-field-label text-black text-[14px] font-black">المجموعة / الأستاذ(ة)</span>
-                        <span className="receipt-field-value text-black font-black">{sheikhName || '......'}</span>
-                    </div>
-                    <div className="receipt-field col-span-2">
-                        <span className="receipt-field-label text-black text-[14px] font-black">ولي الأمر</span>
-                        <span className="receipt-field-value text-black font-black">
-                            {details?.guardianName || '......'}
-                            {details?.guardianPhone && <span className="text-[12px] font-black mr-1" dir="ltr">({details.guardianPhone})</span>}
-                        </span>
-                    </div>
+            {/* Body */}
+            <div className="receipt-body">
+
+                {/* معلومات الطالب */}
+                <div className="border-b border-black pb-1 mb-1 space-y-[2px]">
+                    <FieldRow label="الطالب" value={studentName} />
+                    <FieldRow label="المجموعة / الأستاذ(ة)" value={sheikhName} />
+                    <FieldRow
+                        label="ولي الأمر"
+                        value={
+                            details?.guardianName
+                                ? <>
+                                    {details.guardianName}
+                                    {details?.guardianPhone && (
+                                        <span className="text-[10px] font-bold mr-1" dir="ltr">({details.guardianPhone})</span>
+                                    )}
+                                  </>
+                                : '......'
+                        }
+                    />
                 </div>
 
-                {/* Tab Specific Content */}
-                <div className="min-h-[50px]">
+                {/* محتوى حسب نوع الوصل */}
+                <div className="space-y-[2px]">
+
                     {type === 'summon' && (
-                        <div className="space-y-2">
-                            <div className="p-1.5 bg-white rounded-xl">
-                                <span className="receipt-field-label text-black text-[14px] font-black">موعد الحضور المقرر</span>
-                                <p className="text-sm font-black text-black">{details?.date || '......'}</p>
-                            </div>
-                            <div className="receipt-field">
-                                <span className="receipt-field-label text-black text-[13px] font-black">سبب الاستدعاء</span>
-                                <p className="text-xs leading-relaxed font-black text-black">{details?.reason || 'المقابلة من أجل مصلحة الطالب التربوية.'}</p>
-                            </div>
-                        </div>
+                        <>
+                            <FieldRow label="موعد الحضور" value={details?.date} />
+                            <FieldRow label="سبب الاستدعاء" value={details?.reason || 'المقابلة من أجل مصلحة الطالب.'} />
+                        </>
                     )}
 
                     {type === 'exit' && (
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center p-1.5 bg-white rounded-xl">
-                                <span className="text-xs font-black text-black">وقت الخروج:</span>
-                                <span className="text-xl font-black text-black">{details?.time || '......'}</span>
-                            </div>
-                            <div className="receipt-field">
-                                <span className="receipt-field-label text-black text-[13px] font-black">سبب الخروج</span>
-                                <p className="text-xs font-black text-black">{details?.reason || '......'}</p>
-                            </div>
-                        </div>
+                        <>
+                            <FieldRow label="وقت الخروج" value={details?.time} />
+                            <FieldRow label="سبب الخروج" value={details?.reason} />
+                        </>
                     )}
 
                     {type === 'absence' && (
-                        <div className="space-y-2">
-                            <div className="p-1.5 bg-white rounded-xl">
-                                <span className="receipt-field-label text-black text-[13px] font-black">أيام الغياب المصرح بها</span>
-                                <p className="text-sm font-black text-black">{details?.dates || '......'}</p>
-                            </div>
-                            <div className="receipt-field">
-                                <span className="receipt-field-label text-black text-[13px] font-black">السبب</span>
-                                <p className="text-xs font-black text-black">{details?.reason || '......'}</p>
-                            </div>
-                        </div>
+                        <>
+                            <FieldRow label="أيام الغياب" value={details?.dates} />
+                            <FieldRow label="السبب" value={details?.reason} />
+                        </>
                     )}
 
                     {type === 'payment' && (
-                        <div className="space-y-4">
-                            <div className="text-center p-4 bg-white rounded-2xl">
-                                <p className="text-xs font-black text-black underline mb-2 tracking-wider">{details?.title || '......'}</p>
-                                <div className="text-2xl font-black text-black">
-                                    {details?.amount ? `${Number(details.amount).toLocaleString()} د.ج` : '...... د.ج'}
-                                </div>
+                        <div className="text-center py-1">
+                            <p className="text-[10px] font-bold text-black underline mb-1">
+                                {details?.title || '......'}
+                            </p>
+                            <div className="text-[18px] font-black text-black">
+                                {details?.amount
+                                    ? `${Number(details.amount).toLocaleString()} د.ج`
+                                    : '...... د.ج'}
                             </div>
                         </div>
                     )}
 
                     {type === 'entry' && (
-                        <div className="space-y-2">
-                            <div className="grid grid-cols-2 gap-2 border-b-2 border-black pb-1 mb-1">
-                                <div className="receipt-field">
-                                    <span className="receipt-field-label text-black text-[13px] font-black">أيام الغياب</span>
-                                    <span className="receipt-field-value text-black font-black">{details?.absenceDays || '0'}</span>
-                                </div>
-                                <div className="receipt-field">
-                                    <span className="receipt-field-label text-black text-[13px] font-black">السبب</span>
-                                    <span className="receipt-field-value text-black font-black">{details?.reason || '......'}</span>
-                                </div>
-                            </div>
-
-                            <div className="bg-white p-1 rounded-lg mb-1">
-                                <span className="receipt-field-label text-black text-[13px] font-black">العقوبة المقررة</span>
-                                <p className="text-xs font-black text-black">{details?.punishment || 'لا يوجد'}</p>
-                            </div>
-                        </div>
+                        <>
+                            <FieldRow label="أيام الغياب" value={details?.absenceDays || '0'} />
+                            <FieldRow label="السبب" value={details?.reason} />
+                            <FieldRow label="العقوبة المقررة" value={details?.punishment || 'لا يوجد'} />
+                        </>
                     )}
 
                     {type === 'join' && (
-                        <div className="space-y-2">
-                            <div className="receipt-field mb-1">
-                                <span className="receipt-field-label text-black text-[13px] font-black">المستوى الدراسي</span>
-                                <span className="receipt-field-value text-black font-black">{details?.level || '......'}</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 border-t-2 border-black pt-1">
-                                <div className="receipt-field">
-                                    <span className="receipt-field-label text-black text-[13px] font-black">أيام الدراسة</span>
-                                    <span className="receipt-field-value text-black font-black">{details?.studyDays || '......'}</span>
-                                </div>
-                                <div className="receipt-field">
-                                    <span className="receipt-field-label text-black text-[13px] font-black">التوقيت</span>
-                                    <span className="receipt-field-value text-black font-black">{details?.timing || '......'}</span>
-                                </div>
-                            </div>
-                        </div>
+                        <>
+                            <FieldRow label="المستوى الدراسي" value={details?.level} />
+                            <FieldRow label="أيام الدراسة" value={details?.studyDays} />
+                            <FieldRow label="التوقيت" value={details?.timing} />
+                        </>
                     )}
                 </div>
 
-                {/* Footer Section */}
-                <div className="receipt-qr-section border-t-2 border-black">
-                    <div className="flex flex-col gap-1">
-                        <div className="receipt-field">
-                            <span className="receipt-field-label text-black text-[13px] font-black">تاريخ الإصدار</span>
-                            <span className="text-[12px] font-[1000] text-black">
-                                {timestamp ? format(new Date(timestamp), 'yyyy/MM/dd HH:mm', { locale: ar }) : format(new Date(), 'yyyy/MM/dd HH:mm', { locale: ar })}
-                            </span>
-                        </div>
-                        <div className="h-8 w-16 border-2 border-black flex items-center justify-center text-[8px] font-black text-black rounded mt-1 rotate-1 uppercase">
-                            ختم الإدارة
-                        </div>
+                {/* Footer: QR + التاريخ */}
+                <div className="receipt-qr-section">
+                    <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] font-bold text-black">تاريخ الإصدار</span>
+                        <span className="text-[11px] font-black text-black" dir="ltr">
+                            {timestamp
+                                ? format(new Date(timestamp), 'yyyy/MM/dd HH:mm', { locale: ar })
+                                : format(new Date(), 'yyyy/MM/dd HH:mm', { locale: ar })}
+                        </span>
                     </div>
                     {qrCodeUrl && type !== 'join' && (
-                        <div className="receipt-qr-image border-black/10">
+                        <div className="receipt-qr-image">
                             <img
                                 src={qrCodeUrl}
                                 alt="QR"
