@@ -81,11 +81,43 @@ export default function AdminDocsPage() {
     const [joinStudyDays, setJoinStudyDays] = useState('');
     const [joinTiming, setJoinTiming] = useState('');
 
+    // Warning State
+    const [warningDegree, setWarningDegree] = useState('إنذار أول');
+    const [warningReason, setWarningReason] = useState('');
+    const [warningAction, setWarningAction] = useState('');
+    const [warningCard, setWarningCard] = useState<'بدون' | 'بطاقة صفراء' | 'بطاقة حمراء'>('بطاقة صفراء');
+
+    // Compensation State
+    const [compensatedDate, setCompensatedDate] = useState('');
+    const [compensationDate, setCompensationDate] = useState('');
+    const [compensationAmount, setCompensationAmount] = useState('');
+    const [compensationTeacher, setCompensationTeacher] = useState('');
+    const [compensationResult, setCompensationResult] = useState('تم الاستظهار والاستيفاء بنجاح');
+
+    // Transfer State
+    const [transferFromGroup, setTransferFromGroup] = useState('');
+    const [transferToGroup, setTransferToGroup] = useState('');
+    const [transferEffectiveDate, setTransferEffectiveDate] = useState('');
+    const [transferReason, setTransferReason] = useState('');
+
+    // Mushaf Sticker State
+    const [stickerCurrentSurah, setStickerCurrentSurah] = useState('');
+    const [stickerDate, setStickerDate] = useState('');
+    const [stickerNote, setStickerNote] = useState('');
+    const [stickerDua, setStickerDua] = useState('« خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ »');
+
     const selectedSheikhName = useMemo(() => {
         if (!selectedStudent || !allUsers) return 'غير محدد';
         const sheikh = allUsers.find(u => u.role === 'sheikh' && u.group === selectedStudent.groupName);
         return sheikh?.displayName || 'غير محدد';
     }, [selectedStudent, allUsers]);
+
+    // Automatically initialize transferFromGroup when student is chosen
+    useEffect(() => {
+        if (selectedStudent?.groupName) {
+            setTransferFromGroup(selectedStudent.groupName);
+        }
+    }, [selectedStudent]);
 
     // Derived values: use manual inputs when no student selected
     const effectiveStudentName = isManualMode ? manualStudentName : (selectedStudent?.fullName || selectedPreRegistration?.fullName || '');
@@ -294,10 +326,51 @@ export default function AdminDocsPage() {
                 };
                 break;
             case 'join':
-                logType = 'join' as any; // Using 'as any' temporarily if type definition isn't updated yet
+                logType = 'join';
                 details = {
                     studyDays: joinStudyDays,
                     timing: joinTiming,
+                    ticketNumber: ''
+                };
+                break;
+            case 'warning':
+                logType = 'warning';
+                details = {
+                    degree: warningDegree,
+                    reason: warningReason,
+                    action: warningAction,
+                    card: warningCard,
+                    ticketNumber: ''
+                };
+                break;
+            case 'compensation':
+                logType = 'compensation';
+                details = {
+                    compensatedDate,
+                    compensationDate,
+                    amount: compensationAmount,
+                    teacher: compensationTeacher || effectiveTeacherName,
+                    result: compensationResult,
+                    ticketNumber: ''
+                };
+                break;
+            case 'transfer':
+                logType = 'transfer';
+                details = {
+                    fromGroup: transferFromGroup || selectedStudent?.groupName || 'غير محدد',
+                    toGroup: transferToGroup,
+                    effectiveDate: transferEffectiveDate,
+                    reason: transferReason,
+                    ticketNumber: ''
+                };
+                break;
+            case 'mushaf_sticker':
+                logType = 'mushaf_sticker';
+                details = {
+                    currentSurah: stickerCurrentSurah,
+                    date: stickerDate || format(new Date(), 'yyyy/MM/dd'),
+                    note: stickerNote,
+                    dua: stickerDua,
                     ticketNumber: ''
                 };
                 break;
@@ -376,6 +449,37 @@ export default function AdminDocsPage() {
             }
         }
 
+        // ربط الإنذار الرسمي بصفحة إدارة العقوبات تلقائياً
+        if (activeTab === 'warning' && selectedStudent) {
+            try {
+                const db = getDatabase();
+                const covenantId = `cov_${Date.now()}`;
+                const newCovenant: Covenant = {
+                    id: covenantId,
+                    type: 'إجراء تأديبي',
+                    text: warningReason ? `${warningDegree}: ${warningReason}` : `إنذار رسمي (${warningDegree})`,
+                    status: 'نشط',
+                    card: (warningCard as any) || 'بطاقة صفراء',
+                    date: new Date().toISOString(),
+                    writtenPenalty: warningAction || 'إنذار رسمي مسجل في الملف',
+                    isCompensated: false,
+                    commitmentType: 'سلوك',
+                };
+                const existingCovenants: Covenant[] = selectedStudent.covenants || [];
+                const updatedCovenants = [...existingCovenants, newCovenant].map(c => sanitizeData(c));
+                await update(
+                    ref(db, `users/${selectedStudent.ownerId}/students/${selectedStudent.id}`),
+                    { covenants: updatedCovenants }
+                );
+                toast({
+                    title: '⚠️ تم تسجيل الإنذار في العقوبات',
+                    description: `تم ربط الإنذار بسجل الطالب ${selectedStudent.fullName} في صفحة إدارة العقوبات.`,
+                });
+            } catch (err) {
+                console.error('Error registering warning penalty:', err);
+            }
+        }
+
         // Trigger print
         window.print();
     };
@@ -391,6 +495,17 @@ export default function AdminDocsPage() {
         setEntryAbsenceDays('');
         setEntryAbsenceReason('');
         setEntryPunishment('');
+        setWarningReason('');
+        setWarningAction('');
+        setCompensatedDate('');
+        setCompensationDate('');
+        setCompensationAmount('');
+        setCompensationTeacher('');
+        setTransferReason('');
+        setTransferEffectiveDate('');
+        setStickerCurrentSurah('');
+        setStickerDate('');
+        setStickerNote('');
     };
 
     // Filtered Logs Logic
@@ -663,13 +778,37 @@ export default function AdminDocsPage() {
                                             </CardHeader>
                                             <CardContent className="p-4">
                                                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                                                    <TabsList className="grid grid-cols-3 bg-gray-100 p-1 rounded-xl h-auto gap-1">
-                                                        <TabsTrigger value="summon" className="py-2 rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-sm">استدعاء</TabsTrigger>
-                                                        <TabsTrigger value="exit" className="py-2 rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-sm">خروج</TabsTrigger>
-                                                        <TabsTrigger value="absence" className="py-2 rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-sm">غياب</TabsTrigger>
-                                                        <TabsTrigger value="payment" className="py-2 rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-sm">سداد</TabsTrigger>
-                                                        <TabsTrigger value="entry" className="py-2 rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-sm">دخول</TabsTrigger>
-                                                        <TabsTrigger value="join" className="py-2 rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-sm">إنضمام</TabsTrigger>
+                                                    <TabsList className="grid grid-cols-2 sm:grid-cols-5 bg-gray-100 p-1.5 rounded-2xl h-auto gap-1.5">
+                                                        <TabsTrigger value="summon" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-xs">
+                                                            📩 استدعاء
+                                                        </TabsTrigger>
+                                                        <TabsTrigger value="entry" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-xs">
+                                                            🚪 إذن دخول
+                                                        </TabsTrigger>
+                                                        <TabsTrigger value="exit" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-xs">
+                                                            🏃 خروج
+                                                        </TabsTrigger>
+                                                        <TabsTrigger value="absence" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-xs">
+                                                            📅 غياب
+                                                        </TabsTrigger>
+                                                        <TabsTrigger value="payment" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-xs">
+                                                            💰 سداد
+                                                        </TabsTrigger>
+                                                        <TabsTrigger value="join" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-xs">
+                                                            📝 إنضمام
+                                                        </TabsTrigger>
+                                                        <TabsTrigger value="warning" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-rose-600 data-[state=active]:text-white transition-all text-[11px] md:text-xs">
+                                                            ⚠️ إنذار رسمي
+                                                        </TabsTrigger>
+                                                        <TabsTrigger value="compensation" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-emerald-600 data-[state=active]:text-white transition-all text-[11px] md:text-xs">
+                                                            🔄 تعويض حصة
+                                                        </TabsTrigger>
+                                                        <TabsTrigger value="transfer" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all text-[11px] md:text-xs">
+                                                            🔀 انتقال فوج
+                                                        </TabsTrigger>
+                                                        <TabsTrigger value="mushaf_sticker" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-amber-600 data-[state=active]:text-white transition-all text-[11px] md:text-xs">
+                                                            📖 ملصق المصحف
+                                                        </TabsTrigger>
                                                     </TabsList>
 
                                                     <TabsContent value="summon" className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
@@ -758,6 +897,130 @@ export default function AdminDocsPage() {
                                                             <Input placeholder="مثال: 08:00 - 12:00" className="bg-white border-gray-200" value={joinTiming} onChange={(e) => setJoinTiming(e.target.value)} />
                                                         </div>
                                                     </TabsContent>
+
+                                                    <TabsContent value="warning" className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div className="space-y-1.5">
+                                                                <Label className="text-xs font-bold text-gray-600">درجة الإنذار</Label>
+                                                                <select
+                                                                    aria-label="درجة الإنذار"
+                                                                    value={warningDegree}
+                                                                    onChange={(e) => setWarningDegree(e.target.value)}
+                                                                    className="w-full h-10 px-2 rounded-lg border border-gray-200 bg-white text-xs font-bold text-gray-800 outline-none focus:ring-1 ring-rose-500"
+                                                                >
+                                                                    <option value="إنذار أول">إنذار أول (تنبيه)</option>
+                                                                    <option value="إنذار ثانٍ">إنذار ثانٍ (شديد)</option>
+                                                                    <option value="إنذار نهائي">إنذار نهائي (قبل الفصل)</option>
+                                                                </select>
+                                                            </div>
+                                                            <div className="space-y-1.5">
+                                                                <Label className="text-xs font-bold text-gray-600">البطاقة المسجلة</Label>
+                                                                <select
+                                                                    aria-label="البطاقة التأديبية"
+                                                                    value={warningCard}
+                                                                    onChange={(e) => setWarningCard(e.target.value as any)}
+                                                                    className="w-full h-10 px-2 rounded-lg border border-gray-200 bg-white text-xs font-bold text-gray-800 outline-none focus:ring-1 ring-rose-500"
+                                                                >
+                                                                    <option value="بطاقة صفراء">🟨 بطاقة صفراء (إنذار)</option>
+                                                                    <option value="بطاقة حمراء">🟥 بطاقة حمراء (نهائي)</option>
+                                                                    <option value="بدون">بدون بطاقة</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">سبب الإنذار *</Label>
+                                                            <Input placeholder="مثال: تكرار الغياب بدون مبرر / عدم إحضار المصحف" className="bg-white border-gray-200" value={warningReason} onChange={(e) => setWarningReason(e.target.value)} />
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">الإجراء المتخذ أو المقرر</Label>
+                                                            <Input placeholder="مثال: استدعاء ولي الأمر فورا أو الالتزام بحفظ الحزب" className="bg-white border-gray-200" value={warningAction} onChange={(e) => setWarningAction(e.target.value)} />
+                                                        </div>
+                                                        <div className="bg-rose-50 border border-rose-200 rounded-xl p-2.5 text-[11px] text-rose-700 font-bold flex items-center gap-2">
+                                                            <span className="text-base">⚠️</span>
+                                                            <span>سيتم تسجيل هذا الإنذار تلقائياً في صفحة إدارة العقوبات وسجل الطالب.</span>
+                                                        </div>
+                                                    </TabsContent>
+
+                                                    <TabsContent value="compensation" className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div className="space-y-1.5">
+                                                                <Label className="text-xs font-bold text-gray-600">تاريخ الحصة المعوَّضة</Label>
+                                                                <Input type="date" className="bg-white border-gray-200 text-xs" value={compensatedDate} onChange={(e) => setCompensatedDate(e.target.value)} />
+                                                            </div>
+                                                            <div className="space-y-1.5">
+                                                                <Label className="text-xs font-bold text-gray-600">تاريخ جلسة التعويض</Label>
+                                                                <Input type="date" className="bg-white border-gray-200 text-xs" value={compensationDate} onChange={(e) => setCompensationDate(e.target.value)} />
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">المقدار المستظهر / المحتوى المعوض</Label>
+                                                            <Input placeholder="مثال: استظهار الحزب 15 كاملاً + تسميع اللوح" className="bg-white border-gray-200" value={compensationAmount} onChange={(e) => setCompensationAmount(e.target.value)} />
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">المشرف على التعويض (اختياري)</Label>
+                                                            <Input placeholder={`الافتراضي: ${effectiveTeacherName}`} className="bg-white border-gray-200" value={compensationTeacher} onChange={(e) => setCompensationTeacher(e.target.value)} />
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">النتيجة / الملاحظة</Label>
+                                                            <Input placeholder="مثال: تم الاستظهار بنجاح بمستوى ممتاز" className="bg-white border-gray-200" value={compensationResult} onChange={(e) => setCompensationResult(e.target.value)} />
+                                                        </div>
+                                                    </TabsContent>
+
+                                                    <TabsContent value="transfer" className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div className="space-y-1.5">
+                                                                <Label className="text-xs font-bold text-gray-600">الفوج السابق / الحالي</Label>
+                                                                <Input placeholder="الفوج السابق" className="bg-white border-gray-200 text-xs" value={transferFromGroup} onChange={(e) => setTransferFromGroup(e.target.value)} />
+                                                            </div>
+                                                            <div className="space-y-1.5">
+                                                                <Label className="text-xs font-bold text-gray-600">الفوج الجديد المحول إليه *</Label>
+                                                                <select
+                                                                    aria-label="الفوج الجديد المحول إليه"
+                                                                    value={transferToGroup}
+                                                                    onChange={(e) => setTransferToGroup(e.target.value)}
+                                                                    className="w-full h-10 px-2 rounded-lg border border-gray-200 bg-white text-xs font-bold text-gray-800 outline-none focus:ring-1 ring-blue-500"
+                                                                >
+                                                                    <option value="">اختر الفوج الجديد...</option>
+                                                                    {sheikhGroups.map(g => (
+                                                                        <option key={g} value={g}>{g}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">تاريخ سريان النقل</Label>
+                                                            <Input placeholder="مثال: ابتداءً من يوم السبت القادم" className="bg-white border-gray-200" value={transferEffectiveDate} onChange={(e) => setTransferEffectiveDate(e.target.value)} />
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">سبب الانتقال</Label>
+                                                            <Input placeholder="مثال: ترقية مستوى الحفظ / ملاءمة توقيت الدراسة" className="bg-white border-gray-200" value={transferReason} onChange={(e) => setTransferReason(e.target.value)} />
+                                                        </div>
+                                                    </TabsContent>
+
+                                                    <TabsContent value="mushaf_sticker" className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                                                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-900">
+                                                            <p className="text-xs font-bold">✨ ملصق مخصص للطباعة على الطابعة الحرارية ولصقه في الغلاف الداخلي لمصحف الطالب.</p>
+                                                            <p className="text-[10px] text-amber-700 mt-0.5">اسم الطالب سيطبع بخط عريض وبارز داخل إطار إسلامي مزخرف.</p>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">السورة أو الحزب الحالي (اختياري)</Label>
+                                                            <Input placeholder="مثال: سورة الكهف / الحزب العاشر" className="bg-white border-gray-200" value={stickerCurrentSurah} onChange={(e) => setStickerCurrentSurah(e.target.value)} />
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div className="space-y-1.5">
+                                                                <Label className="text-xs font-bold text-gray-600">التاريخ (اختياري)</Label>
+                                                                <Input placeholder="مثال: رجب 1447هـ / 2026م" className="bg-white border-gray-200 text-xs" value={stickerDate} onChange={(e) => setStickerDate(e.target.value)} />
+                                                            </div>
+                                                            <div className="space-y-1.5">
+                                                                <Label className="text-xs font-bold text-gray-600">ملاحظة إضافية (اختياري)</Label>
+                                                                <Input placeholder="مثال: رواية ورش عن نافع" className="bg-white border-gray-200 text-xs" value={stickerNote} onChange={(e) => setStickerNote(e.target.value)} />
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">عبارة التهنئة / الحديث الشريف</Label>
+                                                            <Input className="bg-white border-gray-200 text-xs font-bold" value={stickerDua} onChange={(e) => setStickerDua(e.target.value)} />
+                                                        </div>
+                                                    </TabsContent>
                                                 </Tabs>
                                             </CardContent>
                                         </Card>
@@ -794,6 +1057,31 @@ export default function AdminDocsPage() {
                                                     punishment: entryPunishment,
                                                     stats: stats30Days
                                                 } : {}),
+                                                ...(activeTab === 'warning' ? {
+                                                    degree: warningDegree,
+                                                    reason: warningReason,
+                                                    action: warningAction,
+                                                    card: warningCard,
+                                                } : {}),
+                                                ...(activeTab === 'compensation' ? {
+                                                    compensatedDate,
+                                                    compensationDate,
+                                                    amount: compensationAmount,
+                                                    teacher: compensationTeacher || effectiveTeacherName,
+                                                    result: compensationResult,
+                                                } : {}),
+                                                ...(activeTab === 'transfer' ? {
+                                                    fromGroup: transferFromGroup || selectedStudent?.groupName || 'غير محدد',
+                                                    toGroup: transferToGroup,
+                                                    effectiveDate: transferEffectiveDate,
+                                                    reason: transferReason,
+                                                } : {}),
+                                                ...(activeTab === 'mushaf_sticker' ? {
+                                                    currentSurah: stickerCurrentSurah,
+                                                    date: stickerDate,
+                                                    note: stickerNote,
+                                                    dua: stickerDua,
+                                                } : {}),
                                                 ticketNumber: '',
                                                 guardianName: effectiveGuardianName,
                                                 guardianPhone: effectiveGuardianPhone,
@@ -810,10 +1098,12 @@ export default function AdminDocsPage() {
                                             className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-xl shadow-emerald-500/20 text-lg group transition-all"
                                         >
                                             <Printer className="ml-2 h-6 w-6 group-hover:scale-110 transition-transform" />
-                                            حفظ وطباعة الوصل
+                                            {activeTab === 'mushaf_sticker' ? 'طباعة ملصق المصحف' : 'حفظ وطباعة الوصل'}
                                         </Button>
                                         <p className="text-[10px] text-center text-muted-foreground font-medium px-4">
-                                            عند النقر سيتم تسجيل الوصل في السجلات الإدارية وفتح نافذة الطباعة.
+                                            {activeTab === 'mushaf_sticker' 
+                                                ? 'سيتم طباعة الملصق بقياس 80 مم جاهزاً للصقه في المصحف الشريف.' 
+                                                : 'عند النقر سيتم تسجيل الوصل في السجلات الإدارية وفتح نافذة الطباعة.'}
                                         </p>
                                     </div>
                                 )}
@@ -845,10 +1135,15 @@ export default function AdminDocsPage() {
                                     >
                                         <option value="all">كل الأنواع</option>
                                         <option value="summon">استدعاء</option>
+                                        <option value="entry">دخول</option>
                                         <option value="exit">خروج</option>
                                         <option value="absence">غياب</option>
                                         <option value="payment">سداد</option>
-                                        <option value="entry">دخول</option>
+                                        <option value="join">طالب جديد</option>
+                                        <option value="warning">إنذار رسمي</option>
+                                        <option value="compensation">تعويض حصة</option>
+                                        <option value="transfer">انتقال فوج</option>
+                                        <option value="mushaf_sticker">ملصق المصحف</option>
                                     </select>
 
                                     <Input

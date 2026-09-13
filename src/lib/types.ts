@@ -400,7 +400,7 @@ export interface AdminLog {
   id: string;
   studentId: string;
   studentName: string;
-  type: 'summon' | 'exit' | 'absence' | 'payment' | 'entry' | 'join';
+  type: 'summon' | 'exit' | 'absence' | 'payment' | 'entry' | 'join' | 'warning' | 'compensation' | 'transfer' | 'mushaf_sticker';
   date: string; // ISO string for the relevant action date
   sheikhName: string;
   groupName: string;

@@ -33,7 +33,83 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
         payment: 'وصل استلام مبلغ',
         entry: 'إذن دخول للحلقة',
         join: 'طالب جديد',
+        warning: 'وصل إنذار رسمي',
+        compensation: 'وصل تعويض حصة قرآنية',
+        transfer: 'إشعار انتقال فوج دراسي',
+        mushaf_sticker: 'ملصق المصحف الشريف',
     };
+
+    // تصميم مخصص لملصق المصحف الشريف (إطار إسلامي أنيق واسم بارز)
+    if (type === 'mushaf_sticker') {
+        return (
+            <div
+                id={isHistory ? undefined : "printable-receipt"}
+                className={cn(
+                    "receipt-container",
+                    isHistory && "receipt-history-mode",
+                    className
+                )}
+                dir="rtl"
+            >
+                {/* إطار خارجي مزدوج أنيق للطابعة الحرارية */}
+                <div className="border-[2.5px] border-black p-1 rounded-xl">
+                    <div className="border border-dashed border-black p-2.5 rounded-lg text-center space-y-1.5">
+                        {/* ترويسة مع البسملة واسم المدرسة */}
+                        <div className="border-b border-black pb-1 space-y-0.5">
+                            <p className="text-[11px] font-bold text-black font-serif">﷽</p>
+                            <h2 className="text-[12px] font-black text-black leading-tight font-headline">
+                                المدرسة القرآنية للإمام الشافعي
+                            </h2>
+                            <p className="text-[8px] font-bold text-black/80">
+                                حي تكسبت ـ الوادي
+                            </p>
+                        </div>
+
+                        {/* شارة مصحف الطالب */}
+                        <div className="pt-0.5">
+                            <span className="inline-block text-[9px] font-black px-2.5 py-0.5 border border-black rounded-full bg-black/5">
+                                ❖ هَذَا مُصْحَفُ الطَّالِبِ(ة) ❖
+                            </span>
+                        </div>
+
+                        {/* اسم الطالب بارز وكبير في مربع مميز */}
+                        <div className="my-1 border-2 border-black py-2 px-1 rounded-lg bg-black/5">
+                            <span className="text-[8.5px] font-bold text-black block mb-0.5">الاسم واللقب</span>
+                            <h1 className="text-[17px] font-black text-black leading-tight tracking-wide font-headline">
+                                {studentName || '....................'}
+                            </h1>
+                        </div>
+
+                        {/* معلومات اختيارية */}
+                        <div className="space-y-[2px] text-right pt-0.5">
+                            {sheikhName && sheikhName !== 'غير محدد' && (
+                                <FieldRow label="الشيخ المشرف" value={sheikhName} />
+                            )}
+                            {details?.currentSurah && (
+                                <FieldRow label="السورة / الحزب الحالي" value={details.currentSurah} />
+                            )}
+                            {details?.date && (
+                                <FieldRow label="تاريخ البدء / التسليم" value={details.date} />
+                            )}
+                            {details?.note && (
+                                <FieldRow label="ملاحظة" value={details.note} />
+                            )}
+                        </div>
+
+                        {/* حديث شريف ودعاء ختامي */}
+                        <div className="border-t border-black pt-1.5 mt-1 space-y-0.5">
+                            <p className="text-[8.5px] font-black text-black leading-tight">
+                                {details?.dua || '« خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ »'}
+                            </p>
+                            <p className="text-[7.5px] font-bold text-black/70">
+                                جعله الله ربيع قلبه ونوراً له وشفيعاً يوم القيامة 🤲
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div
@@ -127,6 +203,45 @@ export const ReceiptDesign: React.FC<ReceiptDesignProps> = ({ log, qrCodeUrl, cl
                             <FieldRow label="المستوى الدراسي" value={details?.level} />
                             <FieldRow label="أيام الدراسة" value={details?.studyDays} />
                             <FieldRow label="التوقيت" value={details?.timing} />
+                        </>
+                    )}
+
+                    {type === 'warning' && (
+                        <>
+                            <FieldRow label="درجة الإنذار" value={details?.degree || 'إنذار أول'} />
+                            <FieldRow label="سبب الإنذار" value={details?.reason || 'مخالفة الانضباط أو تكرار الغياب'} />
+                            {details?.card && details.card !== 'بدون' && (
+                                <FieldRow label="البطاقة التأديبية" value={details.card} />
+                            )}
+                            <FieldRow label="الإجراء المقرر" value={details?.action || 'الالتزام والانضباط فوراً'} />
+                            <div className="mt-1 pt-1 border-t border-black/20 text-center">
+                                <span className="text-[8.5px] font-black text-black">⚠️ تنبيه: يُسجّل هذا الإنذار رسمياً في الملف الإداري للطالب.</span>
+                            </div>
+                        </>
+                    )}
+
+                    {type === 'compensation' && (
+                        <>
+                            <FieldRow label="الحصة المعوَّضة" value={details?.compensatedDate || 'حصة سابقة'} />
+                            <FieldRow label="موعد التعويض" value={details?.compensationDate || 'جلسة اليوم'} />
+                            <FieldRow label="المقدار المستظهر" value={details?.amount || 'المقرر المحدد'} />
+                            <FieldRow label="المشرف على التسميع" value={details?.teacher || sheikhName} />
+                            <FieldRow label="النتيجة" value={details?.result || 'تم الاستيفاء بنجاح'} />
+                            <div className="mt-1 pt-1 border-t border-black/20 text-center">
+                                <span className="text-[8.5px] font-black text-black">✓ إفادة رسمية باستيفاء الحصة وتعويضها شرعاً وإدارياً.</span>
+                            </div>
+                        </>
+                    )}
+
+                    {type === 'transfer' && (
+                        <>
+                            <FieldRow label="الفوج الحالي" value={details?.fromGroup || '......'} />
+                            <FieldRow label="الفوج الجديد المحوَّل إليه" value={details?.toGroup || '......'} />
+                            <FieldRow label="تاريخ سريان النقل" value={details?.effectiveDate || 'ابتداءً من الحصة القادمة'} />
+                            <FieldRow label="سبب الانتقال" value={details?.reason || 'تنظيم إداري / ترقية مستوى'} />
+                            <div className="mt-1 pt-1 border-t border-black/20 text-center">
+                                <span className="text-[8.5px] font-black text-black">🔀 إشعار رسمي معتمد من إدارة المدرسة القرآنية.</span>
+                            </div>
                         </>
                     )}
                 </div>
