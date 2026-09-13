@@ -38,6 +38,13 @@ export default function AdminDocsPage() {
     const [selectedPreRegistration, setSelectedPreRegistration] = useState<PreRegistration | null>(null);
     const [activeTab, setActiveTab] = useState('summon');
 
+    // Manual input mode (for unregistered students)
+    const [isManualMode, setIsManualMode] = useState(false);
+    const [manualStudentName, setManualStudentName] = useState('');
+    const [manualTeacherName, setManualTeacherName] = useState('');
+    const [manualGuardianName, setManualGuardianName] = useState('');
+    const [manualGuardianPhone, setManualGuardianPhone] = useState('');
+
     // Filter states for History
     const [filterType, setFilterType] = useState<string>('all');
     const [filterDate, setFilterDate] = useState<string>('');
@@ -73,6 +80,13 @@ export default function AdminDocsPage() {
     // Join Receipt State
     const [joinStudyDays, setJoinStudyDays] = useState('');
     const [joinTiming, setJoinTiming] = useState('');
+
+    // Derived values: use manual inputs when no student selected
+    const effectiveStudentName = isManualMode ? manualStudentName : (selectedStudent?.fullName || selectedPreRegistration?.fullName || '');
+    const effectiveTeacherName = isManualMode ? manualTeacherName : selectedSheikhName;
+    const effectiveGuardianName = isManualMode ? manualGuardianName : (selectedStudent?.guardianName || selectedPreRegistration?.guardianName || '');
+    const effectiveGuardianPhone = isManualMode ? manualGuardianPhone : (selectedStudent?.phone1 || selectedPreRegistration?.phone1 || '');
+    const hasSubject = isManualMode ? !!manualStudentName.trim() : !!(selectedStudent || selectedPreRegistration);
 
     // Search Logic
     const filteredResults = useMemo(() => {
@@ -243,7 +257,7 @@ export default function AdminDocsPage() {
     const { absences, lates, total: totalCount } = stats30Days;
 
     const handlePrint = async () => {
-        if (!selectedStudent && !selectedPreRegistration) return;
+        if (!hasSubject) return;
 
         // Ticket number removed entirely
         // const nextTicketNum = await getNextTicketNumber();
@@ -310,17 +324,18 @@ export default function AdminDocsPage() {
 
         // Save log to Firebase before printing
         await saveAdminLog({
-            studentId: selectedStudent?.id || selectedPreRegistration?.id || 'unknown',
-            studentName: selectedStudent?.fullName || selectedPreRegistration?.fullName || 'Unknown',
+            studentId: selectedStudent?.id || selectedPreRegistration?.id || 'manual',
+            studentName: effectiveStudentName || 'Unknown',
             type: logType,
             date: format(new Date(), 'yyyy-MM-dd'),
-            sheikhName: selectedSheikhName,
-            groupName: selectedStudent?.groupName || 'تسجيل جديد',
+            sheikhName: effectiveTeacherName,
+            groupName: selectedStudent?.groupName || (isManualMode ? manualTeacherName : 'تسجيل جديد'),
             details: {
                 ...details,
                 ownerId: selectedStudent?.ownerId || 'admin',
-                guardianName: selectedStudent?.guardianName || selectedPreRegistration?.guardianName,
-                guardianPhone: selectedStudent?.phone1 || selectedPreRegistration?.phone1
+                guardianName: effectiveGuardianName,
+                guardianPhone: effectiveGuardianPhone,
+                ...(isManualMode ? { isManual: true } : {}),
             }
         });
 
@@ -461,114 +476,183 @@ export default function AdminDocsPage() {
                         <div className="lg:col-span-12 xl:col-span-5 space-y-4">
                             <Card className="bg-white border shadow-sm overflow-hidden">
                                 <CardHeader className="border-b bg-gray-50/80 py-3 px-4">
-                                    <CardTitle className="text-base flex items-center gap-2 font-headline">
-                                        <Search className="h-4 w-4 text-primary" />
-                                        1. {activeTab === 'join' ? 'اختيار تسجيل جديد' : 'اختيار الطالب'}
-                                    </CardTitle>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-base flex items-center gap-2 font-headline">
+                                            {isManualMode ? <Edit className="h-4 w-4 text-amber-500" /> : <Search className="h-4 w-4 text-primary" />}
+                                            1. {activeTab === 'join' ? 'اختيار تسجيل جديد' : 'اختيار الطالب'}
+                                        </CardTitle>
+                                        {/* Toggle between search and manual */}
+                                        <button
+                                            onClick={() => {
+                                                setIsManualMode(!isManualMode);
+                                                setSelectedStudent(null);
+                                                setSelectedPreRegistration(null);
+                                                setSearchTerm('');
+                                                setManualStudentName('');
+                                                setManualTeacherName('');
+                                                setManualGuardianName('');
+                                                setManualGuardianPhone('');
+                                            }}
+                                            className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all ${isManualMode
+                                                ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            {isManualMode ? '🔍 بحث في القائمة' : '✍️ إدخال يدوي'}
+                                        </button>
+                                    </div>
                                 </CardHeader>
                                 <CardContent className="p-4 space-y-3">
-                                    <div className="relative group">
-                                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                        <Input
-                                            placeholder="ابحث باسم الطالب أو رقمه..."
-                                            className="pr-10 h-11 bg-white border-gray-200 rounded-xl"
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                        />
-                                    </div>
-
-                                    <AnimatePresence>
-                                        {searchTerm && filteredResults.length > 0 && (
-                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-1 max-h-52 overflow-y-auto">
-                                                {filteredResults.map((result: any) => (
-                                                    <button
-                                                        key={result.id}
-                                                        onClick={() => {
-                                                            if (result.type === 'student') {
-                                                                setSelectedStudent(result);
-                                                                setSelectedPreRegistration(null);
-                                                            } else {
-                                                                setSelectedPreRegistration(result);
-                                                                setSelectedStudent(null);
-                                                            }
-                                                            setSearchTerm('');
-                                                            resetFields();
-                                                        }}
-                                                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-primary/5 transition-all text-right group border border-transparent hover:border-primary/10"
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                                <User className="h-4 w-4 text-primary" />
-                                                            </div>
-                                                            <div>
-                                                                <div className="font-bold text-sm text-gray-800">{result.fullName}</div>
-                                                                <div className="text-[10px] text-muted-foreground">{formatGroupName(result.groupName, allUsers) || (result.type === 'registration' ? 'تسجيل جديد' : 'بدون فوج')}</div>
-                                                            </div>
-                                                        </div>
-                                                        <ArrowLeft className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all text-primary" />
-                                                    </button>
-                                                ))}
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-
-                                    {(selectedStudent || selectedPreRegistration) && (
-                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-3 border-t border-gray-100 flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/20">
-                                                    <User className="h-4 w-4 text-primary" />
+                                    {isManualMode ? (
+                                        /* Manual input fields */
+                                        <div className="space-y-2.5">
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs font-bold text-gray-600">اسم الطالب *</Label>
+                                                <Input
+                                                    placeholder="اكتب اسم الطالب كاملاً..."
+                                                    className="bg-white border-gray-200"
+                                                    value={manualStudentName}
+                                                    onChange={(e) => setManualStudentName(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs font-bold text-gray-600">اسم الأستاذ / المجموعة</Label>
+                                                <Input
+                                                    placeholder="مثال: الشيخ فؤاد بن عمر"
+                                                    className="bg-white border-gray-200"
+                                                    value={manualTeacherName}
+                                                    onChange={(e) => setManualTeacherName(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="space-y-1.5">
+                                                    <Label className="text-xs font-bold text-gray-600">ولي الأمر</Label>
+                                                    <Input
+                                                        placeholder="اسم الولي"
+                                                        className="bg-white border-gray-200 text-sm"
+                                                        value={manualGuardianName}
+                                                        onChange={(e) => setManualGuardianName(e.target.value)}
+                                                    />
                                                 </div>
-                                                <div>
-                                                    <div className="font-black text-sm text-primary">{selectedStudent?.fullName || selectedPreRegistration?.fullName}</div>
-                                                    <div className="text-[10px] text-muted-foreground">{selectedStudent ? `الشيخ: ${selectedSheikhName}` : 'طالب جديد'}</div>
+                                                <div className="space-y-1.5">
+                                                    <Label className="text-xs font-bold text-gray-600">الهاتف</Label>
+                                                    <Input
+                                                        placeholder="0555..."
+                                                        className="bg-white border-gray-200 text-sm"
+                                                        value={manualGuardianPhone}
+                                                        onChange={(e) => setManualGuardianPhone(e.target.value)}
+                                                    />
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                {selectedStudent && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="h-8 text-[10px] font-bold gap-1 border-primary/20 hover:bg-primary hover:text-white"
-                                                        onClick={async () => {
-                                                            try {
-                                                                const historySnapshot = {
-                                                                    student: {
-                                                                        ...selectedStudent,
-                                                                        sheikhName: selectedSheikhName
-                                                                    },
-                                                                    studentData: studentData,
-                                                                    stats: fullStats,
-                                                                    generatedAt: new Date().toISOString(),
-                                                                    adminLogs: adminLogs.filter(log => log.studentId === selectedStudent.id)
-                                                                };
-                                                                await shareStudentRecord(selectedStudent.id, historySnapshot);
-                                                                navigator.clipboard.writeText(studentRecordLink);
-                                                                toast({
-                                                                    title: "✅ تم نسخ الرابط",
-                                                                    description: "يمكن الآن لولي الأمر مشاهدة السجل عبر الرابط المباشر.",
-                                                                });
-                                                            } catch (error) {
-                                                                toast({
-                                                                    title: "❌ خطأ",
-                                                                    description: "فشل في توليد رابط المشاركة.",
-                                                                    variant: "destructive"
-                                                                });
-                                                            }
-                                                        }}
-                                                    >
-                                                        <Link className="h-3 w-3" />
-                                                        نسخ الرابط
-                                                    </Button>
+                                            {manualStudentName.trim() && (
+                                                <div className="pt-1 border-t border-gray-100 flex items-center gap-2">
+                                                    <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center">
+                                                        <User className="h-4 w-4 text-amber-600" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-black text-sm text-amber-700">{manualStudentName}</div>
+                                                        <div className="text-[10px] text-muted-foreground">إدخال يدوي — غير مسجل في النظام</div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        /* Search mode */
+                                        <>
+                                            <div className="relative group">
+                                                <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                                <Input
+                                                    placeholder="ابحث باسم الطالب أو رقمه..."
+                                                    className="pr-10 h-11 bg-white border-gray-200 rounded-xl"
+                                                    value={searchTerm}
+                                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                                />
+                                            </div>
+
+                                            <AnimatePresence>
+                                                {searchTerm && filteredResults.length > 0 && (
+                                                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-1 max-h-52 overflow-y-auto">
+                                                        {filteredResults.map((result: any) => (
+                                                            <button
+                                                                key={result.id}
+                                                                onClick={() => {
+                                                                    if (result.type === 'student') {
+                                                                        setSelectedStudent(result);
+                                                                        setSelectedPreRegistration(null);
+                                                                    } else {
+                                                                        setSelectedPreRegistration(result);
+                                                                        setSelectedStudent(null);
+                                                                    }
+                                                                    setSearchTerm('');
+                                                                    resetFields();
+                                                                }}
+                                                                className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-primary/5 transition-all text-right group border border-transparent hover:border-primary/10"
+                                                            >
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                                        <User className="h-4 w-4 text-primary" />
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="font-bold text-sm text-gray-800">{result.fullName}</div>
+                                                                        <div className="text-[10px] text-muted-foreground">{formatGroupName(result.groupName, allUsers) || (result.type === 'registration' ? 'تسجيل جديد' : 'بدون فوج')}</div>
+                                                                    </div>
+                                                                </div>
+                                                                <ArrowLeft className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all text-primary" />
+                                                            </button>
+                                                        ))}
+                                                    </motion.div>
                                                 )}
-                                                <Button variant="ghost" size="sm" onClick={() => { setSelectedStudent(null); setSelectedPreRegistration(null); }} className="h-8 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10">إلغاء</Button>
-                                            </div>
-                                        </motion.div>
+                                            </AnimatePresence>
+
+                                            {(selectedStudent || selectedPreRegistration) && (
+                                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/20">
+                                                            <User className="h-4 w-4 text-primary" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-black text-sm text-primary">{selectedStudent?.fullName || selectedPreRegistration?.fullName}</div>
+                                                            <div className="text-[10px] text-muted-foreground">{selectedStudent ? `الشيخ: ${selectedSheikhName}` : 'طالب جديد'}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        {selectedStudent && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-8 text-[10px] font-bold gap-1 border-primary/20 hover:bg-primary hover:text-white"
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const historySnapshot = {
+                                                                            student: { ...selectedStudent, sheikhName: selectedSheikhName },
+                                                                            studentData: studentData,
+                                                                            stats: fullStats,
+                                                                            generatedAt: new Date().toISOString(),
+                                                                            adminLogs: adminLogs.filter(log => log.studentId === selectedStudent.id)
+                                                                        };
+                                                                        await shareStudentRecord(selectedStudent.id, historySnapshot);
+                                                                        navigator.clipboard.writeText(studentRecordLink);
+                                                                        toast({ title: "✅ تم نسخ الرابط", description: "يمكن الآن لولي الأمر مشاهدة السجل عبر الرابط المباشر." });
+                                                                    } catch (error) {
+                                                                        toast({ title: "❌ خطأ", description: "فشل في توليد رابط المشاركة.", variant: "destructive" });
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Link className="h-3 w-3" />
+                                                                نسخ الرابط
+                                                            </Button>
+                                                        )}
+                                                        <Button variant="ghost" size="sm" onClick={() => { setSelectedStudent(null); setSelectedPreRegistration(null); }} className="h-8 text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50">إلغاء</Button>
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </>
                                     )}
                                 </CardContent>
                             </Card>
 
                             <AnimatePresence>
-                                {(selectedStudent || selectedPreRegistration) && (
+                                {hasSubject && (
                                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
                                         <Card className="bg-white border shadow-sm">
                                             <CardHeader className="border-b bg-gray-50/80 py-3 px-4">
@@ -691,35 +775,35 @@ export default function AdminDocsPage() {
 
                             <div className="sticky top-24 w-full flex flex-col items-center gap-6">
                                 {/* THE RECEIPT TARGET */}
-                                {(selectedStudent || selectedPreRegistration) && (
+                                {hasSubject && (
                                     <ReceiptDesign
                                         log={{
                                             type: activeTab as any,
-                                            studentName: selectedStudent?.fullName || selectedPreRegistration?.fullName,
-                                            sheikhName: selectedSheikhName,
-                                            groupName: selectedStudent?.groupName || 'تسجيل جديد',
+                                            studentName: effectiveStudentName,
+                                            sheikhName: effectiveTeacherName,
+                                            groupName: selectedStudent?.groupName || (isManualMode ? manualTeacherName : 'تسجيل جديد'),
                                             details: {
-                                                ... (activeTab === 'summon' ? { date: summonDate, reason: summonReason } : {}),
-                                                ... (activeTab === 'exit' ? { time: exitTime, reason: exitReason } : {}),
-                                                ... (activeTab === 'absence' ? { dates: absenceDates, reason: absenceReason } : {}),
-                                                ... (activeTab === 'payment' ? { title: paymentTitle, amount: paymentAmount } : {}),
-                                                ... (activeTab === 'join' ? { studyDays: joinStudyDays, timing: joinTiming, level: selectedPreRegistration?.educationalLevel } : {}),
-                                                ... (activeTab === 'entry' ? {
+                                                ...(activeTab === 'summon' ? { date: summonDate, reason: summonReason } : {}),
+                                                ...(activeTab === 'exit' ? { time: exitTime, reason: exitReason } : {}),
+                                                ...(activeTab === 'absence' ? { dates: absenceDates, reason: absenceReason } : {}),
+                                                ...(activeTab === 'payment' ? { title: paymentTitle, amount: paymentAmount } : {}),
+                                                ...(activeTab === 'join' ? { studyDays: joinStudyDays, timing: joinTiming, level: selectedPreRegistration?.educationalLevel } : {}),
+                                                ...(activeTab === 'entry' ? {
                                                     absenceDays: entryAbsenceDays,
                                                     reason: entryAbsenceReason,
                                                     punishment: entryPunishment,
                                                     stats: stats30Days
                                                 } : {}),
                                                 ticketNumber: '',
-                                                guardianName: selectedStudent?.guardianName || selectedPreRegistration?.guardianName,
-                                                guardianPhone: selectedStudent?.phone1 || selectedPreRegistration?.phone1
+                                                guardianName: effectiveGuardianName,
+                                                guardianPhone: effectiveGuardianPhone,
                                             }
                                         }}
                                         qrCodeUrl={qrCodeUrl}
                                     />
                                 )}
 
-                                {(selectedStudent || selectedPreRegistration) && (
+                                {hasSubject && (
                                     <div className="w-full max-w-[300px] space-y-3">
                                         <Button
                                             onClick={handlePrint}
