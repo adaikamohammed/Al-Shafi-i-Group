@@ -81,6 +81,12 @@ export default function AdminDocsPage() {
     const [joinStudyDays, setJoinStudyDays] = useState('');
     const [joinTiming, setJoinTiming] = useState('');
 
+    const selectedSheikhName = useMemo(() => {
+        if (!selectedStudent || !allUsers) return 'غير محدد';
+        const sheikh = allUsers.find(u => u.role === 'sheikh' && u.group === selectedStudent.groupName);
+        return sheikh?.displayName || 'غير محدد';
+    }, [selectedStudent, allUsers]);
+
     // Derived values: use manual inputs when no student selected
     const effectiveStudentName = isManualMode ? manualStudentName : (selectedStudent?.fullName || selectedPreRegistration?.fullName || '');
     const effectiveTeacherName = isManualMode ? manualTeacherName : selectedSheikhName;
@@ -126,12 +132,6 @@ export default function AdminDocsPage() {
             (s.phone1 && s.phone1.includes(searchTerm.trim()))
         ).slice(0, 15).map(s => ({ ...s, type: 'student' as const }));
     }, [students, preRegistrations, searchTerm, activeTab]);
-
-    const selectedSheikhName = useMemo(() => {
-        if (!selectedStudent || !allUsers) return 'غير محدد';
-        const sheikh = allUsers.find(u => u.role === 'sheikh' && u.group === selectedStudent.groupName);
-        return sheikh?.displayName || 'غير محدد';
-    }, [selectedStudent, allUsers]);
 
     // Consolidated Student Stats & History Calculation (Single Pass & String Comparison)
     const combinedStudentStats = useMemo(() => {
