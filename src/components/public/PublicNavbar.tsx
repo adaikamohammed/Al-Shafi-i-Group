@@ -6,8 +6,10 @@ import { Menu } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import Image from 'next/image';
 import ContactModal from './ContactModal';
+import { useAuth } from '@/context/AuthContext';
 
 export default function PublicNavbar() {
+    const { user } = useAuth();
     return (
         <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
             <div className="container mx-auto px-4 h-20 flex justify-between items-center">
@@ -40,9 +42,9 @@ export default function PublicNavbar() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-3">
-                    <Link href="/login">
+                    <Link href={user ? "/dashboard" : "/login"}>
                         <Button className="rounded-xl px-6 font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all">
-                            دخول المشايخ
+                            {user ? "دخول الفوج 🚪" : "دخول المشايخ"}
                         </Button>
                     </Link>
 
@@ -66,9 +68,9 @@ export default function PublicNavbar() {
                                     <ContactModal>
                                         <button className="text-lg font-bold text-gray-800 w-full text-right">تواصل معنا</button>
                                     </ContactModal>
-                                    <Link href="/login" className="w-full">
+                                    <Link href={user ? "/dashboard" : "/login"} className="w-full">
                                         <Button className="w-full rounded-xl py-6 font-bold text-lg">
-                                            دخول المشايخ
+                                            {user ? "دخول الفوج 🚪" : "دخول المشايخ"}
                                         </Button>
                                     </Link>
                                 </div>

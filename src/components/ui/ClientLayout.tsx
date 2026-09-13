@@ -98,12 +98,16 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     const isPublicPage = pathname === '/' || pathname === '/about' || pathname === '/future' || pathname === '/stats' || pathname.startsWith('/parent-portal') || pathname.startsWith('/record');
     if (!authLoading && !user && pathname !== '/login' && !isPublicPage) {
       router.push('/login');
+      return;
     }
 
-    // Redirect authenticated users from public root to home - DISABLED to allow access to public page
-    // if (!authLoading && user && pathname === '/') {
-    //   router.push('/home');
-    // }
+    // Redirect authenticated users from root or login directly to their group (/dashboard)
+    const isExplicitPublic = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('public') === 'true';
+    if (!authLoading && user) {
+      if ((pathname === '/' && !isExplicitPublic) || pathname === '/login') {
+        router.replace('/dashboard');
+      }
+    }
   }, [user, authLoading, router, pathname]);
 
   useEffect(() => {
@@ -121,6 +125,19 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   }, [])
 
   const isPublicPage = pathname === '/' || pathname === '/about' || pathname === '/future' || pathname === '/stats' || pathname.startsWith('/parent-portal') || pathname.startsWith('/record');
+  const hasLocalActiveSession = typeof window !== 'undefined' && localStorage.getItem('has_active_session') === 'true';
+  const isExplicitPublic = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('public') === 'true';
+
+  // Smooth direct transition for remembered accounts opening root or login
+  if (!isExplicitPublic && ((pathname === '/' && (user || (authLoading && hasLocalActiveSession))) || (pathname === '/login' && (user || (authLoading && hasLocalActiveSession))))) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-3" dir="rtl">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-sm font-bold text-gray-700">جاري الدخول إلى الفوج مباشرة...</p>
+      </div>
+    );
+  }
+
   if (authLoading && !isPublicPage) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">

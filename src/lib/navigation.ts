@@ -104,7 +104,7 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'النظام والإعدادات',
         items: [
             { href: '/home', label: 'البوابة الرئيسية', icon: Home },
-            { href: '/', label: 'الواجهة العامة', icon: Home },
+            { href: '/?public=true', label: 'الواجهة العامة', icon: Home },
             { href: '/profile', label: 'الملف الشخصي', icon: UserCog },
             { href: '/settings', label: 'الإعدادات', icon: Settings },
             { href: '/updates', label: 'التحديثات', icon: Sparkles },

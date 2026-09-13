@@ -17,9 +17,35 @@ export default function LoginPage() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signInWithEmail } = useAuth();
+  const { user, loading: authLoading, signInWithEmail } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const [hasLocalSession, setHasLocalSession] = useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('has_active_session') === 'true') {
+      setHasLocalSession(true);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/dashboard');
+    }
+  }, [user, authLoading, router]);
+
+  // If user is already authenticated or active session is loading, do NOT show the login form
+  if (user || (authLoading && hasLocalSession)) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0a] text-white gap-4" dir="rtl">
+        <div className="p-8 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-xl flex flex-col items-center gap-3 shadow-2xl">
+          <Loader2 className="w-10 h-10 animate-spin text-[#1A5F5E]" />
+          <p className="text-base font-bold text-white">جاري الدخول إلى حسابك...</p>
+          <p className="text-xs text-slate-400">مرحباً بك مجدداً</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

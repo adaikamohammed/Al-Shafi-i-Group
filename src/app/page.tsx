@@ -1,12 +1,49 @@
 "use client";
 
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import PublicNavbar from '@/components/public/PublicNavbar';
 import HeroSection from '@/components/public/HeroSection';
 import StatsSection from '@/components/public/StatsSection';
 import Footer from '@/components/public/Footer';
+import { Loader2 } from 'lucide-react';
 
 export default function LandingPage() {
+    const { user, loading: authLoading } = useAuth();
+    const router = useRouter();
+    const [hasLocalSession, setHasLocalSession] = useState(false);
+    const [isExplicitPublic, setIsExplicitPublic] = useState(false);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const hasSession = localStorage.getItem('has_active_session') === 'true';
+            const isPublicParam = new URLSearchParams(window.location.search).get('public') === 'true';
+            setHasLocalSession(hasSession);
+            setIsExplicitPublic(isPublicParam);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!authLoading && user && !isExplicitPublic) {
+            router.replace('/dashboard');
+        }
+    }, [user, authLoading, isExplicitPublic, router]);
+
+    // If device has an active account session and isn't intentionally viewing the public page, transition smoothly
+    if (!isExplicitPublic && (user || (authLoading && hasLocalSession))) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-white gap-4" dir="rtl">
+                <div className="p-8 bg-slate-50 border border-gray-200/80 rounded-3xl shadow-xl flex flex-col items-center gap-3">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <p className="text-base font-bold text-gray-800">جاري الدخول إلى الفوج مباشرة...</p>
+                    <p className="text-xs text-gray-500">مرحباً بك في مدرسة الإمام الشافعي</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-white" dir="rtl">
             <PublicNavbar />

@@ -200,8 +200,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
         setUser(appUser);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('has_active_session', 'true');
+          localStorage.setItem('cached_user_email', appUser.email || '');
+          localStorage.setItem('cached_user_role', appUser.role || 'sheikh');
+        }
       } else {
         setUser(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('has_active_session');
+          localStorage.removeItem('cached_user_email');
+          localStorage.removeItem('cached_user_role');
+        }
       }
       setLoading(false);
     });
@@ -234,6 +244,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const formattedEmail = email.toLowerCase().trim();
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('has_active_session', 'true');
+      }
     } catch (error: any) {
       const isSheikhAccount = sheikhInitialData[formattedEmail];
       if ((error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') &&
@@ -242,6 +255,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
           console.log("Auto-registering sheikh:", email);
           await createUserWithEmailAndPassword(auth, email, password);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('has_active_session', 'true');
+          }
           return;
         } catch (signUpError: any) {
           console.error("Auto-signup failed:", signUpError);
@@ -340,6 +356,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('has_active_session');
+      localStorage.removeItem('cached_user_email');
+      localStorage.removeItem('cached_user_role');
+      localStorage.removeItem('cached_user_group');
+    }
     await signOut(auth);
   };
 
