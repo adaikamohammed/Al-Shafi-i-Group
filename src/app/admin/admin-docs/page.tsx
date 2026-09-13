@@ -518,6 +518,55 @@ export default function AdminDocsPage() {
             }
         }
 
+        // ربط تعويض الحصة بصفحة إدارة العقوبات تلقائياً
+        if (activeTab === 'compensation' && selectedStudent) {
+            try {
+                const db = getDatabase();
+                const covenantId = `cov_${Date.now()}`;
+                const newCovenant: Covenant = {
+                    id: covenantId,
+                    type: 'إجراء تأديبي',
+                    text: `تعويض حصة: ${compensationResult || 'تم الاستيفاء والاستظهار بنجاح'}`,
+                    status: 'تم الوفاء بها',
+                    card: 'بدون',
+                    date: new Date().toISOString(),
+                    compensationSessions: parseInt(compensationAmount) || 1,
+                    compensationDate: compensationDate ? new Date(compensationDate).toISOString() : new Date().toISOString(),
+                    isCompensated: true,
+                    commitmentType: 'تعويض',
+                };
+                const existingCovenants: Covenant[] = selectedStudent.covenants || [];
+                const updatedCovenants = [...existingCovenants, newCovenant].map(c => sanitizeData(c));
+                await update(
+                    ref(db, `users/${selectedStudent.ownerId}/students/${selectedStudent.id}`),
+                    { covenants: updatedCovenants }
+                );
+                toast({
+                    title: '🔄 تم تسجيل التعويض',
+                    description: `تم قيد تعويض الحصة في سجل الطالب ${selectedStudent.fullName}.`,
+                });
+            } catch (err) {
+                console.error('Error registering compensation covenant:', err);
+            }
+        }
+
+        // تحديث فوج الطالب تلقائياً عند إصدار وصل انتقال الفوج
+        if (activeTab === 'transfer' && selectedStudent && transferToGroup.trim()) {
+            try {
+                const db = getDatabase();
+                await update(
+                    ref(db, `users/${selectedStudent.ownerId}/students/${selectedStudent.id}`),
+                    { groupName: transferToGroup.trim() }
+                );
+                toast({
+                    title: '🔀 تم تحديث الفوج',
+                    description: `تم نقل الطالب ${selectedStudent.fullName} إلى ${transferToGroup.trim()} بنجاح.`,
+                });
+            } catch (err) {
+                console.error('Error updating student group on transfer:', err);
+            }
+        }
+
         // Trigger print
         window.print();
     };
