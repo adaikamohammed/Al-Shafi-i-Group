@@ -158,231 +158,6 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  const sidebarContent = (
-    <div className={cn(
-      "flex h-full flex-col transition-colors duration-700",
-      theme.isLight ? "bg-white/80" : "bg-slate-950/40"
-    )}>
-      <SidebarHeader className="p-4">
-        <Link href="/profile" className="block p-2 rounded-2xl hover:bg-white/10 transition-colors group">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10 border border-white/10 shrink-0">
-              <AvatarImage src={user?.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${user?.displayName}`} alt={user?.displayName || ''} />
-              <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-              <h1 className={cn(
-                "font-headline text-sm font-bold truncate",
-                theme.isLight ? "text-slate-900" : "text-white"
-              )}>
-                {isSuperAdmin ? 'الإدارة العامة' : (user?.group || 'فوج غير محدد')}
-              </h1>
-              <p className="text-[10px] text-muted-foreground truncate">{user?.displayName}</p>
-            </div>
-          </div>
-        </Link>
-      </SidebarHeader>
-
-      <SidebarContent className="px-2 custom-scrollbar overflow-y-auto py-4">
-        <SidebarMenu className="gap-4">
-          {filteredNavGroups.map((group) => {
-            const primaryItem = group.items.find(i => i.primary);
-            const mainIcon = primaryItem?.icon || group.items[0]?.icon || Layers;
-            const isOpen = openGroups.includes(group.title);
-
-            return (
-              <SidebarMenuItem key={group.title} className="group/menu relative">
-                <Collapsible open={isOpen} onOpenChange={() => toggleGroup(group.title)}>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton
-                      className={cn(
-                        "rounded-2xl h-12 w-full flex items-center gap-3 transition-all duration-500 border border-transparent shadow-sm hover:scale-[1.02] relative group/btn px-3",
-                        "group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center",
-                        theme.isLight
-                          ? "bg-white text-slate-600 hover:bg-white hover:text-primary hover:border-primary/20 shadow-slate-200/50"
-                          : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white hover:border-white/10"
-                      )}
-                      tooltip={group.title}
-                    >
-                      <div className={cn(
-                        "p-2 rounded-xl transition-all duration-500 shrink-0 flex items-center justify-center",
-                        "group-data-[collapsible=icon]:p-1 group-data-[collapsible=icon]:rounded-lg",
-                        theme.isLight ? "bg-slate-50 group-hover/btn:bg-primary/10" : "bg-white/5 group-hover/btn:bg-white/10"
-                      )}>
-                        {React.createElement(mainIcon, {
-                          className: "h-5 w-5 group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:w-4"
-                        })}
-                      </div>
-                      <span className="font-bold text-[11px] tracking-tight group-data-[collapsible=icon]:hidden whitespace-nowrap overflow-hidden font-headline">
-                        {group.title}
-                      </span>
-
-                      {/* Chevron indicator */}
-                      <ChevronLeft className={cn(
-                        "h-4 w-4 mr-auto transition-transform duration-300 group-data-[collapsible=icon]:hidden",
-                        isOpen && "rotate-90"
-                      )} />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-
-                  <div className="md:hidden">
-                    <CollapsibleContent>
-                      <div className="mt-2 space-y-1 pr-2">
-                        {group.items.map((item) => (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className={cn(
-                              "flex items-center gap-3 p-2 pr-4 rounded-xl transition-all cursor-pointer",
-                              theme.isLight
-                                ? "hover:bg-slate-100 text-slate-600"
-                                : "hover:bg-white/5 text-white/70",
-                              pathname === item.href && (theme.isLight
-                                ? "bg-primary/10 text-primary font-bold"
-                                : "bg-primary/20 text-primary font-bold")
-                            )}
-                          >
-                            <item.icon className={cn("h-3.5 w-3.5 shrink-0 mr-1", item.primary && "text-primary")} />
-                            <span className={cn("text-[10px] font-medium font-body", item.primary && "text-primary")}>
-                              {item.label}
-                            </span>
-                          </Link>
-                        ))}
-                      </div>
-                    </CollapsibleContent>
-                  </div>
-                </Collapsible>
-
-                {/* Popout menu on hover when sidebar is collapsed to icon mode */}
-                <div className="absolute right-full top-0 mr-2 z-[99] hidden md:group-hover/menu:block pointer-events-auto bg-card border rounded-3xl shadow-xl w-60 p-4 border-border/80 animate-in fade-in slide-in-from-right-3 duration-200">
-                  <div className="border-b pb-2 mb-2">
-                    <h4 className="font-headline font-black text-xs text-primary">{group.title}</h4>
-                  </div>
-                  <div className="space-y-1">
-                    {group.items.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          "flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",
-                          theme.isLight
-                            ? "hover:bg-slate-100 text-slate-600"
-                            : "hover:bg-white/5 text-white/70",
-                          pathname === item.href && (theme.isLight
-                            ? "bg-primary/10 text-primary font-bold"
-                            : "bg-primary/20 text-primary font-bold")
-                        )}
-                      >
-                        <item.icon className={cn("h-3.5 w-3.5 shrink-0 mr-1", item.primary && "text-primary")} />
-                        <span className={cn("text-[10px] font-medium font-body", item.primary && "text-primary")}>
-                          {item.label}
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </SidebarMenuItem>
-            );
-          })}
-        </SidebarMenu>
-      </SidebarContent>
-
-      <SidebarFooter className="p-2 gap-2 mt-auto">
-        <SidebarSeparator className="mb-2 opacity-5" />
-
-        <SidebarMenu className="gap-1">
-          {filteredBottomNavItems.map((item) => {
-            const Icon = item.icon;
-
-            return (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === item.href}
-                  tooltip={item.label}
-                  className={cn(
-                    "rounded-xl h-10 px-3 transition-all duration-300",
-                    theme.isLight ? "text-slate-600 hover:bg-slate-100" : "text-white/60 hover:bg-white/5 hover:text-white",
-                    "data-[active=true]:bg-primary data-[active=true]:text-primary-foreground shadow-md"
-                  )}
-                >
-                  <Link href={item.href} className="flex items-center gap-3">
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="font-bold text-[11px] tracking-tight group-data-[collapsible=icon]:hidden">{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            );
-          })}
-
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  tooltip="تغيير المظهر"
-                  className={cn(
-                    "rounded-xl h-10 px-3 transition-all duration-300",
-                    theme.isLight ? "text-slate-600 hover:bg-slate-100" : "text-white/60 hover:bg-white/5 hover:text-white"
-                  )}
-                >
-                  <Palette className="h-4 w-4 shrink-0" />
-                  <span className="font-bold text-[11px] tracking-tight group-data-[collapsible=icon]:hidden">المظهر</span>
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                side={isMobile ? "bottom" : "right"}
-                align={isMobile ? "end" : "start"}
-                className="w-64 bg-slate-900 border-white/10 text-white p-2 max-h-[300px] overflow-y-auto custom-scrollbar"
-              >
-                <div className="px-2 py-1.5 text-xs font-bold text-muted-foreground">اختر المظهر</div>
-                {Object.values(PORTAL_THEMES).map((t) => (
-                  <DropdownMenuItem
-                    key={t.id}
-                    onClick={() => updateUserProfile({ portalTheme: t.id })}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/10 cursor-pointer mb-1 focus:bg-white/10 focus:text-white"
-                  >
-                    <div className={cn("h-8 w-8 rounded-lg border border-white/20 shrink-0 shadow-sm", t.preview)} />
-                    <div className="flex flex-col gap-0.5 overflow-hidden">
-                      <span className="font-bold text-xs truncate">{t.name}</span>
-                      <span className="text-[10px] text-muted-foreground truncate opacity-70">
-                        {t.isLight ? 'فاتح' : 'داكن'}
-                        {t.id === 'pink_horizon' ? ' (جديد)' : ''}
-                      </span>
-                    </div>
-                    {currentThemeId === t.id && <Check className="h-4 w-4 text-emerald-500 mr-auto" />}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-
-
-
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={logout}
-              tooltip="تسجيل الخروج"
-              className="rounded-xl h-10 px-3 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 mt-2"
-            >
-              <LogOut className="h-4 w-4 shrink-0" />
-              <span className="font-bold text-[11px] group-data-[collapsible=icon]:hidden">تسجيل الخروج</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-
-        <div className="flex justify-end pt-2 group-data-[collapsible=icon]:justify-center">
-          <SidebarTrigger className="hover:bg-white/5 h-8 w-8" />
-        </div>
-      </SidebarFooter>
-    </div>
-  );
-
-  // Render simplified layout for public landing page if user is logged in or not (handled above if not logged in, but here if logged in on root)
-  // Actually, if user IS logged in and goes to '/', we might want to redirect them to '/dashboard' or show the public page with a "Go to Dashboard" button.
-  // For now, let's treat '/' as public page even for logged in users, OR redirect them.
-  // Let's redirect logged-in users from '/' to '/dashboard' inside a useEffect or just render public page.
-  // The user requirement implies '/' is public.
-
   // Render simplified layout for public landing page if user is logged in
   if (isPublicPage) {
     return <div className="max-w-full mx-auto font-body">{children}</div>;
@@ -459,10 +234,10 @@ function AppSidebarContent({
 
   const sidebarContent = (
     <div className={cn(
-      "flex h-full flex-col transition-colors duration-700",
+      "flex h-full max-h-screen flex-col transition-colors duration-700 overflow-hidden",
       theme.isLight ? "bg-white/80" : "bg-slate-950/40"
     )}>
-      <SidebarHeader className="p-4">
+      <SidebarHeader className="p-4 shrink-0 border-b border-border/40">
         <Link href="/profile" className="block p-2 rounded-2xl hover:bg-white/10 transition-colors group">
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border border-white/10 shrink-0">
@@ -481,14 +256,19 @@ function AppSidebarContent({
           </div>
         </Link>
       </SidebarHeader>
-      <SidebarContent className="px-2 custom-scrollbar md:overflow-visible overflow-y-auto py-4">
+      <SidebarContent className="px-2 custom-scrollbar overflow-y-auto flex-1 min-h-0 py-3">
         <SidebarMenu className="gap-2">
           {filteredNavGroups.map((group: any) => {
             const primaryItem = group.items.find((i: any) => i.primary);
             const mainIcon = primaryItem?.icon || group.items[0]?.icon || Layers;
             const isOpen = openGroups.includes(group.title);
             const isHovered = hoveredGroup === group.title;
-            const hasActive = group.items.some((i: any) => pathname.startsWith(i.href));
+            const isItemActive = (href: string) => {
+              const cleanHref = href.split('?')[0];
+              if (cleanHref === '/') return pathname === '/';
+              return pathname === cleanHref || pathname.startsWith(cleanHref + '/');
+            };
+            const hasActive = group.items.some((i: any) => isItemActive(i.href));
 
             const GROUP_COLORS: Record<string, {
               activeBg: string; activeText: string; activeShadow: string;
@@ -610,7 +390,7 @@ function AppSidebarContent({
                 {isOpen && (
                   <div className="pt-1 pr-3 pb-1 space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-200">
                     {group.items.map((item: any) => {
-                      const active = pathname.startsWith(item.href);
+                      const active = isItemActive(item.href);
                       const Icon = item.icon;
                       return (
                         <Link
@@ -633,8 +413,8 @@ function AppSidebarContent({
                   </div>
                 )}
 
-                {/* ── Desktop: flyout popup on hover when accordion is closed ── */}
-                {!isMobile && !isOpen && (
+                {/* ── Desktop: flyout popup on hover ONLY when sidebar is in collapsed icon mode ── */}
+                {state === 'collapsed' && !isMobile && !isOpen && (
                   <AnimatePresence>
                     {isHovered && (
                       <HoverPopup
@@ -651,7 +431,10 @@ function AppSidebarContent({
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="p-2 gap-2 mt-auto">
+      <SidebarFooter className={cn(
+        "p-2 gap-1 mt-auto shrink-0 border-t z-10",
+        theme.isLight ? "bg-white/95 border-slate-200/80" : "bg-slate-950/95 border-white/10"
+      )}>
         <SidebarSeparator className="mb-2 opacity-5" />
 
         <SidebarMenu className="gap-1">
@@ -885,7 +668,7 @@ function AppSidebarContent({
                 {children}
               </main>
             </div>
-            <SheetContent side="right" className="flex flex-col p-0 bg-card border-none w-72 print:hidden">
+            <SheetContent side="right" className="flex flex-col p-0 bg-card border-none w-72 h-full max-h-screen overflow-hidden print:hidden">
               <SheetHeader className="sr-only">
                 <SheetTitle>القائمة الجانبية</SheetTitle>
               </SheetHeader>
@@ -898,7 +681,7 @@ function AppSidebarContent({
               side="right"
               collapsible="icon"
               className={cn(
-                "border-l transition-all duration-300 print:hidden",
+                "border-l transition-all duration-300 h-screen max-h-screen overflow-hidden print:hidden",
                 theme.isLight ? "border-slate-200" : "border-white/5"
               )}
             >
