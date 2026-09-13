@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Printer, User, ClipboardList, ArrowLeft, Edit, Calendar, Clock, History, FileText, CheckCircle2, Filter, Link, Trash2 } from 'lucide-react';
+import { Search, Printer, User, ClipboardList, ArrowLeft, Edit, Calendar, Clock, History, FileText, CheckCircle2, Filter, Link, Trash2, X, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, subDays, isAfter } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -19,6 +19,20 @@ import { useToast } from '@/hooks/use-toast';
 import { formatGroupName, sanitizeData } from '@/lib/utils';
 import { getDatabase, ref, update } from 'firebase/database';
 
+// دالة تطبيع موحدة وسريعة للبحث العربي
+const normalizeArabicText = (text: string) => {
+    if (!text) return '';
+    return text
+        .replace(/[\u064B-\u065F\u0670]/g, '') // إزالة التشكيل
+        .replace(/[آأإٱ]/g, 'ا')
+        .replace(/[ؤئ]/g, 'ي')
+        .replace(/ة/g, 'ه')
+        .replace(/ى/g, 'ي')
+        .replace(/ٰ/g, '')
+        .toLowerCase()
+        .trim();
+};
+
 export default function AdminDocsPage() {
     const {
         students,
@@ -29,14 +43,16 @@ export default function AdminDocsPage() {
         adminLogs,
         dailySessions,
         shareStudentRecord,
-        updateStudent
+        updateStudent,
+        loading: isDataLoading
     } = useStudentContext();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState('');
+    const [searchGroupFilter, setSearchGroupFilter] = useState('all');
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     const [selectedPreRegistration, setSelectedPreRegistration] = useState<PreRegistration | null>(null);
-    const [activeTab, setActiveTab] = useState('summon');
+    const [activeTab, setActiveTab] = useState('entry');
 
     // Manual input mode (for unregistered students)
     const [isManualMode, setIsManualMode] = useState(false);
@@ -126,44 +142,66 @@ export default function AdminDocsPage() {
     const effectiveGuardianPhone = isManualMode ? manualGuardianPhone : (selectedStudent?.phone1 || selectedPreRegistration?.phone1 || '');
     const hasSubject = isManualMode ? !!manualStudentName.trim() : !!(selectedStudent || selectedPreRegistration);
 
-    // Search Logic
+    // فهرسة مسبقة للطلاب لتسريع البحث الفوري (0ms)
+    const indexedStudents = useMemo(() => {
+        return students.map(s => {
+            const normName = normalizeArabicText(s.fullName || '');
+            const normAlt = normalizeArabicText(s.normalizedFullName || '');
+            const normGuardian = normalizeArabicText(s.guardianName || '');
+            const normGroup = normalizeArabicText(s.groupName || '');
+            const groupNameFormatted = formatGroupName(s.groupName || '', allUsers) || '';
+            const normFormatted = normalizeArabicText(groupNameFormatted);
+            const phone = (s.phone1 || '') + ' ' + (s.phone2 || '');
+            return {
+                student: s,
+                groupNameFormatted,
+                searchKey: `${normName} ${normAlt} ${normGuardian} ${normGroup} ${normFormatted} ${phone}`,
+            };
+        });
+    }, [students, allUsers]);
+
+    // فهرسة مسبقة للتسجيلات الجديدة
+    const indexedPreRegs = useMemo(() => {
+        return preRegistrations.map(r => {
+            const normName = normalizeArabicText(r.fullName || '');
+            const normAlt = normalizeArabicText(r.normalizedFullName || '');
+            const normGuardian = normalizeArabicText(r.guardianName || '');
+            const phone = (r.phone1 || '') + ' ' + (r.phone2 || '');
+            return {
+                reg: r,
+                searchKey: `${normName} ${normAlt} ${normGuardian} ${phone}`,
+            };
+        });
+    }, [preRegistrations]);
+
+    // منطق البحث الفوري والخفيف
     const filteredResults = useMemo(() => {
-        if (!searchTerm.trim()) return [];
+        const rawTerm = searchTerm.trim();
+        const hasGroupFilter = searchGroupFilter !== 'all';
 
-        // تطبيع عربي شامل: يزيل التشكيل ويوحّد متغيرات الحروف
-        const normalize = (text: string) => {
-            return text
-                .replace(/[\u064B-\u065F\u0670]/g, '') // إزالة التشكيل والمدّة
-                .replace(/[آأإٱ]/g, 'ا')
-                .replace(/[ؤئ]/g, 'ي')
-                .replace(/ة/g, 'ه')
-                .replace(/ى/g, 'ي')
-                .replace(/ٰ/g, '')
-                .toLowerCase()
-                .trim();
-        };
+        if (!rawTerm && !hasGroupFilter) return [];
 
-        const term = normalize(searchTerm);
-        // البحث بكل كلمة على حدة (يجد "رياض" حتى لو كتب اسم أول فقط)
-        const termWords = term.split(/\s+/).filter(Boolean);
-
-        const matchesName = (name: string) => {
-            const n = normalize(name);
-            return termWords.every(w => n.includes(w));
-        };
+        const normalizedTerm = normalizeArabicText(rawTerm);
+        const words = normalizedTerm.split(/\s+/).filter(Boolean);
 
         if (activeTab === 'join') {
-            return preRegistrations.filter(r =>
-                matchesName(r.normalizedFullName || r.fullName) ||
-                (r.phone1 && r.phone1.includes(searchTerm.trim()))
-            ).slice(0, 15).map(r => ({ ...r, type: 'registration' as const }));
+            return indexedPreRegs
+                .filter(item => words.length === 0 || words.every(w => item.searchKey.includes(w)))
+                .slice(0, 20)
+                .map(item => ({ ...item.reg, type: 'registration' as const }));
         }
 
-        return students.filter(s =>
-            matchesName(s.normalizedFullName || s.fullName) ||
-            (s.phone1 && s.phone1.includes(searchTerm.trim()))
-        ).slice(0, 15).map(s => ({ ...s, type: 'student' as const }));
-    }, [students, preRegistrations, searchTerm, activeTab]);
+        return indexedStudents
+            .filter(item => {
+                if (hasGroupFilter && item.student.groupName !== searchGroupFilter) {
+                    return false;
+                }
+                if (words.length === 0) return true;
+                return words.every(w => item.searchKey.includes(w));
+            })
+            .slice(0, 20)
+            .map(item => ({ ...item.student, groupNameFormatted: item.groupNameFormatted, type: 'student' as const }));
+    }, [indexedStudents, indexedPreRegs, searchTerm, activeTab, searchGroupFilter]);
 
     // Consolidated Student Stats & History Calculation (Single Pass & String Comparison)
     const combinedStudentStats = useMemo(() => {
@@ -533,7 +571,7 @@ export default function AdminDocsPage() {
 
     const sheikhGroups = useMemo(() => {
         const groups = new Set(allUsers.filter(u => u.role === 'sheikh').map(u => u.group));
-        return Array.from(groups).filter(Boolean);
+        return (Array.from(groups).filter(Boolean) as string[]);
     }, [allUsers]);
 
 
@@ -674,47 +712,113 @@ export default function AdminDocsPage() {
                                     ) : (
                                         /* Search mode */
                                         <>
+                                            {/* Sheikh / Group Quick Filter */}
+                                            <div className="flex items-center gap-2">
+                                                <select
+                                                    aria-label="تصفية حسب الفوج"
+                                                    value={searchGroupFilter}
+                                                    onChange={(e) => setSearchGroupFilter(e.target.value)}
+                                                    className="w-full h-9 px-3 rounded-xl border border-gray-200 bg-gray-50/70 text-xs font-bold text-gray-700 outline-none focus:ring-1 ring-primary transition-all"
+                                                >
+                                                    <option value="all">🔍 جميع الأفواج ({students.length} طالب مسجل)</option>
+                                                    {sheikhGroups.map(g => (
+                                                        <option key={g} value={g}>{formatGroupName(g || '', allUsers)}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Search Input */}
                                             <div className="relative group">
                                                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                                                 <Input
-                                                    placeholder="ابحث باسم الطالب أو رقمه..."
-                                                    className="pr-10 h-11 bg-white border-gray-200 rounded-xl"
+                                                    placeholder={isDataLoading && students.length === 0 ? "جاري تحميل بيانات الطلاب..." : "اكتب اسم الطالب أو الهاتف للبحث..."}
+                                                    className="pr-10 pl-9 h-11 bg-white border-gray-200 rounded-xl font-medium focus:border-primary"
                                                     value={searchTerm}
                                                     onChange={(e) => setSearchTerm(e.target.value)}
                                                 />
+                                                {searchTerm && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSearchTerm('')}
+                                                        className="absolute left-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 flex items-center justify-center transition-colors"
+                                                        title="مسح البحث"
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </button>
+                                                )}
                                             </div>
 
+                                            {/* Loading Feedback */}
+                                            {isDataLoading && students.length === 0 && (
+                                                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold">
+                                                    <Loader2 className="h-4 w-4 animate-spin shrink-0 text-amber-600" />
+                                                    <span>جاري تحميل بيانات الطلاب... يرجى الانتظار ثوانٍ</span>
+                                                </div>
+                                            )}
+
+                                            {/* Search Results / Feedback */}
                                             <AnimatePresence>
-                                                {searchTerm && filteredResults.length > 0 && (
-                                                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-1 max-h-52 overflow-y-auto">
-                                                        {filteredResults.map((result: any) => (
-                                                            <button
-                                                                key={result.id}
-                                                                onClick={() => {
-                                                                    if (result.type === 'student') {
-                                                                        setSelectedStudent(result);
-                                                                        setSelectedPreRegistration(null);
-                                                                    } else {
-                                                                        setSelectedPreRegistration(result);
-                                                                        setSelectedStudent(null);
-                                                                    }
-                                                                    setSearchTerm('');
-                                                                    resetFields();
-                                                                }}
-                                                                className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-primary/5 transition-all text-right group border border-transparent hover:border-primary/10"
-                                                            >
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                                        <User className="h-4 w-4 text-primary" />
-                                                                    </div>
-                                                                    <div>
-                                                                        <div className="font-bold text-sm text-gray-800">{result.fullName}</div>
-                                                                        <div className="text-[10px] text-muted-foreground">{formatGroupName(result.groupName, allUsers) || (result.type === 'registration' ? 'تسجيل جديد' : 'بدون فوج')}</div>
-                                                                    </div>
+                                                {(searchTerm.trim() || searchGroupFilter !== 'all') && (
+                                                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-1">
+                                                        {filteredResults.length > 0 ? (
+                                                            <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
+                                                                <div className="text-[10px] font-bold text-gray-500 px-1 pb-0.5">
+                                                                    نتائج البحث ({filteredResults.length} طالب):
                                                                 </div>
-                                                                <ArrowLeft className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all text-primary" />
-                                                            </button>
-                                                        ))}
+                                                                {filteredResults.map((result: any) => (
+                                                                    <button
+                                                                        key={result.id}
+                                                                        onClick={() => {
+                                                                            if (result.type === 'student') {
+                                                                                setSelectedStudent(result);
+                                                                                setSelectedPreRegistration(null);
+                                                                            } else {
+                                                                                setSelectedPreRegistration(result);
+                                                                                setSelectedStudent(null);
+                                                                            }
+                                                                            setSearchTerm('');
+                                                                            resetFields();
+                                                                        }}
+                                                                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-primary/5 transition-all text-right group border border-gray-100 hover:border-primary/20 bg-gray-50/50 hover:bg-white shadow-xs"
+                                                                    >
+                                                                        <div className="flex items-center gap-2.5">
+                                                                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                                                                <User className="h-4 w-4 text-primary" />
+                                                                            </div>
+                                                                            <div>
+                                                                                <div className="font-bold text-sm text-gray-900">{result.fullName}</div>
+                                                                                <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                                                                                    <span>{formatGroupName((result as any).groupName || '', allUsers) || (result.type === 'registration' ? 'تسجيل جديد' : 'بدون فوج')}</span>
+                                                                                    {result.phone1 && <span dir="ltr">({result.phone1})</span>}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <ArrowLeft className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all text-primary shrink-0" />
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            !isDataLoading && searchTerm.trim() && (
+                                                                <div className="p-3 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-center space-y-2">
+                                                                    <p className="text-xs text-gray-600 font-bold">
+                                                                        لم يُعثر على طالب يطابق: <span className="text-gray-900 font-black">"{searchTerm}"</span>
+                                                                    </p>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setIsManualMode(true);
+                                                                            setManualStudentName(searchTerm.trim());
+                                                                            setSearchTerm('');
+                                                                        }}
+                                                                        className="text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold gap-1.5 h-8 mx-auto shadow-none"
+                                                                    >
+                                                                        <Edit className="h-3.5 w-3.5" />
+                                                                        استخدام "{searchTerm}" كإدخال يدوي
+                                                                    </Button>
+                                                                </div>
+                                                            )
+                                                        )}
                                                     </motion.div>
                                                 )}
                                             </AnimatePresence>
@@ -778,36 +882,77 @@ export default function AdminDocsPage() {
                                             </CardHeader>
                                             <CardContent className="p-4">
                                                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                                                    <TabsList className="grid grid-cols-2 sm:grid-cols-5 bg-gray-100 p-1.5 rounded-2xl h-auto gap-1.5">
-                                                        <TabsTrigger value="summon" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-xs">
-                                                            📩 استدعاء
+                                                    {/* شبكة منظمة من عمودين مريحة تمنع تداخل النصوص والبطاقات */}
+                                                    <TabsList className="grid grid-cols-2 gap-2 bg-gray-100/90 p-2 rounded-2xl h-auto w-full">
+                                                        <TabsTrigger
+                                                            value="entry"
+                                                            className="h-10 px-3 rounded-xl font-bold flex items-center justify-start gap-2.5 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white transition-all shadow-none border border-transparent"
+                                                        >
+                                                            <span className="text-sm">🚪</span>
+                                                            <span>إذن دخول</span>
                                                         </TabsTrigger>
-                                                        <TabsTrigger value="entry" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-xs">
-                                                            🚪 إذن دخول
+                                                        <TabsTrigger
+                                                            value="exit"
+                                                            className="h-10 px-3 rounded-xl font-bold flex items-center justify-start gap-2.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-white transition-all shadow-none border border-transparent"
+                                                        >
+                                                            <span className="text-sm">🏃</span>
+                                                            <span>خروج استثنائي</span>
                                                         </TabsTrigger>
-                                                        <TabsTrigger value="exit" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-xs">
-                                                            🏃 خروج
+                                                        <TabsTrigger
+                                                            value="absence"
+                                                            className="h-10 px-3 rounded-xl font-bold flex items-center justify-start gap-2.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-white transition-all shadow-none border border-transparent"
+                                                        >
+                                                            <span className="text-sm">📅</span>
+                                                            <span>إشعار غياب</span>
                                                         </TabsTrigger>
-                                                        <TabsTrigger value="absence" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-xs">
-                                                            📅 غياب
+                                                        <TabsTrigger
+                                                            value="summon"
+                                                            className="h-10 px-3 rounded-xl font-bold flex items-center justify-start gap-2.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-white transition-all shadow-none border border-transparent"
+                                                        >
+                                                            <span className="text-sm">📩</span>
+                                                            <span>استدعاء ولي</span>
                                                         </TabsTrigger>
-                                                        <TabsTrigger value="payment" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-xs">
-                                                            💰 سداد
+                                                        <TabsTrigger
+                                                            value="warning"
+                                                            className="h-10 px-3 rounded-xl font-bold flex items-center justify-start gap-2.5 text-xs data-[state=active]:bg-rose-600 data-[state=active]:text-white transition-all shadow-none border border-transparent"
+                                                        >
+                                                            <span className="text-sm">⚠️</span>
+                                                            <span>إنذار رسمي</span>
                                                         </TabsTrigger>
-                                                        <TabsTrigger value="join" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-xs">
-                                                            📝 إنضمام
+                                                        <TabsTrigger
+                                                            value="compensation"
+                                                            className="h-10 px-3 rounded-xl font-bold flex items-center justify-start gap-2.5 text-xs data-[state=active]:bg-teal-600 data-[state=active]:text-white transition-all shadow-none border border-transparent"
+                                                        >
+                                                            <span className="text-sm">🔄</span>
+                                                            <span>تعويض حصة</span>
                                                         </TabsTrigger>
-                                                        <TabsTrigger value="warning" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-rose-600 data-[state=active]:text-white transition-all text-[11px] md:text-xs">
-                                                            ⚠️ إنذار رسمي
+                                                        <TabsTrigger
+                                                            value="payment"
+                                                            className="h-10 px-3 rounded-xl font-bold flex items-center justify-start gap-2.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-white transition-all shadow-none border border-transparent"
+                                                        >
+                                                            <span className="text-sm">💰</span>
+                                                            <span>وصل سداد</span>
                                                         </TabsTrigger>
-                                                        <TabsTrigger value="compensation" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-emerald-600 data-[state=active]:text-white transition-all text-[11px] md:text-xs">
-                                                            🔄 تعويض حصة
+                                                        <TabsTrigger
+                                                            value="transfer"
+                                                            className="h-10 px-3 rounded-xl font-bold flex items-center justify-start gap-2.5 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all shadow-none border border-transparent"
+                                                        >
+                                                            <span className="text-sm">🔀</span>
+                                                            <span>انتقال فوج</span>
                                                         </TabsTrigger>
-                                                        <TabsTrigger value="transfer" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all text-[11px] md:text-xs">
-                                                            🔀 انتقال فوج
+                                                        <TabsTrigger
+                                                            value="join"
+                                                            className="h-10 px-3 rounded-xl font-bold flex items-center justify-start gap-2.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-white transition-all shadow-none border border-transparent"
+                                                        >
+                                                            <span className="text-sm">📝</span>
+                                                            <span>تسجيل جديد</span>
                                                         </TabsTrigger>
-                                                        <TabsTrigger value="mushaf_sticker" className="py-2 px-1 rounded-xl font-bold data-[state=active]:bg-amber-600 data-[state=active]:text-white transition-all text-[11px] md:text-xs">
-                                                            📖 ملصق المصحف
+                                                        <TabsTrigger
+                                                            value="mushaf_sticker"
+                                                            className="h-10 px-3 rounded-xl font-bold flex items-center justify-start gap-2.5 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white transition-all shadow-none border border-amber-300/60 bg-amber-50/60 text-amber-900"
+                                                        >
+                                                            <span className="text-sm">📖</span>
+                                                            <span>ملصق المصحف</span>
                                                         </TabsTrigger>
                                                     </TabsList>
 
