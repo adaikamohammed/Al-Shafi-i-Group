@@ -78,27 +78,39 @@ export default function AdminDocsPage() {
     const filteredResults = useMemo(() => {
         if (!searchTerm.trim()) return [];
 
+        // تطبيع عربي شامل: يزيل التشكيل ويوحّد متغيرات الحروف
         const normalize = (text: string) => {
-            return text.toLowerCase()
-                .replace(/[آأإ]/g, 'ا')
+            return text
+                .replace(/[\u064B-\u065F\u0670]/g, '') // إزالة التشكيل والمدّة
+                .replace(/[آأإٱ]/g, 'ا')
+                .replace(/[ؤئ]/g, 'ي')
                 .replace(/ة/g, 'ه')
                 .replace(/ى/g, 'ي')
+                .replace(/ٰ/g, '')
+                .toLowerCase()
                 .trim();
         };
 
         const term = normalize(searchTerm);
+        // البحث بكل كلمة على حدة (يجد "رياض" حتى لو كتب اسم أول فقط)
+        const termWords = term.split(/\s+/).filter(Boolean);
+
+        const matchesName = (name: string) => {
+            const n = normalize(name);
+            return termWords.every(w => n.includes(w));
+        };
 
         if (activeTab === 'join') {
             return preRegistrations.filter(r =>
-                (r.normalizedFullName || normalize(r.fullName)).includes(term) ||
-                (r.phone1 && r.phone1.includes(term))
-            ).slice(0, 10).map(r => ({ ...r, type: 'registration' as const }));
+                matchesName(r.normalizedFullName || r.fullName) ||
+                (r.phone1 && r.phone1.includes(searchTerm.trim()))
+            ).slice(0, 15).map(r => ({ ...r, type: 'registration' as const }));
         }
 
         return students.filter(s =>
-            (s.normalizedFullName || normalize(s.fullName)).includes(term) ||
-            (s.phone1 && s.phone1.includes(term))
-        ).slice(0, 10).map(s => ({ ...s, type: 'student' as const }));
+            matchesName(s.normalizedFullName || s.fullName) ||
+            (s.phone1 && s.phone1.includes(searchTerm.trim()))
+        ).slice(0, 15).map(s => ({ ...s, type: 'student' as const }));
     }, [students, preRegistrations, searchTerm, activeTab]);
 
     const selectedSheikhName = useMemo(() => {
@@ -426,9 +438,9 @@ export default function AdminDocsPage() {
                 </div>
 
                 <Tabs value={activeTab === 'history' ? 'history' : 'docs'} onValueChange={(v) => v === 'history' ? setActiveTab('history') : setActiveTab('summon')} className="w-auto">
-                    <TabsList className="bg-black/20 backdrop-blur-md rounded-xl p-1">
-                        <TabsTrigger value="docs" className="rounded-lg font-bold data-[state=active]:bg-primary transition-all px-6">الوثائق</TabsTrigger>
-                        <TabsTrigger value="history" className="rounded-lg font-bold data-[state=active]:bg-primary transition-all px-6 gap-2">
+                    <TabsList className="bg-gray-100 border border-gray-200 rounded-xl p-1">
+                        <TabsTrigger value="docs" className="rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all px-6">الوثائق</TabsTrigger>
+                        <TabsTrigger value="history" className="rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all px-6 gap-2">
                             <History className="h-4 w-4" />
                             السجلات
                         </TabsTrigger>
@@ -446,20 +458,20 @@ export default function AdminDocsPage() {
                         className="grid grid-cols-1 lg:grid-cols-12 gap-8"
                     >
                         {/* Search & Inputs Sidebar */}
-                        <div className="lg:col-span-12 xl:col-span-5 space-y-6">
-                            <Card className="border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl ring-1 ring-white/10 overflow-hidden">
-                                <CardHeader className="border-b border-white/5">
-                                    <CardTitle className="text-lg flex items-center gap-2 font-headline">
-                                        <Search className="h-5 w-5 text-blue-400" />
+                        <div className="lg:col-span-12 xl:col-span-5 space-y-4">
+                            <Card className="bg-white border shadow-sm overflow-hidden">
+                                <CardHeader className="border-b bg-gray-50/80 py-3 px-4">
+                                    <CardTitle className="text-base flex items-center gap-2 font-headline">
+                                        <Search className="h-4 w-4 text-primary" />
                                         1. {activeTab === 'join' ? 'اختيار تسجيل جديد' : 'اختيار الطالب'}
                                     </CardTitle>
                                 </CardHeader>
-                                <CardContent className="p-6 space-y-4">
+                                <CardContent className="p-4 space-y-3">
                                     <div className="relative group">
-                                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-blue-400 transition-colors" />
+                                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                                         <Input
-                                            placeholder="ابحث باسم الطالب..."
-                                            className="pr-10 h-11 bg-black/20 border-white/10 rounded-xl"
+                                            placeholder="ابحث باسم الطالب أو رقمه..."
+                                            className="pr-10 h-11 bg-white border-gray-200 rounded-xl"
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                         />
@@ -467,7 +479,7 @@ export default function AdminDocsPage() {
 
                                     <AnimatePresence>
                                         {searchTerm && filteredResults.length > 0 && (
-                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-1">
+                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-1 max-h-52 overflow-y-auto">
                                                 {filteredResults.map((result: any) => (
                                                     <button
                                                         key={result.id}
@@ -482,18 +494,18 @@ export default function AdminDocsPage() {
                                                             setSearchTerm('');
                                                             resetFields();
                                                         }}
-                                                        className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white/10 transition-all text-right group border border-transparent hover:border-white/5"
+                                                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-primary/5 transition-all text-right group border border-transparent hover:border-primary/10"
                                                     >
                                                         <div className="flex items-center gap-3">
-                                                            <div className="h-9 w-9 rounded-full bg-blue-500/10 flex items-center justify-center">
-                                                                <User className="h-4 w-4 text-blue-400" />
+                                                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                                <User className="h-4 w-4 text-primary" />
                                                             </div>
                                                             <div>
-                                                                <div className="font-bold text-sm">{result.fullName}</div>
+                                                                <div className="font-bold text-sm text-gray-800">{result.fullName}</div>
                                                                 <div className="text-[10px] text-muted-foreground">{formatGroupName(result.groupName, allUsers) || (result.type === 'registration' ? 'تسجيل جديد' : 'بدون فوج')}</div>
                                                             </div>
                                                         </div>
-                                                        <ArrowLeft className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all" />
+                                                        <ArrowLeft className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all text-primary" />
                                                     </button>
                                                 ))}
                                             </motion.div>
@@ -501,10 +513,10 @@ export default function AdminDocsPage() {
                                     </AnimatePresence>
 
                                     {(selectedStudent || selectedPreRegistration) && (
-                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-4 border-t border-white/5 flex items-center justify-between">
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-3 border-t border-gray-100 flex items-center justify-between">
                                             <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary/20">
-                                                    <User className="h-5 w-5 text-primary" />
+                                                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/20">
+                                                    <User className="h-4 w-4 text-primary" />
                                                 </div>
                                                 <div>
                                                     <div className="font-black text-sm text-primary">{selectedStudent?.fullName || selectedPreRegistration?.fullName}</div>
@@ -558,112 +570,108 @@ export default function AdminDocsPage() {
                             <AnimatePresence>
                                 {(selectedStudent || selectedPreRegistration) && (
                                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                                        <Card className="border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl ring-1 ring-white/10">
-                                            <CardHeader className="border-b border-white/5">
-                                                <CardTitle className="text-lg flex items-center gap-2 font-headline">
-                                                    <Edit className="h-5 w-5 text-amber-400" />
+                                        <Card className="bg-white border shadow-sm">
+                                            <CardHeader className="border-b bg-gray-50/80 py-3 px-4">
+                                                <CardTitle className="text-base flex items-center gap-2 font-headline">
+                                                    <Edit className="h-4 w-4 text-amber-500" />
                                                     2. تفاصيل الوصل
                                                 </CardTitle>
                                             </CardHeader>
-                                            <CardContent className="p-6">
-                                                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                                                    <TabsList className="grid grid-cols-3 bg-black/40 p-1 rounded-xl h-auto gap-1">
-                                                        <TabsTrigger value="summon" className="py-2.5 rounded-lg font-bold data-[state=active]:bg-primary transition-all text-[11px] md:text-sm">استدعاء</TabsTrigger>
-                                                        <TabsTrigger value="exit" className="py-2.5 rounded-lg font-bold data-[state=active]:bg-primary transition-all text-[11px] md:text-sm">خروج</TabsTrigger>
-                                                        <TabsTrigger value="absence" className="py-2.5 rounded-lg font-bold data-[state=active]:bg-primary transition-all text-[11px] md:text-sm">غياب</TabsTrigger>
-                                                        <TabsTrigger value="payment" className="py-2.5 rounded-lg font-bold data-[state=active]:bg-primary transition-all text-[11px] md:text-sm">سداد</TabsTrigger>
-                                                        <TabsTrigger value="entry" className="py-2.5 rounded-lg font-bold data-[state=active]:bg-primary transition-all text-[11px] md:text-sm">دخول</TabsTrigger>
-                                                        <TabsTrigger value="join" className="py-2.5 rounded-lg font-bold data-[state=active]:bg-primary transition-all text-[11px] md:text-sm">إنضمام</TabsTrigger>
+                                            <CardContent className="p-4">
+                                                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+                                                    <TabsList className="grid grid-cols-3 bg-gray-100 p-1 rounded-xl h-auto gap-1">
+                                                        <TabsTrigger value="summon" className="py-2 rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-sm">استدعاء</TabsTrigger>
+                                                        <TabsTrigger value="exit" className="py-2 rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-sm">خروج</TabsTrigger>
+                                                        <TabsTrigger value="absence" className="py-2 rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-sm">غياب</TabsTrigger>
+                                                        <TabsTrigger value="payment" className="py-2 rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-sm">سداد</TabsTrigger>
+                                                        <TabsTrigger value="entry" className="py-2 rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-sm">دخول</TabsTrigger>
+                                                        <TabsTrigger value="join" className="py-2 rounded-lg font-bold data-[state=active]:bg-primary data-[state=active]:text-white transition-all text-[11px] md:text-sm">إنضمام</TabsTrigger>
                                                     </TabsList>
 
-                                                    <TabsContent value="summon" className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground">موعد الحضور (يوم وساعة)</Label>
-                                                            <Input placeholder="مثال: غداً الثلاثاء الساعة 10:00" className="bg-white/5 border-white/10" value={summonDate} onChange={(e) => setSummonDate(e.target.value)} />
+                                                    <TabsContent value="summon" className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">موعد الحضور (يوم وساعة)</Label>
+                                                            <Input placeholder="مثال: غداً الثلاثاء الساعة 10:00" className="bg-white border-gray-200" value={summonDate} onChange={(e) => setSummonDate(e.target.value)} />
                                                         </div>
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground">سبب الاستدعاء</Label>
-                                                            <Input placeholder="مثال: مناقشة سلوك الطالب" className="bg-white/5 border-white/10" value={summonReason} onChange={(e) => setSummonReason(e.target.value)} />
-                                                        </div>
-                                                    </TabsContent>
-
-                                                    <TabsContent value="exit" className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground">وقت الخروج</Label>
-                                                            <Input placeholder="مثال: الساعة 11:30 صباحاً" className="bg-white/5 border-white/10" value={exitTime} onChange={(e) => setExitTime(e.target.value)} />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground">سبب الخروج</Label>
-                                                            <Input placeholder="مثال: موعد طبي طارئ" className="bg-white/5 border-white/10" value={exitReason} onChange={(e) => setExitReason(e.target.value)} />
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">سبب الاستدعاء</Label>
+                                                            <Input placeholder="مثال: مناقشة سلوك الطالب" className="bg-white border-gray-200" value={summonReason} onChange={(e) => setSummonReason(e.target.value)} />
                                                         </div>
                                                     </TabsContent>
 
-                                                    <TabsContent value="absence" className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground">أيام الغياب</Label>
-                                                            <Input placeholder="مثال: الأسبوع القادم كاملاً" className="bg-white/5 border-white/10" value={absenceDates} onChange={(e) => setAbsenceDates(e.target.value)} />
+                                                    <TabsContent value="exit" className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">وقت الخروج</Label>
+                                                            <Input placeholder="مثال: الساعة 11:30 صباحاً" className="bg-white border-gray-200" value={exitTime} onChange={(e) => setExitTime(e.target.value)} />
                                                         </div>
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground">سبب الغياب</Label>
-                                                            <Input placeholder="مثال: سفر عائلي" className="bg-white/5 border-white/10" value={absenceReason} onChange={(e) => setAbsenceReason(e.target.value)} />
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">سبب الخروج</Label>
+                                                            <Input placeholder="مثال: موعد طبي طارئ" className="bg-white border-gray-200" value={exitReason} onChange={(e) => setExitReason(e.target.value)} />
                                                         </div>
                                                     </TabsContent>
 
-                                                    <TabsContent value="payment" className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground">بيان السداد (عنوان الوصل)</Label>
-                                                            <Input placeholder="مثال: مستحقات الفصل الأول" className="bg-white/5 border-white/10 font-bold" value={paymentTitle} onChange={(e) => setPaymentTitle(e.target.value)} />
+                                                    <TabsContent value="absence" className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">أيام الغياب</Label>
+                                                            <Input placeholder="مثال: الأسبوع القادم كاملاً" className="bg-white border-gray-200" value={absenceDates} onChange={(e) => setAbsenceDates(e.target.value)} />
                                                         </div>
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground">المبلغ المدفوع (د.ج)</Label>
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">سبب الغياب</Label>
+                                                            <Input placeholder="مثال: سفر عائلي" className="bg-white border-gray-200" value={absenceReason} onChange={(e) => setAbsenceReason(e.target.value)} />
+                                                        </div>
+                                                    </TabsContent>
+
+                                                    <TabsContent value="payment" className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">بيان السداد (عنوان الوصل)</Label>
+                                                            <Input placeholder="مثال: مستحقات الفصل الأول" className="bg-white border-gray-200 font-bold" value={paymentTitle} onChange={(e) => setPaymentTitle(e.target.value)} />
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">المبلغ المدفوع (د.ج)</Label>
                                                             <div className="relative">
-                                                                <Input type="number" placeholder="0" className="bg-white/5 border-white/10 text-lg font-black text-emerald-400 pr-12" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} />
+                                                                <Input type="number" placeholder="0" className="bg-white border-gray-200 text-lg font-black text-emerald-600 pr-12" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} />
                                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">د.ج</span>
                                                             </div>
                                                         </div>
                                                     </TabsContent>
 
-                                                    <TabsContent value="entry" className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground">أيام الغياب السابقة</Label>
-                                                            <Input placeholder="مثال: الأسبوع الماضي" className="bg-white/5 border-white/10" value={entryAbsenceDays} onChange={(e) => setEntryAbsenceDays(e.target.value)} />
+                                                    <TabsContent value="entry" className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">أيام الغياب السابقة</Label>
+                                                            <Input placeholder="مثال: يومين" className="bg-white border-gray-200" value={entryAbsenceDays} onChange={(e) => setEntryAbsenceDays(e.target.value)} />
                                                         </div>
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground">السبب</Label>
-                                                            <Input placeholder="مثال: وعكة صحية" className="bg-white/5 border-white/10" value={entryAbsenceReason} onChange={(e) => setEntryAbsenceReason(e.target.value)} />
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">السبب</Label>
+                                                            <Input placeholder="مثال: وعكة صحية" className="bg-white border-gray-200" value={entryAbsenceReason} onChange={(e) => setEntryAbsenceReason(e.target.value)} />
                                                         </div>
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground">العقوبة (إن وجدت)</Label>
-                                                            <Input placeholder="مثال: استظهار الحزب المنسي" className="bg-white/5 border-white/10" value={entryPunishment} onChange={(e) => setEntryPunishment(e.target.value)} />
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">العقوبة (إن وجدت)</Label>
+                                                            <Input placeholder="مثال: حزب وتعويض" className="bg-white border-gray-200" value={entryPunishment} onChange={(e) => setEntryPunishment(e.target.value)} />
                                                         </div>
-
-                                                        {/* Preview 30 day summary */}
-                                                        <div className="pt-2">
-                                                            <div className="bg-primary/10 rounded-xl p-3 border border-primary/20 flex justify-around text-center">
-                                                                <div>
-                                                                    <div className="text-sm font-black">{stats30Days.total}</div>
-                                                                    <div className="text-[10px] text-muted-foreground font-bold">حضور</div>
-                                                                </div>
-                                                                <div>
-                                                                    <div className="text-sm font-black text-amber-400">{stats30Days.lates}</div>
-                                                                    <div className="text-[10px] text-muted-foreground font-bold">تأخر</div>
-                                                                </div>
-                                                                <div>
-                                                                    <div className="text-sm font-black text-rose-400">{stats30Days.absences}</div>
-                                                                    <div className="text-[10px] text-muted-foreground font-bold">غياب</div>
-                                                                </div>
+                                                        <div className="bg-primary/5 rounded-xl p-3 border border-primary/10 flex justify-around text-center">
+                                                            <div>
+                                                                <div className="text-sm font-black text-gray-800">{stats30Days.total}</div>
+                                                                <div className="text-[10px] text-muted-foreground font-bold">حضور</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-sm font-black text-amber-500">{stats30Days.lates}</div>
+                                                                <div className="text-[10px] text-muted-foreground font-bold">تأخر</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-sm font-black text-rose-500">{stats30Days.absences}</div>
+                                                                <div className="text-[10px] text-muted-foreground font-bold">غياب</div>
                                                             </div>
                                                         </div>
                                                     </TabsContent>
 
-                                                    <TabsContent value="join" className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground">أيام الدراسة</Label>
-                                                            <Input placeholder="مثال: الجمعة والسبت" className="bg-white/5 border-white/10" value={joinStudyDays} onChange={(e) => setJoinStudyDays(e.target.value)} />
+                                                    <TabsContent value="join" className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">أيام الدراسة</Label>
+                                                            <Input placeholder="مثال: الجمعة والسبت" className="bg-white border-gray-200" value={joinStudyDays} onChange={(e) => setJoinStudyDays(e.target.value)} />
                                                         </div>
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground">التوقيت</Label>
-                                                            <Input placeholder="مثال: 08:00 - 12:00" className="bg-white/5 border-white/10" value={joinTiming} onChange={(e) => setJoinTiming(e.target.value)} />
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs font-bold text-gray-600">التوقيت</Label>
+                                                            <Input placeholder="مثال: 08:00 - 12:00" className="bg-white border-gray-200" value={joinTiming} onChange={(e) => setJoinTiming(e.target.value)} />
                                                         </div>
                                                     </TabsContent>
                                                 </Tabs>
@@ -737,19 +745,19 @@ export default function AdminDocsPage() {
                         className="space-y-6"
                     >
                         {/* Filters Bar */}
-                        <Card className="border-white/10 bg-white/5 backdrop-blur-md">
-                            <CardContent className="p-4 flex flex-wrap items-center gap-4">
+                        <Card className="bg-white border shadow-sm">
+                            <CardContent className="p-3 flex flex-wrap items-center gap-3">
                                 <div className="flex items-center gap-2">
                                     <Filter className="h-4 w-4 text-primary" />
-                                    <span className="text-sm font-bold">تصفية السجلات:</span>
+                                    <span className="text-sm font-bold">تصفية:</span>
                                 </div>
 
-                                <div className="flex items-center gap-3">
+                                <div className="flex flex-wrap items-center gap-2">
                                     <select
                                         aria-label="نوع الوثيقة"
                                         value={filterType}
                                         onChange={(e) => setFilterType(e.target.value)}
-                                        className="bg-black/20 border-white/10 rounded-lg text-xs font-bold p-2 outline-none focus:ring-1 ring-primary"
+                                        className="bg-white border border-gray-200 rounded-lg text-xs font-bold p-2 outline-none focus:ring-1 ring-primary"
                                     >
                                         <option value="all">كل الأنواع</option>
                                         <option value="summon">استدعاء</option>
@@ -763,18 +771,18 @@ export default function AdminDocsPage() {
                                         type="date"
                                         value={filterDate}
                                         onChange={(e) => setFilterDate(e.target.value)}
-                                        className="h-9 bg-black/20 border-white/10 text-xs w-40"
+                                        className="h-9 bg-white border-gray-200 text-xs w-40"
                                     />
 
                                     <select
                                         aria-label="الفوج / الشيخ"
                                         value={filterSheikh}
                                         onChange={(e) => setFilterSheikh(e.target.value)}
-                                        className="bg-black/20 border-white/10 rounded-lg text-xs font-bold p-2 outline-none focus:ring-1 ring-primary"
+                                        className="bg-white border border-gray-200 rounded-lg text-xs font-bold p-2 outline-none focus:ring-1 ring-primary"
                                     >
                                         <option value="sheikhs">أفواج المشايخ</option>
                                         <option value="ustadhat">أفواج الأستاذات</option>
-                                        <option value="all">كل أفواج المدرسة</option>
+                                        <option value="all">كل الأفواج</option>
                                         {sheikhGroups.map(g => (
                                             <option key={g} value={g}>{g}</option>
                                         ))}
@@ -784,7 +792,7 @@ export default function AdminDocsPage() {
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => { setFilterType('all'); setFilterDate(''); setFilterSheikh('sheikhs'); }}
-                                        className="text-[10px] h-8"
+                                        className="text-[10px] h-8 text-rose-500 hover:text-rose-600"
                                     >
                                         إعادة تعيين
                                     </Button>
@@ -844,9 +852,9 @@ export default function AdminDocsPage() {
                                         </div>
                                     </motion.div>
                                 )) : (
-                                    <div className="col-span-full h-40 flex flex-col items-center justify-center text-muted-foreground bg-white/5 rounded-2xl border border-dashed border-white/10 w-full">
+                                    <div className="col-span-full h-40 flex flex-col items-center justify-center text-muted-foreground bg-gray-50 rounded-2xl border border-dashed border-gray-200 w-full">
                                         <ClipboardList className="h-10 w-10 opacity-20 mb-2" />
-                                        <p className="text-sm font-bold opacity-30">لا توجد سجلات مطابقة للبحث</p>
+                                        <p className="text-sm font-bold opacity-50">لا توجد سجلات مطابقة للبحث</p>
                                     </div>
                                 )}
                             </div>
@@ -856,7 +864,7 @@ export default function AdminDocsPage() {
                                     <Button
                                         onClick={() => setVisibleLogsCount(prev => prev + 20)}
                                         variant="outline"
-                                        className="font-bold px-8 border-primary/30 hover:bg-primary/10 rounded-xl gap-2 text-white"
+                                        className="font-bold px-8 border-primary/30 hover:bg-primary/10 rounded-xl gap-2"
                                     >
                                         تحميل المزيد ({filteredLogs.length - visibleLogsCount})
                                     </Button>
