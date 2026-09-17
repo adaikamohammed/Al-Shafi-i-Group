@@ -43,3 +43,8 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+
+# scratch and local temporary tools
+scratch/
+export-camp.ts
+process-camp-data.js

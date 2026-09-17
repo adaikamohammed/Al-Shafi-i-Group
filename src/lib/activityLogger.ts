@@ -1,6 +1,7 @@
 import { ref, push, serverTimestamp, get, update } from 'firebase/database';
 import { db } from './firebase';
 import { toast } from '@/hooks/use-toast';
+import { isEffectiveOnline, executeWithTimeout } from './offlineSyncEngine';
 
 export type ActivityAction =
     | 'ADD_STUDENT'
@@ -66,7 +67,9 @@ export const logActivity = async (
 
         console.log(`[ActivityLogger] Atomic log aggregation to global and user path:`, updates);
 
-        await update(ref(db), updates);
+        if (isEffectiveOnline()) {
+            await executeWithTimeout(update(ref(db), updates), 2000);
+        }
     } catch (error: any) {
         console.error('Error logging activity:', error);
         if (error.code === 'PERMISSION_DENIED' || error.message?.includes('permission_denied')) {

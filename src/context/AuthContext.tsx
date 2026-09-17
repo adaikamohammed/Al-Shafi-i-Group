@@ -15,6 +15,7 @@ import { ref, set, get, update } from 'firebase/database';
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
+import { saveEncrypted, loadEncrypted, deleteEncrypted } from '@/lib/cryptoStore';
 
 const sheikhInitialData: { [email: string]: { name: string; group: string; role: 'sheikh' | 'super_admin' | 'management' } } = {
   "admin0@gmail.com": { name: "المدير العام", group: "كل الأفواج", role: "super_admin" },
@@ -99,118 +100,129 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setLoading(true);
       if (currentUser) {
-        const userRef = ref(db, `users/${currentUser.uid}/profile`);
-        let snapshot = await get(userRef);
+        let appUser: AppUser | null = null;
+        const cachedProfile = await loadEncrypted<AppUser | null>('currentUserProfile', null);
 
-        // Auto-migrate/Initialize user profile and dummy students if they don't exist yet
-        if (!snapshot.exists()) {
+        // إذا كان الجهاز غير متصل بالإنترنت، نعتمد فوراً على الملف المشفر المخزن محلياً
+        if (typeof navigator !== 'undefined' && !navigator.onLine && cachedProfile && cachedProfile.uid === currentUser.uid) {
+          appUser = cachedProfile;
+        } else {
           try {
-            const emailKey = currentUser.email?.toLowerCase().trim() || '';
-            const sheikhInfo = sheikhInitialData[emailKey] || { name: currentUser.displayName || 'مستخدم جديد', group: 'فوج غير محدد', role: 'sheikh' };
-            const displayName = sheikhInfo.name || currentUser.displayName || 'مستخدم جديد';
+            const userRef = ref(db, `users/${currentUser.uid}/profile`);
+            // مهلة زمنية 2.5 ثانية للاتصال بالسيرفر، إن لم يستجب ننتقل للمحلي فوراً دون تعليق
+            const getWithTimeout = Promise.race([
+              get(userRef),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500))
+            ]);
+            let snapshot: any = await getWithTimeout;
 
-            // 1. Write profile
-            const profileData = {
-              email: currentUser.email,
-              displayName: displayName,
-              group: sheikhInfo.group,
-              role: sheikhInfo.role,
-              joinDate: format(new Date(), 'yyyy-MM-dd'),
-              isDemo: false
-            };
-            await set(ref(db, `users/${currentUser.uid}/profile`), profileData);
+            if (!snapshot && cachedProfile && cachedProfile.uid === currentUser.uid) {
+              appUser = cachedProfile;
+            } else if (snapshot && !snapshot.exists()) {
+              // Auto-migrate/Initialize user profile and dummy students if they don't exist yet
+              try {
+                const emailKey = currentUser.email?.toLowerCase().trim() || '';
+                const sheikhInfo = sheikhInitialData[emailKey] || { name: currentUser.displayName || 'مستخدم جديد', group: 'فوج غير محدد', role: 'sheikh' };
+                const displayName = sheikhInfo.name || currentUser.displayName || 'مستخدم جديد';
 
-            // 2. Generate 3 dummy students to avoid an empty dashboard
-            const studentsRef = ref(db, `users/${currentUser.uid}/students`);
-            const initialStudents: any = {};
-            for (let i = 1; i <= 3; i++) {
-              const studentId = `student_${currentUser.uid}_${i}`; // Predictable student ID
-              initialStudents[studentId] = {
-                id: studentId,
-                fullName: `طالب ${i} - ${sheikhInfo.group}`,
-                birthDate: new Date(2010, 0, 1).toISOString(),
-                registrationDate: new Date().toISOString(),
-                status: 'نشط',
-                educationalLevel: 'متوسط',
-                subscriptionTier: 'فئة الأصاغر',
-                ownerId: currentUser.uid,
-                groupName: sheikhInfo.group,
-                memorizedSurahsCount: Math.floor(Math.random() * 10),
-                updatedAt: new Date().toISOString(),
-                photoURL: ''
+                const profileData = {
+                  email: currentUser.email,
+                  displayName: displayName,
+                  group: sheikhInfo.group,
+                  role: sheikhInfo.role,
+                  joinDate: format(new Date(), 'yyyy-MM-dd'),
+                  isDemo: false
+                };
+                await set(ref(db, `users/${currentUser.uid}/profile`), profileData);
+
+                const studentsRef = ref(db, `users/${currentUser.uid}/students`);
+                const initialStudents: any = {};
+                for (let i = 1; i <= 3; i++) {
+                  const studentId = `student_${currentUser.uid}_${i}`;
+                  initialStudents[studentId] = {
+                    id: studentId,
+                    fullName: `طالب ${i} - ${sheikhInfo.group}`,
+                    birthDate: new Date(2010, 0, 1).toISOString(),
+                    registrationDate: new Date().toISOString(),
+                    status: 'نشط',
+                    educationalLevel: 'متوسط',
+                    subscriptionTier: 'فئة الأصاغر',
+                    ownerId: currentUser.uid,
+                    groupName: sheikhInfo.group,
+                    memorizedSurahsCount: Math.floor(Math.random() * 10),
+                    updatedAt: new Date().toISOString(),
+                    photoURL: ''
+                  };
+                }
+                await set(studentsRef, initialStudents);
+                snapshot = await get(userRef);
+              } catch (e) {
+                console.error("Initialization error:", e);
+              }
+            }
+
+            if (!appUser && snapshot && snapshot.exists()) {
+              let profileData = snapshot.val();
+              const email = currentUser.email || '';
+              if (sheikhInitialData[email] && (profileData.group === 'فوج غير محدد' || !profileData.group || profileData.displayName === 'مستخدم جديد')) {
+                const info = sheikhInitialData[email];
+                const updates = {
+                  displayName: info.name,
+                  group: info.group,
+                  role: info.role
+                };
+                await update(ref(db, `users/${currentUser.uid}/profile`), updates);
+                profileData = { ...profileData, ...updates };
+                if (currentUser.displayName !== info.name) {
+                  await updateProfile(currentUser, { displayName: info.name });
+                }
+              }
+
+              appUser = {
+                uid: currentUser.uid,
+                email: currentUser.email,
+                ...profileData
               };
             }
-            await set(studentsRef, initialStudents);
-
-            // Re-fetch profile snapshot
-            snapshot = await get(userRef);
-          } catch (e) {
-            console.error("Initialization error:", e);
+          } catch (fetchErr) {
+            console.warn('Network error during user profile fetch, using cached profile:', fetchErr);
+            if (cachedProfile && cachedProfile.uid === currentUser.uid) {
+              appUser = cachedProfile;
+            }
           }
         }
 
-        let appUser: AppUser;
-        if (snapshot.exists()) {
-          let profileData = snapshot.val();
-
-          // Sync logic for accounts with default values
-          const email = currentUser.email || '';
-          if (sheikhInitialData[email] && (profileData.group === 'فوج غير محدد' || !profileData.group || profileData.displayName === 'مستخدم جديد')) {
-            const info = sheikhInitialData[email];
-            const updates = {
-              displayName: info.name,
-              group: info.group,
-              role: info.role
-            };
-            await update(ref(db, `users/${currentUser.uid}/profile`), updates);
-            profileData = { ...profileData, ...updates };
-            if (currentUser.displayName !== info.name) {
-              await updateProfile(currentUser, { displayName: info.name });
-            }
-          }
-
-          appUser = {
-            uid: currentUser.uid,
-            email: currentUser.email,
-            ...profileData
-          };
-        } else {
+        // إذا تعذر جلب الحساب وما زال فارغاً، نستخدم البيانات الافتراضية
+        if (!appUser) {
           const sheikhInfo = sheikhInitialData[currentUser.email || ''] || { name: currentUser.displayName || 'مستخدم جديد', group: 'فوج غير محدد', role: 'sheikh' };
-
-          const displayName = sheikhInfo.name || currentUser.displayName || 'مستخدم جديد';
-
           appUser = {
             uid: currentUser.uid,
             email: currentUser.email,
-            displayName: displayName,
+            displayName: sheikhInfo.name || currentUser.displayName || 'مستخدم جديد',
             group: sheikhInfo.group,
             role: sheikhInfo.role,
             joinDate: format(new Date(), 'yyyy-MM-dd'),
           };
-          const newProfileRef = ref(db, `users/${currentUser.uid}/profile`);
-          await set(newProfileRef, {
-            email: appUser.email,
-            displayName: appUser.displayName,
-            group: appUser.group,
-            role: appUser.role,
-            joinDate: appUser.joinDate,
-          });
-          if (currentUser.displayName !== appUser.displayName) {
-            await updateProfile(currentUser, { displayName: appUser.displayName });
-          }
         }
+
         setUser(appUser);
+        // حفظ الملف الشخصي مشفراً محلياً للزيارات اللاحقة أوفلاين
+        await saveEncrypted('currentUserProfile', appUser);
+
         if (typeof window !== 'undefined') {
           localStorage.setItem('has_active_session', 'true');
           localStorage.setItem('cached_user_email', appUser.email || '');
           localStorage.setItem('cached_user_role', appUser.role || 'sheikh');
+          localStorage.setItem('cached_user_group', appUser.group || '');
         }
       } else {
         setUser(null);
+        await deleteEncrypted('currentUserProfile');
         if (typeof window !== 'undefined') {
           localStorage.removeItem('has_active_session');
           localStorage.removeItem('cached_user_email');
           localStorage.removeItem('cached_user_role');
+          localStorage.removeItem('cached_user_group');
         }
       }
       setLoading(false);

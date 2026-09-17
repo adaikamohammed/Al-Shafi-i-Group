@@ -13,6 +13,8 @@ import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "fi
 import { useToast } from '@/hooks/use-toast';
 import { sanitizeData } from '@/lib/utils';
 import { logActivity } from '@/lib/activityLogger';
+import { saveEncrypted, loadEncrypted } from '@/lib/cryptoStore';
+import { queueOfflineMutation, isEffectiveOnline, executeWithTimeout } from '@/lib/offlineSyncEngine';
 
 const DEFAULT_POINTS_CONFIG: PointsConfig = {
   attendance: { 'حاضر': 5, 'متأخر': 2, 'تعويض': 3.5, 'غائب': -10 },
@@ -202,6 +204,43 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setWeeklyOutcomes({});
       return;
     }
+
+    // ⚡ Local-First Cache Hydration: استرجاع فوري للبيانات المشفرة محلياً (0ms wait)
+    loadEncrypted<Student[]>('students', []).then(cached => {
+      if (cached && cached.length > 0) {
+        setStudents(cached.map(s => ({
+          ...s,
+          birthDate: s.birthDate ? (s.birthDate instanceof Date ? s.birthDate : parseISO(s.birthDate as any)) : new Date(),
+          registrationDate: s.registrationDate ? (s.registrationDate instanceof Date ? s.registrationDate : parseISO(s.registrationDate as any)) : new Date(),
+          updatedAt: s.updatedAt ? (s.updatedAt instanceof Date ? s.updatedAt : parseISO(s.updatedAt as any)) : new Date(),
+        })));
+        setLoading(false);
+      }
+    });
+    loadEncrypted<Record<string, Record<string, DailySession>>>('dailySessions', {}).then(cached => {
+      if (cached && Object.keys(cached).length > 0) {
+        setDailySessions(cached);
+        setLoading(false);
+      }
+    });
+    loadEncrypted<Record<string, Record<string, DailyReport>>>('dailyReports', {}).then(cached => {
+      if (cached && Object.keys(cached).length > 0) setDailyReports(cached);
+    });
+    loadEncrypted<Record<string, SurahMastery>>('surahProgress', {}).then(cached => {
+      if (cached && Object.keys(cached).length > 0) setSurahProgress(cached);
+    });
+    loadEncrypted<Payment[]>('payments', []).then(cached => {
+      if (cached && cached.length > 0) setPayments(cached);
+    });
+    loadEncrypted<AdminLog[]>('adminLogs', []).then(cached => {
+      if (cached && cached.length > 0) setAdminLogs(cached);
+    });
+    loadEncrypted<AppSettings>('settings', DEFAULT_SETTINGS).then(cached => {
+      if (cached) setSettingsState(cached);
+    });
+    loadEncrypted<AppUser[]>('allUsers', []).then(cached => {
+      if (cached && cached.length > 0) setAllUsers(cached);
+    });
 
     setLoading(true);
     let notificationsRef: any = null;
@@ -419,6 +458,15 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           setSettingsState(finalSettings);
           mergeAndSetLogs();
           setLoading(false);
+
+          // ⚡ حفظ مشفر محلياً للأوفلاين
+          saveEncrypted('students', allStudents);
+          saveEncrypted('dailySessions', allSessions);
+          saveEncrypted('dailyReports', allReports);
+          saveEncrypted('surahProgress', allProgress);
+          saveEncrypted('payments', allPayments);
+          saveEncrypted('adminLogs', allAdminLogs);
+          saveEncrypted('settings', finalSettings);
         }
       }, (error: any) => {
         // Silently handle permission errors (expected during logout/role transitions)
@@ -478,9 +526,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
       onValue(studentsRef, (s: any) => {
         const val = s.val();
-        setStudents(val ? Object.entries(val).map(([id, st]: [string, any]) =>
+        const loadedStudents = val ? Object.entries(val).map(([id, st]: [string, any]) =>
           processStudentData({ ...st, id }, authContextUser.uid, (role === 'sheikh' ? authContextUser.group : st.groupName) as string)
-        ) : []);
+        ) : [];
+        setStudents(loadedStudents);
+        saveEncrypted('students', loadedStudents);
       }, handleError);
 
       onValue(sessionsRef, (s: any) => {
@@ -521,16 +571,29 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           }
         });
         setDailySessions(normalized);
+        saveEncrypted('dailySessions', normalized);
       }, handleError);
-      onValue(reportsRef, (s: any) => setDailyReports(s.val() || {}), handleError);
-      onValue(progressRef, (s: any) => setSurahProgress(s.val() || {}), handleError);
+      onValue(reportsRef, (s: any) => {
+        const rep = s.val() || {};
+        setDailyReports(rep);
+        saveEncrypted('dailyReports', rep);
+      }, handleError);
+      onValue(progressRef, (s: any) => {
+        const prog = s.val() || {};
+        setSurahProgress(prog);
+        saveEncrypted('surahProgress', prog);
+      }, handleError);
       onValue(paymentsRef, (s: any) => {
         const val = s.val();
-        setPayments(val ? Object.entries(val).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : []);
+        const pmts = val ? Object.entries(val).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) })) : [];
+        setPayments(pmts);
+        saveEncrypted('payments', pmts);
       }, handleError);
       onValue(adminLogsRef, (s: any) => {
         const val = s.val();
-        setAdminLogs(val ? Object.entries(val).map(([id, l]) => ({ id, ...(l as Omit<AdminLog, 'id'>) })) : []);
+        const logs = val ? Object.entries(val).map(([id, l]) => ({ id, ...(l as Omit<AdminLog, 'id'>) })) : [];
+        setAdminLogs(logs);
+        saveEncrypted('adminLogs', logs);
       }, handleError);
       onValue(activityLogsRef, (s: any) => {
         const val = s.val();
@@ -561,7 +624,11 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           }
         };
       };
-      onValue(settingsRef, (s: any) => setSettingsState(mergeSettings(s.val())), handleError);
+      onValue(settingsRef, (s: any) => {
+        const stg = mergeSettings(s.val());
+        setSettingsState(stg);
+        saveEncrypted('settings', stg);
+      }, handleError);
       onValue(weeklyOutcomesRef, (s: any) => {
         setWeeklyOutcomes(s.val() || {});
       }, handleError);
@@ -880,15 +947,19 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const studentId = uuidv4();
     let photoURL = studentData.photoURL || '';
 
-    if (studentData.photoFile) {
-      const imageRef = storageRef(storage, `student_photos/${studentId}`);
-      await uploadBytes(imageRef, studentData.photoFile);
-      photoURL = await getDownloadURL(imageRef);
+    if (studentData.photoFile && typeof navigator !== 'undefined' && navigator.onLine) {
+      try {
+        const imageRef = storageRef(storage, `student_photos/${studentId}`);
+        await uploadBytes(imageRef, studentData.photoFile);
+        photoURL = await getDownloadURL(imageRef);
+      } catch (err) {
+        console.warn('Failed to upload photo online:', err);
+      }
     }
 
     const { photoFile, ...restOfStudentData } = studentData;
 
-    const newStudent: Omit<Student, 'id'> & { id: string } = {
+    const newStudent: Student = {
       ...(restOfStudentData as any),
       id: studentId,
       ownerId: ownerId,
@@ -899,31 +970,68 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       covenants: [],
       photoURL: photoURL
     };
-    const studentRef = ref(db, `users/${ownerId}/students/${studentId}`);
-    const studentOp = set(studentRef, sanitizeData({
+
+    // 1. التحديث الفوري فائق السرعة للحالة المحلية (0ms)
+    setStudents(prev => {
+      const next = [...prev, newStudent];
+      saveEncrypted('students', next);
+      return next;
+    });
+
+    const isOnline = isEffectiveOnline();
+    const studentPath = `users/${ownerId}/students/${studentId}`;
+    const sanitizedStudent = sanitizeData({
       ...newStudent,
       birthDate: newStudent.birthDate instanceof Date ? newStudent.birthDate.toISOString() : newStudent.birthDate || null,
       registrationDate: newStudent.registrationDate instanceof Date ? newStudent.registrationDate.toISOString() : newStudent.registrationDate,
       updatedAt: newStudent.updatedAt instanceof Date ? newStudent.updatedAt.toISOString() : newStudent.updatedAt,
-      covenants: newStudent.covenants || null // Use null for empty array
-    }));
+      covenants: newStudent.covenants || null
+    });
 
-    const surahProgressRef = ref(db, `users/${ownerId}/surahProgress/${studentId}`);
-    const progressOp = set(surahProgressRef, {});
+    if (isOnline) {
+      try {
+        const studentRef = ref(db, studentPath);
+        const surahProgressRef = ref(db, `users/${ownerId}/surahProgress/${studentId}`);
+        await executeWithTimeout(Promise.all([set(studentRef, sanitizedStudent), set(surahProgressRef, {})]), 2500);
 
-    await Promise.all([studentOp, progressOp]);
-
-    // Log action
-    logActivity(
-      'ADD_STUDENT',
-      authContextUser.uid,
-      `تم إضافة طالب جديد: ${newStudent.fullName}`,
-      studentId,
-      newStudent.fullName,
-      authContextUser.displayName || 'Unknown',
-      newStudent.groupName,
-      ownerId
-    );
+        logActivity(
+          'ADD_STUDENT',
+          authContextUser.uid,
+          `تم إضافة طالب جديد: ${newStudent.fullName}`,
+          studentId,
+          newStudent.fullName,
+          authContextUser.displayName || 'Unknown',
+          newStudent.groupName,
+          ownerId
+        );
+      } catch (e) {
+        await queueOfflineMutation({
+          type: 'SET',
+          path: studentPath,
+          payload: sanitizedStudent,
+          description: `إضافة طالب جديد: ${newStudent.fullName}`,
+          ownerId,
+          authorUid: authContextUser.uid
+        });
+        toast({
+          title: "⚡ تم الحفظ محلياً بسرعة",
+          description: "تم حفظ الطالب محلياً بسبب بطء الاتصال، وستُرفع البيانات تلقائياً لاحقاً.",
+        });
+      }
+    } else {
+      await queueOfflineMutation({
+        type: 'SET',
+        path: studentPath,
+        payload: sanitizedStudent,
+        description: `إضافة طالب جديد: ${newStudent.fullName}`,
+        ownerId,
+        authorUid: authContextUser.uid
+      });
+      toast({
+        title: "💾 تم الحفظ محلياً بنجاح",
+        description: "تم تشفير بيانات الطالب محلياً (AES-256)، وستُرفع تلقائياً عند الاتصال بالإنترنت.",
+      });
+    }
   };
 
   const importStudents = (newStudents: Omit<Student, 'id' | 'updatedAt' | 'memorizedSurahsCount' | 'ownerId'>[]) => {
@@ -1031,10 +1139,14 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     // Prioritize new photoURL from updatedData (might be a preset avatar)
     let finalPhotoURL = updatedData.photoURL !== undefined ? updatedData.photoURL : originalStudent.photoURL;
 
-    if (updatedData.photoFile) {
-      const imageRef = storageRef(storage, `student_photos/${studentId}`);
-      await uploadBytes(imageRef, updatedData.photoFile);
-      finalPhotoURL = await getDownloadURL(imageRef);
+    if (updatedData.photoFile && typeof navigator !== 'undefined' && navigator.onLine) {
+      try {
+        const imageRef = storageRef(storage, `student_photos/${studentId}`);
+        await uploadBytes(imageRef, updatedData.photoFile);
+        finalPhotoURL = await getDownloadURL(imageRef);
+      } catch (e) {
+        console.warn('Failed to upload photo online:', e);
+      }
     }
 
     const { photoFile, ...restOfUpdatedData } = updatedData;
@@ -1046,32 +1158,68 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return acc;
     }, {} as Record<string, Covenant>);
 
-    // Clean up undefined values before sending to Firebase
-    const sanitizedData = sanitizeData(finalData);
+    // 1. التحديث الفوري للحالة المحلية (0ms)
+    setStudents(prev => {
+      const next = prev.map(s => s.id === studentId ? finalData : s);
+      saveEncrypted('students', next);
+      return next;
+    });
 
-    const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
-    await set(studentRef, {
-      ...sanitizedData,
-      birthDate: sanitizedData.birthDate instanceof Date ? sanitizedData.birthDate.toISOString() : sanitizedData.birthDate || null,
-      registrationDate: sanitizedData.registrationDate instanceof Date ? sanitizedData.registrationDate.toISOString() : sanitizedData.registrationDate,
-      updatedAt: sanitizedData.updatedAt instanceof Date ? sanitizedData.updatedAt.toISOString() : sanitizedData.updatedAt,
+    const isOnline = isEffectiveOnline();
+    const path = `users/${studentOwnerId}/students/${studentId}`;
+    const sanitizedData = sanitizeData({
+      ...finalData,
+      birthDate: finalData.birthDate instanceof Date ? finalData.birthDate.toISOString() : finalData.birthDate || null,
+      registrationDate: finalData.registrationDate instanceof Date ? finalData.registrationDate.toISOString() : finalData.registrationDate,
+      updatedAt: finalData.updatedAt instanceof Date ? finalData.updatedAt.toISOString() : finalData.updatedAt,
       covenants: Object.keys(covenantsObject).length > 0 ? covenantsObject : null
     });
 
-    // Log action
-    logActivity(
-      'UPDATE_STUDENT',
-      authContextUser.uid,
-      `تم تحديث بيانات الطالب: ${finalData.fullName}`,
-      studentId,
-      finalData.fullName,
-      authContextUser.displayName || 'Unknown',
-      finalData.groupName,
-      studentOwnerId
-    );
+    if (isOnline) {
+      try {
+        const studentRef = ref(db, path);
+        await executeWithTimeout(set(studentRef, sanitizedData), 2500);
 
-    // Auto-sync public student report
-    syncPublicStudentReport(studentId);
+        // Log action
+        logActivity(
+          'UPDATE_STUDENT',
+          authContextUser.uid,
+          `تم تحديث بيانات الطالب: ${finalData.fullName}`,
+          studentId,
+          finalData.fullName,
+          authContextUser.displayName || 'Unknown',
+          finalData.groupName,
+          studentOwnerId
+        );
+      } catch (err) {
+        await queueOfflineMutation({
+          type: 'SET',
+          path,
+          payload: sanitizedData,
+          description: `تحديث بيانات الطالب: ${finalData.fullName}`,
+          ownerId: studentOwnerId,
+          authorUid: authContextUser.uid
+        });
+      }
+    } else {
+      await queueOfflineMutation({
+        type: 'SET',
+        path,
+        payload: sanitizedData,
+        description: `تحديث بيانات الطالب: ${finalData.fullName}`,
+        ownerId: studentOwnerId,
+        authorUid: authContextUser.uid
+      });
+      toast({
+        title: "💾 تم التعديل محلياً",
+        description: "تم تحديث بيانات الطالب محلياً وستُرفع تلقائياً عند توفر الإنترنت.",
+      });
+    }
+
+    // Auto-sync public student report in background if online
+    if (isOnline) {
+      syncPublicStudentReport(studentId);
+    }
   };
 
   const deleteStudent = async (studentId: string, ownerId: string) => {
@@ -1079,34 +1227,68 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const studentOwnerId = (isSuperAdmin || isManagement) ? ownerId : authContextUser.uid;
     if (!studentOwnerId) return;
 
-    const studentRef = ref(db, `users/${studentOwnerId}/students/${studentId}`);
     const studentToDelete = students.find(s => s.id === studentId);
-    await remove(studentRef);
 
-    if (studentToDelete) {
-      // Log action
-      logActivity(
-        'DELETE_STUDENT',
-        authContextUser.uid,
-        `تم حذف الطالب: ${studentToDelete.fullName}`,
-        studentId,
-        studentToDelete.fullName,
-        authContextUser.displayName || 'Unknown',
-        studentToDelete.groupName,
-        studentOwnerId
-      );
-    }
+    // 1. التحديث الفوري للحالة المحلية
+    setStudents(prev => {
+      const next = prev.filter(s => s.id !== studentId);
+      saveEncrypted('students', next);
+      return next;
+    });
 
-    // Delete photo from storage
-    try {
-      const imageRef = storageRef(storage, `student_photos/${studentId}`);
-      await deleteObject(imageRef);
-    } catch (error: any) {
-      if (error.code !== 'storage/object-not-found') {
-        console.error("Error deleting student photo:", error);
+    const isOnline = isEffectiveOnline();
+    const path = `users/${studentOwnerId}/students/${studentId}`;
+
+    if (isOnline) {
+      try {
+        const studentRef = ref(db, path);
+        await executeWithTimeout(remove(studentRef), 2500);
+
+        if (studentToDelete) {
+          logActivity(
+            'DELETE_STUDENT',
+            authContextUser.uid,
+            `تم حذف الطالب: ${studentToDelete.fullName}`,
+            studentId,
+            studentToDelete.fullName,
+            authContextUser.displayName || 'Unknown',
+            studentToDelete.groupName,
+            studentOwnerId
+          );
+        }
+
+        // Delete photo from storage
+        try {
+          const imageRef = storageRef(storage, `student_photos/${studentId}`);
+          await deleteObject(imageRef);
+        } catch (error: any) {
+          if (error.code !== 'storage/object-not-found') {
+            console.error("Error deleting student photo:", error);
+          }
+        }
+      } catch (err) {
+        await queueOfflineMutation({
+          type: 'REMOVE',
+          path,
+          description: `حذف الطالب: ${studentToDelete?.fullName || studentId}`,
+          ownerId: studentOwnerId,
+          authorUid: authContextUser.uid
+        });
       }
+    } else {
+      await queueOfflineMutation({
+        type: 'REMOVE',
+        path,
+        description: `حذف الطالب: ${studentToDelete?.fullName || studentId}`,
+        ownerId: studentOwnerId,
+        authorUid: authContextUser.uid
+      });
+      toast({
+        title: "🗑️ تم الحذف محلياً",
+        description: "تم حذف الطالب محلياً وسيتم تطبيق الحذف سحابياً فور توفر الإنترنت.",
+      });
     }
-  }
+  };
 
   const deleteAllStudents = () => {
     if (!authContextUser) return;
@@ -1141,197 +1323,148 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addDailySession = async (session: DailySession, targetOwnerId?: string): Promise<void> => {
-    // Allow if user is authenticated. If superAdmin, they MUST provide targetOwnerId (or use their own if debugging, but mainly for others)
     if (!authContextUser) return;
 
-    // Use targetOwnerId if provided (for Admins), otherwise use current user's UID
     const ownerId = (isSuperAdmin || isManagement) && targetOwnerId ? targetOwnerId : authContextUser.uid;
+    const targetDate = session.date;
+    const sessionId = session.id;
+    const uniqueKey = isPrivileged ? `${ownerId}_${sessionId}` : sessionId;
 
-    try {
-      // Clean up old top-level keys if the date path has the old structure
-      const dayRef = ref(db, `users/${ownerId}/dailySessions/${session.date}`);
-      const daySnap = await get(dayRef);
-      if (daySnap.exists()) {
-        const val = daySnap.val();
-        if (val && typeof val === 'object' && 'date' in val) {
-          // It's the old structure! Delete the entire date node first to clean up the top-level keys
-          await remove(dayRef);
-        }
+    const fullSession: DailySession = {
+      ...session,
+      id: sessionId,
+      ownerId,
+      createdAt: session.createdAt || new Date().toISOString()
+    };
+
+    // 1. التحديث الفوري فائق السرعة للحالة المحلية (0ms)
+    setDailySessions(prev => {
+      const next = { ...prev };
+      if (!next[targetDate]) next[targetDate] = {};
+      next[targetDate] = { ...next[targetDate], [uniqueKey]: fullSession };
+      saveEncrypted('dailySessions', next);
+      return next;
+    });
+
+    const isOnline = isEffectiveOnline();
+    const path = `users/${ownerId}/dailySessions/${targetDate}/${sessionId}`;
+    const sanitizedSession = sanitizeData(fullSession);
+
+    if (isOnline) {
+      try {
+        const sessionRef = ref(db, path);
+        await executeWithTimeout(set(sessionRef, sanitizedSession), 2500);
+
+        // تسجيل النشاط
+        logActivity(
+          'ADD_SESSION',
+          authContextUser.uid,
+          `تم تسجيل حصة جديدة بتاريخ: ${session.date} ${targetOwnerId ? `(نيابة عن شيخ)` : ''}`,
+          session.id,
+          session.sessionType,
+          authContextUser.displayName || 'Unknown',
+          authContextUser.group || 'غير محدد',
+          ownerId
+        );
+      } catch (error) {
+        console.warn('Firebase direct save failed/timed out, queuing mutation:', error);
+        await queueOfflineMutation({
+          type: 'SET',
+          path,
+          payload: sanitizedSession,
+          description: `تسجيل حصة: ${targetDate} (${fullSession.sessionType})`,
+          ownerId,
+          authorUid: authContextUser.uid
+        });
+        toast({
+          title: "⚡ تم الحفظ محلياً بسرعة فائقة",
+          description: "تم حفظ بيانات الحصة محلياً بسبب بطء الاتصال، وستُرفع تلقائياً للسحابة لاحقاً.",
+        });
       }
+    } else {
+      await queueOfflineMutation({
+        type: 'SET',
+        path,
+        payload: sanitizedSession,
+        description: `تسجيل حصة: ${targetDate} (${fullSession.sessionType})`,
+        ownerId,
+        authorUid: authContextUser.uid
+      });
+      toast({
+        title: "💾 تم الحفظ أوفلاين بنجاح",
+        description: "تم تشفير وحفظ بيانات الحصة محلياً (AES-256)، وستُرفع تلقائياً عند الاتصال بالإنترنت.",
+      });
+    }
 
-      // الحفظ في Firebase
-      const sessionRef = ref(db, `users/${ownerId}/dailySessions/${session.date}/${session.id}`);
-      await set(sessionRef, sanitizeData({ ...session, ownerId, createdAt: session.createdAt || new Date().toISOString() })); // Ensure ownerId and createdAt are set in the record
-
-      // تسجيل النشاط
-      await logActivity(
-        'ADD_SESSION',
-        authContextUser.uid,
-        `تم تسجيل حصة جديدة بتاريخ: ${session.date} ${targetOwnerId ? `(نيابة عن شيخ)` : ''}`,
-        session.id,
-        session.sessionType,
-        authContextUser.displayName || 'Unknown',
-        authContextUser.group || 'غير محدد',
-        ownerId // The owner of the data
-      );
-
-      // Auto-sync public reports for all students in this session
+    // Auto-sync public reports for all students in this session if online
+    if (isOnline) {
       const records = session.records || [];
       records.forEach(r => {
         if (r.studentId) {
           syncPublicStudentReport(r.studentId);
         }
       });
-
-      // ─── Auto Push Notification: check for 3 consecutive absences or 3 لم يحفظ in 7 days ───
-      // Run in background without blocking session save
-      setTimeout(async () => {
-        try {
-          const allSessionsSnap = await get(ref(db, `users/${ownerId}/dailySessions`));
-          if (!allSessionsSnap.exists()) return;
-          const allSessions = allSessionsSnap.val();
-
-          // Collect last 14 days of records per student
-          const today = new Date();
-          const checkDays: string[] = [];
-          for (let i = 0; i < 14; i++) {
-            const d = new Date(today);
-            d.setDate(today.getDate() - i);
-            checkDays.push(d.toISOString().split('T')[0]);
-          }
-          const last7Days = checkDays.slice(0, 7);
-
-          records.forEach((r: any) => {
-            if (!r.studentId) return;
-            const studentName = students.find(s => s.id === r.studentId)?.fullName || r.studentId;
-
-            // Build history across 14 days
-            const attendanceHistory: string[] = [];
-            const memHistory: { date: string; value: string }[] = [];
-
-            checkDays.forEach(dateStr => {
-              const daySess = allSessions[dateStr];
-              if (!daySess) return;
-              Object.values(daySess as Record<string, any>).forEach((sess: any) => {
-                if (!sess?.records) return;
-                const sessRecords = Array.isArray(sess.records) ? sess.records : Object.values(sess.records);
-                const rec = (sessRecords as any[]).find((x: any) => x.studentId === r.studentId);
-                if (!rec) return;
-                if (rec.attendance) attendanceHistory.push(rec.attendance);
-                if (rec.memorization && !rec.review) {
-                  memHistory.push({ date: dateStr, value: rec.memorization });
-                }
-              });
-            });
-
-            // Check: 3 consecutive absences
-            let consecutiveAbsences = 0;
-            let maxConsecutive = 0;
-            attendanceHistory.forEach(a => {
-              if (a === 'غائب' || a === 'غياب') {
-                consecutiveAbsences++;
-                maxConsecutive = Math.max(maxConsecutive, consecutiveAbsences);
-              } else {
-                consecutiveAbsences = 0;
-              }
-            });
-
-            // Check: 3 لم يحفظ in last 7 days
-            const notMemLast7 = memHistory.filter(m => last7Days.includes(m.date) && m.value === 'لم يحفظ').length;
-
-            const sendNotification = async (payload: any) => {
-              try {
-                const idToken = await auth.currentUser?.getIdToken();
-                await fetch('/api/notify', {
-                  method: 'POST',
-                  headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken || ''}`
-                  },
-                  body: JSON.stringify(payload)
-                });
-              } catch (err) {
-                console.error("Failed to send client notification:", err);
-              }
-            };
-
-            if (maxConsecutive >= 3) {
-              sendNotification({
-                targetUid: ownerId,
-                title: `⚠️ تنبيه غياب متكرر`,
-                body: `الطالب "${studentName}" غاب لـ ${maxConsecutive} حصص متتالية. يُرجى التواصل مع ولي أمره.`
-              });
-            } else if (notMemLast7 >= 3) {
-              sendNotification({
-                targetUid: ownerId,
-                title: `📖 تنبيه تراجع الحفظ`,
-                body: `الطالب "${studentName}" لم يحفظ درسه ${notMemLast7} مرات في الأسبوع الماضي. يُرجى متابعته.`
-              });
-            }
-          });
-        } catch (e) {
-          // Silent fail – don't block UX for notification errors
-          console.warn('Push notification check failed silently:', e);
-        }
-      }, 2000);
-    } catch (error) {
-      console.error("Error saving session:", error);
-      throw error;
     }
   };
 
-  const deleteDailySession = (sessionId: string, date?: string, targetOwnerId?: string) => {
+  const deleteDailySession = async (sessionId: string, date?: string, targetOwnerId?: string) => {
     if (!authContextUser || !sessionId) return;
 
-    // Determine the path owner
     const ownerId = (isSuperAdmin || isManagement) && targetOwnerId ? targetOwnerId : authContextUser.uid;
-
-    // استخدام التاريخ الممرر أو استخراجه من الـ ID كخيار احتياطي
     const targetDate = date || sessionId.substring(0, 10);
+    const uniqueKey = isPrivileged ? `${ownerId}_${sessionId}` : sessionId;
 
-    const dayRef = ref(db, `users/${ownerId}/dailySessions/${targetDate}`);
-
-    // Attempt to find session in local state for logging
-    const sessionsForDate = dailySessions[targetDate] || {};
-    const sessionToDelete = Object.values(sessionsForDate).find(s => s.id === sessionId);
-
-    get(dayRef).then((snap: any) => {
-      if (snap.exists()) {
-        const val = snap.val();
-        if (val && typeof val === 'object') {
-          if ('date' in val) {
-            // Old structure - delete the whole day node
-            remove(dayRef).then(() => {
-              logActivity(
-                'DELETE_SESSION',
-                authContextUser.uid,
-                `تم حذف حصة بتاريخ: ${targetDate} ${targetOwnerId ? '(نيابة عن شيخ)' : ''}`,
-                sessionId,
-                sessionToDelete?.sessionType || 'غير معروف',
-                authContextUser.displayName || 'Unknown',
-                authContextUser.group || 'غير محدد',
-                ownerId
-              );
-            });
-          } else {
-            // New structure - delete just the session id
-            const sessionRef = ref(db, `users/${ownerId}/dailySessions/${targetDate}/${sessionId}`);
-            remove(sessionRef).then(() => {
-              logActivity(
-                'DELETE_SESSION',
-                authContextUser.uid,
-                `تم حذف حصة بتاريخ: ${targetDate} ${targetOwnerId ? '(نيابة عن شيخ)' : ''}`,
-                sessionId,
-                sessionToDelete?.sessionType || 'غير معروف',
-                authContextUser.displayName || 'Unknown',
-                authContextUser.group || 'غير محدد',
-                ownerId
-              );
-            });
-          }
-        }
+    // 1. التحديث الفوري للحالة المحلية
+    setDailySessions(prev => {
+      const next = { ...prev };
+      if (next[targetDate]) {
+        const dayCopy = { ...next[targetDate] };
+        delete dayCopy[uniqueKey];
+        delete dayCopy[sessionId];
+        next[targetDate] = dayCopy;
       }
+      saveEncrypted('dailySessions', next);
+      return next;
     });
+
+    const isOnline = isEffectiveOnline();
+    const path = `users/${ownerId}/dailySessions/${targetDate}/${sessionId}`;
+
+    if (isOnline) {
+      try {
+        await executeWithTimeout(remove(ref(db, path)), 2500);
+        logActivity(
+          'DELETE_SESSION',
+          authContextUser.uid,
+          `تم حذف حصة بتاريخ: ${targetDate} ${targetOwnerId ? '(نيابة عن شيخ)' : ''}`,
+          sessionId,
+          'حصة محذوفة',
+          authContextUser.displayName || 'Unknown',
+          authContextUser.group || 'غير محدد',
+          ownerId
+        );
+      } catch {
+        await queueOfflineMutation({
+          type: 'REMOVE',
+          path,
+          description: `حذف حصة: ${targetDate}`,
+          ownerId,
+          authorUid: authContextUser.uid
+        });
+      }
+    } else {
+      await queueOfflineMutation({
+        type: 'REMOVE',
+        path,
+        description: `حذف حصة: ${targetDate}`,
+        ownerId,
+        authorUid: authContextUser.uid
+      });
+      toast({
+        title: "🗑️ تم الحذف محلياً",
+        description: "تم حذف الحصة محلياً وسيتم تطبيق الحذف سحابياً فور عودة الإنترنت.",
+      });
+    }
   };
 
   const getSessionsForDay = (date: string): DailySession[] => {
@@ -1502,7 +1635,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "✅ تم الحفظ", description: "تم حفظ تقييم الحصيلة الأسبوعية." });
   };
 
-  const toggleSurahStatus = (studentId: string, surahId: number) => {
+  const toggleSurahStatus = async (studentId: string, surahId: number) => {
     if (!authContextUser) return;
 
     const studentOwnerId = students.find(s => s.id === studentId)?.ownerId;
@@ -1523,48 +1656,65 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       newEntry.completedAt = currentEntry.completedAt || new Date().toISOString();
     }
 
-    const progressRef = ref(db, `users/${studentOwnerId}/surahProgress/${studentId}/${surahId}`);
+    const isOnline = isEffectiveOnline();
+    const progressPath = `users/${studentOwnerId}/surahProgress/${studentId}/${surahId}`;
+    const wholeMapPath = `users/${studentOwnerId}/surahProgress/${studentId}`;
 
     if (nextStatus === 0) {
-      remove(progressRef).then(() => {
-        const student = students.find(s => s.id === studentId);
-        logActivity(
-          'UPDATE_SURAH_PROGRESS',
-          authContextUser.uid,
-          `تم حذف حالة السورة (ID: ${surahId})`,
-          studentId,
-          student?.fullName || 'غير معروف',
-          authContextUser.displayName || 'Unknown',
-          student?.groupName || 'غير محدد',
-          studentOwnerId
-        );
-      });
-      delete studentProgressMap[surahId]; // Keep local map in sync
+      delete studentProgressMap[surahId];
     } else {
-      set(progressRef, newEntry).then(() => {
-        const student = students.find(s => s.id === studentId);
-        logActivity(
-          'UPDATE_SURAH_PROGRESS',
-          authContextUser.uid,
-          `تحديث حالة السورة (ID: ${surahId})`,
-          studentId,
-          student?.fullName || 'غير معروف',
-          authContextUser.displayName || 'Unknown',
-          student?.groupName || 'غير محدد',
-          studentOwnerId
-        );
-      });
-      studentProgressMap[surahId] = newEntry; // Keep local map in sync
+      studentProgressMap[surahId] = newEntry;
     }
 
-    // Old point system removed as requested by user. 
-    // Qualitative 6-tier evaluation now handles progress tracking.
-
-    const surahProgressRef = ref(db, `users/${studentOwnerId}/surahProgress/${studentId}`);
-    set(surahProgressRef, studentProgressMap);
+    // 1. التحديث الفوري للحالة المحلية
+    setSurahProgress(prev => {
+      const next = { ...prev, [studentId]: studentProgressMap };
+      saveEncrypted('surahProgress', next);
+      return next;
+    });
 
     const memorizedCount = Object.values(studentProgressMap).filter(entry => entry.status > 0).length;
     updateStudent(studentId, { memorizedSurahsCount: memorizedCount }, studentOwnerId);
+
+    if (isOnline) {
+      try {
+        if (nextStatus === 0) {
+          await executeWithTimeout(remove(ref(db, progressPath)), 2500);
+        } else {
+          await executeWithTimeout(set(ref(db, progressPath), newEntry), 2500);
+        }
+        await executeWithTimeout(set(ref(db, wholeMapPath), studentProgressMap), 2500);
+
+        logActivity(
+          'UPDATE_SURAH_PROGRESS',
+          authContextUser.uid,
+          nextStatus === 0 ? `تم حذف حالة السورة (ID: ${surahId})` : `تحديث حالة السورة (ID: ${surahId})`,
+          studentId,
+          students.find(s => s.id === studentId)?.fullName || 'غير معروف',
+          authContextUser.displayName || 'Unknown',
+          students.find(s => s.id === studentId)?.groupName || 'غير محدد',
+          studentOwnerId
+        );
+      } catch {
+        await queueOfflineMutation({
+          type: nextStatus === 0 ? 'REMOVE' : 'SET',
+          path: progressPath,
+          payload: nextStatus === 0 ? null : newEntry,
+          description: `تغيير حالة السورة (${surahId})`,
+          ownerId: studentOwnerId,
+          authorUid: authContextUser.uid
+        });
+      }
+    } else {
+      await queueOfflineMutation({
+        type: nextStatus === 0 ? 'REMOVE' : 'SET',
+        path: progressPath,
+        payload: nextStatus === 0 ? null : newEntry,
+        description: `تغيير حالة السورة (${surahId})`,
+        ownerId: studentOwnerId,
+        authorUid: authContextUser.uid
+      });
+    }
   }
 
   const bulkUpdateSurahStatus = async (studentIds: string[], surahIds: number[], targetStatus: 0 | 1 | 2) => {
@@ -1572,6 +1722,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     const updates: { [key: string]: any } = {};
     const timestamp = new Date().toISOString();
+    const newProgressState = { ...surahProgress };
 
     studentIds.forEach(studentId => {
       const student = students.find(s => s.id === studentId);
@@ -1580,7 +1731,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const studentOwnerId = student.ownerId;
       if (!isSuperAdmin && !isManagement && authContextUser.uid !== studentOwnerId) return;
 
-      const studentProgressMap = { ...(surahProgress[studentId] || {}) };
+      const studentProgressMap = { ...(newProgressState[studentId] || {}) };
       let changed = false;
 
       surahIds.forEach(surahId => {
@@ -1607,6 +1758,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (changed) {
+        newProgressState[studentId] = studentProgressMap;
         const newMemorizedCount = Object.values(studentProgressMap).filter(entry => entry.status > 0).length;
         updates[`users/${studentOwnerId}/students/${studentId}/memorizedSurahsCount`] = newMemorizedCount;
         updates[`users/${studentOwnerId}/students/${studentId}/updatedAt`] = timestamp;
@@ -1624,18 +1776,56 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    if (Object.keys(updates).length > 0) {
-      const dbRef = ref(db);
-      await update(dbRef, sanitizeData(updates));
-      toast({
-        title: "✅ تم التحديث الجماعي",
-        description: `تم تحديث ${surahIds.length} سورة لـ ${studentIds.length} طلاب بنجاح.`,
-      });
+    // 1. التحديث الفوري للحالة المحلية
+    setSurahProgress(newProgressState);
+    saveEncrypted('surahProgress', newProgressState);
 
-      // Auto-sync public reports for all updated students
-      studentIds.forEach(id => {
-        syncPublicStudentReport(id);
-      });
+    if (Object.keys(updates).length > 0) {
+      const isOnline = isEffectiveOnline();
+      const sanitizedUpdates = sanitizeData(updates);
+
+      if (isOnline) {
+        try {
+          await executeWithTimeout(update(ref(db), sanitizedUpdates), 2500);
+          toast({
+            title: "✅ تم التحديث الجماعي",
+            description: `تم تحديث ${surahIds.length} سورة لـ ${studentIds.length} طلاب بنجاح.`,
+          });
+        } catch {
+          await queueOfflineMutation({
+            type: 'UPDATE',
+            path: '',
+            payload: sanitizedUpdates,
+            description: `تحديث جماعي للسور (${studentIds.length} طلاب)`,
+            ownerId: authContextUser.uid,
+            authorUid: authContextUser.uid
+          });
+          toast({
+            title: "💾 تم التحديث محلياً",
+            description: "تم حفظ التحديث محلياً بسبب بطء الاتصال، وسيتم رفعه تلقائياً.",
+          });
+        }
+      } else {
+        await queueOfflineMutation({
+          type: 'UPDATE',
+          path: '',
+          payload: sanitizedUpdates,
+          description: `تحديث جماعي للسور (${studentIds.length} طلاب)`,
+          ownerId: authContextUser.uid,
+          authorUid: authContextUser.uid
+        });
+        toast({
+          title: "💾 تم التحديث أوفلاين",
+          description: "تم حفظ التحديثات أوفلاين وسيتم الرفع فور استقرار النت.",
+        });
+      }
+
+      // Auto-sync public reports for all updated students if online
+      if (isOnline) {
+        studentIds.forEach(id => {
+          syncPublicStudentReport(id);
+        });
+      }
     }
   };
 
@@ -1656,8 +1846,44 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       ...paymentData,
       id: paymentId,
     };
-    const paymentRef = ref(db, `users/${studentOwnerId}/payments/${paymentId}`);
-    await set(paymentRef, newPayment);
+
+    // 1. التحديث الفوري للحالة المحلية
+    setPayments(prev => {
+      const next = [...prev, newPayment];
+      saveEncrypted('payments', next);
+      return next;
+    });
+
+    const isOnline = isEffectiveOnline();
+    const path = `users/${studentOwnerId}/payments/${paymentId}`;
+
+    if (isOnline) {
+      try {
+        await executeWithTimeout(set(ref(db, path), sanitizeData(newPayment)), 2500);
+      } catch (err) {
+        await queueOfflineMutation({
+          type: 'SET',
+          path,
+          payload: newPayment,
+          description: `تسجيل دفعة: ${newPayment.amount} دج`,
+          ownerId: studentOwnerId,
+          authorUid: authContextUser.uid
+        });
+      }
+    } else {
+      await queueOfflineMutation({
+        type: 'SET',
+        path,
+        payload: newPayment,
+        description: `تسجيل دفعة: ${newPayment.amount} دج`,
+        ownerId: studentOwnerId,
+        authorUid: authContextUser.uid
+      });
+      toast({
+        title: "💾 تم الحفظ محلياً",
+        description: "تم تسجيل الدفعة محلياً وسيتم رفعها للسحاب عند توفر الإنترنت.",
+      });
+    }
   };
 
   const updatePaymentStatus = async (paymentId: string, status: PaymentStatus, amount: number) => {
@@ -1675,9 +1901,40 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("Not authorized to update this payment");
     }
 
-    const paymentRef = ref(db, `users/${student.ownerId}/payments/${paymentId}`);
-    await update(paymentRef, { status, amount });
-  }
+    // 1. التحديث الفوري للحالة المحلية
+    setPayments(prev => {
+      const next = prev.map(p => p.id === paymentId ? { ...p, status, amount } : p);
+      saveEncrypted('payments', next);
+      return next;
+    });
+
+    const isOnline = isEffectiveOnline();
+    const path = `users/${student.ownerId}/payments/${paymentId}`;
+
+    if (isOnline) {
+      try {
+        await executeWithTimeout(update(ref(db, path), { status, amount }), 2500);
+      } catch (err) {
+        await queueOfflineMutation({
+          type: 'UPDATE',
+          path,
+          payload: { status, amount },
+          description: `تحديث حالة الدفعة: ${status}`,
+          ownerId: student.ownerId,
+          authorUid: authContextUser.uid
+        });
+      }
+    } else {
+      await queueOfflineMutation({
+        type: 'UPDATE',
+        path,
+        payload: { status, amount },
+        description: `تحديث حالة الدفعة: ${status}`,
+        ownerId: student.ownerId,
+        authorUid: authContextUser.uid
+      });
+    }
+  };
 
   const bulkAddOrUpdatePayments = async (operations: Array<{
     studentId: string;
@@ -1718,14 +1975,86 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (Object.keys(updates).length > 0) {
-      await update(ref(db), updates);
+      // 1. التحديث الفوري للحالة المحلية
+      setPayments(prev => {
+        let next = [...prev];
+        for (const op of operations) {
+          if (op.paymentId) {
+            next = next.map(p => p.id === op.paymentId ? { ...p, status: op.status, amount: op.amount } : p);
+          } else {
+            const student = students.find(s => s.id === op.studentId);
+            if (student) {
+              const matchedPayment = Object.values(updates).find((p: any) => p && p.studentId === op.studentId);
+              if (matchedPayment) next.push(matchedPayment);
+            }
+          }
+        }
+        saveEncrypted('payments', next);
+        return next;
+      });
+
+      const isOnline = isEffectiveOnline();
+      const sanitizedUpdates = sanitizeData(updates);
+
+      if (isOnline) {
+        try {
+          await executeWithTimeout(update(ref(db), sanitizedUpdates), 2500);
+        } catch {
+          await queueOfflineMutation({
+            type: 'UPDATE',
+            path: '',
+            payload: sanitizedUpdates,
+            description: `تحديث مدفوعات جماعية (${operations.length} طالب)`,
+            ownerId: authContextUser.uid,
+            authorUid: authContextUser.uid
+          });
+        }
+      } else {
+        await queueOfflineMutation({
+          type: 'UPDATE',
+          path: '',
+          payload: sanitizedUpdates,
+          description: `تحديث مدفوعات جماعية (${operations.length} طالب)`,
+          ownerId: authContextUser.uid,
+          authorUid: authContextUser.uid
+        });
+      }
     }
   };
 
   const saveSettings = async (newSettings: AppSettings) => {
     if (!authContextUser) throw new Error("User not authenticated");
-    const settingsRef = ref(db, `users/${authContextUser.uid}/settings`);
-    await set(settingsRef, newSettings);
+    setSettingsState(newSettings);
+    saveEncrypted('settings', newSettings);
+
+    const isOnline = isEffectiveOnline();
+    const settingsPath = `users/${authContextUser.uid}/settings`;
+    const sanitized = sanitizeData(newSettings);
+
+    if (isOnline) {
+      try {
+        const settingsRef = ref(db, settingsPath);
+        await executeWithTimeout(set(settingsRef, sanitized), 2500);
+      } catch {
+        await queueOfflineMutation({
+          type: 'SET',
+          path: settingsPath,
+          payload: sanitized,
+          description: 'تحديث إعدادات التطبيق',
+          ownerId: authContextUser.uid,
+          authorUid: authContextUser.uid
+        });
+      }
+    } else {
+      await queueOfflineMutation({
+        type: 'SET',
+        path: settingsPath,
+        payload: sanitized,
+        description: 'تحديث إعدادات التطبيق',
+        ownerId: authContextUser.uid,
+        authorUid: authContextUser.uid
+      });
+    }
   };
 
   const updateSheikhGroupSettings = async (
@@ -1740,19 +2069,49 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const sheikhSettingsRef = ref(db, `users/${sheikhId}/settings`);
+      const sheikhSettingsPath = `users/${sheikhId}/settings`;
       const updates: any = {};
       if (mode !== undefined) updates.groupMemorizationMode = mode;
       if (targetSurah !== undefined) updates.groupSurah = targetSurah;
 
-      await update(sheikhSettingsRef, sanitizeData(updates));
-      
       if (authContextUser.uid === sheikhId) {
-        setSettingsState((prev) => ({
-          ...prev,
-          ...(mode !== undefined ? { groupMemorizationMode: mode } : {}),
-          ...(targetSurah !== undefined ? { groupSurah: targetSurah } : {}),
-        }));
+        setSettingsState((prev) => {
+          const next = {
+            ...prev,
+            ...(mode !== undefined ? { groupMemorizationMode: mode } : {}),
+            ...(targetSurah !== undefined ? { groupSurah: targetSurah } : {}),
+          };
+          saveEncrypted('settings', next);
+          return next;
+        });
+      }
+
+      const isOnline = isEffectiveOnline();
+      const sanitized = sanitizeData(updates);
+
+      if (isOnline) {
+        try {
+          const sheikhSettingsRef = ref(db, sheikhSettingsPath);
+          await executeWithTimeout(update(sheikhSettingsRef, sanitized), 2500);
+        } catch {
+          await queueOfflineMutation({
+            type: 'UPDATE',
+            path: sheikhSettingsPath,
+            payload: sanitized,
+            description: 'تحديث إعدادات الفوج والورد',
+            ownerId: sheikhId,
+            authorUid: authContextUser.uid
+          });
+        }
+      } else {
+        await queueOfflineMutation({
+          type: 'UPDATE',
+          path: sheikhSettingsPath,
+          payload: sanitized,
+          description: 'تحديث إعدادات الفوج والورد',
+          ownerId: sheikhId,
+          authorUid: authContextUser.uid
+        });
       }
 
       toast({
@@ -1886,21 +2245,54 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       timestamp: new Date().toISOString()
     };
 
-    const ownerId = isPrivileged ? logData.details.ownerId || authContextUser.uid : authContextUser.uid;
-    const logRef = ref(db, `users/${ownerId}/admin_logs/${logId}`);
+    const ownerId = isPrivileged ? logData.details?.ownerId || authContextUser.uid : authContextUser.uid;
 
-    await set(logRef, log);
+    // 1. التحديث الفوري للحالة المحلية (0ms)
+    setAdminLogs(prev => {
+      const next = [log, ...prev];
+      saveEncrypted('adminLogs', next);
+      return next;
+    });
 
-    // Sync with public report if it exists
-    try {
-      const publicReportRef = ref(db, `public_student_reports/${logData.studentId}`);
-      const publicReportSnap = await get(publicReportRef);
-      if (publicReportSnap.exists()) {
-        const publicAdminLogsRef = ref(db, `public_student_reports/${logData.studentId}/adminLogs/${logId}`);
-        await set(publicAdminLogsRef, log);
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const path = `users/${ownerId}/admin_logs/${logId}`;
+    const sanitizedLog = sanitizeData(log);
+
+    if (isOnline) {
+      try {
+        const logRef = ref(db, path);
+        await set(logRef, sanitizedLog);
+
+        // Sync with public report if it exists
+        try {
+          const publicReportRef = ref(db, `public_student_reports/${logData.studentId}`);
+          const publicReportSnap = await get(publicReportRef);
+          if (publicReportSnap.exists()) {
+            const publicAdminLogsRef = ref(db, `public_student_reports/${logData.studentId}/adminLogs/${logId}`);
+            await set(publicAdminLogsRef, sanitizedLog);
+          }
+        } catch (error) {
+          console.error("Error syncing with public report:", error);
+        }
+      } catch (err) {
+        await queueOfflineMutation({
+          type: 'SET',
+          path,
+          payload: sanitizedLog,
+          description: `تسجيل وصل: ${log.type} (${log.studentName})`,
+          ownerId,
+          authorUid: authContextUser.uid
+        });
       }
-    } catch (error) {
-      console.error("Error syncing with public report:", error);
+    } else {
+      await queueOfflineMutation({
+        type: 'SET',
+        path,
+        payload: sanitizedLog,
+        description: `تسجيل وصل: ${log.type} (${log.studentName})`,
+        ownerId,
+        authorUid: authContextUser.uid
+      });
     }
 
     toast({
@@ -1911,29 +2303,48 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteAdminLog = async (log: AdminLog) => {
     if (!authContextUser) return;
+    const ownerId = log.details?.ownerId || authContextUser.uid;
 
-    try {
-      // 1. Delete from student history (personal logs of the creator)
-      const ownerId = log.details?.ownerId || authContextUser.uid;
-      const logRef = ref(db, `users/${ownerId}/admin_logs/${log.id}`);
-      await remove(logRef);
+    // 1. التحديث الفوري للحالة المحلية
+    setAdminLogs(prev => {
+      const next = prev.filter(l => l.id !== log.id);
+      saveEncrypted('adminLogs', next);
+      return next;
+    });
 
-      // 2. Delete from public reports if syncing
-      const publicLogRef = ref(db, `public_student_reports/${log.studentId}/adminLogs/${log.id}`);
-      await remove(publicLogRef);
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const path = `users/${ownerId}/admin_logs/${log.id}`;
 
-      toast({
-        title: "🗑️ تم الحذف",
-        description: "تم حذف الوصل من السجلات بنجاح.",
-      });
-    } catch (error) {
-      console.error("Error deleting admin log:", error);
-      toast({
-        title: "❌ خطأ في الحذف",
-        description: "حدث خطأ أثناء محاولة حذف الوصل.",
-        variant: "destructive"
+    if (isOnline) {
+      try {
+        const logRef = ref(db, path);
+        await remove(logRef);
+
+        const publicLogRef = ref(db, `public_student_reports/${log.studentId}/adminLogs/${log.id}`);
+        await remove(publicLogRef);
+      } catch (e) {
+        await queueOfflineMutation({
+          type: 'REMOVE',
+          path,
+          description: `حذف وصل: ${log.type} (${log.studentName})`,
+          ownerId,
+          authorUid: authContextUser.uid
+        });
+      }
+    } else {
+      await queueOfflineMutation({
+        type: 'REMOVE',
+        path,
+        description: `حذف وصل: ${log.type} (${log.studentName})`,
+        ownerId,
+        authorUid: authContextUser.uid
       });
     }
+
+    toast({
+      title: "🗑️ تم الحذف",
+      description: "تم حذف الوصل من السجلات بنجاح.",
+    });
   };
 
   const shareStudentRecord = async (studentId: string, historyData: any) => {
@@ -2359,6 +2770,18 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const fbUpdates: Record<string, any> = {};
       const timestamp = new Date().toISOString();
 
+      // 1. التحديث الفوري للحالة المحلية
+      setStudents(prev => {
+        const next = prev.map(s => {
+          if (updates[s.id]) {
+            return { ...s, ...updates[s.id], updatedAt: new Date() };
+          }
+          return s;
+        });
+        saveEncrypted('students', next);
+        return next;
+      });
+
       Object.entries(updates).forEach(([studentId, data]) => {
         const student = students.find(s => s.id === studentId);
         if (student) {
@@ -2381,11 +2804,44 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         }
       });
 
-      await update(ref(db), sanitizeData(fbUpdates));
-      toast({
-        title: "✅ تم التحديث بنجاح",
-        description: `تم تحديث بيانات ${Object.keys(updates).length} طالب(ة).`,
-      });
+      const isOnline = isEffectiveOnline();
+      const sanitizedUpdates = sanitizeData(fbUpdates);
+
+      if (isOnline) {
+        try {
+          await executeWithTimeout(update(ref(db), sanitizedUpdates), 2500);
+          toast({
+            title: "✅ تم التحديث بنجاح",
+            description: `تم تحديث بيانات ${Object.keys(updates).length} طالب(ة).`,
+          });
+        } catch {
+          await queueOfflineMutation({
+            type: 'UPDATE',
+            path: '',
+            payload: sanitizedUpdates,
+            description: `تحديث جماعي لـ ${Object.keys(updates).length} طالب`,
+            ownerId: authContextUser.uid,
+            authorUid: authContextUser.uid
+          });
+          toast({
+            title: "💾 تم التحديث محلياً",
+            description: "تم حفظ التحديث محلياً بسبب بطء الاتصال، وستُرفع التحديثات تلقائياً.",
+          });
+        }
+      } else {
+        await queueOfflineMutation({
+          type: 'UPDATE',
+          path: '',
+          payload: sanitizedUpdates,
+          description: `تحديث جماعي لـ ${Object.keys(updates).length} طالب`,
+          ownerId: authContextUser.uid,
+          authorUid: authContextUser.uid
+        });
+        toast({
+          title: "💾 تم التحديث محلياً بنجاح",
+          description: "تم حفظ التحديثات أوفلاين وستُرفع تلقائياً عند استقرار الإنترنت.",
+        });
+      }
     } catch (error: any) {
       console.error("Bulk update error:", error);
       toast({
@@ -2421,32 +2877,78 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       completedAt: needsCompletedAt ? new Date().toISOString() : (currentEntry.completedAt || undefined)
     };
 
-    const progressRef = ref(db, `users/${studentOwnerId}/surahProgress/${studentId}/${surahId}`);
-
+    // 1. التحديث الفوري للحالة المحلية
     if (evaluation === 'لم يحفظ') {
-      await remove(progressRef);
+      delete studentProgressMap[surahId];
     } else {
-      await set(progressRef, newEntry);
+      studentProgressMap[surahId] = newEntry;
     }
 
-    logActivity(
-      'UPDATE_SURAH_PROGRESS',
-      authContextUser.uid,
-      `تقييم السورة (ID: ${surahId}): ${evaluation}`,
-      studentId,
-      student?.fullName || 'غير معروف',
-      authContextUser.displayName || 'Sheikh',
-      student?.groupName || 'غير محدد',
-      studentOwnerId
-    );
-
-    toast({
-      title: `✅ تم تقييم السورة`,
-      description: `التقييم: ${evaluation}`,
+    setSurahProgress(prev => {
+      const next = { ...prev, [studentId]: studentProgressMap };
+      saveEncrypted('surahProgress', next);
+      return next;
     });
 
+    const isOnline = isEffectiveOnline();
+    const progressPath = `users/${studentOwnerId}/surahProgress/${studentId}/${surahId}`;
+
+    if (isOnline) {
+      try {
+        if (evaluation === 'لم يحفظ') {
+          await executeWithTimeout(remove(ref(db, progressPath)), 2500);
+        } else {
+          await executeWithTimeout(set(ref(db, progressPath), newEntry), 2500);
+        }
+
+        logActivity(
+          'UPDATE_SURAH_PROGRESS',
+          authContextUser.uid,
+          `تقييم السورة (ID: ${surahId}): ${evaluation}`,
+          studentId,
+          student?.fullName || 'غير معروف',
+          authContextUser.displayName || 'Sheikh',
+          student?.groupName || 'غير محدد',
+          studentOwnerId
+        );
+
+        toast({
+          title: `✅ تم تقييم السورة`,
+          description: `التقييم: ${evaluation}`,
+        });
+      } catch {
+        await queueOfflineMutation({
+          type: evaluation === 'لم يحفظ' ? 'REMOVE' : 'SET',
+          path: progressPath,
+          payload: evaluation === 'لم يحفظ' ? null : newEntry,
+          description: `تقييم سورة (${surahId}) للطالب ${student.fullName}`,
+          ownerId: studentOwnerId,
+          authorUid: authContextUser.uid
+        });
+        toast({
+          title: `💾 تم التقييم محلياً`,
+          description: `تم حفظ تقييم السورة محلياً بسبب ضعف الشبكة، وسيتم رفعه تلقائياً.`,
+        });
+      }
+    } else {
+      await queueOfflineMutation({
+        type: evaluation === 'لم يحفظ' ? 'REMOVE' : 'SET',
+        path: progressPath,
+        payload: evaluation === 'لم يحفظ' ? null : newEntry,
+        description: `تقييم سورة (${surahId}) للطالب ${student.fullName}`,
+        ownerId: studentOwnerId,
+        authorUid: authContextUser.uid
+      });
+      toast({
+        title: `💾 تم التقييم أوفلاين`,
+        description: `تم حفظ تقييم السورة محلياً (${evaluation}) وسيُرفع عند الاتصال بالإنترنت.`,
+      });
+    }
+
     // Auto-sync public student report
-    syncPublicStudentReport(studentId);
+    if (isOnline) {
+      syncPublicStudentReport(studentId);
+    }
   };
 
   const migrateSurahDataToEvaluationSystem = async () => {

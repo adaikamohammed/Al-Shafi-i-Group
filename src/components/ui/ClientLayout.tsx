@@ -30,6 +30,7 @@ const BOTTOM_NAV_ITEMS_LOCAL = BOTTOM_NAV_ITEMS; // Just for clarity if needed, 
 
 
 import { DateDisplay } from '@/components/ui/DateDisplay';
+import { SyncStatusWidget } from '@/components/ui/SyncStatusWidget';
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading, logout, isSuperAdmin, isManagement, role, updateUserProfile } = useAuth();
@@ -74,23 +75,13 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      if (process.env.NODE_ENV === 'development') {
-        navigator.serviceWorker.getRegistrations().then(registrations => {
-          for (let registration of registrations) {
-            registration.unregister().then(success => {
-              if (success) console.log('Successfully unregistered stale service worker in development mode.');
-            });
-          }
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(registration => {
+          console.log('Shafii Offline SW registered: ', registration);
+        }).catch(registrationError => {
+          console.log('Shafii SW registration failed: ', registrationError);
         });
-      } else {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/firebase-messaging-sw.js').then(registration => {
-            console.log('Firebase Messaging SW registered: ', registration);
-          }).catch(registrationError => {
-            console.log('Firebase Messaging SW registration failed: ', registrationError);
-          });
-        });
-      }
+      });
     }
   }, []);
 
@@ -655,14 +646,17 @@ function AppSidebarContent({
                     {isSuperAdmin ? 'الإدارة العامة' : (user?.group || 'فوج الشافعي')}
                   </h1>
                 </div>
-                <Button
-                  onClick={() => setCommandBarOpen(true)}
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-xl"
-                >
-                  <Search className="h-5 w-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <SyncStatusWidget />
+                  <Button
+                    onClick={() => setCommandBarOpen(true)}
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-xl"
+                  >
+                    <Search className="h-5 w-5" />
+                  </Button>
+                </div>
               </header>
               <main className="flex-grow p-4 animate-in fade-in duration-700 print:p-0">
                 {children}
@@ -699,7 +693,8 @@ function AppSidebarContent({
                   )}
                 </div>
 
-                <div className="hidden md:block">
+                <div className="hidden md:flex items-center gap-4">
+                  <SyncStatusWidget />
                   <DateDisplay />
                 </div>
 

@@ -22,7 +22,7 @@ import { PenaltiesReport } from '@/components/reports/PenaltiesReport';
 
 export default function PenaltiesPage() {
     const { user, isSuperAdmin, isManagement } = useAuth(); // Added role checkers
-    const { students, allUsers } = useStudentContext(); // Need allUsers for Sheikh names
+    const { students, allUsers, updateStudent } = useStudentContext(); // Need allUsers for Sheikh names
 
     const handlePrint = () => {
         window.print();
@@ -249,10 +249,10 @@ export default function PenaltiesPage() {
             // FIX: Use sanitizeData to prevent undefined values
             const covenantsToSave = updatedCovenants.map(c => sanitizeData(c));
 
-            // FIX: Use correct path users/{ownerId}/students/{studentId}
-            await update(ref(db, `users/${selectedStudent.ownerId}/students/${selectedStudent.id}`), {
+            // Use updateStudent from context (supports offline queue & encryption)
+            await updateStudent(selectedStudent.id, {
                 covenants: covenantsToSave
-            });
+            }, selectedStudent.ownerId);
 
             resetForm();
         } catch (error) {
@@ -299,14 +299,13 @@ export default function PenaltiesPage() {
         if (!confirm('هل أنت متأكد من حذف هذه العقوبة؟')) return;
 
         try {
-            const db = getDatabase();
             const updatedCovenants = (student.covenants || []).filter((c: Covenant) => c.id !== covenantId);
             const covenantsToSave = updatedCovenants.map((c: Covenant) => sanitizeData(c));
 
-            await update(ref(db, `users/${student.ownerId}/students/${student.id}`), {
+            await updateStudent(student.id, {
                 covenants: covenantsToSave
-            });
-            toast({ title: "تم الحذف", description: "تم حذف العقوبة بنجاح", className: "bg-red-600 text-white" });
+            }, student.ownerId);
+            toast({ title: "تم الحذف", description: "تم حذف العقوبة بنجاح", className: "bg-green-600 text-white" });
         } catch (error) {
             console.error(error);
             toast({ title: "خطأ", description: "فشل الحذف", variant: "destructive" });
