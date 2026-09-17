@@ -363,7 +363,7 @@ export default function YearlyPerformancePage() {
 
             let attendanceRate = 0;
             if (!isHoliday && !isSheikhAbsentNoSub && workSessions.length > 0) {
-                const activeStudentsCount = (students || []).filter(s => s.status === 'نشط').length;
+                const activeStudentsCount = (students || []).filter(s => s && s.status === 'نشط').length;
                 if (activeStudentsCount > 0) {
                     const allRecords = workSessions.flatMap(s => s.records || []);
                     const attendanceCount = allRecords.filter(r => r.attendance === 'حاضر' || r.attendance === 'متأخر').length;
@@ -401,7 +401,7 @@ export default function YearlyPerformancePage() {
 
         if (!dailySessions || !students) return { periodStats: emptyStats, statsTitle: '' };
 
-        const activeStudentsCount = students.filter(s => s.status === 'نشط').length;
+        const activeStudentsCount = (students || []).filter(s => s && s.status === 'نشط').length;
         if (activeStudentsCount === 0) return { periodStats: emptyStats, statsTitle: '' };
 
         let startDate: Date;

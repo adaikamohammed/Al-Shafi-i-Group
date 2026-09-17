@@ -141,7 +141,7 @@ export function GroupEvaluationCard({ students, sessions, groupName }: { student
     const [range, setRange] = useState<RangeType>('monthly');
     const [displayYear, setDisplayYear] = useState(new Date());
 
-    const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
+    const activeStudents = useMemo(() => (students || []).filter(s => s && s.status === 'نشط'), [students]);
 
     const chartData = useMemo(() => {
         if (range === 'daily') {

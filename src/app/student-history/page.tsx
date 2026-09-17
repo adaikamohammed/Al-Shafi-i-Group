@@ -258,7 +258,7 @@ function StudentHistoryContent() {
         (students || []).find(s => s.id === selectedStudentId)
         , [students, selectedStudentId]);
 
-    const activeStudents = useMemo(() => (students || []).filter(s => s.status === 'نشط').sort((a, b) => arabicCompare(a.fullName, b.fullName)), [students]);
+    const activeStudents = useMemo(() => (students || []).filter(s => s && s.status === 'نشط').sort((a, b) => arabicCompare(a?.fullName || '', b?.fullName || '')), [students]);
     const studentOptions: SearchableSelectOption[] = useMemo(() => activeStudents.map(s => ({ value: s.id, label: s.fullName })), [activeStudents]);
 
     useEffect(() => {

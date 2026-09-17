@@ -11,16 +11,16 @@ import { useAuth } from '@/context/AuthContext';
 export function ImpactStats() {
     const { user } = useAuth();
     const { students, dailySessions } = useStudentContext();
-    const activeStudents = useMemo(() => (students || []).filter(s => s.status === 'نشط'), [students]);
+    const activeStudents = useMemo(() => (students || []).filter(s => s && s.status === 'نشط'), [students]);
 
     const currentThemeId = user?.portalTheme || 'midnight';
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;
 
     const stats = useMemo(() => {
-        const total = students.length;
+        const total = (students || []).length;
         const totalSessions = Object.values(dailySessions).reduce((acc, day) => acc + Object.keys(day).length, 0);
-        const totalSurahs = students.reduce((acc, s) => acc + (s.memorizedSurahsCount || 0), 0);
-        const topPerformers = activeStudents.filter(s => s.memorizedSurahsCount > 5).length;
+        const totalSurahs = (students || []).reduce((acc, s) => acc + ((s && s.memorizedSurahsCount) || 0), 0);
+        const topPerformers = activeStudents.filter(s => s && s.memorizedSurahsCount > 5).length;
 
         if (currentThemeId === 'ramadan') {
             return [

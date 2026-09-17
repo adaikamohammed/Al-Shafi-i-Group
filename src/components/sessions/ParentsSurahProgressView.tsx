@@ -47,7 +47,7 @@ export const ParentsSurahProgressView = ({ dailySessions, students, globalProgre
     const containerRef = useRef<HTMLDivElement>(null);
 
     const activeStudents = useMemo(() =>
-        [...students].filter(s => s.status === 'نشط').sort((a, b) => arabicCompare(a.fullName, b.fullName)),
+        [...(students || [])].filter(s => s && s.status === 'نشط').sort((a, b) => arabicCompare(a?.fullName || '', b?.fullName || '')),
         [students]
     );
 

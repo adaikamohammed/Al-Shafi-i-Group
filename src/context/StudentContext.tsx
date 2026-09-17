@@ -142,6 +142,21 @@ export const normalizeArabic = (text: string) => {
     .trim();
 };
 
+export const sanitizeSurahProgress = (raw: any): Record<string, SurahMastery> => {
+  if (!raw || typeof raw !== 'object') return {};
+  const clean: Record<string, SurahMastery> = {};
+  for (const [studentId, map] of Object.entries(raw)) {
+    if (!map || typeof map !== 'object') continue;
+    clean[studentId] = {};
+    for (const [surahId, entry] of Object.entries(map as Record<string, any>)) {
+      if (entry && typeof entry === 'object') {
+        clean[studentId][surahId as any] = entry;
+      }
+    }
+  }
+  return clean;
+};
+
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const { user: authContextUser, loading: authLoading, isSuperAdmin, isManagement, role } = useAuth();
   const isAdmin00 = authContextUser?.email === 'admin00@gmail.com' || authContextUser?.email === 'abdallah.shafii@gmail.com';
@@ -208,7 +223,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     // ⚡ Local-First Cache Hydration: استرجاع فوري للبيانات المشفرة محلياً (0ms wait)
     loadEncrypted<Student[]>('students', []).then(cached => {
       if (cached && cached.length > 0) {
-        setStudents(cached.map(s => ({
+        const validCached = cached.filter((s): s is Student => Boolean(s && typeof s === 'object'));
+        setStudents(validCached.map(s => ({
           ...s,
           birthDate: s.birthDate ? (s.birthDate instanceof Date ? s.birthDate : parseISO(s.birthDate as any)) : new Date(),
           registrationDate: s.registrationDate ? (s.registrationDate instanceof Date ? s.registrationDate : parseISO(s.registrationDate as any)) : new Date(),
@@ -227,10 +243,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       if (cached && Object.keys(cached).length > 0) setDailyReports(cached);
     });
     loadEncrypted<Record<string, SurahMastery>>('surahProgress', {}).then(cached => {
-      if (cached && Object.keys(cached).length > 0) setSurahProgress(cached);
+      if (cached && Object.keys(cached).length > 0) setSurahProgress(sanitizeSurahProgress(cached));
     });
     loadEncrypted<Payment[]>('payments', []).then(cached => {
-      if (cached && cached.length > 0) setPayments(cached);
+      if (cached && cached.length > 0) setPayments(cached.filter(Boolean));
     });
     loadEncrypted<AdminLog[]>('adminLogs', []).then(cached => {
       if (cached && cached.length > 0) setAdminLogs(cached);
@@ -449,10 +465,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
             }
           }
 
-          setStudents(allStudents);
+          const validStudents = allStudents.filter((s): s is Student => Boolean(s && typeof s === 'object' && s.id));
+          const cleanProgress = sanitizeSurahProgress(allProgress);
+
+          setStudents(validStudents);
           setDailySessions(allSessions);
           setDailyReports(allReports);
-          setSurahProgress(allProgress);
+          setSurahProgress(cleanProgress);
           setPayments(allPayments);
           setAdminLogs(allAdminLogs);
           setSettingsState(finalSettings);
@@ -460,10 +479,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           setLoading(false);
 
           // ⚡ حفظ مشفر محلياً للأوفلاين
-          saveEncrypted('students', allStudents);
+          saveEncrypted('students', validStudents);
           saveEncrypted('dailySessions', allSessions);
           saveEncrypted('dailyReports', allReports);
-          saveEncrypted('surahProgress', allProgress);
+          saveEncrypted('surahProgress', cleanProgress);
           saveEncrypted('payments', allPayments);
           saveEncrypted('adminLogs', allAdminLogs);
           saveEncrypted('settings', finalSettings);
@@ -529,8 +548,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         const loadedStudents = val ? Object.entries(val).map(([id, st]: [string, any]) =>
           processStudentData({ ...st, id }, authContextUser.uid, (role === 'sheikh' ? authContextUser.group : st.groupName) as string)
         ) : [];
-        setStudents(loadedStudents);
-        saveEncrypted('students', loadedStudents);
+        const validLoadedStudents = loadedStudents.filter((st): st is Student => Boolean(st && typeof st === 'object' && st.id));
+        setStudents(validLoadedStudents);
+        saveEncrypted('students', validLoadedStudents);
       }, handleError);
 
       onValue(sessionsRef, (s: any) => {
@@ -580,8 +600,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       }, handleError);
       onValue(progressRef, (s: any) => {
         const prog = s.val() || {};
-        setSurahProgress(prog);
-        saveEncrypted('surahProgress', prog);
+        const cleanProg = sanitizeSurahProgress(prog);
+        setSurahProgress(cleanProg);
+        saveEncrypted('surahProgress', cleanProg);
       }, handleError);
       onValue(paymentsRef, (s: any) => {
         const val = s.val();
@@ -691,7 +712,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
 
   // Hall of Fame Logic
-  const activeStudents = useMemo(() => students.filter(s => s.status === 'نشط'), [students]);
+  const activeStudents = useMemo(() => (students || []).filter(s => s && s.status === 'نشط'), [students]);
 
   const allSortedSessions = useMemo(() => {
     if (!dailySessions) return [];
@@ -865,8 +886,8 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const studentProgress = surahProgress[student.id];
       if (!studentProgress) return;
 
-      const recentCompletions = Object.values(studentProgress).filter(entry => {
-        if (entry.status > 0 && entry.completedAt) {
+      const recentCompletions = Object.values(studentProgress).filter((entry: any) => {
+        if (entry && typeof entry === 'object' && entry.status > 0 && entry.completedAt) {
           try {
             const completionDate = parseISO(entry.completedAt);
             return isAfter(completionDate, thirtyDaysAgo);
@@ -1643,7 +1664,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     const studentProgressMap: SurahMastery = { ...(surahProgress[studentId] || {}) };
     const currentEntry = studentProgressMap[surahId] || { status: 0 };
-    const currentStatus = currentEntry.status;
+    const currentStatus = currentEntry?.status ?? 0;
 
     const nextStatus = ((currentStatus + 1) % 3) as 0 | 1 | 2;
 
@@ -1653,7 +1674,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     if (nextStatus > 0 && currentStatus === 0) {
       newEntry.completedAt = new Date().toISOString();
     } else if (nextStatus > 0) {
-      newEntry.completedAt = currentEntry.completedAt || new Date().toISOString();
+      newEntry.completedAt = currentEntry?.completedAt || new Date().toISOString();
     }
 
     const isOnline = isEffectiveOnline();
@@ -1673,7 +1694,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return next;
     });
 
-    const memorizedCount = Object.values(studentProgressMap).filter(entry => entry.status > 0).length;
+    const memorizedCount = Object.values(studentProgressMap).filter((entry: any) => entry && entry.status > 0).length;
     updateStudent(studentId, { memorizedSurahsCount: memorizedCount }, studentOwnerId);
 
     if (isOnline) {
@@ -1736,7 +1757,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
       surahIds.forEach(surahId => {
         const currentEntry = studentProgressMap[surahId] || { status: 0 };
-        const currentStatus = currentEntry.status;
+        const currentStatus = currentEntry?.status ?? 0;
 
         if (currentStatus === targetStatus) return;
         changed = true;
@@ -1745,7 +1766,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         if (targetStatus > 0 && currentStatus === 0) {
           newEntry.completedAt = timestamp;
         } else if (targetStatus > 0) {
-          newEntry.completedAt = currentEntry.completedAt || timestamp;
+          newEntry.completedAt = currentEntry?.completedAt || timestamp;
         }
 
         if (targetStatus === 0) {
@@ -1759,7 +1780,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
       if (changed) {
         newProgressState[studentId] = studentProgressMap;
-        const newMemorizedCount = Object.values(studentProgressMap).filter(entry => entry.status > 0).length;
+        const newMemorizedCount = Object.values(studentProgressMap).filter((entry: any) => entry && entry.status > 0).length;
         updates[`users/${studentOwnerId}/students/${studentId}/memorizedSurahsCount`] = newMemorizedCount;
         updates[`users/${studentOwnerId}/students/${studentId}/updatedAt`] = timestamp;
 
@@ -2390,7 +2411,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       );
 
       // Calculate scores for all active students in the same group
-      const groupStudents = students.filter(s => s.status === 'نشط' && s.groupName === student.groupName);
+      const groupStudents = (students || []).filter(s => s && s.status === 'نشط' && s.groupName === student.groupName);
       const studentScores: Record<string, { id: string; points: number; stats: any }> = {};
       groupStudents.forEach(s => {
         studentScores[s.id] = { id: s.id, points: 0, stats: { absent: 0, makeup: 0, calm: 0, medium: 0, undisciplined: 0 } };
@@ -2448,7 +2469,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
       // Mastery count
       const studentMastery = surahProgress[student.id] || {};
-      const masteredCount = Object.values(studentMastery).filter(s => s.status === 2).length;
+      const masteredCount = Object.values(studentMastery).filter((s: any) => s && s.status === 2).length;
 
       // Student records in month
       const studentRecordsInMonth = sessionsInMonth.flatMap(s => s.records ?? []).filter(r => r.studentId === student.id);
@@ -2456,7 +2477,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       const disciplineScore = studentRecordsInMonth.length > 0 ? ((studentRecordsInMonth.filter(r => r.behavior === 'هادئ').length * 2 + studentRecordsInMonth.filter(r => r.behavior === 'مقبول' || (r.behavior as any) === 'متوسط').length * 1) / (studentRecordsInMonth.length * 2)) * 10 : 0;
       const memorizationScore = (masteredCount / 114) * 10; // 114 surahs
 
-      const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط' && c.card !== 'بدون');
+      const activeCovenant = (student.covenants || []).find(c => c && c.status === 'نشط' && c.card !== 'بدون');
       const latestBadge = settings.badges?.find(b => b.id === 'mastery_king' && currentPoints >= b.threshold) || null;
 
       // Generate history snapshot
@@ -2863,7 +2884,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const currentEntry = studentProgressMap[surahId] || { status: 0 };
 
     // Set completion date when moving from 0 to >0
-    const needsCompletedAt = (evaluation !== 'لم يحفظ' && currentEntry.status === 0);
+    const needsCompletedAt = (evaluation !== 'لم يحفظ' && (!currentEntry || currentEntry.status === 0));
 
     // Map evaluation to internal status for scoring/legacy compatibility
     let status: 0 | 1 | 2 = 0;
@@ -2874,7 +2895,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     const newEntry: import('@/lib/types').SurahMasteryEntry = {
       status,
       evaluation,
-      completedAt: needsCompletedAt ? new Date().toISOString() : (currentEntry.completedAt || undefined)
+      completedAt: needsCompletedAt ? new Date().toISOString() : (currentEntry?.completedAt || undefined)
     };
 
     // 1. التحديث الفوري للحالة المحلية
@@ -2968,6 +2989,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         for (const surahIdStr in progress) {
           const surahId = parseInt(surahIdStr);
           const entry = progress[surahId];
+          if (!entry || typeof entry !== 'object') continue;
 
           // Skip if already has evaluation or admin5Evaluation
           if (entry.evaluation) continue;

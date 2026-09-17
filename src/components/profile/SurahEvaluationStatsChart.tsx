@@ -86,7 +86,7 @@ export function SurahEvaluationStatsChart({ students, surahProgress }: SurahEval
     const insights = useMemo(() => {
         if (!students || !surahProgress) return { chartData: [], stats: { totalExcellent: 0, totalMemorized: 0 } };
 
-        const activeStudents = students.filter(s => s.status === 'نشط');
+        const activeStudents = (students || []).filter(s => s && s.status === 'نشط');
         const activeCount = activeStudents.length;
 
         const surahStats: Record<number, Record<string, number>> = {};
@@ -97,25 +97,28 @@ export function SurahEvaluationStatsChart({ students, surahProgress }: SurahEval
 
         Object.entries(surahProgress).forEach(([studentId, progress]) => {
             if (activeStudents.some(s => s.id === studentId)) {
-                Object.entries(progress).forEach(([surahId, entry]) => {
-                    const sId = parseInt(surahId);
-                    const evaluation = entry.evaluation;
+                if (progress && typeof progress === 'object') {
+                    Object.entries(progress).forEach(([surahId, entry]) => {
+                        if (!entry || typeof entry !== 'object') return;
+                        const sId = parseInt(surahId);
+                        const evaluation = entry.evaluation;
 
-                    if (evaluation && evaluation !== 'لم يحفظ') {
-                        surahStats[sId][evaluation] = (surahStats[sId][evaluation] || 0) + 1;
+                        if (evaluation && evaluation !== 'لم يحفظ') {
+                            surahStats[sId][evaluation] = (surahStats[sId][evaluation] || 0) + 1;
 
-                        if (evaluation === 'ممتاز') {
-                            totalExcellent++;
-                        } else {
-                            totalMemorized++;
+                            if (evaluation === 'ممتاز') {
+                                totalExcellent++;
+                            } else {
+                                totalMemorized++;
+                            }
+                        } else if (entry.status > 0 && !evaluation) {
+                            // Fallback for old data without evaluation (during migration)
+                            const type = entry.status === 2 ? 'ممتاز' : 'جيد';
+                            surahStats[sId][type] = (surahStats[sId][type] || 0) + 1;
+                            if (type === 'ممتاز') totalExcellent++; else totalMemorized++;
                         }
-                    } else if (entry.status > 0 && !evaluation) {
-                        // Fallback for old data without evaluation (during migration)
-                        const type = entry.status === 2 ? 'ممتاز' : 'جيد';
-                        surahStats[sId][type] = (surahStats[sId][type] || 0) + 1;
-                        if (type === 'ممتاز') totalExcellent++; else totalMemorized++;
-                    }
-                });
+                    });
+                }
             }
         });
 

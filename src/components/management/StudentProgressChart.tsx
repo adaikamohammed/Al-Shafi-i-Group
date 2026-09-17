@@ -232,13 +232,13 @@ export function StudentProgressChart({ sheikhs, students, dailySessions }: Stude
 
     // ── Active students per group ─────────────────────────────────────────
     const activeStudents = useMemo(() => {
-        return (students || []).filter(s => s.status === 'نشط');
+        return (students || []).filter(s => s && s.status === 'نشط');
     }, [students]);
 
     const studentsInGroup = useMemo(() => {
         if (!selectedGroup) return [];
         return activeStudents.filter(s =>
-            ((s as any).group === selectedGroup || s.groupName === selectedGroup)
+            s && ((s as any).group === selectedGroup || s.groupName === selectedGroup)
         );
     }, [activeStudents, selectedGroup]);
 

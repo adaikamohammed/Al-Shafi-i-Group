@@ -9,7 +9,7 @@ import { format, parse, parseISO, subDays, addDays, isSameDay, getDay } from 'da
 import { ar } from 'date-fns/locale';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { cn, arabicCompare } from '@/lib/utils';
-import { AttendanceStatus, PerformanceLevel, BehaviorLevel } from '@/lib/types';
+import { AttendanceStatus, PerformanceLevel, BehaviorLevel, Student } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -132,7 +132,8 @@ function RegisterSessionContent() {
 
     const activeStudents = useMemo(() => {
         const sessionDate = selectedDay;
-        return (students ?? []).filter(s => {
+        return (students ?? []).filter((s): s is Student => {
+            if (!s || typeof s !== 'object') return false;
             // لا يظهر الطالب إذا كانت الحصة قبل تاريخ انضمامه للفوج
             if (sessionDate && s.registrationDate) {
                 const regDate = s.registrationDate instanceof Date
@@ -150,7 +151,7 @@ function RegisterSessionContent() {
             }
             const isGroupMatch = isSuperAdmin ? true : s.groupName === user?.group;
             return s.status === "نشط" && isGroupMatch;
-        }).sort((a, b) => arabicCompare(a.fullName, b.fullName));
+        }).sort((a, b) => arabicCompare(a?.fullName || '', b?.fullName || ''));
     }, [students, isSuperAdmin, user, effectiveOwnerId, selectedDay]);
 
     // Combined list: Active Students + Students who have a record in this specific session

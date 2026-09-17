@@ -104,8 +104,8 @@ export const StudentTable = React.memo(({
                     </TableHeader>
                     <TableBody>
                         {students.length > 0 ? (
-                            students.map((student) => {
-                                const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط');
+                            students.filter((s): s is Student => Boolean(s && typeof s === 'object')).map((student) => {
+                                const activeCovenant = (student.covenants || []).find(c => c && c.status === 'نشط');
 
                                 let rowClass = 'hover:bg-muted/30 transition-colors';
                                 if (student.status === 'مطرود') {
@@ -202,8 +202,8 @@ export const StudentTable = React.memo(({
             {/* Mobile View Card List */}
             <div className="md:hidden space-y-4">
                 {students.length > 0 ? (
-                    students.map((student) => {
-                        const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط');
+                    students.filter((s): s is Student => Boolean(s && typeof s === 'object')).map((student) => {
+                        const activeCovenant = (student.covenants || []).find(c => c && c.status === 'نشط');
                         return (
                             <Card
                                 key={student.id}

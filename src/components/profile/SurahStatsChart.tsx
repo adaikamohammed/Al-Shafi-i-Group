@@ -109,7 +109,7 @@ export function SurahStatsChart({ students, surahProgress }: SurahStatsChartProp
     const insights = useMemo(() => {
         if (!students || !surahProgress) return { chartData: [], stats: { totalMastered: 0, totalMemorized: 0 } };
 
-        const activeStudents = students.filter(s => s.status === 'نشط');
+        const activeStudents = (students || []).filter(s => s && s.status === 'نشط');
         const activeCount = activeStudents.length;
 
         const surahCounts: Record<number, { mastered: number; memorized: number; total: number }> = {};
@@ -120,16 +120,19 @@ export function SurahStatsChart({ students, surahProgress }: SurahStatsChartProp
 
         Object.entries(surahProgress).forEach(([studentId, progress]) => {
             if (activeStudents.some(s => s.id === studentId)) {
-                Object.entries(progress).forEach(([surahId, entry]) => {
-                    const sId = parseInt(surahId);
-                    if (entry.status === 2) {
-                        surahCounts[sId].mastered++;
-                        totalMastered++;
-                    } else if (entry.status === 1) {
-                        surahCounts[sId].memorized++;
-                        totalMemorized++;
-                    }
-                });
+                if (progress && typeof progress === 'object') {
+                    Object.entries(progress).forEach(([surahId, entry]) => {
+                        const sId = parseInt(surahId);
+                        if (!surahCounts[sId]) return;
+                        if (entry && entry.status === 2) {
+                            surahCounts[sId].mastered++;
+                            totalMastered++;
+                        } else if (entry && entry.status === 1) {
+                            surahCounts[sId].memorized++;
+                            totalMemorized++;
+                        }
+                    });
+                }
             }
         });
 

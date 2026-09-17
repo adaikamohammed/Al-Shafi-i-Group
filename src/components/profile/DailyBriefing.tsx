@@ -25,7 +25,7 @@ export function DailyBriefing({ students, dailySessions, sheikhName }: DailyBrie
         // ... (existing logic remains)
         const alerts: { type: 'warning' | 'info' | 'success', message: string, icon: any }[] = [];
         const currentMonthStart = startOfMonth(new Date());
-        const activeStudents = students.filter(s => s.status === 'نشط');
+        const activeStudents = (students || []).filter(s => s && s.status === 'نشط');
         let retentionRiskCount = 0;
         const allSessions = Object.values(dailySessions).flatMap(year => Object.values(year)).flatMap(month => Object.values(month));
 

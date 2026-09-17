@@ -51,7 +51,7 @@ export const SurahEvaluationView: React.FC<SurahEvaluationViewProps> = ({
         []);
 
     const filteredStudents = useMemo(() => {
-        let result = students.filter(s => s.status === 'نشط'); // Only active students
+        let result = (students || []).filter(s => s && s.status === 'نشط'); // Only active students
 
         if (filterGroup !== 'all') {
             if (filterGroup === 'sheikhs') {

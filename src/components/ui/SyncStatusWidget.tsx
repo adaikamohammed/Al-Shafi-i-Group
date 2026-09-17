@@ -52,10 +52,11 @@ export function SyncStatusWidget({ className }: { className?: string }) {
     setIsForcedOffline(isForceOfflineMode());
 
     const unsubscribe = subscribeToSyncStatus((payload) => {
-      setStatus(payload.status);
-      setPendingCount(payload.pendingCount);
-      setLastSyncTime(payload.lastSyncTime);
-      setIsForcedOffline(payload.isForcedOffline);
+      if (!payload) return;
+      if (payload.status) setStatus(payload.status);
+      if (typeof payload.pendingCount === 'number') setPendingCount(payload.pendingCount);
+      if (payload.lastSyncTime !== undefined) setLastSyncTime(payload.lastSyncTime);
+      if (typeof payload.isForcedOffline === 'boolean') setIsForcedOffline(payload.isForcedOffline);
     });
 
     return () => unsubscribe();

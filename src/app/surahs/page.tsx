@@ -54,8 +54,8 @@ export default function SurahProgressPage() {
     }, [surahProgress, selectedStudentId]);
 
     const progressCounts = useMemo(() => {
-        const memorized = Object.values(studentProgress).filter(s => s.status === 1).length;
-        const mastered = Object.values(studentProgress).filter(s => s.status === 2).length;
+        const memorized = Object.values(studentProgress).filter((s: any) => s && s.status === 1).length;
+        const mastered = Object.values(studentProgress).filter((s: any) => s && s.status === 2).length;
         return { memorized, mastered, total: memorized + mastered };
     }, [studentProgress]);
 
@@ -82,13 +82,14 @@ export default function SurahProgressPage() {
                 'لم يحفظ': 0
             };
 
-            const masteryScore = Object.values(progress).reduce((sum, entry) => {
+            const masteryScore = Object.values(progress).reduce((sum, entry: any) => {
+                if (!entry || typeof entry !== 'object') return sum;
                 const evalValue = entry.evaluation || (entry.status === 2 ? 'ممتاز' : entry.status === 1 ? 'جيد' : 'لم يحفظ');
                 return sum + (weights[evalValue] || 0);
             }, 0);
 
-            const memorizedCount = Object.values(progress).filter(entry => entry.status > 0).length;
-            const masteredCount = Object.values(progress).filter(entry => entry.status === 2 || entry.evaluation === 'ممتاز').length;
+            const memorizedCount = Object.values(progress).filter((entry: any) => entry && entry.status > 0).length;
+            const masteredCount = Object.values(progress).filter((entry: any) => entry && (entry.status === 2 || entry.evaluation === 'ممتاز')).length;
 
             return {
                 ...student,
@@ -116,7 +117,7 @@ export default function SurahProgressPage() {
             }
             acc[groupName].students.push(student);
             acc[groupName].totalStudents++;
-            if (student.status === 'نشط') {
+            if (student && student.status === 'نشط') {
                 acc[groupName].activeStudents++;
             }
             return acc;
@@ -125,8 +126,8 @@ export default function SurahProgressPage() {
         return Object.values(groups).map((group: any) => {
             const groupProgress = group.students.map((student: any) => {
                 const progress = surahProgress ? (surahProgress[student.id] || {}) : {};
-                const memorizedCount = Object.values(progress).filter((entry: any) => entry.status === 1).length;
-                const masteredCount = Object.values(progress).filter((entry: any) => entry.status === 2).length;
+                const memorizedCount = Object.values(progress).filter((entry: any) => entry && entry.status === 1).length;
+                const masteredCount = Object.values(progress).filter((entry: any) => entry && entry.status === 2).length;
                 const masteryScore = (memorizedCount * 1) + (masteredCount * 3);
                 return {
                     ...student,
@@ -136,7 +137,7 @@ export default function SurahProgressPage() {
                 };
             });
 
-            const activeGroupProgress = groupProgress.filter((s: any) => s.status === 'نشط');
+            const activeGroupProgress = groupProgress.filter((s: any) => s && s.status === 'نشط');
             const averageMasteryScore = activeGroupProgress.length > 0
                 ? activeGroupProgress.reduce((sum: number, s: any) => sum + s.masteryScore, 0) / activeGroupProgress.length
                 : 0;
@@ -268,7 +269,7 @@ export default function SurahProgressPage() {
 
     React.useEffect(() => {
         if (studentsToShow.length > 0 && !selectedStudentId) {
-            const firstActive = studentsToShow.find(s => s.status === 'نشط');
+            const firstActive = studentsToShow.find(s => s && s.status === 'نشط');
             setSelectedStudentId(firstActive ? firstActive.id : studentsToShow[0].id);
         }
     }, [studentsToShow, selectedStudentId]);
@@ -552,64 +553,64 @@ export default function SurahProgressPage() {
                                             <TableHead>الحالة</TableHead>
                                         </TableRow>
                                     </TableHeader>
-                                    <TableBody>
-                                        {leaderboard.map((student, index) => {
-                                            const rank = index + 1;
-                                            let rankClass = "";
-                                            if (student.status === 'نشط') {
-                                                if (rank === 1) rankClass = "bg-yellow-100 dark:bg-yellow-900/50 hover:bg-yellow-100/80";
-                                                else if (rank === 2) rankClass = "bg-gray-200 dark:bg-gray-700/50 hover:bg-gray-200/80";
-                                                else if (rank === 3) rankClass = "bg-orange-100 dark:bg-orange-900/50 hover:bg-orange-100/80";
-                                            }
+                                     <TableBody>
+                                         {leaderboard.map((student, index) => {
+                                             const rank = index + 1;
+                                             let rankClass = "";
+                                             if (student?.status === 'نشط') {
+                                                 if (rank === 1) rankClass = "bg-yellow-100 dark:bg-yellow-900/50 hover:bg-yellow-100/80";
+                                                 else if (rank === 2) rankClass = "bg-gray-200 dark:bg-gray-700/50 hover:bg-gray-200/80";
+                                                 else if (rank === 3) rankClass = "bg-orange-100 dark:bg-orange-900/50 hover:bg-orange-100/80";
+                                             }
 
-                                            const totalSurahs = student.memorizedCount + student.masteredCount;
-                                            const memorizedPercent = (student.memorizedCount / allSurahs.length) * 100;
-                                            const masteredPercent = (student.masteredCount / allSurahs.length) * 100;
+                                             const totalSurahs = (student?.memorizedCount || 0) + (student?.masteredCount || 0);
+                                             const memorizedPercent = ((student?.memorizedCount || 0) / allSurahs.length) * 100;
+                                             const masteredPercent = ((student?.masteredCount || 0) / allSurahs.length) * 100;
 
-                                            return (
-                                                <TableRow key={student.id} className={cn(rankClass, student.status === 'مطرود' && 'opacity-50')}>
-                                                    <TableCell className="font-bold text-lg">
-                                                        {student.status === 'نشط' ? (rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank) : '-'}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex flex-col">
-                                                            <div className="flex items-center gap-2">
-                                                                <span>{student.fullName}</span>
-                                                                {totalSurahs === 114 &&
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger>
-                                                                            <Award className="h-5 w-5 text-yellow-500" />
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent>
-                                                                            <p>خاتم للقرآن الكريم</p>
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                }
-                                                            </div>
-                                                            <Tooltip>
-                                                                <TooltipTrigger>
-                                                                    <Progress className="h-2 w-28 mt-1">
-                                                                        <Progress value={masteredPercent + memorizedPercent} className="bg-green-300" />
-                                                                        <Progress value={masteredPercent} className="bg-green-600 -mt-2" />
-                                                                    </Progress>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>
-                                                                    <p>محفوظ: {student.memorizedCount}</p>
-                                                                    <p>متقن: {student.masteredCount}</p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="font-bold">
-                                                        {student.status === 'نشط' ? student.masteryScore : '-'}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge variant={student.status === 'مطرود' ? 'destructive' : 'default'}>{student.status}</Badge>
-                                                    </TableCell>
-                                                </TableRow>
-                                            )
-                                        })}
-                                    </TableBody>
+                                             return (
+                                                 <TableRow key={student.id} className={cn(rankClass, student?.status === 'مطرود' && 'opacity-50')}>
+                                                     <TableCell className="font-bold text-lg">
+                                                         {student?.status === 'نشط' ? (rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank) : '-'}
+                                                     </TableCell>
+                                                     <TableCell>
+                                                         <div className="flex flex-col">
+                                                             <div className="flex items-center gap-2">
+                                                                 <span>{student.fullName}</span>
+                                                                 {totalSurahs === 114 &&
+                                                                     <Tooltip>
+                                                                         <TooltipTrigger>
+                                                                             <Award className="h-5 w-5 text-yellow-500" />
+                                                                         </TooltipTrigger>
+                                                                         <TooltipContent>
+                                                                             <p>خاتم للقرآن الكريم</p>
+                                                                         </TooltipContent>
+                                                                     </Tooltip>
+                                                                 }
+                                                             </div>
+                                                             <Tooltip>
+                                                                 <TooltipTrigger>
+                                                                     <Progress className="h-2 w-28 mt-1">
+                                                                         <Progress value={masteredPercent + memorizedPercent} className="bg-green-300" />
+                                                                         <Progress value={masteredPercent} className="bg-green-600 -mt-2" />
+                                                                     </Progress>
+                                                                 </TooltipTrigger>
+                                                                 <TooltipContent>
+                                                                     <p>محفوظ: {student?.memorizedCount || 0}</p>
+                                                                     <p>متقن: {student?.masteredCount || 0}</p>
+                                                                 </TooltipContent>
+                                                             </Tooltip>
+                                                         </div>
+                                                     </TableCell>
+                                                     <TableCell className="font-bold">
+                                                         {student?.status === 'نشط' ? student.masteryScore : '-'}
+                                                     </TableCell>
+                                                     <TableCell>
+                                                         <Badge variant={student?.status === 'مطرود' ? 'destructive' : 'default'}>{student?.status || '-'}</Badge>
+                                                     </TableCell>
+                                                 </TableRow>
+                                             )
+                                         })}
+                                     </TableBody>
                                 </Table>
                             </div>
                         </CardContent>

@@ -21,7 +21,7 @@ export const useStudentStats = (students: Student[] | null, dailySessions: Recor
         );
 
         const studentScores: Record<string, any> = {};
-        (students ?? []).filter(s => s.status === 'نشط').forEach(student => {
+        (students ?? []).filter(s => s && s.status === 'نشط').forEach(student => {
             studentScores[student.id] = {
                 id: student.id,
                 points: 0,
@@ -125,7 +125,7 @@ export const useStudentStats = (students: Student[] | null, dailySessions: Recor
             );
 
             const studentScoresInMonth: Record<string, any> = {};
-            (students ?? []).filter(s => s.status === 'نشط').forEach(s => {
+            (students ?? []).filter(s => s && s.status === 'نشط').forEach(s => {
                 studentScoresInMonth[s.id] = {
                     id: s.id,
                     points: 0,

@@ -80,9 +80,9 @@ export function GlobalSearch({ students, isOpen, onOpenChange, router }: GlobalS
 
   // Index students with comprehensive metadata for rich fuzzy filtering
   const indexedStudents = useMemo(() => {
-    return (students ?? []).map(student => {
+    return (students ?? []).filter((s): s is Student => Boolean(s && typeof s === 'object')).map(student => {
       // Build search keywords string
-      const warningText = student.covenants?.map(c => c.text + ' ' + c.type).join(' ') || '';
+      const warningText = (student.covenants || []).map(c => (c?.text || '') + ' ' + (c?.type || '')).join(' ') || '';
       const groupName = student.groupName || '';
       
       const keywords = [
@@ -100,7 +100,7 @@ export function GlobalSearch({ students, isOpen, onOpenChange, router }: GlobalS
       ].filter(Boolean).join(' ');
 
       // Check if student has active warnings (covenants that are 'نشط')
-      const activeCovenants = student.covenants?.filter(c => c.status === 'نشط') || [];
+      const activeCovenants = (student.covenants || []).filter(c => c && c.status === 'نشط');
 
       return {
         ...student,
@@ -113,7 +113,7 @@ export function GlobalSearch({ students, isOpen, onOpenChange, router }: GlobalS
 
   // Filter students under active warning status to display in a dedicated alerts section
   const warningStudents = useMemo(() => {
-    return indexedStudents.filter(s => s.activeCovenants.length > 0 && s.status === 'نشط');
+    return indexedStudents.filter(s => s && s.activeCovenants.length > 0 && s.status === 'نشط');
   }, [indexedStudents]);
 
   return (

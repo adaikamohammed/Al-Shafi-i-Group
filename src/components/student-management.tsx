@@ -131,8 +131,8 @@ export function StudentManagement() {
             }
         }
         sortableStudents = sortableStudents.filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
-        if (statusFilter !== 'all') sortableStudents = sortableStudents.filter(s => s.status === statusFilter);
-        if (levelFilter.length > 0) sortableStudents = sortableStudents.filter(s => s.educationalLevel && levelFilter.includes(s.educationalLevel));
+        if (statusFilter !== 'all') sortableStudents = sortableStudents.filter(s => s && s.status === statusFilter);
+        if (levelFilter.length > 0) sortableStudents = sortableStudents.filter(s => s && s.educationalLevel && levelFilter.includes(s.educationalLevel));
 
         sortableStudents.sort((a, b) => {
             if (sortConfig.key === 'pageNumber') {
@@ -208,7 +208,7 @@ export function StudentManagement() {
 
     // Filter active students under user's purview
     const activeStudentsForDues = useMemo(() => {
-        return allStudents.filter(s => s.status === 'نشط');
+        return (allStudents || []).filter(s => s && s.status === 'نشط');
     }, [allStudents]);
 
     // Check which active students have registered their dues in currentYear & currentQuarter
@@ -333,7 +333,7 @@ export function StudentManagement() {
                         <div className="absolute right-0 top-0 p-2 opacity-10 group-hover:scale-110 transition-transform"><UserCheck className="h-16 w-16" /></div>
                         <CardContent className="p-4 relative">
                             <p className="text-xs text-emerald-600 font-body font-bold">الطلبة النشطون</p>
-                            <h3 className="text-3xl font-bold font-headline mt-1 text-emerald-700">{allStudents.filter(s => s.status === 'نشط').length}</h3>
+                            <h3 className="text-3xl font-bold font-headline mt-1 text-emerald-700">{(allStudents || []).filter(s => s && s.status === 'نشط').length}</h3>
                         </CardContent>
                     </Card>
                     <Card className="border-none bg-amber-50 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
@@ -347,7 +347,7 @@ export function StudentManagement() {
                         <div className="absolute right-0 top-0 p-2 opacity-10 group-hover:scale-110 transition-transform"><UserMinus className="h-16 w-16" /></div>
                         <CardContent className="p-4 relative">
                             <p className="text-xs text-red-600 font-body font-bold">المطرودون</p>
-                            <h3 className="text-3xl font-bold font-headline mt-1 text-red-700">{allStudents.filter(s => s.status === 'مطرود').length}</h3>
+                            <h3 className="text-3xl font-bold font-headline mt-1 text-red-700">{(allStudents || []).filter(s => s && s.status === 'مطرود').length}</h3>
                         </CardContent>
                     </Card>
                     <Card className="border-none bg-blue-50 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">

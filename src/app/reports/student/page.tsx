@@ -43,7 +43,7 @@ export default function StudentReportPage() {
     const [messageTemplate, setMessageTemplate] = useState<MessageTemplate>('report');
     const [messageContent, setMessageContent] = useState('');
 
-    const activeStudents = useMemo(() => (students ?? []).filter(s => s.status === 'نشط').sort((a, b) => arabicCompare(a.fullName, b.fullName)), [students]);
+    const activeStudents = useMemo(() => (students ?? []).filter(s => s && s.status === 'نشط').sort((a, b) => arabicCompare(a?.fullName || '', b?.fullName || '')), [students]);
     const studentOptions: SearchableSelectOption[] = useMemo(() => activeStudents.map(s => ({ value: s.id, label: s.fullName })), [activeStudents]);
     const selectedStudent = useMemo(() => activeStudents.find(s => s.id === selectedStudentId), [activeStudents, selectedStudentId]);
 
@@ -147,7 +147,7 @@ export default function StudentReportPage() {
         const disciplineScore = stats.totalBehavior > 0 ? ((stats.calm * 2 + stats.mediumBehavior * 1) / (stats.totalBehavior * 2)) * 10 : 0;
 
         const studentMastery = surahProgress[selectedStudentId] || {};
-        const masteredCount = Object.values(studentMastery).filter(s => s.status === 2).length;
+        const masteredCount = Object.values(studentMastery).filter((s: any) => s && s.status === 2).length;
         const memorizationScore = masteredCount > 0 ? (masteredCount / 114) * 10 : 0;
 
         const reviewScore = totalSessionsHeld > 0 ? (stats.reviewed / totalSessionsHeld) * 10 : 0;
@@ -162,7 +162,7 @@ export default function StudentReportPage() {
 
         let autoNote = '';
         const studentProgressData = surahProgress[selectedStudentId] || {};
-        const memorizedCount = Object.values(studentProgressData).filter(s => s.status === 1).length;
+        const memorizedCount = Object.values(studentProgressData).filter((s: any) => s && s.status === 1).length;
         if (masteredCount > 0 && memorizedCount > masteredCount) {
             autoNote = 'الطالب يحفظ جيداً ولكن يحتاج لتركيز أكبر على مراجعة وتثبيت المحفوظ القديم.';
         } else {
@@ -180,7 +180,7 @@ export default function StudentReportPage() {
 
         const studentSurahs = ((loading ? [] : (students ?? []).find(s => s.id === selectedStudentId)?.memorizedSurahsCount) || 0);
 
-        const activeCovenant = (student.covenants || []).find(c => c.status === 'نشط' && c.card !== 'بدون');
+        const activeCovenant = (student?.covenants || []).find(c => c && c.status === 'نشط' && c.card !== 'بدون');
 
         return {
             student,

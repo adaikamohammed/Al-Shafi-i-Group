@@ -185,8 +185,9 @@ export default function StatsPage() {
                 // 2. Process Surah Progress
                 if (user.surahProgress) {
                     Object.values(user.surahProgress).forEach((studentProgress: any) => {
+                        if (!studentProgress || typeof studentProgress !== 'object') return;
                         Object.values(studentProgress).forEach((entry: any) => {
-                            if (entry.status >= 1) {
+                            if (entry && entry.status >= 1) {
                                 totalSurahsMemorized++;
                                 groupStats[uniqueKey].surahs++;
                             }
@@ -198,6 +199,7 @@ export default function StatsPage() {
                 let hasStudents = false;
                 if (user.students) {
                     Object.values(user.students).forEach((student: any) => {
+                        if (!student || typeof student !== 'object') return;
                         const s = student as Student;
                         const isValidStatus = s.status !== 'مطرود' && s.status !== 'محذوف';
 

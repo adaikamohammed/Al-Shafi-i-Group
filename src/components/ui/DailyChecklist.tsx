@@ -24,7 +24,7 @@ interface Task {
 export function DailyChecklist() {
     const { user } = useAuth();
     const { dailySessions, students, payments } = useStudentContext();
-    const activeStudents = useMemo(() => (students || []).filter(s => s.status === 'نشط'), [students]);
+    const activeStudents = useMemo(() => (students || []).filter(s => s && s.status === 'نشط'), [students]);
 
     const currentThemeId = user?.portalTheme || 'midnight';
     const theme = PORTAL_THEMES[currentThemeId] || PORTAL_THEMES.midnight;

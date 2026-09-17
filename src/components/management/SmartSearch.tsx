@@ -23,7 +23,7 @@ export function SmartSearch({ students, sheikhs, onStudentClick }: SmartSearchPr
     const [isOpen, setIsOpen] = useState(false);
 
     const activeStudents = useMemo(() =>
-        (students || []).filter(s => s.status === 'نشط'),
+        (students || []).filter(s => s && s.status === 'نشط'),
         [students]);
 
     // Smart filters
