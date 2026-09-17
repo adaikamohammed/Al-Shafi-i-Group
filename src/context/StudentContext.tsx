@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { Student, DailySession, DailyReport, Payment, AppSettings, SurahMastery, PointsConfig, Reward, BadgeConfig, DailyRecord, Covenant, PreRegistration, AppUser, PaymentStatus, SurahMasteryEntry, AdminLog, ActivityLog, Meeting, MeetingSuggestion, InternalNotification, WeeklyOutcome, GroupSurahConfig } from '@/lib/types';
 import { isWithinInterval, parseISO, isValid, isAfter, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from './AuthContext';
@@ -80,7 +80,7 @@ interface StudentContextType {
   deleteStudent: (studentId: string, ownerId: string) => void;
   deleteAllStudents: () => void;
   deleteMultipleStudents: (studentsToDelete: { id: string, ownerId: string }[]) => void;
-  addDailySession: (session: DailySession, targetOwnerId?: string) => Promise<void>;
+  addDailySession: (session: DailySession, targetOwnerId?: string, options?: { silent?: boolean }) => Promise<void>;
   deleteDailySession: (sessionId: string, date?: string, targetOwnerId?: string) => void;
   getSessionsForDay: (date: string) => DailySession[];
   getSessionById: (sessionId: string) => DailySession | undefined;
@@ -1343,7 +1343,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: `🗑️ تم حذف ${studentsToDelete.length} طالب`, description: "تم حذف الطلاب المحددين بنجاح." });
   };
 
-  const addDailySession = async (session: DailySession, targetOwnerId?: string): Promise<void> => {
+  const addDailySession = async (session: DailySession, targetOwnerId?: string, options?: { silent?: boolean }): Promise<void> => {
     if (!authContextUser) return;
 
     const ownerId = (isSuperAdmin || isManagement) && targetOwnerId ? targetOwnerId : authContextUser.uid;
@@ -1397,10 +1397,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           ownerId,
           authorUid: authContextUser.uid
         });
-        toast({
-          title: "⚡ تم الحفظ محلياً بسرعة فائقة",
-          description: "تم حفظ بيانات الحصة محلياً بسبب بطء الاتصال، وستُرفع تلقائياً للسحابة لاحقاً.",
-        });
+        if (!options?.silent) {
+          toast({
+            title: "⚡ تم الحفظ محلياً بسرعة فائقة",
+            description: "تم حفظ بيانات الحصة محلياً بسبب بطء الاتصال، وستُرفع تلقائياً للسحابة لاحقاً.",
+          });
+        }
       }
     } else {
       await queueOfflineMutation({
@@ -1411,10 +1413,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         ownerId,
         authorUid: authContextUser.uid
       });
-      toast({
-        title: "💾 تم الحفظ أوفلاين بنجاح",
-        description: "تم تشفير وحفظ بيانات الحصة محلياً (AES-256)، وستُرفع تلقائياً عند الاتصال بالإنترنت.",
-      });
+      if (!options?.silent) {
+        toast({
+          title: "💾 تم الحفظ أوفلاين بنجاح",
+          description: "تم تشفير وحفظ بيانات الحصة محلياً (AES-256)، وستُرفع تلقائياً عند الاتصال بالإنترنت.",
+        });
+      }
     }
 
     // Auto-sync public reports for all students in this session if online
@@ -1488,7 +1492,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const getSessionsForDay = (date: string): DailySession[] => {
+  const getSessionsForDay = useCallback((date: string): DailySession[] => {
     const sessionsForDate = (dailySessions ?? {})[date];
     if (!sessionsForDate) return [];
 
@@ -1498,7 +1502,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       id: session.id || id,
       ownerId: session.ownerId || (isManagement || isSuperAdmin ? undefined : authContextUser?.uid)
     }));
-  }
+  }, [dailySessions, isManagement, isSuperAdmin, authContextUser?.uid]);
 
   const getSessionById = (sessionId: string): DailySession | undefined => {
     const date = sessionId.substring(0, 10);

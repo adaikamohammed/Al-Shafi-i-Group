@@ -124,6 +124,11 @@ function RegisterSessionContent() {
     const [loadedDate, setLoadedDate] = useState<string | null>(null);
     const [showExplanation, setShowExplanation] = useState(false);
 
+    // Active session and stable function refs
+    const activeSessionKeyRef = useRef<string | null>(null);
+    const getSessionsForDayRef = useRef(getSessionsForDay);
+    getSessionsForDayRef.current = getSessionsForDay;
+
     // Swipe navigation refs
     const touchStartX = useRef<number>(0);
     const touchStartY = useRef<number>(0);
@@ -358,31 +363,38 @@ function RegisterSessionContent() {
     useEffect(() => {
         // Load initial data logic - Local First & Offline Ready
         const loadFromFirebase = async () => {
-            // 1. Immediate State Reset on Date Change to prevent leakage
+            if (!selectedDay || !user) return;
+
+            const dateStr = format(selectedDay, 'yyyy-MM-dd');
+
+            // 🔍 Detect session owner from context (if viewing as admin)
+            let sessionOwnerId = effectiveOwnerId || user.uid;
+
+            if (!ownerIdParam) {
+                const contextSessions = getSessionsForDayRef.current(dateStr);
+                const existingContextSession = contextSessions.find((s: any) => {
+                    const num = s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
+                    return num === sessionToOpen;
+                });
+                if (existingContextSession && existingContextSession.ownerId) {
+                    sessionOwnerId = existingContextSession.ownerId;
+                }
+            }
+
+            const currentKey = `${dateStr}-s${sessionToOpen}-${sessionOwnerId}`;
+            // 🛡️ CRITICAL GUARD: If this session is ALREADY loaded in the editor, NEVER reset or wipe the user's state!
+            if (activeSessionKeyRef.current === currentKey) {
+                return;
+            }
+            activeSessionKeyRef.current = currentKey;
+
+            // 1. Reset state ONLY on genuine session/date switch
             setLoadedDate(null);
             setAttendanceRecords({});
             setCurrentSessionId(null);
             setSessionType('حصة أساسية'); // Default reset
 
-            if (!selectedDay || !user) return;
-
             try {
-                const dateStr = format(selectedDay, 'yyyy-MM-dd');
-
-                // 🔍 Detect session owner from context (if viewing as admin)
-                let sessionOwnerId = effectiveOwnerId || user.uid;
-
-                if (!ownerIdParam) {
-                    const contextSessions = getSessionsForDay(dateStr);
-                    const existingContextSession = contextSessions.find((s: any) => {
-                        const num = s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
-                        return num === sessionToOpen;
-                    });
-                    if (existingContextSession && existingContextSession.ownerId) {
-                        sessionOwnerId = existingContextSession.ownerId;
-                    }
-                }
-
                 // دالة تطبيق بيانات الحصة على الواجهة
                 const applySessionData = (session: any) => {
                     setCurrentSessionId(session.id); // LOCK ID
@@ -406,28 +418,35 @@ function RegisterSessionContent() {
                     if (session.tasmieToVerse) setTasmieToVerse(session.tasmieToVerse);
 
                     const records: any = {};
-                    session.records?.forEach((record: any) => {
-                        records[record.studentId] = {
-                            attendance: record.attendance,
-                            memorization: record.memorization,
-                            behavior: record.behavior,
-                            bonus: record.bonus || '',
-                            negativeBonus: record.negativeBonus || '',
-                            notes: record.notes || '',
-                            review: record.review,
-                            isDelayed: record.isDelayed || false,
-                            surahId: record.surahId,
-                            fromVerse: record.fromVerse,
-                            toVerse: record.toVerse,
-                            catchUpRecords: record.catchUpRecords || [],
-                            makeupSessions: record.makeupSessions || []
-                        };
+                    const rawRecords = Array.isArray(session.records)
+                        ? session.records
+                        : (session.records && typeof session.records === 'object')
+                            ? Object.values(session.records)
+                            : [];
+                    rawRecords.forEach((record: any) => {
+                        if (record && record.studentId) {
+                            records[record.studentId] = {
+                                attendance: record.attendance,
+                                memorization: record.memorization,
+                                behavior: record.behavior,
+                                bonus: record.bonus || '',
+                                negativeBonus: record.negativeBonus || '',
+                                notes: record.notes || '',
+                                review: record.review,
+                                isDelayed: record.isDelayed || false,
+                                surahId: record.surahId,
+                                fromVerse: record.fromVerse,
+                                toVerse: record.toVerse,
+                                catchUpRecords: record.catchUpRecords || [],
+                                makeupSessions: record.makeupSessions || []
+                            };
+                        }
                     });
                     setAttendanceRecords(records);
                 };
 
                 // أولاً: البحث في الذاكرة المحلية (Context / IndexedDB) لتحميل فوري 0ms
-                const localSessions = getSessionsForDay(dateStr);
+                const localSessions = getSessionsForDayRef.current(dateStr);
                 let existingSession: any = localSessions.find((s: any) => {
                     const num = s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
                     return num === sessionToOpen;
@@ -529,7 +548,7 @@ function RegisterSessionContent() {
         };
 
         loadFromFirebase();
-    }, [loading, selectedDay, sessionToOpen, user, getSessionsForDay]);
+    }, [loading, selectedDay, sessionToOpen, user?.uid, ownerIdParam, effectiveOwnerId]);
 
     const handleSessionTypeChange = (val: any) => {
         setSessionType(val);
@@ -670,16 +689,21 @@ function RegisterSessionContent() {
         attendanceRecords
     }), [sessionType, teacherAbsenceReason, substituteTeacher, activityType, activityDescription, surahId, fromVerse, toVerse, isReview, isCounterStopped, talqinSurahId, talqinFromVerse, talqinToVerse, tasmieSurahId, tasmieFromVerse, tasmieToVerse, attendanceRecords]);
 
-    const debouncedSessionData = useDebounce(sessionData, 1500); // Auto-save after 1.5s of inactivity
+    // Ref to always hold the latest session data without triggering re-renders
+    const sessionDataRef = useRef(sessionData);
+    sessionDataRef.current = sessionData;
+
+    const isDirtyRef = useRef(isDirty);
+    isDirtyRef.current = isDirty;
 
     // Shared Save Logic
-    const performSave = async (data: typeof sessionData, silent = false): Promise<void> => {
+    const performSave = async (dataToSave?: typeof sessionData, silent = false): Promise<void> => {
         if (!selectedDay || !user) return;
+        const data = dataToSave || sessionDataRef.current;
         const dateStr = format(selectedDay, 'yyyy-MM-dd');
-        let sessionOwnerId: string | undefined = undefined;
+        let sessionOwnerId: string | undefined = effectiveOwnerId || user?.uid;
 
         // Race Condition Guard: Ensure we are saving data for the currently loaded day
-        // If loadedDate doesn't match dateStr, it means we navigated away but this save (from debounce) fired late.
         if (loadedDate && loadedDate !== dateStr) {
             console.warn("Save prevented: Race condition detected. Loaded:", loadedDate, "Target:", dateStr);
             return;
@@ -689,7 +713,7 @@ function RegisterSessionContent() {
         let id = currentSessionId;
 
         if (!id) {
-            const existingSessions = getSessionsForDay(dateStr);
+            const existingSessions = getSessionsForDayRef.current(dateStr);
             const existingSession = existingSessions.find(s => {
                 const num = s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
                 return num === sessionToOpen;
@@ -698,19 +722,12 @@ function RegisterSessionContent() {
             setCurrentSessionId(id); // Lock it for future saves in this session
         }
 
-        // ✅ CRITICAL: قراءة البيانات السابقة ودمجها مع الجديدة محلياً وسحابياً
-        let existingRecords: any[] = [];
         let existingSessionCreatedAt: string | undefined = undefined;
-        
-        sessionOwnerId = effectiveOwnerId || user?.uid;
 
-        // 1. أولاً: استخراج السجلات المحفوظة محلياً لضمان عدم ضياع أي سجل في وضع أوفلاين
-        const localContextSessions = getSessionsForDay(dateStr);
+        // استخراج السجلات ومعلومات الجلسة السابقة محلياً للحفاظ على تاريخ الإنشاء وصاحب الحصة
+        const localContextSessions = getSessionsForDayRef.current(dateStr);
         const existingLocal = localContextSessions.find((s: any) => s.id === id || (Number(s.sessionNumber || 1) === sessionToOpen));
         if (existingLocal) {
-            if (existingLocal.records) {
-                existingRecords = existingLocal.records;
-            }
             if (existingLocal.createdAt) {
                 existingSessionCreatedAt = existingLocal.createdAt;
             }
@@ -719,53 +736,11 @@ function RegisterSessionContent() {
             }
         }
 
-        // 2. ثانياً: إذا كان متصلاً بالإنترنت فقط، محاولة استرجاع أحدث السجلات السحابية بمهلة أمان
-        if (isEffectiveOnline()) {
-            try {
-                const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
-                const snapshot: any = await executeWithTimeout(get(sessionsRef), 2000);
-                if (snapshot && snapshot.exists()) {
-                    const val = snapshot.val();
-                    let sessionsDict: Record<string, any> = {};
-                    if (val && typeof val === 'object') {
-                        if ('date' in val && ('records' in val || 'sessionType' in val)) {
-                            const sessionId = val.id || `${dateStr}-s1`;
-                            sessionsDict[sessionId] = {
-                                ...val,
-                                id: sessionId,
-                                sessionNumber: val.sessionNumber !== undefined ? Number(val.sessionNumber) : 1
-                            };
-                        } else {
-                            sessionsDict = val;
-                        }
-                    }
-                    const existingSession = Object.values(sessionsDict).find((s: any) => s.id === id || (Number(s.sessionNumber || 1) === sessionToOpen)) as any;
-                    if (existingSession) {
-                        if (existingSession.records) {
-                            existingRecords = existingSession.records;
-                        }
-                        if (existingSession.createdAt) {
-                            existingSessionCreatedAt = existingSession.createdAt;
-                        }
-                    }
-                }
-            } catch (error) {
-                // هادئ: الاعتماد على السجلات المحلية الموثوقة
-            }
-        }
-
-        // دمج البيانات القديمة مع الجديدة
-        const mergedRecords: Record<string, any> = {};
-
-        // أولاً: تحميل جميع البيانات القديمة
-        existingRecords.forEach((record: any) => {
-            mergedRecords[record.studentId] = record;
-        });
-
-        // ثانياً: تحديث/إضافة البيانات الجديدة
+        // بناء سجلات الطلاب مباشرة من أحدث حالة مسجلة على الواجهة
+        const recordsArray: any[] = [];
         Object.entries(data.attendanceRecords).forEach(([studentId, d]: [string, any]) => {
-            if (d.attendance) { // فقط إذا كان هناك attendance
-                mergedRecords[studentId] = {
+            if (d && d.attendance) { // فقط إذا كان هناك حضور مسجل
+                recordsArray.push({
                     ...d,
                     sessionId: id,
                     studentId,
@@ -778,14 +753,11 @@ function RegisterSessionContent() {
                     tasmieSurahId: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.tasmieSurahId : null,
                     tasmieFromVerse: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.tasmieFromVerse : null,
                     tasmieToVerse: (isUnifiedMode || groupMode === 'hybrid' || isAdmin5) ? data.tasmieToVerse : null,
-                    catchUpRecords: d.catchUpRecords || [], // Save catch-up records
-                    makeupSessions: d.makeupSessions || [], // حفظ حصص التعويض الفردية
-                };
+                    catchUpRecords: d.catchUpRecords || [],
+                    makeupSessions: d.makeupSessions || [],
+                });
             }
         });
-
-        // تحويل إلى array
-        const recordsArray = Object.values(mergedRecords);
 
         const sessionPayload: any = {
             id,
@@ -814,7 +786,7 @@ function RegisterSessionContent() {
         // Pass effectiveOwnerId if it differs from current user (i.e. Admin actions)
         const targetOwner = (effectiveOwnerId && effectiveOwnerId !== user?.uid) ? effectiveOwnerId : undefined;
         try {
-            await addDailySession(sessionPayload, targetOwner);
+            await addDailySession(sessionPayload, targetOwner, { silent });
 
             if ((isUnifiedMode || groupMode === 'hybrid') && sessionOwnerId && data.talqinSurahId && data.talqinToVerse) {
                 try {
@@ -834,60 +806,85 @@ function RegisterSessionContent() {
                 toast({
                     title: isEffectiveOnline() ? "✅ تم حفظ الحصة" : "⚡ تم الحفظ محلياً بنجاح",
                     description: isEffectiveOnline()
-                        ? "تم حفظ الحصة وتحديث التقييمات بنجاح."
-                        : "تم حفظ الحصة محلياً وستُرفع تلقائياً للسحابة فور عودة الإنترنت.",
-                    duration: 2500,
+                        ? "تم حفظ الحصة وتحديث التقييمات بنجاح في السحابة."
+                        : "تم تشفير وحفظ بيانات الحصة محلياً وستُرفع تلقائياً للسحابة فور توفر الإنترنت.",
+                    duration: 3000,
                 });
             }
         } catch (error: any) {
             console.error('Failed to save session:', error);
-            toast({
-                title: "❌ فشل حفظ الحصة",
-                description: `حدث خطأ أثناء الحفظ: ${error.message || error}`,
-                variant: "destructive",
-                duration: 3000,
-            });
+            if (!silent) {
+                toast({
+                    title: "❌ فشل حفظ الحصة",
+                    description: `حدث خطأ أثناء الحفظ: ${error.message || error}`,
+                    variant: "destructive",
+                    duration: 3000,
+                });
+            }
             throw error;
         }
     };
 
-    // Save Draft to LocalStorage whenever debounced data changes
+    // Save Draft to LocalStorage whenever sessionData changes
     useEffect(() => {
-        if (DRAFT_KEY && debouncedSessionData && (isDirty || currentSessionId)) {
+        if (DRAFT_KEY && (isDirty || currentSessionId)) {
             const draft = {
-                ...debouncedSessionData,
+                ...sessionData,
                 id: currentSessionId // IMPORTANT: Persist the ID
             };
-            localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+            try {
+                localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+            } catch (e) {
+                // Ignore storage quota limits
+            }
         }
-    }, [debouncedSessionData, DRAFT_KEY, isDirty, currentSessionId]);
+    }, [sessionData, DRAFT_KEY, isDirty, currentSessionId]);
 
-    // Auto-Save Effect
+    // Auto-Save Effect: Saves in the background quietly after 2.5s of idle time without disturbing the user
     useEffect(() => {
         if (loading || isInitialLoad || !isDirty) return;
 
-        const autoSave = async () => {
+        const timer = setTimeout(async () => {
+            if (!isDirtyRef.current) return;
+            const dataToSave = sessionDataRef.current;
             setIsSaving(true);
             try {
-                await performSave(debouncedSessionData, true);
+                await performSave(dataToSave, true);
                 setLastSaved(new Date());
-                setIsDirty(false);
+                // Only clear dirty state if no new edits arrived during the async save
+                if (sessionDataRef.current === dataToSave) {
+                    setIsDirty(false);
+                }
             } catch (error) {
                 console.error("Auto-save failed:", error);
             } finally {
                 setIsSaving(false);
             }
-        };
+        }, 2500);
 
-        autoSave();
-    }, [debouncedSessionData]); // Dependencies handled by useDebounce
+        return () => clearTimeout(timer);
+    }, [sessionData, loading, isInitialLoad, isDirty]);
+
+    const handleManualSave = async () => {
+        setIsSaving(true);
+        try {
+            const dataToSave = sessionDataRef.current;
+            await performSave(dataToSave, false);
+            setLastSaved(new Date());
+            setIsDirty(false);
+        } catch (e) {
+            console.error("Manual save failed:", e);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const handleReturn = async () => {
-        if (isDirty || isSaving) {
+        if (isDirtyRef.current || isSaving) {
             setIsSaving(true);
             try {
-                await performSave(sessionData, true); // Force final save
-                toast({ title: "تم الحفظ", description: "تم حفظ التغييرات قبل الخروج.", duration: 2000 });
+                await performSave(sessionDataRef.current, true); // Force final save
+                toast({ title: "تم الحفظ", description: "تم حفظ التغييرات بنجاح.", duration: 2000 });
             } catch (e) {
                 console.error("Save on exit failed", e);
                 toast({ title: "تنبيه", description: "قد لا تكون بعض التغييرات محفوظة.", variant: "destructive", duration: 3000 });
@@ -906,10 +903,10 @@ function RegisterSessionContent() {
 
         try {
             // Save current data before navigating
-            if (isDirty) {
+            if (isDirtyRef.current) {
                 setIsSaving(true);
                 try {
-                    await performSave(sessionData, true);
+                    await performSave(sessionDataRef.current, true);
                 } catch (e) {
                     console.error("Save before navigate failed", e);
                     toast({ title: "تنبيه", description: "قد لا تكون بعض التغييرات محفوظة.", variant: "destructive", duration: 3000 });
@@ -1027,20 +1024,27 @@ function RegisterSessionContent() {
                     if (session.tasmieToVerse) setTasmieToVerse(session.tasmieToVerse);
 
                     const records: any = {};
-                    session.records?.forEach((record: any) => {
-                        records[record.studentId] = {
-                            attendance: record.attendance,
-                            memorization: record.memorization,
-                            behavior: record.behavior,
-                            notes: record.notes,
-                            review: record.review,
-                            isDelayed: record.isDelayed || false,
-                            surahId: record.surahId,
-                            fromVerse: record.fromVerse,
-                            toVerse: record.toVerse,
-                            catchUpRecords: record.catchUpRecords || [],
-                            makeupSessions: record.makeupSessions || []
-                        };
+                    const rawRecords = Array.isArray(session.records)
+                        ? session.records
+                        : (session.records && typeof session.records === 'object')
+                            ? Object.values(session.records)
+                            : [];
+                    rawRecords.forEach((record: any) => {
+                        if (record && record.studentId) {
+                            records[record.studentId] = {
+                                attendance: record.attendance,
+                                memorization: record.memorization,
+                                behavior: record.behavior,
+                                notes: record.notes,
+                                review: record.review,
+                                isDelayed: record.isDelayed || false,
+                                surahId: record.surahId,
+                                fromVerse: record.fromVerse,
+                                toVerse: record.toVerse,
+                                catchUpRecords: record.catchUpRecords || [],
+                                makeupSessions: record.makeupSessions || []
+                            };
+                        }
                     });
                     setAttendanceRecords(records);
 
@@ -1232,12 +1236,16 @@ function RegisterSessionContent() {
                                 رقم الحصة: <span className="font-bold text-primary">{sessionToOpen}</span> (يوم {format(selectedDay, 'EEEE', { locale: ar })})
                             </p>
                             {isSaving ? (
-                                <span className="text-[9px] sm:text-[10px] text-primary flex items-center gap-1 bg-primary/5 px-2 py-0.5 rounded-full animate-pulse">
-                                    <Cloud className="h-3 w-3" /> جاري الحفظ...
+                                <span className="text-[9px] sm:text-[10px] text-primary flex items-center gap-1 bg-primary/10 px-2 py-0.5 rounded-full animate-pulse font-bold">
+                                    <Loader2 className="h-3 w-3 animate-spin" /> جاري الحفظ...
+                                </span>
+                            ) : isDirty ? (
+                                <span className="text-[9px] sm:text-[10px] text-amber-700 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 px-2 py-0.5 rounded-full font-bold">
+                                    ✏️ تعديلات قيد التسجيل
                                 </span>
                             ) : lastSaved ? (
-                                <span className="text-[9px] sm:text-[10px] text-green-600 flex items-center gap-1 bg-green-50 px-2 py-0.5 rounded-full transition-all">
-                                    <Cloud className="h-3 w-3" /> تم الحفظ
+                                <span className="text-[9px] sm:text-[10px] text-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                    <CheckCircle className="h-3 w-3" /> {isEffectiveOnline() ? "متزامن مع السحابة" : "محفوظ محلياً (أوفلاين)"}
                                 </span>
                             ) : null}
                             <Button
@@ -1611,13 +1619,63 @@ function RegisterSessionContent() {
 
 
 
-            <footer className="fixed bottom-0 left-0 right-0 bg-background/85 backdrop-blur-md border-t p-2.5 sm:p-4 z-50">
+            <footer className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-md border-t p-2.5 sm:p-4 z-50 shadow-lg">
                 <div className="container mx-auto max-w-4xl flex items-center justify-between gap-2 sm:gap-4">
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={handleReturn} className="h-10 sm:h-11 rounded-xl px-4 sm:px-6 font-bold text-xs sm:text-sm">
-                            <ArrowRight className="ml-1.5 sm:ml-2 h-4 w-4" /> رجوع
+                    <div className="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            onClick={handleManualSave}
+                            disabled={isSaving}
+                            className="h-10 sm:h-11 rounded-xl px-4 sm:px-7 font-black text-xs sm:text-sm bg-primary hover:bg-primary/90 text-primary-foreground shadow-md gap-2 transition-all active:scale-95"
+                        >
+                            {isSaving ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>جاري الحفظ...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="h-4 w-4" />
+                                    <span>حفظ الحصة</span>
+                                </>
+                            )}
                         </Button>
-                        <Button variant="destructive" onClick={handleDelete} className="h-10 sm:h-11 rounded-xl px-3 sm:px-4 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200">
+
+                        {/* Status text in footer */}
+                        <div className="hidden xs:flex items-center gap-1.5 text-[11px] sm:text-xs">
+                            {isSaving ? (
+                                <span className="text-primary font-bold flex items-center gap-1">
+                                    <Loader2 className="h-3 w-3 animate-spin" /> جاري الحفظ...
+                                </span>
+                            ) : isDirty ? (
+                                <span className="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                                    ✏️ تعديلات غير محفوظة
+                                </span>
+                            ) : lastSaved ? (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                                    <CheckCircle className="h-3.5 w-3.5" />
+                                    {isEffectiveOnline() ? "متزامن" : "محفوظ محلياً"}
+                                </span>
+                            ) : null}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={handleReturn}
+                            disabled={isSaving}
+                            className="h-10 sm:h-11 rounded-xl px-3 sm:px-5 font-bold text-xs sm:text-sm"
+                        >
+                            <ArrowRight className="ml-1 sm:ml-1.5 h-4 w-4" /> رجوع
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDelete}
+                            disabled={isSaving}
+                            className="h-10 sm:h-11 rounded-xl px-2.5 sm:px-3.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                            title="حذف الحصة"
+                        >
                             <Trash2 className="h-4 w-4" />
                         </Button>
                     </div>
