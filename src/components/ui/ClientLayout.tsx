@@ -75,15 +75,40 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
+      const registerSW = () => {
         navigator.serviceWorker.register('/sw.js').then(registration => {
           console.log('Shafii Offline SW registered: ', registration);
         }).catch(registrationError => {
           console.log('Shafii SW registration failed: ', registrationError);
         });
-      });
+      };
+
+      if (document.readyState === 'complete') {
+        registerSW();
+      } else {
+        window.addEventListener('load', registerSW);
+        return () => window.removeEventListener('load', registerSW);
+      }
     }
   }, []);
+
+  // التحميل المسبق الصامت للصفحات الحيوية لضمان عملها أوفلاين 100%
+  useEffect(() => {
+    if (user && router && typeof navigator !== 'undefined' && navigator.onLine) {
+      try {
+        router.prefetch('/sessions/register');
+        router.prefetch('/sessions');
+        router.prefetch('/dashboard');
+        router.prefetch('/students');
+
+        // تنشيط الكاش للصفحة أيضاً عبر fetch صامت
+        fetch('/sessions/register', { cache: 'no-cache' }).catch(() => {});
+        fetch('/sessions', { cache: 'no-cache' }).catch(() => {});
+      } catch (e) {
+        // Silent
+      }
+    }
+  }, [user, router]);
 
   useEffect(() => {
     const isPublicPage = pathname === '/' || pathname === '/about' || pathname === '/future' || pathname === '/stats' || pathname.startsWith('/parent-portal') || pathname.startsWith('/record');

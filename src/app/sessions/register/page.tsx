@@ -22,6 +22,7 @@ import { SearchableSelect, SearchableSelectOption } from '@/components/ui/Search
 import { surahs } from '@/lib/surahs';
 import { db } from '@/lib/firebase';
 import { ref as dbRef, get } from 'firebase/database';
+import { isEffectiveOnline, executeWithTimeout } from '@/lib/offlineSyncEngine';
 
 function RegisterSessionContent() {
     const { user, isSuperAdmin } = useAuth();
@@ -355,7 +356,7 @@ function RegisterSessionContent() {
     }, []);
 
     useEffect(() => {
-        // Load initial data logic
+        // Load initial data logic - Local First & Offline Ready
         const loadFromFirebase = async () => {
             // 1. Immediate State Reset on Date Change to prevent leakage
             setLoadedDate(null);
@@ -382,36 +383,8 @@ function RegisterSessionContent() {
                     }
                 }
 
-                const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
-                const snapshot = await get(sessionsRef);
-
-                let existingSession = null;
-                if (snapshot.exists()) {
-                    const val = snapshot.val();
-                    let sessionsDict: Record<string, any> = {};
-                    if (val && typeof val === 'object') {
-                        if ('date' in val && ('records' in val || 'sessionType' in val)) {
-                            // Old structure: single session object directly under the date key
-                            const sessionId = val.id || `${dateStr}-s1`;
-                            sessionsDict[sessionId] = {
-                                ...val,
-                                id: sessionId,
-                                sessionNumber: val.sessionNumber !== undefined ? Number(val.sessionNumber) : 1
-                            };
-                        } else {
-                            // New structure: dictionary of session objects
-                            sessionsDict = val;
-                        }
-                    }
-                    existingSession = Object.values(sessionsDict).find((s: any) => {
-                        const num = s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
-                        return num === sessionToOpen;
-                    });
-                }
-
-                if (existingSession) {
-                    const session = existingSession as any;
-                    // DB Data Exists - Load from Firebase
+                // دالة تطبيق بيانات الحصة على الواجهة
+                const applySessionData = (session: any) => {
                     setCurrentSessionId(session.id); // LOCK ID
                     setSessionType(session.sessionType as any);
                     setTeacherAbsenceReason(session.teacherAbsenceReason || '');
@@ -439,48 +412,71 @@ function RegisterSessionContent() {
                             memorization: record.memorization,
                             behavior: record.behavior,
                             bonus: record.bonus || '',
-                            notes: record.notes,
+                            negativeBonus: record.negativeBonus || '',
+                            notes: record.notes || '',
                             review: record.review,
                             isDelayed: record.isDelayed || false,
                             surahId: record.surahId,
                             fromVerse: record.fromVerse,
                             toVerse: record.toVerse,
-                            catchUpRecords: record.catchUpRecords || [], // Load catch-up
-                            makeupSessions: record.makeupSessions || [] // Load makeup sessions
+                            catchUpRecords: record.catchUpRecords || [],
+                            makeupSessions: record.makeupSessions || []
                         };
                     });
                     setAttendanceRecords(records);
-                } else {
-                    // No DB Data
-                    // FIX: Disabled Local Storage Drafts per user request to prevent data leakage
-                    /*
-                    const isEditingOther = effectiveOwnerId && effectiveOwnerId !== user?.uid;
-                    const savedDraft = (DRAFT_KEY && !isEditingOther) ? localStorage.getItem(DRAFT_KEY) : null;
+                };
 
-                    if (savedDraft) {
-                        try {
-                            const draft = JSON.parse(savedDraft);
-                            setCurrentSessionId(draft.id || null);
-                            setSessionType(draft.sessionType || 'حصة أساسية');
-                            setTeacherAbsenceReason(draft.teacherAbsenceReason || '');
-                            setSubstituteTeacher(draft.substituteTeacher || '');
-                            setActivityType(draft.activityType || '');
-                            setActivityDescription(draft.activityDescription || '');
-                            setSurahId(draft.surahId || 26);
-                            setFromVerse(draft.fromVerse || 1);
-                            setToVerse(draft.toVerse || 1);
-                            setIsReview(draft.isReview || false);
-                            setAttendanceRecords(draft.attendanceRecords || {});
-                            toast({ title: "مسودة محفوظة", description: "تم استرجاع بيانات غير محفوظة من المتصفح." });
-                        } catch (e) {
-                            console.error("Failed to parse draft", e);
+                // أولاً: البحث في الذاكرة المحلية (Context / IndexedDB) لتحميل فوري 0ms
+                const localSessions = getSessionsForDay(dateStr);
+                let existingSession: any = localSessions.find((s: any) => {
+                    const num = s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
+                    return num === sessionToOpen;
+                });
+
+                if (existingSession) {
+                    applySessionData(existingSession);
+                }
+
+                // ثانياً: إذا كان متصلاً بالإنترنت فقط، محاولة قراءة آخر تحديث سحابي
+                if (isEffectiveOnline()) {
+                    try {
+                        const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
+                        const snapshot: any = await executeWithTimeout(get(sessionsRef), 2200);
+
+                        if (snapshot && snapshot.exists()) {
+                            const val = snapshot.val();
+                            let sessionsDict: Record<string, any> = {};
+                            if (val && typeof val === 'object') {
+                                if ('date' in val && ('records' in val || 'sessionType' in val)) {
+                                    const sessionId = val.id || `${dateStr}-s1`;
+                                    sessionsDict[sessionId] = {
+                                        ...val,
+                                        id: sessionId,
+                                        sessionNumber: val.sessionNumber !== undefined ? Number(val.sessionNumber) : 1
+                                    };
+                                } else {
+                                    sessionsDict = val;
+                                }
+                            }
+                            const cloudSession = Object.values(sessionsDict).find((s: any) => {
+                                const num = s.sessionNumber !== undefined ? Number(s.sessionNumber) : (s.id && s.id.endsWith('-s2') ? 2 : 1);
+                                return num === sessionToOpen;
+                            });
+
+                            if (cloudSession) {
+                                existingSession = cloudSession;
+                                applySessionData(cloudSession);
+                            }
                         }
-                    } else {
-                    */
-                    setCurrentSessionId(null); // Truly new
-                    setAttendanceRecords({}); // FIX: Reset records to prevent leakage from previous day
+                    } catch (e) {
+                        // هادئ: في حال بطء أو انقطاع النت، نستمر بالبيانات المحلية بدون أي رسالة خطأ
+                    }
+                }
 
-                    // FIX: Stopped defaulting to Holiday on Thu/Fri per user request
+                if (!existingSession) {
+                    // لا توجد حصة سابقة -> تهيئة حصة جديدة فارغة
+                    setCurrentSessionId(null);
+                    setAttendanceRecords({});
                     setSessionType(sessionToOpen === 1 ? 'حصة أساسية' : 'حصة إضافية');
 
                     if (isUnifiedMode && groupSurahConfig && sessionToOpen === 1) {
@@ -490,7 +486,7 @@ function RegisterSessionContent() {
 
                         setSurahId(targetSurahId);
                         setTalqinSurahId(targetSurahId);
-                        
+
                         const surahData = surahs.find(s => s.id === targetSurahId);
                         const total = surahData?.verses || 286;
 
@@ -508,23 +504,7 @@ function RegisterSessionContent() {
                         setTasmieFromVerse(lastFrom);
                         setTasmieToVerse(lastTo);
                     } else if (isAdmin5 && sessionToOpen === 1) {
-                        // نحاول أولاً من Firebase مباشرة لضمان أحدث البيانات
                         let sessionsSource: Record<string, Record<string, any>> = dailySessions || {};
-
-                        // إذا كانت context sessions فارغة، جرّب Firebase مباشرة
-                        const hasContextSessions = Object.keys(sessionsSource).length > 0;
-                        if (!hasContextSessions) {
-                            try {
-                                const allRef = dbRef(db, `users/${sessionOwnerId}/dailySessions`);
-                                const allSnap = await get(allRef);
-                                if (allSnap.exists()) {
-                                    sessionsSource = allSnap.val();
-                                }
-                            } catch (e) {
-                                console.warn('Could not fetch sessions from Firebase for surah auto-detect', e);
-                            }
-                        }
-
                         const nextData = computeNextSurahData(sessionsSource);
                         setSurahId(nextData.surahId);
                         setTalqinSurahId(nextData.talqinSurahId);
@@ -536,8 +516,7 @@ function RegisterSessionContent() {
                     }
                 }
             } catch (error) {
-                console.error("Error loading session from Firebase:", error);
-                toast({ title: "خطأ", description: "فشل تحميل البيانات من الخادم.", variant: "destructive" });
+                console.warn("Session local init notice:", error);
             } finally {
                 setIsInitialLoad(false);
                 setIsDirty(false);
@@ -550,7 +529,7 @@ function RegisterSessionContent() {
         };
 
         loadFromFirebase();
-    }, [loading, selectedDay, sessionToOpen, user]);
+    }, [loading, selectedDay, sessionToOpen, user, getSessionsForDay]);
 
     const handleSessionTypeChange = (val: any) => {
         setSessionType(val);
@@ -719,50 +698,60 @@ function RegisterSessionContent() {
             setCurrentSessionId(id); // Lock it for future saves in this session
         }
 
-        // ✅ CRITICAL: قراءة البيانات القديمة من Firebase ودمجها مع الجديدة
+        // ✅ CRITICAL: قراءة البيانات السابقة ودمجها مع الجديدة محلياً وسحابياً
         let existingRecords: any[] = [];
         let existingSessionCreatedAt: string | undefined = undefined;
-        try {
-            // 🔍 Detect session owner
-            sessionOwnerId = effectiveOwnerId || user?.uid;
+        
+        sessionOwnerId = effectiveOwnerId || user?.uid;
 
-            if (!ownerIdParam) {
-                const contextSessions = getSessionsForDay(dateStr);
-                const existingContextSession = contextSessions.find((s: any) => s.id === id);
-                if (existingContextSession && existingContextSession.ownerId) {
-                    sessionOwnerId = existingContextSession.ownerId;
-                }
+        // 1. أولاً: استخراج السجلات المحفوظة محلياً لضمان عدم ضياع أي سجل في وضع أوفلاين
+        const localContextSessions = getSessionsForDay(dateStr);
+        const existingLocal = localContextSessions.find((s: any) => s.id === id || (Number(s.sessionNumber || 1) === sessionToOpen));
+        if (existingLocal) {
+            if (existingLocal.records) {
+                existingRecords = existingLocal.records;
             }
+            if (existingLocal.createdAt) {
+                existingSessionCreatedAt = existingLocal.createdAt;
+            }
+            if (existingLocal.ownerId && !ownerIdParam) {
+                sessionOwnerId = existingLocal.ownerId;
+            }
+        }
 
-            const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
-            const snapshot = await get(sessionsRef);
-            if (snapshot.exists()) {
-                const val = snapshot.val();
-                let sessionsDict: Record<string, any> = {};
-                if (val && typeof val === 'object') {
-                    if ('date' in val && ('records' in val || 'sessionType' in val)) {
-                        const sessionId = val.id || `${dateStr}-s1`;
-                        sessionsDict[sessionId] = {
-                            ...val,
-                            id: sessionId,
-                            sessionNumber: val.sessionNumber !== undefined ? Number(val.sessionNumber) : 1
-                        };
-                    } else {
-                        sessionsDict = val;
+        // 2. ثانياً: إذا كان متصلاً بالإنترنت فقط، محاولة استرجاع أحدث السجلات السحابية بمهلة أمان
+        if (isEffectiveOnline()) {
+            try {
+                const sessionsRef = dbRef(db, `users/${sessionOwnerId}/dailySessions/${dateStr}`);
+                const snapshot: any = await executeWithTimeout(get(sessionsRef), 2000);
+                if (snapshot && snapshot.exists()) {
+                    const val = snapshot.val();
+                    let sessionsDict: Record<string, any> = {};
+                    if (val && typeof val === 'object') {
+                        if ('date' in val && ('records' in val || 'sessionType' in val)) {
+                            const sessionId = val.id || `${dateStr}-s1`;
+                            sessionsDict[sessionId] = {
+                                ...val,
+                                id: sessionId,
+                                sessionNumber: val.sessionNumber !== undefined ? Number(val.sessionNumber) : 1
+                            };
+                        } else {
+                            sessionsDict = val;
+                        }
+                    }
+                    const existingSession = Object.values(sessionsDict).find((s: any) => s.id === id || (Number(s.sessionNumber || 1) === sessionToOpen)) as any;
+                    if (existingSession) {
+                        if (existingSession.records) {
+                            existingRecords = existingSession.records;
+                        }
+                        if (existingSession.createdAt) {
+                            existingSessionCreatedAt = existingSession.createdAt;
+                        }
                     }
                 }
-                const existingSession = Object.values(sessionsDict).find((s: any) => s.id === id) as any;
-                if (existingSession) {
-                    if (existingSession.records) {
-                        existingRecords = existingSession.records;
-                    }
-                    if (existingSession.createdAt) {
-                        existingSessionCreatedAt = existingSession.createdAt;
-                    }
-                }
+            } catch (error) {
+                // هادئ: الاعتماد على السجلات المحلية الموثوقة
             }
-        } catch (error) {
-            console.error("Error reading existing records:", error);
         }
 
         // دمج البيانات القديمة مع الجديدة
@@ -824,36 +813,41 @@ function RegisterSessionContent() {
 
         // Pass effectiveOwnerId if it differs from current user (i.e. Admin actions)
         const targetOwner = (effectiveOwnerId && effectiveOwnerId !== user?.uid) ? effectiveOwnerId : undefined;
-        console.log('📝 Saving Session:', { effectiveOwnerId, currentUserId: user?.uid, targetOwner, ownerIdParam });
         try {
             await addDailySession(sessionPayload, targetOwner);
 
             if ((isUnifiedMode || groupMode === 'hybrid') && sessionOwnerId && data.talqinSurahId && data.talqinToVerse) {
-                await updateSheikhGroupSettings(sessionOwnerId, undefined, {
-                    surahId: data.talqinSurahId,
-                    currentVerse: data.talqinToVerse,
-                    lastTalqinFrom: data.talqinFromVerse,
-                    lastTalqinTo: data.talqinToVerse,
-                    startedAt: groupSurahConfig?.startedAt || new Date().toISOString().split('T')[0]
-                });
+                try {
+                    await updateSheikhGroupSettings(sessionOwnerId, undefined, {
+                        surahId: data.talqinSurahId,
+                        currentVerse: data.talqinToVerse,
+                        lastTalqinFrom: data.talqinFromVerse,
+                        lastTalqinTo: data.talqinToVerse,
+                        startedAt: groupSurahConfig?.startedAt || new Date().toISOString().split('T')[0]
+                    });
+                } catch (settErr) {
+                    console.warn('Could not sync sheikh settings immediately:', settErr);
+                }
             }
 
             if (!silent) {
                 toast({
-                    title: "✅ تم حفظ الحصة",
-                    description: "تم حفظ الحصة وتحديث التقييمات بنجاح.",
-                    duration: 2000,
+                    title: isEffectiveOnline() ? "✅ تم حفظ الحصة" : "⚡ تم الحفظ محلياً بنجاح",
+                    description: isEffectiveOnline()
+                        ? "تم حفظ الحصة وتحديث التقييمات بنجاح."
+                        : "تم حفظ الحصة محلياً وستُرفع تلقائياً للسحابة فور عودة الإنترنت.",
+                    duration: 2500,
                 });
             }
         } catch (error: any) {
             console.error('Failed to save session:', error);
             toast({
                 title: "❌ فشل حفظ الحصة",
-                description: `حدث خطأ أثناء الحفظ (الرجاء التحقق من الصلاحيات): ${error.message || error}`,
+                description: `حدث خطأ أثناء الحفظ: ${error.message || error}`,
                 variant: "destructive",
                 duration: 3000,
             });
-            throw error; // Rethrow to let autoSave and exit loops handle it correctly
+            throw error;
         }
     };
 
@@ -1213,36 +1207,36 @@ function RegisterSessionContent() {
 
     return (
         <div
-            className="container mx-auto p-4 max-w-4xl space-y-6 pb-24 rtl"
+            className="container mx-auto p-2 sm:p-4 max-w-4xl space-y-3 sm:space-y-6 pb-28 rtl"
             dir="rtl"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
         >
-            <header className="bg-card p-4 rounded-2xl shadow-sm border space-y-3">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={handleReturn} className="rounded-xl">
-                        <ArrowRight className="h-5 w-5" />
+            <header className="bg-card p-3 sm:p-4 rounded-2xl shadow-sm border space-y-2.5 sm:space-y-3">
+                <div className="flex items-center gap-2 sm:gap-4">
+                    <Button variant="ghost" size="icon" onClick={handleReturn} className="rounded-xl shrink-0 h-9 w-9 sm:h-10 sm:w-10">
+                        <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
                     <div className="flex-1 min-w-0">
-                        <h1 className="text-lg md:text-xl font-headline font-bold flex items-center gap-2">
-                            <FileText className="h-5 w-5 md:h-6 md:w-6 text-primary shrink-0" />
+                        <h1 className="text-sm sm:text-base md:text-xl font-headline font-bold flex items-center gap-1.5 sm:gap-2">
+                            <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
                             <span className="truncate">تسجيل حصة: {format(selectedDay, 'd MMMM yyyy', { locale: ar })}</span>
                             {effectiveOwnerId && effectiveOwnerId !== user?.uid && (
-                                <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full mr-2 shrink-0">
+                                <span className="text-[10px] sm:text-xs bg-amber-100 text-amber-800 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full mr-1.5 shrink-0">
                                     نيابة عن شيخ
                                 </span>
                             )}
                         </h1>
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <p className="text-xs text-muted-foreground font-body">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-wrap mt-0.5">
+                            <p className="text-[11px] sm:text-xs text-muted-foreground font-body">
                                 رقم الحصة: <span className="font-bold text-primary">{sessionToOpen}</span> (يوم {format(selectedDay, 'EEEE', { locale: ar })})
                             </p>
                             {isSaving ? (
-                                <span className="text-[10px] text-primary flex items-center gap-1 bg-primary/5 px-2 py-0.5 rounded-full animate-pulse">
+                                <span className="text-[9px] sm:text-[10px] text-primary flex items-center gap-1 bg-primary/5 px-2 py-0.5 rounded-full animate-pulse">
                                     <Cloud className="h-3 w-3" /> جاري الحفظ...
                                 </span>
                             ) : lastSaved ? (
-                                <span className="text-[10px] text-green-600 flex items-center gap-1 bg-green-50 px-2 py-0.5 rounded-full transition-all">
+                                <span className="text-[9px] sm:text-[10px] text-green-600 flex items-center gap-1 bg-green-50 px-2 py-0.5 rounded-full transition-all">
                                     <Cloud className="h-3 w-3" /> تم الحفظ
                                 </span>
                             ) : null}
@@ -1251,7 +1245,7 @@ function RegisterSessionContent() {
                                 size="sm"
                                 onClick={handleRefresh}
                                 disabled={isRefreshing || isSaving}
-                                className="h-7 rounded-lg text-[10px] font-bold"
+                                className="h-6 sm:h-7 rounded-lg text-[9px] sm:text-[10px] font-bold px-2"
                                 title="تحديث البيانات من الخادم"
                             >
                                 <RefreshCw className={cn("h-3 w-3 ml-1", isRefreshing && "animate-spin")} />
@@ -1262,24 +1256,24 @@ function RegisterSessionContent() {
                 </div>
 
                 {/* Day Navigation Bar */}
-                <div className="flex items-center justify-between bg-muted/40 rounded-xl px-1.5 sm:px-2 py-1 border border-border/50">
+                <div className="flex items-center justify-between bg-muted/40 rounded-xl px-1 sm:px-2 py-1 border border-border/50">
                     <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => navigateToDay(-1)}
                         disabled={isNavigating || isSaving}
-                        className="h-10 rounded-lg font-bold text-[11px] sm:text-xs gap-0.5 sm:gap-1 hover:bg-primary/10 active:bg-primary/20 transition-all px-2 sm:px-3"
+                        className="h-8 sm:h-10 rounded-lg font-bold text-[10px] sm:text-xs gap-0.5 sm:gap-1 hover:bg-primary/10 active:bg-primary/20 transition-all px-1.5 sm:px-3"
                     >
-                        <ChevronRight className="h-4 w-4 shrink-0" />
+                        <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                         <span className="hidden sm:inline">{format(addDays(selectedDay, -1), 'EEEE', { locale: ar })}</span>
                         <span className="sm:hidden">السابق</span>
                     </Button>
 
                     <div className="flex flex-col items-center gap-0 text-center min-w-0 px-1">
-                        <span className="text-[11px] sm:text-xs font-bold text-primary leading-tight">
+                        <span className="text-[10px] sm:text-xs font-bold text-primary leading-tight">
                             {format(selectedDay, 'EEEE', { locale: ar })}
                         </span>
-                        <span className="text-[9px] sm:text-[10px] text-muted-foreground leading-tight">
+                        <span className="text-[8px] sm:text-[10px] text-muted-foreground leading-tight">
                             {format(selectedDay, 'dd/MM', { locale: ar })}
                         </span>
                     </div>
@@ -1289,11 +1283,11 @@ function RegisterSessionContent() {
                         size="sm"
                         onClick={() => navigateToDay(1)}
                         disabled={isNavigating || isSaving}
-                        className="h-10 rounded-lg font-bold text-[11px] sm:text-xs gap-0.5 sm:gap-1 hover:bg-primary/10 active:bg-primary/20 transition-all px-2 sm:px-3"
+                        className="h-8 sm:h-10 rounded-lg font-bold text-[10px] sm:text-xs gap-0.5 sm:gap-1 hover:bg-primary/10 active:bg-primary/20 transition-all px-1.5 sm:px-3"
                     >
                         <span className="hidden sm:inline">{format(addDays(selectedDay, 1), 'EEEE', { locale: ar })}</span>
                         <span className="sm:hidden">التالي</span>
-                        <ChevronLeft className="h-4 w-4 shrink-0" />
+                        <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                     </Button>
                 </div>
                 {isNavigating && (
@@ -1304,9 +1298,9 @@ function RegisterSessionContent() {
             </header>
 
             {groupMode === 'not_set' && (
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between gap-4 animate-in fade-in duration-300 rtl" dir="rtl">
-                    <div className="flex items-center gap-3">
-                        <AlertTriangle className="w-5.5 h-5.5 text-amber-600 shrink-0" />
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3 sm:p-4 flex items-center justify-between gap-3 sm:gap-4 animate-in fade-in duration-300 rtl" dir="rtl">
+                    <div className="flex items-center gap-2.5 sm:gap-3">
+                        <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
                         <div className="space-y-0.5 text-right">
                             <p className="text-xs font-black text-amber-800 dark:text-amber-300">إعداد نمط الحفظ للفوج غير مكتمل</p>
                             <p className="text-[10px] font-medium text-amber-700/80 dark:text-amber-400/80">لم تقم بتحديد النمط التشغيلي للفوج (موحد أو فردي) بعد. يرجى ضبط الإعدادات لتفعيل التعبئة التلقائية للورد واقتراح الآيات الذكي.</p>
@@ -1323,16 +1317,16 @@ function RegisterSessionContent() {
                 </div>
             )}
 
-            <section className="bg-card p-4 rounded-2xl shadow-sm border space-y-4">
+            <section className="bg-card p-3 sm:p-4 rounded-2xl shadow-sm border space-y-3 sm:space-y-4">
                 {(sessionType === 'حصة أساسية' || sessionType === 'حصة تعويضية' || sessionType === 'حصة إضافية') && (
                     <SessionStatsWidget students={sessionStudents} records={attendanceRecords} />
                 )}
 
-                <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
+                <div className="flex flex-col md:flex-row gap-3 sm:gap-4 items-end justify-between">
                     <div className="space-y-1 flex-1 w-full">
                         <Label className="text-xs text-muted-foreground font-bold">نوع الحصة</Label>
                         <Select value={sessionType} onValueChange={handleSessionTypeChange} dir="rtl">
-                            <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-9 sm:h-10 rounded-xl text-xs sm:text-sm"><SelectValue /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="حصة أساسية">حصة أساسية</SelectItem>
                                 <SelectItem value="حصة أنشطة">حصة أنشطة 🏃‍♂️</SelectItem>
@@ -1344,18 +1338,18 @@ function RegisterSessionContent() {
                     </div>
 
                     {(sessionType === 'حصة أساسية' || sessionType === 'حصة تعويضية' || sessionType === 'حصة إضافية' || sessionType === 'حصة أنشطة' || (sessionType === 'غياب الشيخ' && substituteTeacher)) && (
-                        <div className="flex flex-wrap gap-2 w-full md:w-auto justify-end">
-                            <Button onClick={handleMarkAllPresent} variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 h-10 rounded-xl flex-1 md:flex-none font-bold text-xs">
-                                <UserCheck className="ml-2 h-4 w-4" /> تحضير الجميع
+                        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 sm:gap-2 w-full md:w-auto justify-end">
+                            <Button onClick={handleMarkAllPresent} variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 h-9 sm:h-10 rounded-xl font-bold text-[11px] sm:text-xs justify-center">
+                                <UserCheck className="ml-1.5 h-3.5 w-3.5 shrink-0" /> تحضير الجميع
                             </Button>
-                            <Button onClick={handleMarkAllQuiet} variant="secondary" className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 h-10 rounded-xl flex-1 md:flex-none font-bold text-xs">
-                                <Smile className="ml-2 h-4 w-4" /> هدوء الجميع
+                            <Button onClick={handleMarkAllQuiet} variant="secondary" className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 h-9 sm:h-10 rounded-xl font-bold text-[11px] sm:text-xs justify-center">
+                                <Smile className="ml-1.5 h-3.5 w-3.5 shrink-0" /> هدوء الجميع
                             </Button>
-                            <Button onClick={handleMarkAllReview} variant="secondary" className="bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 h-10 rounded-xl flex-1 md:flex-none font-bold text-xs">
-                                <RotateCcw className="ml-2 h-4 w-4" /> مراجعة الجميع
+                            <Button onClick={handleMarkAllReview} variant="secondary" className="bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 h-9 sm:h-10 rounded-xl font-bold text-[11px] sm:text-xs justify-center">
+                                <RotateCcw className="ml-1.5 h-3.5 w-3.5 shrink-0" /> مراجعة الجميع
                             </Button>
-                            <Button onClick={handleMarkAllGood} variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 h-10 rounded-xl flex-1 md:flex-none font-bold text-xs">
-                                <CheckCircle className="ml-2 h-4 w-4" /> جيد الجميع
+                            <Button onClick={handleMarkAllGood} variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 h-9 sm:h-10 rounded-xl font-bold text-[11px] sm:text-xs justify-center">
+                                <CheckCircle className="ml-1.5 h-3.5 w-3.5 shrink-0" /> جيد الجميع
                             </Button>
                         </div>
                     )}
@@ -1617,13 +1611,13 @@ function RegisterSessionContent() {
 
 
 
-            <footer className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-md border-t p-4 z-50">
-                <div className="container mx-auto max-w-4xl flex items-center justify-between gap-4">
+            <footer className="fixed bottom-0 left-0 right-0 bg-background/85 backdrop-blur-md border-t p-2.5 sm:p-4 z-50">
+                <div className="container mx-auto max-w-4xl flex items-center justify-between gap-2 sm:gap-4">
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={handleReturn} className="h-11 rounded-xl px-6">
-                            <ArrowRight className="ml-2 h-4 w-4" /> رجوع
+                        <Button variant="outline" onClick={handleReturn} className="h-10 sm:h-11 rounded-xl px-4 sm:px-6 font-bold text-xs sm:text-sm">
+                            <ArrowRight className="ml-1.5 sm:ml-2 h-4 w-4" /> رجوع
                         </Button>
-                        <Button variant="destructive" onClick={handleDelete} className="h-11 rounded-xl px-4 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200">
+                        <Button variant="destructive" onClick={handleDelete} className="h-10 sm:h-11 rounded-xl px-3 sm:px-4 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200">
                             <Trash2 className="h-4 w-4" />
                         </Button>
                     </div>

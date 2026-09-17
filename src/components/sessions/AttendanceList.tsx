@@ -286,7 +286,7 @@ export const AttendanceList = ({
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <div className="flex flex-wrap gap-1.5 w-full">
+                                                        <div className="grid grid-cols-4 sm:flex sm:flex-wrap gap-1 sm:gap-1.5 w-full">
                                                             {MEMORIZATION_OPTIONS.map((opt) => {
                                                                 const isSelected = record.memorization === opt.value;
                                                                 return (
@@ -303,14 +303,14 @@ export const AttendanceList = ({
                                                                             });
                                                                         }}
                                                                         className={cn(
-                                                                            "px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 border shrink-0 hover:scale-[1.02]",
+                                                                            "px-1 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-black transition-all flex items-center justify-center gap-1 border shrink-0 sm:shrink hover:scale-[1.02] text-center",
                                                                             isSelected
                                                                                 ? `${opt.color} shadow-md scale-105`
                                                                                 : "bg-background border-border text-muted-foreground hover:bg-muted/15 hover:text-foreground"
                                                                         )}
                                                                     >
-                                                                        <span>{opt.emoji}</span>
-                                                                        <span>{opt.label}</span>
+                                                                        <span className="text-[11px] sm:text-xs">{opt.emoji}</span>
+                                                                        <span className="truncate">{opt.label}</span>
                                                                     </button>
                                                                 );
                                                             })}
@@ -365,7 +365,7 @@ export const AttendanceList = ({
                                                         {/* السلوك (Behavior) */}
                                                         <div className="w-full sm:w-[120px] md:w-[140px] shrink-0">
                                                             <Select value={record.behavior} onValueChange={(val) => onUpdateRecord(student.id, 'behavior', val)} dir="rtl">
-                                                                <SelectTrigger className="h-8 md:h-9 text-[10px] sm:text-xs font-bold w-full rounded-xl">
+                                                                <SelectTrigger className="h-8 md:h-9 text-[10px] sm:text-xs font-bold w-full rounded-xl px-1.5 sm:px-2.5">
                                                                     <SelectValue placeholder="السلوك" />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
@@ -379,7 +379,7 @@ export const AttendanceList = ({
                                                         {/* البونص (Bonus) */}
                                                         <div className="w-full sm:w-[120px] md:w-[140px] shrink-0">
                                                             <Select value={record.bonus || ""} onValueChange={(val) => onUpdateRecord(student.id, 'bonus', val)} dir="rtl">
-                                                                <SelectTrigger className="h-8 md:h-9 text-[10px] sm:text-xs font-bold w-full border-purple-200 focus:border-purple-400 bg-purple-50/20 text-purple-700 rounded-xl">
+                                                                <SelectTrigger className="h-8 md:h-9 text-[10px] sm:text-xs font-bold w-full border-purple-200 focus:border-purple-400 bg-purple-50/20 text-purple-700 rounded-xl px-1.5 sm:px-2.5">
                                                                     <SelectValue placeholder="بونص" />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
@@ -395,7 +395,7 @@ export const AttendanceList = ({
                                                         {/* الخصم السلوكي (Deduction) */}
                                                         <div className="w-full sm:w-[120px] md:w-[140px] shrink-0">
                                                             <Select value={record.negativeBonus || ""} onValueChange={(val) => onUpdateRecord(student.id, 'negativeBonus', val)} dir="rtl">
-                                                                <SelectTrigger className="h-8 md:h-9 text-[10px] sm:text-xs font-bold w-full border-red-200 focus:border-red-400 bg-red-50/20 text-red-700 rounded-xl">
+                                                                <SelectTrigger className="h-8 md:h-9 text-[10px] sm:text-xs font-bold w-full border-red-200 focus:border-red-400 bg-red-50/20 text-red-700 rounded-xl px-1.5 sm:px-2.5">
                                                                     <SelectValue placeholder="خصم سلوكي ⚠️" />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
