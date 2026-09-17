@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo, Suspense, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useStudentContext } from '@/context/StudentContext';
 import { useToast } from '@/hooks/use-toast';
-import { useDebounce } from '@/hooks/use-debounce';
 import { format, parse, parseISO, subDays, addDays, isSameDay, getDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -555,7 +554,7 @@ function RegisterSessionContent() {
         setIsDirty(true);
     };
 
-    const handleUpdateRecord = (studentId: string, field: keyof AttendanceRecord, value: any) => {
+    const handleUpdateRecord = (studentId: string, field: keyof AttendanceRecord | Partial<AttendanceRecord>, value?: any) => {
         setIsDirty(true);
         setAttendanceRecords(prev => {
             const currentRecord = prev[studentId] || {
@@ -568,19 +567,23 @@ function RegisterSessionContent() {
                 review: false
             };
 
+            const patch = typeof field === 'object' ? field : { [field]: value };
             const updatedRecord = {
                 ...currentRecord,
-                [field]: value,
-                attendance: field === 'attendance' ? value : (currentRecord.attendance || 'حاضر')
+                ...patch
             };
 
+            if (patch.attendance === undefined && !currentRecord.attendance && (patch.memorization || patch.behavior)) {
+                updatedRecord.attendance = 'حاضر';
+            }
+
             // Auto-set evaluation to "لم يحفظ" when marking present or late in basic session
-            if (field === 'attendance' && (value === 'حاضر' || value === 'متأخر') && sessionType === 'حصة أساسية' && !updatedRecord.memorization) {
+            if ((patch.attendance === 'حاضر' || patch.attendance === 'متأخر') && sessionType === 'حصة أساسية' && !updatedRecord.memorization) {
                 updatedRecord.memorization = 'لم يحفظ';
             }
 
             // Clear review, behavior, memorization, and bonus when marking as absent
-            if (field === 'attendance' && (value === 'غائب' || value === 'غياب')) {
+            if (patch.attendance === 'غائب' || patch.attendance === 'غياب') {
                 updatedRecord.review = false;
                 updatedRecord.behavior = '';
                 updatedRecord.memorization = '' as PerformanceLevel;
@@ -825,46 +828,6 @@ function RegisterSessionContent() {
         }
     };
 
-    // Save Draft to LocalStorage whenever sessionData changes
-    useEffect(() => {
-        if (DRAFT_KEY && (isDirty || currentSessionId)) {
-            const draft = {
-                ...sessionData,
-                id: currentSessionId // IMPORTANT: Persist the ID
-            };
-            try {
-                localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-            } catch (e) {
-                // Ignore storage quota limits
-            }
-        }
-    }, [sessionData, DRAFT_KEY, isDirty, currentSessionId]);
-
-    // Auto-Save Effect: Saves in the background quietly after 2.5s of idle time without disturbing the user
-    useEffect(() => {
-        if (loading || isInitialLoad || !isDirty) return;
-
-        const timer = setTimeout(async () => {
-            if (!isDirtyRef.current) return;
-            const dataToSave = sessionDataRef.current;
-            setIsSaving(true);
-            try {
-                await performSave(dataToSave, true);
-                setLastSaved(new Date());
-                // Only clear dirty state if no new edits arrived during the async save
-                if (sessionDataRef.current === dataToSave) {
-                    setIsDirty(false);
-                }
-            } catch (error) {
-                console.error("Auto-save failed:", error);
-            } finally {
-                setIsSaving(false);
-            }
-        }, 2500);
-
-        return () => clearTimeout(timer);
-    }, [sessionData, loading, isInitialLoad, isDirty]);
-
     const handleManualSave = async () => {
         setIsSaving(true);
         try {
@@ -880,16 +843,19 @@ function RegisterSessionContent() {
     };
 
     const handleReturn = async () => {
-        if (isDirtyRef.current || isSaving) {
-            setIsSaving(true);
-            try {
-                await performSave(sessionDataRef.current, true); // Force final save
-                toast({ title: "تم الحفظ", description: "تم حفظ التغييرات بنجاح.", duration: 2000 });
-            } catch (e) {
-                console.error("Save on exit failed", e);
-                toast({ title: "تنبيه", description: "قد لا تكون بعض التغييرات محفوظة.", variant: "destructive", duration: 3000 });
-            } finally {
-                setIsSaving(false);
+        if (isDirtyRef.current) {
+            const shouldSave = confirm("توجد تعديلات مسجلة على هذه الحصة.\n\nهل تريد حفظ الحصة قبل الخروج؟");
+            if (shouldSave) {
+                setIsSaving(true);
+                try {
+                    await performSave(sessionDataRef.current, false);
+                    setIsDirty(false);
+                } catch (e) {
+                    console.error("Save on exit failed", e);
+                    return; // منع الخروج في حال فشل الحفظ
+                } finally {
+                    setIsSaving(false);
+                }
             }
         }
         const returnUrl = ownerIdParam ? `/sessions?ownerId=${ownerIdParam}` : '/sessions';
@@ -899,22 +865,25 @@ function RegisterSessionContent() {
     // Navigate to previous/next day
     const navigateToDay = async (direction: -1 | 1) => {
         if (isNavigating || isSaving) return;
-        setIsNavigating(true);
 
-        try {
-            // Save current data before navigating
-            if (isDirtyRef.current) {
+        if (isDirtyRef.current) {
+            const shouldSave = confirm("توجد تعديلات مسجلة على هذه الحصة.\n\nهل تريد حفظ الحصة قبل الانتقال؟");
+            if (shouldSave) {
                 setIsSaving(true);
                 try {
-                    await performSave(sessionDataRef.current, true);
+                    await performSave(sessionDataRef.current, false);
+                    setIsDirty(false);
                 } catch (e) {
                     console.error("Save before navigate failed", e);
-                    toast({ title: "تنبيه", description: "قد لا تكون بعض التغييرات محفوظة.", variant: "destructive", duration: 3000 });
+                    return;
                 } finally {
                     setIsSaving(false);
                 }
             }
+        }
 
+        setIsNavigating(true);
+        try {
             const newDate = addDays(selectedDay, direction);
             const newDateStr = format(newDate, 'yyyy-MM-dd');
 
@@ -1248,6 +1217,18 @@ function RegisterSessionContent() {
                                     <CheckCircle className="h-3 w-3" /> {isEffectiveOnline() ? "متزامن مع السحابة" : "محفوظ محلياً (أوفلاين)"}
                                 </span>
                             ) : null}
+                            {isDirty && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={handleManualSave}
+                                    disabled={isSaving}
+                                    className="h-6 sm:h-7 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] sm:text-[10px] font-black px-2.5 shadow-sm gap-1 animate-pulse"
+                                >
+                                    <Save className="h-3 w-3" />
+                                    <span>حفظ الحصة</span>
+                                </Button>
+                            )}
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -1626,16 +1607,26 @@ function RegisterSessionContent() {
                             type="button"
                             onClick={handleManualSave}
                             disabled={isSaving}
-                            className="h-10 sm:h-11 rounded-xl px-4 sm:px-7 font-black text-xs sm:text-sm bg-primary hover:bg-primary/90 text-primary-foreground shadow-md gap-2 transition-all active:scale-95"
+                            className={cn(
+                                "h-11 sm:h-12 rounded-2xl px-5 sm:px-8 font-black text-xs sm:text-sm shadow-md gap-2 transition-all active:scale-95 touch-manipulation select-none cursor-pointer",
+                                isDirty
+                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white ring-4 ring-emerald-500/25 shadow-emerald-500/20 shadow-lg"
+                                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                            )}
                         >
                             {isSaving ? (
                                 <>
                                     <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span>جاري الحفظ...</span>
+                                    <span>جاري الحفظ محلياً...</span>
+                                </>
+                            ) : isDirty ? (
+                                <>
+                                    <Save className="h-4 w-4" />
+                                    <span>💾 حفظ الحصة الآن</span>
                                 </>
                             ) : (
                                 <>
-                                    <Save className="h-4 w-4" />
+                                    <CheckCircle className="h-4 w-4" />
                                     <span>حفظ الحصة</span>
                                 </>
                             )}

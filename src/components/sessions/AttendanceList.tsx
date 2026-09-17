@@ -228,7 +228,7 @@ export const AttendanceList = ({
                                                     type="button"
                                                     size="sm"
                                                     variant={record.attendance === 'حاضر' ? 'default' : 'outline'}
-                                                    className={cn("flex-1 text-[11px] sm:text-xs font-black rounded-xl px-1 sm:px-3", record.attendance === 'حاضر' && "bg-emerald-600 hover:bg-emerald-700")}
+                                                    className={cn("flex-1 text-[11px] sm:text-xs font-black rounded-xl px-1 sm:px-3 touch-manipulation select-none active:scale-95 transition-all cursor-pointer", record.attendance === 'حاضر' && "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm")}
                                                     onClick={() => onUpdateRecord(student.id, 'attendance', record.attendance === 'حاضر' ? '' : 'حاضر')}
                                                 >
                                                     <Check className="h-3.5 w-3.5 ml-1 sm:ml-1.5 shrink-0" /> حاضر
@@ -237,7 +237,7 @@ export const AttendanceList = ({
                                                     type="button"
                                                     size="sm"
                                                     variant={record.attendance === 'متأخر' ? 'default' : 'outline'}
-                                                    className={cn("flex-1 text-[11px] sm:text-xs font-black rounded-xl px-1 sm:px-3", record.attendance === 'متأخر' && "bg-amber-500 hover:bg-amber-600")}
+                                                    className={cn("flex-1 text-[11px] sm:text-xs font-black rounded-xl px-1 sm:px-3 touch-manipulation select-none active:scale-95 transition-all cursor-pointer", record.attendance === 'متأخر' && "bg-amber-500 hover:bg-amber-600 text-white shadow-sm")}
                                                     onClick={() => onUpdateRecord(student.id, 'attendance', record.attendance === 'متأخر' ? '' : 'متأخر')}
                                                 >
                                                     <Clock className="h-3.5 w-3.5 ml-1 sm:ml-1.5 shrink-0" /> متأخر
@@ -246,7 +246,7 @@ export const AttendanceList = ({
                                                     type="button"
                                                     size="sm"
                                                     variant={record.attendance === 'غياب' ? 'destructive' : 'outline'}
-                                                    className={cn("flex-1 text-[11px] sm:text-xs font-black rounded-xl px-1 sm:px-3", record.attendance === 'غياب' && "bg-red-600 hover:bg-red-700")}
+                                                    className={cn("flex-1 text-[11px] sm:text-xs font-black rounded-xl px-1 sm:px-3 touch-manipulation select-none active:scale-95 transition-all cursor-pointer", record.attendance === 'غياب' && "bg-red-600 hover:bg-red-700 text-white shadow-sm")}
                                                     onClick={() => onUpdateRecord(student.id, 'attendance', record.attendance === 'غياب' ? '' : 'غياب')}
                                                 >
                                                     <X className="h-3.5 w-3.5 ml-1 sm:ml-1.5 shrink-0" /> غائب
@@ -303,7 +303,7 @@ export const AttendanceList = ({
                                                                             });
                                                                         }}
                                                                         className={cn(
-                                                                            "px-1 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-black transition-all flex items-center justify-center gap-1 border shrink-0 sm:shrink hover:scale-[1.02] text-center",
+                                                                            "px-1 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-black transition-all flex items-center justify-center gap-1 border shrink-0 sm:shrink text-center touch-manipulation select-none active:scale-95 cursor-pointer",
                                                                             isSelected
                                                                                 ? `${opt.color} shadow-md scale-105`
                                                                                 : "bg-background border-border text-muted-foreground hover:bg-muted/15 hover:text-foreground"
