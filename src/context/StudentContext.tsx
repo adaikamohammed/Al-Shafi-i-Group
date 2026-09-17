@@ -1397,12 +1397,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           ownerId,
           authorUid: authContextUser.uid
         });
-        if (!options?.silent) {
-          toast({
-            title: "⚡ تم الحفظ محلياً بسرعة فائقة",
-            description: "تم حفظ بيانات الحصة محلياً بسبب بطء الاتصال، وستُرفع تلقائياً للسحابة لاحقاً.",
-          });
-        }
       }
     } else {
       await queueOfflineMutation({
@@ -1413,12 +1407,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         ownerId,
         authorUid: authContextUser.uid
       });
-      if (!options?.silent) {
-        toast({
-          title: "💾 تم الحفظ أوفلاين بنجاح",
-          description: "تم تشفير وحفظ بيانات الحصة محلياً (AES-256)، وستُرفع تلقائياً عند الاتصال بالإنترنت.",
-        });
-      }
     }
 
     // Auto-sync public reports for all students in this session if online

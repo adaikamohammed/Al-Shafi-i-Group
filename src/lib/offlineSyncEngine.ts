@@ -17,29 +17,24 @@ import {
 } from './cryptoStore';
 import { v4 as uuidv4 } from 'uuid';
 
-export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'forced-offline' | 'error';
+export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error';
 
 export interface SyncListenerPayload {
   status: SyncStatus;
   pendingCount: number;
   lastSyncTime: string | null;
-  isForcedOffline: boolean;
+  isForcedOffline?: boolean;
 }
 
 const FORCE_OFFLINE_STORAGE_KEY = 'shafii_force_offline_mode';
 
-let isForcedOfflineCache = false;
 if (typeof window !== 'undefined') {
   try {
-    isForcedOfflineCache = localStorage.getItem(FORCE_OFFLINE_STORAGE_KEY) === 'true';
-  } catch {
-    isForcedOfflineCache = false;
-  }
+    localStorage.removeItem(FORCE_OFFLINE_STORAGE_KEY);
+  } catch {}
 }
 
-let currentStatus: SyncStatus = isForcedOfflineCache
-  ? 'forced-offline'
-  : (typeof navigator !== 'undefined' && navigator.onLine ? 'synced' : 'offline');
+let currentStatus: SyncStatus = typeof navigator !== 'undefined' && navigator.onLine ? 'synced' : 'offline';
 
 let pendingCountCache = 0;
 let lastSyncTimeCache: string | null = null;
@@ -53,7 +48,7 @@ function notifySubscribers() {
     status: currentStatus,
     pendingCount: pendingCountCache,
     lastSyncTime: lastSyncTimeCache,
-    isForcedOffline: isForcedOfflineCache,
+    isForcedOffline: false,
   };
   subscribers.forEach(cb => {
     try { cb(payload); } catch (e) { console.error('Error in sync subscriber:', e); }
@@ -69,39 +64,21 @@ function updateStatus(newStatus: SyncStatus, newPendingCount?: number) {
 }
 
 /**
- * فحص ما إذا كان الوضع المحلي السريع مفعل يدوياً
+ * فحص ما إذا كان الوضع المحلي السريع مفعل يدوياً (تم إلغاؤه بناءً على رغبة المستخدم)
  */
 export function isForceOfflineMode(): boolean {
-  return isForcedOfflineCache;
+  return false;
+}
+
+export function setForceOfflineMode(_enabled: boolean) {
+  // no-op
 }
 
 /**
- * تفعيل أو إيقاف وضع العمل المحلي السريع
- */
-export function setForceOfflineMode(enabled: boolean) {
-  isForcedOfflineCache = enabled;
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem(FORCE_OFFLINE_STORAGE_KEY, enabled ? 'true' : 'false');
-    } catch {}
-  }
-  if (enabled) {
-    updateStatus('forced-offline');
-  } else {
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
-    updateStatus(isOnline ? (pendingCountCache > 0 ? 'syncing' : 'synced') : 'offline');
-    if (isOnline && pendingCountCache > 0) {
-      syncPendingMutations().catch(console.error);
-    }
-  }
-}
-
-/**
- * فحص فعلي للاتصال يأخذ بالحسبان تفعيل وضع العمل السريع
+ * فحص فعلي للاتصال بالإنترنت
  */
 export function isEffectiveOnline(): boolean {
   if (typeof navigator === 'undefined') return true;
-  if (isForcedOfflineCache) return false;
   return navigator.onLine;
 }
 
@@ -126,7 +103,7 @@ export function subscribeToSyncStatus(cb: (payload: SyncListenerPayload) => void
     status: currentStatus,
     pendingCount: pendingCountCache,
     lastSyncTime: lastSyncTimeCache,
-    isForcedOffline: isForcedOfflineCache,
+    isForcedOffline: false,
   });
   return () => {
     subscribers.delete(cb);
@@ -138,7 +115,7 @@ export function getSyncStatus(): SyncListenerPayload {
     status: currentStatus,
     pendingCount: pendingCountCache,
     lastSyncTime: lastSyncTimeCache,
-    isForcedOffline: isForcedOfflineCache,
+    isForcedOffline: false,
   };
 }
 
@@ -161,14 +138,12 @@ export async function queueOfflineMutation(
   const pending = await getOfflineMutations();
   pendingCountCache = pending.length;
   
-  const nextStatus = isForcedOfflineCache
-    ? 'forced-offline'
-    : (typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : currentStatus);
+  const nextStatus = typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : currentStatus;
 
   updateStatus(nextStatus, pendingCountCache);
 
-  // إذا كان الإنترنت متوفراً ولم يتم تفعيل الوضع المحلي السريع قسرياً، نحاول المزامنة الفورية
-  if (!isForcedOfflineCache && typeof navigator !== 'undefined' && navigator.onLine) {
+  // إذا كان الإنترنت متوفراً، نحاول المزامنة الفورية
+  if (typeof navigator !== 'undefined' && navigator.onLine) {
     syncPendingMutations().catch(err => console.warn('Auto sync after queue failed:', err));
   }
 
@@ -182,7 +157,7 @@ export async function refreshPendingCount(): Promise<number> {
   try {
     const pending = await getOfflineMutations();
     pendingCountCache = pending.length;
-    if (pendingCountCache === 0 && !isForcedOfflineCache && currentStatus !== 'offline') {
+    if (pendingCountCache === 0 && currentStatus !== 'offline') {
       updateStatus('synced', 0);
     } else {
       notifySubscribers();
@@ -196,7 +171,7 @@ export async function refreshPendingCount(): Promise<number> {
 /**
  * محرك المزامنة الرئيسي (سحب العمليات المعلقة ورفعها لـ Firebase RTDB)
  */
-export async function syncPendingMutations(options?: { allowForcedOffline?: boolean }): Promise<{
+export async function syncPendingMutations(_options?: { allowForcedOffline?: boolean }): Promise<{
   success: boolean;
   syncedCount: number;
   remainingCount: number;
@@ -208,14 +183,8 @@ export async function syncPendingMutations(options?: { allowForcedOffline?: bool
 
   if (!navigator.onLine) {
     await refreshPendingCount();
-    updateStatus(isForcedOfflineCache ? 'forced-offline' : 'offline');
+    updateStatus('offline');
     return { success: false, syncedCount: 0, remainingCount: pendingCountCache, error: 'لا يوجد اتصال بالإنترنت' };
-  }
-
-  if (isForcedOfflineCache && !options?.allowForcedOffline) {
-    await refreshPendingCount();
-    updateStatus('forced-offline');
-    return { success: false, syncedCount: 0, remainingCount: pendingCountCache, error: 'الوضع المحلي السريع مفعّل' };
   }
 
   if (isSyncing) {
@@ -232,7 +201,7 @@ export async function syncPendingMutations(options?: { allowForcedOffline?: bool
     pendingCountCache = pendingMutations.length;
 
     if (pendingMutations.length === 0) {
-      updateStatus(isForcedOfflineCache ? 'forced-offline' : 'synced', 0);
+      updateStatus('synced', 0);
       isSyncing = false;
       return { success: true, syncedCount: 0, remainingCount: 0 };
     }
@@ -242,7 +211,7 @@ export async function syncPendingMutations(options?: { allowForcedOffline?: bool
     for (const mutation of pendingMutations) {
       // فحص الاتصال قبل كل عملية لتفادي التعليق
       if (!navigator.onLine) {
-        updateStatus(isForcedOfflineCache ? 'forced-offline' : 'offline', pendingMutations.length - syncedCount);
+        updateStatus('offline', pendingMutations.length - syncedCount);
         break;
       }
 
@@ -270,7 +239,7 @@ export async function syncPendingMutations(options?: { allowForcedOffline?: bool
 
         // إذا كان خطأ شبكة أو انتهاء المهلة
         if (err?.message === 'NETWORK_TIMEOUT' || err?.code === 'NETWORK_ERROR' || !navigator.onLine) {
-          updateStatus(isForcedOfflineCache ? 'forced-offline' : 'offline');
+          updateStatus('offline');
           break;
         }
 
@@ -292,10 +261,10 @@ export async function syncPendingMutations(options?: { allowForcedOffline?: bool
       const nowIso = new Date().toISOString();
       lastSyncTimeCache = nowIso;
       await setLastSyncTime(nowIso);
-      updateStatus(isForcedOfflineCache ? 'forced-offline' : 'synced', 0);
+      updateStatus('synced', 0);
       console.log(`✅ اكتملت المزامنة بنجاح! تم رفع ${syncedCount} عملية.`);
     } else {
-      updateStatus(isForcedOfflineCache ? 'forced-offline' : (navigator.onLine ? 'error' : 'offline'), pendingCountCache);
+      updateStatus(navigator.onLine ? 'error' : 'offline', pendingCountCache);
     }
 
     return {
@@ -326,7 +295,7 @@ export function initOfflineSyncEngine(onSyncSuccessToast?: (syncedCount: number)
 
   // فحص أولي عند فتح التطبيق
   refreshPendingCount().then(count => {
-    if (count > 0 && navigator.onLine && !isForcedOfflineCache) {
+    if (count > 0 && navigator.onLine) {
       syncPendingMutations().then(res => {
         if (res.syncedCount > 0 && onSyncSuccessToast) {
           onSyncSuccessToast(res.syncedCount);
@@ -338,24 +307,22 @@ export function initOfflineSyncEngine(onSyncSuccessToast?: (syncedCount: number)
   // 1. المزامنة التلقائية فور عودة الاتصال
   window.addEventListener('online', async () => {
     console.log('🌐 تم استعادة الاتصال بالإنترنت - بدء المزامنة التلقائية...');
-    if (!isForcedOfflineCache) {
-      updateStatus('syncing');
-      const res = await syncPendingMutations();
-      if (res.syncedCount > 0 && onSyncSuccessToast) {
-        onSyncSuccessToast(res.syncedCount);
-      }
+    updateStatus('syncing');
+    const res = await syncPendingMutations();
+    if (res.syncedCount > 0 && onSyncSuccessToast) {
+      onSyncSuccessToast(res.syncedCount);
     }
   });
 
   // 2. تحديث الحالة فور انقطاع الاتصال
   window.addEventListener('offline', () => {
-    console.log('📡 انقطع الاتصال بالإنترنت - التبديل للوضع المحلي المشفر.');
-    updateStatus(isForcedOfflineCache ? 'forced-offline' : 'offline');
+    console.log('📡 انقطع الاتصال بالإنترنت - التبديل للوضع المحلي.');
+    updateStatus('offline');
   });
 
   // 3. المزامنة عند عودة المستخدم للتبويب (Tab visibility)
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && navigator.onLine && !isForcedOfflineCache) {
+    if (document.visibilityState === 'visible' && navigator.onLine) {
       syncPendingMutations().then(res => {
         if (res.syncedCount > 0 && onSyncSuccessToast) {
           onSyncSuccessToast(res.syncedCount);
@@ -366,7 +333,7 @@ export function initOfflineSyncEngine(onSyncSuccessToast?: (syncedCount: number)
 
   // 4. فحص دوري خفيف (Polling Heartbeat) كل 15 ثانية للتأكد من المزامنة
   setInterval(() => {
-    if (!isForcedOfflineCache && navigator.onLine && !isSyncing && pendingCountCache > 0) {
+    if (navigator.onLine && !isSyncing && pendingCountCache > 0) {
       syncPendingMutations().then(res => {
         if (res.syncedCount > 0 && onSyncSuccessToast) {
           onSyncSuccessToast(res.syncedCount);

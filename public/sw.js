@@ -4,7 +4,7 @@
  * يضمن تشغيل وتسجيل الحصص اليومية أوفلاين 100% بدون ظهور شاشة "لا يتوفر اتصال بالإنترنت"
  */
 
-const CACHE_NAME = 'shafii-v2.1-offline-robust';
+const CACHE_NAME = 'shafii-v2.3-offline-clean';
 
 // المسارات الأساسية التي يتم تخزينها مسبقاً
 const PRECACHE_ROUTES = [

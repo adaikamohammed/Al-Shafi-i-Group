@@ -78,6 +78,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
       const registerSW = () => {
         navigator.serviceWorker.register('/sw.js').then(registration => {
           console.log('Shafii Offline SW registered: ', registration);
+          registration.update();
         }).catch(registrationError => {
           console.log('Shafii SW registration failed: ', registrationError);
         });

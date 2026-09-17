@@ -123,6 +123,22 @@ function RegisterSessionContent() {
     const [loadedDate, setLoadedDate] = useState<string | null>(null);
     const [showExplanation, setShowExplanation] = useState(false);
 
+    const [isOnline, setIsOnline] = useState<boolean>(() => {
+        if (typeof navigator !== 'undefined') return navigator.onLine;
+        return true;
+    });
+
+    useEffect(() => {
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
+
     // Active session and stable function refs
     const activeSessionKeyRef = useRef<string | null>(null);
     const getSessionsForDayRef = useRef(getSessionsForDay);
@@ -807,10 +823,10 @@ function RegisterSessionContent() {
 
             if (!silent) {
                 toast({
-                    title: isEffectiveOnline() ? "✅ تم حفظ الحصة" : "⚡ تم الحفظ محلياً بنجاح",
-                    description: isEffectiveOnline()
+                    title: isOnline ? "✅ تم حفظ الحصة" : "✅ تم حفظ الحصة محلياً",
+                    description: isOnline
                         ? "تم حفظ الحصة وتحديث التقييمات بنجاح في السحابة."
-                        : "تم تشفير وحفظ بيانات الحصة محلياً وستُرفع تلقائياً للسحابة فور توفر الإنترنت.",
+                        : "تم حفظ بيانات الحصة محلياً، وستُرفع تلقائياً عند الاتصال بالإنترنت.",
                     duration: 3000,
                 });
             }
@@ -828,6 +844,32 @@ function RegisterSessionContent() {
         }
     };
 
+    // Auto-Save Effect: Only active when ONLINE (synchronization mode)
+    // In offline mode, auto-save is completely disabled so the Sheikh records freely with 0ms lag,
+    // and saves once via the dedicated "حفظ الحصة محلياً" button when finished.
+    useEffect(() => {
+        if (!isOnline || loading || isInitialLoad || !isDirty) return;
+
+        const timer = setTimeout(async () => {
+            if (!isDirtyRef.current) return;
+            const dataToSave = sessionDataRef.current;
+            setIsSaving(true);
+            try {
+                await performSave(dataToSave, true);
+                setLastSaved(new Date());
+                if (sessionDataRef.current === dataToSave) {
+                    setIsDirty(false);
+                }
+            } catch (error) {
+                console.error("Online auto-save failed:", error);
+            } finally {
+                setIsSaving(false);
+            }
+        }, 2500);
+
+        return () => clearTimeout(timer);
+    }, [sessionData, loading, isInitialLoad, isDirty, isOnline]);
+
     const handleManualSave = async () => {
         setIsSaving(true);
         try {
@@ -844,15 +886,27 @@ function RegisterSessionContent() {
 
     const handleReturn = async () => {
         if (isDirtyRef.current) {
-            const shouldSave = confirm("توجد تعديلات مسجلة على هذه الحصة.\n\nهل تريد حفظ الحصة قبل الخروج؟");
-            if (shouldSave) {
+            if (!isOnline) {
+                const shouldSave = confirm("توجد تعديلات مسجلة على هذه الحصة.\n\nهل تريد حفظ الحصة محلياً قبل الخروج؟");
+                if (shouldSave) {
+                    setIsSaving(true);
+                    try {
+                        await performSave(sessionDataRef.current, false);
+                        setIsDirty(false);
+                    } catch (e) {
+                        console.error("Save on exit failed", e);
+                        return; // منع الخروج في حال فشل الحفظ
+                    } finally {
+                        setIsSaving(false);
+                    }
+                }
+            } else {
                 setIsSaving(true);
                 try {
-                    await performSave(sessionDataRef.current, false);
+                    await performSave(sessionDataRef.current, true);
                     setIsDirty(false);
                 } catch (e) {
-                    console.error("Save on exit failed", e);
-                    return; // منع الخروج في حال فشل الحفظ
+                    console.error("Online save on exit failed", e);
                 } finally {
                     setIsSaving(false);
                 }
@@ -867,15 +921,27 @@ function RegisterSessionContent() {
         if (isNavigating || isSaving) return;
 
         if (isDirtyRef.current) {
-            const shouldSave = confirm("توجد تعديلات مسجلة على هذه الحصة.\n\nهل تريد حفظ الحصة قبل الانتقال؟");
-            if (shouldSave) {
+            if (!isOnline) {
+                const shouldSave = confirm("توجد تعديلات مسجلة على هذه الحصة.\n\nهل تريد حفظ الحصة محلياً قبل الانتقال؟");
+                if (shouldSave) {
+                    setIsSaving(true);
+                    try {
+                        await performSave(sessionDataRef.current, false);
+                        setIsDirty(false);
+                    } catch (e) {
+                        console.error("Save before navigate failed", e);
+                        return;
+                    } finally {
+                        setIsSaving(false);
+                    }
+                }
+            } else {
                 setIsSaving(true);
                 try {
-                    await performSave(sessionDataRef.current, false);
+                    await performSave(sessionDataRef.current, true);
                     setIsDirty(false);
                 } catch (e) {
-                    console.error("Save before navigate failed", e);
-                    return;
+                    console.error("Online save before navigate failed", e);
                 } finally {
                     setIsSaving(false);
                 }
@@ -1214,19 +1280,19 @@ function RegisterSessionContent() {
                                 </span>
                             ) : lastSaved ? (
                                 <span className="text-[9px] sm:text-[10px] text-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                                    <CheckCircle className="h-3 w-3" /> {isEffectiveOnline() ? "متزامن مع السحابة" : "محفوظ محلياً (أوفلاين)"}
+                                    <CheckCircle className="h-3 w-3" /> {isOnline ? "متزامن مع السحابة" : "محفوظ محلياً"}
                                 </span>
                             ) : null}
-                            {isDirty && (
+                            {!isOnline && isDirty && (
                                 <Button
                                     type="button"
                                     size="sm"
                                     onClick={handleManualSave}
                                     disabled={isSaving}
-                                    className="h-6 sm:h-7 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] sm:text-[10px] font-black px-2.5 shadow-sm gap-1 animate-pulse"
+                                    className="h-6 sm:h-7 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] sm:text-[10px] font-black px-2.5 shadow-sm gap-1 animate-pulse touch-manipulation cursor-pointer"
                                 >
                                     <Save className="h-3 w-3" />
-                                    <span>حفظ الحصة</span>
+                                    <span>حفظ محلياً</span>
                                 </Button>
                             )}
                             <Button
@@ -1603,49 +1669,52 @@ function RegisterSessionContent() {
             <footer className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-md border-t p-2.5 sm:p-4 z-50 shadow-lg">
                 <div className="container mx-auto max-w-4xl flex items-center justify-between gap-2 sm:gap-4">
                     <div className="flex items-center gap-2">
-                        <Button
-                            type="button"
-                            onClick={handleManualSave}
-                            disabled={isSaving}
-                            className={cn(
-                                "h-11 sm:h-12 rounded-2xl px-5 sm:px-8 font-black text-xs sm:text-sm shadow-md gap-2 transition-all active:scale-95 touch-manipulation select-none cursor-pointer",
-                                isDirty
-                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white ring-4 ring-emerald-500/25 shadow-emerald-500/20 shadow-lg"
-                                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                            )}
-                        >
-                            {isSaving ? (
-                                <>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span>جاري الحفظ محلياً...</span>
-                                </>
-                            ) : isDirty ? (
-                                <>
-                                    <Save className="h-4 w-4" />
-                                    <span>💾 حفظ الحصة الآن</span>
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCircle className="h-4 w-4" />
-                                    <span>حفظ الحصة</span>
-                                </>
-                            )}
-                        </Button>
+                        {/* زر الحفظ يظهر حصرياً في وضع الأوفلاين بناءً على رغبة المستخدم */}
+                        {!isOnline && (
+                            <Button
+                                type="button"
+                                onClick={handleManualSave}
+                                disabled={isSaving}
+                                className={cn(
+                                    "h-11 sm:h-12 rounded-2xl px-4 sm:px-7 font-black text-xs sm:text-sm shadow-md gap-2 transition-all active:scale-95 touch-manipulation select-none cursor-pointer",
+                                    isDirty
+                                        ? "bg-emerald-600 hover:bg-emerald-700 text-white ring-4 ring-emerald-500/25 shadow-emerald-500/20 shadow-lg"
+                                        : "bg-muted text-foreground hover:bg-muted/80 border"
+                                )}
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <span>جاري الحفظ محلياً...</span>
+                                    </>
+                                ) : isDirty ? (
+                                    <>
+                                        <Save className="h-4 w-4" />
+                                        <span>💾 حفظ الحصة محلياً</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle className="h-4 w-4 text-emerald-600" />
+                                        <span>محفوظة محلياً</span>
+                                    </>
+                                )}
+                            </Button>
+                        )}
 
                         {/* Status text in footer */}
-                        <div className="hidden xs:flex items-center gap-1.5 text-[11px] sm:text-xs">
+                        <div className="flex items-center gap-1.5 text-[11px] sm:text-xs">
                             {isSaving ? (
                                 <span className="text-primary font-bold flex items-center gap-1">
                                     <Loader2 className="h-3 w-3 animate-spin" /> جاري الحفظ...
                                 </span>
                             ) : isDirty ? (
                                 <span className="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
-                                    ✏️ تعديلات غير محفوظة
+                                    ✏️ {isOnline ? "جاري الحفظ تلقائياً..." : "تعديلات غير محفوظة"}
                                 </span>
                             ) : lastSaved ? (
                                 <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                                     <CheckCircle className="h-3.5 w-3.5" />
-                                    {isEffectiveOnline() ? "متزامن" : "محفوظ محلياً"}
+                                    {isOnline ? "متزامن مع السحابة" : "محفوظ محلياً"}
                                 </span>
                             ) : null}
                         </div>
