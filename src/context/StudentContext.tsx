@@ -1374,7 +1374,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     if (isOnline) {
       try {
         const sessionRef = ref(db, path);
-        await executeWithTimeout(set(sessionRef, sanitizedSession), 2500);
+        await executeWithTimeout(set(sessionRef, sanitizedSession), 15000);
 
         // تسجيل النشاط
         logActivity(

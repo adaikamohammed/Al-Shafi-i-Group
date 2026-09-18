@@ -5,8 +5,8 @@
  * يدعم "وضع العمل المحلي فائق السرعة" لتفادي بطء أو تعليق الشبكات الضعيفة
  */
 
-import { db } from './firebase';
-import { ref, set, update, remove } from 'firebase/database';
+import { db, auth } from './firebase';
+import { ref, set, update, remove, goOnline } from 'firebase/database';
 import { sanitizeData } from './utils';
 import {
   OfflineMutation,
@@ -191,10 +191,25 @@ export async function syncPendingMutations(_options?: { allowForcedOffline?: boo
     return { success: true, syncedCount: 0, remainingCount: pendingCountCache };
   }
 
+  // تنشيط الاتصال بقاعدة البيانات السحابية فوراً
+  try {
+    goOnline(db);
+  } catch (e) {
+    console.warn('goOnline check:', e);
+  }
+
+  // التأكد من استعادة جلسة المستخدم المصرح له قبل الرفع للسحابة
+  try {
+    if (typeof auth.authStateReady === 'function') {
+      await auth.authStateReady();
+    }
+  } catch {}
+
   isSyncing = true;
   updateStatus('syncing');
 
   let syncedCount = 0;
+  let lastError: string | undefined = undefined;
 
   try {
     const pendingMutations = await getOfflineMutations();
@@ -212,6 +227,7 @@ export async function syncPendingMutations(_options?: { allowForcedOffline?: boo
       // فحص الاتصال قبل كل عملية لتفادي التعليق
       if (!navigator.onLine) {
         updateStatus('offline', pendingMutations.length - syncedCount);
+        lastError = 'انقطع الاتصال بالإنترنت أثناء المزامنة';
         break;
       }
 
@@ -219,14 +235,15 @@ export async function syncPendingMutations(_options?: { allowForcedOffline?: boo
       const dbTargetRef = mutation.path ? ref(db, mutation.path) : ref(db);
 
       try {
+        // مهلة كافية 25 ثانية لمراعاة بطء شبكات الهاتف المحمول في الجزائر
         if (mutation.type === 'SET') {
           const sanitized = sanitizeData(mutation.payload);
-          await executeWithTimeout(set(dbTargetRef, sanitized), 5000);
+          await executeWithTimeout(set(dbTargetRef, sanitized), 25000);
         } else if (mutation.type === 'UPDATE') {
           const sanitized = sanitizeData(mutation.payload);
-          await executeWithTimeout(update(dbTargetRef, sanitized), 5000);
+          await executeWithTimeout(update(dbTargetRef, sanitized), 25000);
         } else if (mutation.type === 'REMOVE') {
-          await executeWithTimeout(remove(dbTargetRef), 5000);
+          await executeWithTimeout(remove(dbTargetRef), 25000);
         }
 
         // نجحت العملية -> نحذفها من الطابور المحلي
@@ -237,14 +254,18 @@ export async function syncPendingMutations(_options?: { allowForcedOffline?: boo
       } catch (err: any) {
         console.error(`❌ فشل رفع العملية [${mutation.description}] على المسار (${mutation.path}):`, err);
 
-        // إذا كان خطأ شبكة أو انتهاء المهلة
-        if (err?.message === 'NETWORK_TIMEOUT' || err?.code === 'NETWORK_ERROR' || !navigator.onLine) {
+        if (err?.code === 'PERMISSION_DENIED' || err?.message?.includes('Permission denied')) {
+          lastError = 'تم رفض الإذن السحابي، تأكد من تسجيل الدخول بحساب الشيخ المصرح له';
+        } else if (err?.message === 'NETWORK_TIMEOUT') {
+          lastError = 'انتهت مهلة الاتصال بالسحابة بسبب بطء الشبكة، يرجى إعادة المحاولة';
           updateStatus('offline');
           break;
+        } else {
+          lastError = err?.message || 'تعذر استكمال المزامنة مع السحابة';
         }
 
         // إذا كان الخطأ تصريح مرفوض أو بنية غير صالحة، نسجل المحاولة لتفادي إيقاف الطابور بالكامل
-        if ((mutation.retryCount ?? 0) > 3) {
+        if ((mutation.retryCount ?? 0) > 4) {
           console.warn(`تجاوز الحد الأقصى للمحاولات للعملية ${mutation.id}، سيتم إزالتها لتفادي إعاقة المزامنة.`);
           await removeOfflineMutation(mutation.id);
         } else {
@@ -270,7 +291,8 @@ export async function syncPendingMutations(_options?: { allowForcedOffline?: boo
     return {
       success: pendingCountCache === 0,
       syncedCount,
-      remainingCount: pendingCountCache
+      remainingCount: pendingCountCache,
+      error: pendingCountCache > 0 ? (lastError || `يوجد ${pendingCountCache} عمليات بانتظار استقرار الشبكة`) : undefined
     };
   } catch (globalError: any) {
     console.error('خطأ غير متوقع في محرك المزامنة:', globalError);
@@ -279,7 +301,7 @@ export async function syncPendingMutations(_options?: { allowForcedOffline?: boo
       success: false,
       syncedCount,
       remainingCount: pendingCountCache,
-      error: globalError?.message
+      error: globalError?.message || 'حدث خطأ غير متوقع أثناء المزامنة'
     };
   } finally {
     isSyncing = false;
@@ -304,14 +326,18 @@ export function initOfflineSyncEngine(onSyncSuccessToast?: (syncedCount: number)
     }
   });
 
-  // 1. المزامنة التلقائية فور عودة الاتصال
-  window.addEventListener('online', async () => {
-    console.log('🌐 تم استعادة الاتصال بالإنترنت - بدء المزامنة التلقائية...');
-    updateStatus('syncing');
-    const res = await syncPendingMutations();
-    if (res.syncedCount > 0 && onSyncSuccessToast) {
-      onSyncSuccessToast(res.syncedCount);
-    }
+  // 1. المزامنة التلقائية فور عودة الاتصال مع مهلة استقرار للشبكة
+  window.addEventListener('online', () => {
+    console.log('🌐 تم استعادة الاتصال بالإنترنت - انتظار استقرار الشبكة لبدء المزامنة...');
+    setTimeout(async () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        updateStatus('syncing');
+        const res = await syncPendingMutations();
+        if (res.syncedCount > 0 && onSyncSuccessToast) {
+          onSyncSuccessToast(res.syncedCount);
+        }
+      }
+    }, 1500);
   });
 
   // 2. تحديث الحالة فور انقطاع الاتصال
