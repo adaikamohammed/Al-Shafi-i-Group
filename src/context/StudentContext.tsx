@@ -8,7 +8,7 @@ import { isWithinInterval, parseISO, isValid, isAfter, subDays, startOfMonth, en
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { db, storage, auth } from '@/lib/firebase';
-import { ref, set, push, onValue, off, remove, DatabaseReference, update, get } from 'firebase/database';
+import { ref, set, push, onValue, off, remove, DatabaseReference, update, get, goOnline } from 'firebase/database';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
 import { sanitizeData } from '@/lib/utils';
@@ -178,21 +178,26 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   const [weeklyOutcomes, setWeeklyOutcomes] = useState<Record<string, WeeklyOutcome>>({});
   const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
-  const [selectedGroup, setSelectedGroupState] = useState<string>('sheikhs_all');
+  const [selectedGroup, setSelectedGroupState] = useState<string>('all');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('selectedGroup');
       if (stored) {
-        setSelectedGroupState(stored);
+        if (stored === 'كل الأفواج' || stored === 'all' || stored === 'كل المدرسة') {
+          setSelectedGroupState('all');
+        } else {
+          setSelectedGroupState(stored);
+        }
       }
     }
   }, []);
 
   const setSelectedGroup = (val: string) => {
-    setSelectedGroupState(val);
+    const normalized = (!val || val === 'كل الأفواج' || val === 'all' || val === 'كل المدرسة') ? 'all' : val;
+    setSelectedGroupState(normalized);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('selectedGroup', val);
+      localStorage.setItem('selectedGroup', normalized);
     }
   };
 
@@ -204,6 +209,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
 
     if (!authContextUser) {
       setLoading(false);
+      setSelectedGroupState('all');
       setStudents([]);
       setDailySessions({});
       setDailyReports({});
@@ -219,6 +225,13 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       setWeeklyOutcomes({});
       return;
     }
+
+    // فور تسجيل الدخول ووجود شبكة، ضمان اتصال قاعدة بيانات Firebase الحية
+    try {
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        goOnline(db);
+      }
+    } catch (e) {}
 
     // ⚡ Local-First Cache Hydration: استرجاع فوري للبيانات المشفرة محلياً (0ms wait)
     loadEncrypted<Student[]>('students', []).then(cached => {
@@ -236,7 +249,6 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     loadEncrypted<Record<string, Record<string, DailySession>>>('dailySessions', {}).then(cached => {
       if (cached && Object.keys(cached).length > 0) {
         setDailySessions(cached);
-        setLoading(false);
       }
     });
     loadEncrypted<Record<string, Record<string, DailyReport>>>('dailyReports', {}).then(cached => {
@@ -271,6 +283,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     let meetingsListener: any = null;
     let dataRef: any = null;
     let dataListener: any = null;
+    let retryUsersTimeout: any = null;
 
     let accumulatedUserLogs: Record<string, ActivityLog> = {};
     let accumulatedGlobalLogs: Record<string, ActivityLog> = {};
@@ -312,190 +325,204 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       };
 
 
-      // 1. All Users Listener (available to all for transfer dialog)
-      allUsersRef = ref(db, 'users');
-      allUsersListener = onValue(allUsersRef, (snapshot: any) => {
-        const usersData = snapshot.val();
-        const usersArray = usersData ? Object.entries(usersData).map(([uid, data]: [string, any]) => ({
-          uid,
-          ...data.profile,
-          settings: data.settings
-        })) : [];
-
-        // Filter out demo sheikhs if a real user with the same email exists
-        const realEmails = new Set(
-          usersArray
-            .filter(u => !u.uid.startsWith('demo_sheikh_') && u.email)
-            .map(u => u.email.toLowerCase().trim())
-        );
-        const filteredUsersArray = usersArray.filter(u => {
-          if (u.uid.startsWith('demo_sheikh_') && u.email) {
-            return !realEmails.has(u.email.toLowerCase().trim());
-          }
-          return true;
-        });
-        setAllUsers(filteredUsersArray);
-
-        if (!usersData) {
-          if (isSuperAdmin || isManagement) setLoading(false);
-          return;
+      // 1. All Users Listener with auto-retry resilience
+      const attachAllUsersListener = () => {
+        if (allUsersRef && allUsersListener) {
+          try { off(allUsersRef, 'value', allUsersListener); } catch (e) {}
         }
+        allUsersRef = ref(db, 'users');
+        allUsersListener = onValue(allUsersRef, (snapshot: any) => {
+          const usersData = snapshot.val();
+          const usersArray = usersData ? Object.entries(usersData).map(([uid, data]: [string, any]) => ({
+            uid,
+            ...data.profile,
+            settings: data.settings
+          })) : [];
 
-        // If management/admin, aggregate data from all users
-        if (isPrivileged) {
-          let allStudents: Student[] = [];
-          let allSessions: Record<string, Record<string, DailySession>> = {};
-          let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
-          let allProgress: Record<string, SurahMastery> = {};
-          let allPayments: Payment[] = [];
-          let allAdminLogs: AdminLog[] = [];
-          let finalSettings: AppSettings = DEFAULT_SETTINGS;
+          // Filter out demo sheikhs if a real user with the same email exists
+          const realEmails = new Set(
+            usersArray
+              .filter(u => !u.uid.startsWith('demo_sheikh_') && u.email)
+              .map(u => u.email.toLowerCase().trim())
+          );
+          const filteredUsersArray = usersArray.filter(u => {
+            if (u.uid.startsWith('demo_sheikh_') && u.email) {
+              return !realEmails.has(u.email.toLowerCase().trim());
+            }
+            return true;
+          });
+          setAllUsers(filteredUsersArray);
 
-          // ⚡ Performance: only keep last 120 days of sessions in memory
-          const sessionCutoff = new Date();
-          sessionCutoff.setDate(sessionCutoff.getDate() - 120);
-          const SESSION_CUTOFF_DATE = sessionCutoff.toISOString().split('T')[0]; // 'YYYY-MM-DD'
-
-          const mergeSettings = (val: any): AppSettings => {
-            if (!val) return DEFAULT_SETTINGS;
-            const pts = val.points || {};
-            const att = pts.attendance || {};
-            const rev = pts.review || {};
-            
-            // Force 'تعويض' to 3.5 if it is 1.5 or missing
-            const finalMakeup = (att['تعويض'] === 1.5 || !att['تعويض']) ? 3.5 : Number(att['تعويض']);
-            // Force 'completed' review to 3 if it is 1 or 5 or missing
-            const finalReview = (rev['completed'] === 1 || rev['completed'] === 5 || !rev['completed']) ? 3 : Number(rev['completed']);
-
-            return {
-              ...DEFAULT_SETTINGS,
-              ...val,
-              points: {
-                ...DEFAULT_SETTINGS.points,
-                ...pts,
-                attendance: { ...DEFAULT_SETTINGS.points.attendance, ...att, 'تعويض': finalMakeup },
-                evaluation: { ...DEFAULT_SETTINGS.points.evaluation, ...(pts.evaluation || {}) },
-                behavior: { ...DEFAULT_SETTINGS.points.behavior, ...(pts.behavior || {}) },
-                review: { ...DEFAULT_SETTINGS.points.review, ...rev, 'completed': finalReview },
-                surah: { ...DEFAULT_SETTINGS.points.surah, ...(pts.surah || {}) },
-              }
-            };
-          };
-
-          if (usersData[authContextUser.uid]?.settings) {
-            finalSettings = mergeSettings(usersData[authContextUser.uid].settings);
+          if (!usersData) {
+            if (isSuperAdmin || isManagement) setLoading(false);
+            return;
           }
 
-          accumulatedUserLogs = {};
-          for (const uid in usersData) {
-            const userData = usersData[uid];
+          // If management/admin, aggregate data from all users
+          if (isPrivileged) {
+            let allStudents: Student[] = [];
+            let allSessions: Record<string, Record<string, DailySession>> = {};
+            let allReports: { [date: string]: { [reportId: string]: DailyReport } } = {};
+            let allProgress: Record<string, SurahMastery> = {};
+            let allPayments: Payment[] = [];
+            let allAdminLogs: AdminLog[] = [];
+            let finalSettings: AppSettings = DEFAULT_SETTINGS;
 
-            // Skip demo sheikhs if they have been migrated to a real user UID
-            if (uid.startsWith('demo_sheikh_') && userData.profile?.email) {
-              const emailKey = userData.profile.email.toLowerCase().trim();
-              if (realEmails.has(emailKey)) {
-                continue;
+            // ⚡ Performance: only keep last 120 days of sessions in memory
+            const sessionCutoff = new Date();
+            sessionCutoff.setDate(sessionCutoff.getDate() - 120);
+            const SESSION_CUTOFF_DATE = sessionCutoff.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+
+            const mergeSettings = (val: any): AppSettings => {
+              if (!val) return DEFAULT_SETTINGS;
+              const pts = val.points || {};
+              const att = pts.attendance || {};
+              const rev = pts.review || {};
+              
+              // Force 'تعويض' to 3.5 if it is 1.5 or missing
+              const finalMakeup = (att['تعويض'] === 1.5 || !att['تعويض']) ? 3.5 : Number(att['تعويض']);
+              // Force 'completed' review to 3 if it is 1 or 5 or missing
+              const finalReview = (rev['completed'] === 1 || rev['completed'] === 5 || !rev['completed']) ? 3 : Number(rev['completed']);
+
+              return {
+                ...DEFAULT_SETTINGS,
+                ...val,
+                points: {
+                  ...DEFAULT_SETTINGS.points,
+                  ...pts,
+                  attendance: { ...DEFAULT_SETTINGS.points.attendance, ...att, 'تعويض': finalMakeup },
+                  evaluation: { ...DEFAULT_SETTINGS.points.evaluation, ...(pts.evaluation || {}) },
+                  behavior: { ...DEFAULT_SETTINGS.points.behavior, ...(pts.behavior || {}) },
+                  review: { ...DEFAULT_SETTINGS.points.review, ...rev, 'completed': finalReview },
+                  surah: { ...DEFAULT_SETTINGS.points.surah, ...(pts.surah || {}) },
+                }
+              };
+            };
+
+            if (usersData[authContextUser.uid]?.settings) {
+              finalSettings = mergeSettings(usersData[authContextUser.uid].settings);
+            }
+
+            accumulatedUserLogs = {};
+            for (const uid in usersData) {
+              const userData = usersData[uid];
+
+              // Skip demo sheikhs if they have been migrated to a real user UID
+              if (uid.startsWith('demo_sheikh_') && userData.profile?.email) {
+                const emailKey = userData.profile.email.toLowerCase().trim();
+                if (realEmails.has(emailKey)) {
+                  continue;
+                }
               }
-            }
 
-            // Log each user's data
-            if (userData.students) {
-              const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) =>
-                processStudentData({ ...s, id }, uid, userData.profile?.group)
-              );
-              allStudents.push(...userStudents);
-            }
+              // Log each user's data
+              if (userData.students) {
+                const userStudents = Object.entries(userData.students).map(([id, s]: [string, any]) =>
+                  processStudentData({ ...s, id }, uid, userData.profile?.group)
+                );
+                allStudents.push(...userStudents);
+              }
 
-            if (userData.dailySessions) {
-              for (const date in userData.dailySessions) {
-                // ⚡ Performance: skip sessions older than 120 days
-                if (date < SESSION_CUTOFF_DATE) continue;
-                if (!allSessions[date]) allSessions[date] = {};
-                const dayVal = userData.dailySessions[date];
-                if (dayVal && typeof dayVal === 'object') {
-                  if ('date' in dayVal && ('records' in dayVal || 'sessionType' in dayVal)) {
-                    // Old structure: single session object directly under the date key
-                    const sessionId = dayVal.id || `${date}-s1`;
-                    const uniqueKey = `${uid}_${sessionId}`;
-                    allSessions[date][uniqueKey] = {
-                      ...dayVal,
-                      id: sessionId,
-                      sessionNumber: dayVal.sessionNumber !== undefined ? Number(dayVal.sessionNumber) : 1,
-                      ownerId: uid
-                    };
-                  } else {
-                    // New structure: dictionary of session objects
-                    Object.entries(dayVal).forEach(([sessionId, session]: [string, any]) => {
-                      if (session && typeof session === 'object' && 'date' in session) {
-                        const uniqueKey = `${uid}_${sessionId}`;
-                        allSessions[date][uniqueKey] = {
-                          ...session,
-                          id: session.id || sessionId,
-                          sessionNumber: session.sessionNumber !== undefined ? Number(session.sessionNumber) : (sessionId.endsWith('-s2') ? 2 : 1),
-                          ownerId: uid
-                        };
-                      }
-                    });
+              if (userData.dailySessions) {
+                for (const date in userData.dailySessions) {
+                  // ⚡ Performance: skip sessions older than 120 days
+                  if (date < SESSION_CUTOFF_DATE) continue;
+                  if (!allSessions[date]) allSessions[date] = {};
+                  const dayVal = userData.dailySessions[date];
+                  if (dayVal && typeof dayVal === 'object') {
+                    if ('date' in dayVal && ('records' in dayVal || 'sessionType' in dayVal)) {
+                      // Old structure: single session object directly under the date key
+                      const sessionId = dayVal.id || `${date}-s1`;
+                      const uniqueKey = `${uid}_${sessionId}`;
+                      allSessions[date][uniqueKey] = {
+                        ...dayVal,
+                        id: sessionId,
+                        sessionNumber: dayVal.sessionNumber !== undefined ? Number(dayVal.sessionNumber) : 1,
+                        ownerId: uid
+                      };
+                    } else {
+                      // New structure: dictionary of session objects
+                      Object.entries(dayVal).forEach(([sessionId, session]: [string, any]) => {
+                        if (session && typeof session === 'object' && 'date' in session) {
+                          const uniqueKey = `${uid}_${sessionId}`;
+                          allSessions[date][uniqueKey] = {
+                            ...session,
+                            id: session.id || sessionId,
+                            sessionNumber: session.sessionNumber !== undefined ? Number(session.sessionNumber) : (sessionId.endsWith('-s2') ? 2 : 1),
+                            ownerId: uid
+                          };
+                        }
+                      });
+                    }
                   }
                 }
               }
-            }
-            if (userData.dailyReports) {
-              for (const date in userData.dailyReports) {
-                if (!allReports[date]) allReports[date] = {};
-                Object.entries(userData.dailyReports[date]).forEach(([reportId, report]: [string, any]) => {
-                  const uniqueKey = `${uid}_${reportId}`;
-                  allReports[date][uniqueKey] = { ...report, id: reportId, authorId: uid };
+              if (userData.dailyReports) {
+                for (const date in userData.dailyReports) {
+                  if (!allReports[date]) allReports[date] = {};
+                  Object.entries(userData.dailyReports[date]).forEach(([reportId, report]: [string, any]) => {
+                    const uniqueKey = `${uid}_${reportId}`;
+                    allReports[date][uniqueKey] = { ...report, id: reportId, authorId: uid };
+                  });
+                }
+              }
+              if (userData.surahProgress) Object.assign(allProgress, userData.surahProgress);
+              if (userData.payments) {
+                const userPayments = Object.entries(userData.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) }));
+                allPayments.push(...userPayments);
+              }
+              if (userData.admin_logs) {
+                const userLogs = Object.entries(userData.admin_logs).map(([id, l]) => ({ id, ...(l as Omit<AdminLog, 'id'>) }));
+                allAdminLogs.push(...userLogs);
+              }
+              if (userData.activity_logs) {
+                Object.entries(userData.activity_logs).forEach(([id, l]) => {
+                  accumulatedUserLogs[id] = { id, ...(l as any) };
                 });
               }
             }
-            if (userData.surahProgress) Object.assign(allProgress, userData.surahProgress);
-            if (userData.payments) {
-              const userPayments = Object.entries(userData.payments).map(([id, p]) => ({ id, ...(p as Omit<Payment, 'id'>) }));
-              allPayments.push(...userPayments);
-            }
-            if (userData.admin_logs) {
-              const userLogs = Object.entries(userData.admin_logs).map(([id, l]) => ({ id, ...(l as Omit<AdminLog, 'id'>) }));
-              allAdminLogs.push(...userLogs);
-            }
-            if (userData.activity_logs) {
-              Object.entries(userData.activity_logs).forEach(([id, l]) => {
-                accumulatedUserLogs[id] = { id, ...(l as any) };
-              });
-            }
+
+            const validStudents = allStudents.filter((s): s is Student => Boolean(s && typeof s === 'object' && s.id));
+            const cleanProgress = sanitizeSurahProgress(allProgress);
+
+            setStudents(validStudents);
+            setDailySessions(allSessions);
+            setDailyReports(allReports);
+            setSurahProgress(cleanProgress);
+            setPayments(allPayments);
+            setAdminLogs(allAdminLogs);
+            setSettingsState(finalSettings);
+            mergeAndSetLogs();
+            setLoading(false);
+
+            // ⚡ حفظ مشفر محلياً للأوفلاين
+            saveEncrypted('students', validStudents);
+            saveEncrypted('dailySessions', allSessions);
+            saveEncrypted('dailyReports', allReports);
+            saveEncrypted('surahProgress', cleanProgress);
+            saveEncrypted('payments', allPayments);
+            saveEncrypted('adminLogs', allAdminLogs);
+            saveEncrypted('settings', finalSettings);
           }
-
-          const validStudents = allStudents.filter((s): s is Student => Boolean(s && typeof s === 'object' && s.id));
-          const cleanProgress = sanitizeSurahProgress(allProgress);
-
-          setStudents(validStudents);
-          setDailySessions(allSessions);
-          setDailyReports(allReports);
-          setSurahProgress(cleanProgress);
-          setPayments(allPayments);
-          setAdminLogs(allAdminLogs);
-          setSettingsState(finalSettings);
-          mergeAndSetLogs();
-          setLoading(false);
-
-          // ⚡ حفظ مشفر محلياً للأوفلاين
-          saveEncrypted('students', validStudents);
-          saveEncrypted('dailySessions', allSessions);
-          saveEncrypted('dailyReports', allReports);
-          saveEncrypted('surahProgress', cleanProgress);
-          saveEncrypted('payments', allPayments);
-          saveEncrypted('adminLogs', allAdminLogs);
-          saveEncrypted('settings', finalSettings);
-        }
-      }, (error: any) => {
-        // Silently handle permission errors (expected during logout/role transitions)
-        if (error.code === 'PERMISSION_DENIED') {
-          console.warn('allUsers: permission denied (expected during auth transitions)');
-        } else {
-          console.warn(`Firebase allUsers read failed: ${error.message}`);
-        }
-        if (isPrivileged) setLoading(false);
-      });
+        }, (error: any) => {
+          if (error.code === 'PERMISSION_DENIED') {
+            console.warn('allUsers: permission denied (auth transition), retrying in 1.5s...');
+            // محاولة إعادة الاتصال التلقائي بعد تأكيد صلاحيات الجلسة
+            if (auth.currentUser) {
+              retryUsersTimeout = setTimeout(() => {
+                if (auth.currentUser) {
+                  try { goOnline(db); } catch (e) {}
+                  attachAllUsersListener();
+                }
+              }, 1500);
+            }
+          } else {
+            console.warn(`Firebase allUsers read failed: ${error.message}`);
+          }
+          if (isPrivileged) setLoading(false);
+        });
+      };
+      attachAllUsersListener();
 
 
       // 2. Pre-registrations
@@ -701,6 +728,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     }, (err: any) => console.warn("Notifications read failed:", err.message));
 
     return () => {
+      if (retryUsersTimeout) clearTimeout(retryUsersTimeout);
       if (allUsersRef && allUsersListener) off(allUsersRef, 'value', allUsersListener);
       if (preRegsRef && preRegsListener) off(preRegsRef, 'value', preRegsListener);
       if (globalLogsRef && globalLogsListener) off(globalLogsRef, 'value', globalLogsListener);

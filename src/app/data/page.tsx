@@ -16,7 +16,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { GroupSelector } from '@/components/management/GroupSelector';
-import { isStudentInMenSheikhs, isStudentInWomenUstadhats } from '@/lib/utils';
+import { isStudentInMenSheikhs, isStudentInWomenUstadhats, filterStudentsByGroup } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -35,19 +35,8 @@ export default function DataExchangePage() {
     const { isManagement } = useAuth();
 
     const filteredStudentsList = React.useMemo(() => {
-        if (isManagement && selectedGroup !== 'all') {
-            if (selectedGroup === 'sheikhs_all') {
-                return (students ?? []).filter(s => isStudentInMenSheikhs(s, allUsers));
-            } else if (selectedGroup === 'ustadhats_all') {
-                return (students ?? []).filter(s => isStudentInWomenUstadhats(s, allUsers));
-            } else {
-                const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
-                if (selectedSheikh?.group) {
-                    return (students ?? []).filter(s => s.groupName?.trim() === selectedSheikh.group?.trim());
-                } else {
-                    return (students ?? []).filter(s => s.ownerId === selectedGroup);
-                }
-            }
+        if (isManagement) {
+            return filterStudentsByGroup(students ?? [], selectedGroup, allUsers);
         }
         return students ?? [];
     }, [students, isManagement, selectedGroup, allUsers]);

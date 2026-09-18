@@ -2,7 +2,7 @@
 
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { getDatabase } from 'firebase/database';
+import { getDatabase, goOnline } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { getMessaging, isSupported as isMessagingSupported } from "firebase/messaging";
@@ -19,13 +19,20 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getDatabase(app);
+const storage = getStorage(app);
 
 // Explicitly ensure long-lived persistent auth across mobile browser restarts
 if (typeof window !== 'undefined') {
   setPersistence(auth, browserLocalPersistence).catch(() => {});
+  // فور عودة الاتصال بالإنترنت، إجبار قاعدة البيانات على الاتصال الفوري بالسيرفر
+  window.addEventListener('online', () => {
+    try {
+      goOnline(db);
+    } catch (e) {}
+  });
 }
-const db = getDatabase(app);
-const storage = getStorage(app);
+
 
 // Initialize Analytics only in the browser and when supported
 const analytics = typeof window !== 'undefined' ? isSupported().then(yes => yes ? getAnalytics(app) : null) : Promise.resolve(null);

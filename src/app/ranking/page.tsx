@@ -13,7 +13,7 @@ import { ar } from 'date-fns/locale';
 import type { Student, DailySession, BadgeConfig, StudentStatus } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn, isStudentInMenSheikhs, isStudentInWomenUstadhats } from '@/lib/utils';
+import { cn, isStudentInMenSheikhs, isStudentInWomenUstadhats, filterStudentsByGroup } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/AuthContext';
 import { GroupSelector } from '@/components/management/GroupSelector';
@@ -74,19 +74,8 @@ export default function RankingPage() {
         const studentScores: Record<string, StudentScore> = {};
 
         let studentsToRank = students ?? [];
-        if (isManagement && selectedGroup !== 'all') {
-            if (selectedGroup === 'sheikhs_all') {
-                studentsToRank = studentsToRank.filter(s => isStudentInMenSheikhs(s, allUsers));
-            } else if (selectedGroup === 'ustadhats_all') {
-                studentsToRank = studentsToRank.filter(s => isStudentInWomenUstadhats(s, allUsers));
-            } else {
-                const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
-                if (selectedSheikh?.group) {
-                    studentsToRank = studentsToRank.filter(s => s.groupName?.trim() === selectedSheikh.group?.trim());
-                } else {
-                    studentsToRank = studentsToRank.filter(s => s.ownerId === selectedGroup);
-                }
-            }
+        if (isManagement) {
+            studentsToRank = filterStudentsByGroup(studentsToRank, selectedGroup, allUsers);
         }
 
         // Initialize all students, active or not

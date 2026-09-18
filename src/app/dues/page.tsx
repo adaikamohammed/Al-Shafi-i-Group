@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Payment, PaymentStatus, Student } from '@/lib/types';
-import { cn, isStudentInMenSheikhs, isStudentInWomenUstadhats, formatGroupName } from '@/lib/utils';
+import { cn, isStudentInMenSheikhs, isStudentInWomenUstadhats, filterStudentsByGroup, formatGroupName } from '@/lib/utils';
 import { GroupSelector } from '@/components/management/GroupSelector';
 
 
@@ -164,21 +164,8 @@ export default function DuesPage() {
 
             // Group Filter Logic
             let groupMatch = true;
-            if (selectedGroup !== 'all' && (isSuperAdmin || isManagement)) {
-                if (selectedGroup === 'sheikhs_all') {
-                    groupMatch = isStudentInMenSheikhs(student, allUsers);
-                } else if (selectedGroup === 'ustadhats_all') {
-                    groupMatch = isStudentInWomenUstadhats(student, allUsers);
-                } else {
-                    // Find the group name associated with the selected sheikh UID
-                    const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
-                    if (selectedSheikh?.group) {
-                        groupMatch = student.groupName === selectedSheikh.group;
-                    } else {
-                        // Fallback to strict owner matching if group name not found (unlikely)
-                        groupMatch = student.ownerId === selectedGroup;
-                    }
-                }
+            if (isSuperAdmin || isManagement) {
+                groupMatch = filterStudentsByGroup([student], selectedGroup, allUsers).length > 0;
             }
 
             return nameMatch && quarterMatch && statusMatch && groupMatch;

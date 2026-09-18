@@ -17,7 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DailyInspiration } from '@/components/ui/DailyInspiration';
 import { useRouter } from 'next/navigation';
 import { Student, StudentStatus } from '@/lib/types';
-import { arabicCompare, isStudentInMenSheikhs, isStudentInWomenUstadhats } from '@/lib/utils';
+import { arabicCompare, isStudentInMenSheikhs, isStudentInWomenUstadhats, filterStudentsByGroup } from '@/lib/utils';
 import { format, getQuarter, getYear, parseISO } from 'date-fns';
 
 // Refactored Components
@@ -116,19 +116,8 @@ export function StudentManagement() {
         let sortableStudents = isSuperAdmin || isManagement ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
 
         // Management Filter
-        if (isManagement && selectedGroup !== 'all') {
-            if (selectedGroup === 'sheikhs_all') {
-                sortableStudents = sortableStudents.filter(s => isStudentInMenSheikhs(s, allUsers));
-            } else if (selectedGroup === 'ustadhats_all') {
-                sortableStudents = sortableStudents.filter(s => isStudentInWomenUstadhats(s, allUsers));
-            } else {
-                const selectedUser = allUsers.find(u => u.uid === selectedGroup);
-                if (selectedUser?.group) {
-                    sortableStudents = sortableStudents.filter(s => s.groupName?.trim() === selectedUser.group?.trim());
-                } else {
-                    sortableStudents = sortableStudents.filter(s => s.ownerId === selectedGroup);
-                }
-            }
+        if (isManagement) {
+            sortableStudents = filterStudentsByGroup(sortableStudents, selectedGroup, allUsers);
         }
         sortableStudents = sortableStudents.filter(student => student.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
         if (statusFilter !== 'all') sortableStudents = sortableStudents.filter(s => s && s.status === statusFilter);
@@ -165,19 +154,8 @@ export function StudentManagement() {
 
     const allStudents = useMemo(() => {
         let list = isSuperAdmin || isManagement ? (students ?? []) : (students ?? []).filter(s => s.ownerId === user?.uid);
-        if (isManagement && selectedGroup !== 'all') {
-            if (selectedGroup === 'sheikhs_all') {
-                list = list.filter(s => isStudentInMenSheikhs(s, allUsers));
-            } else if (selectedGroup === 'ustadhats_all') {
-                list = list.filter(s => isStudentInWomenUstadhats(s, allUsers));
-            } else {
-                const selectedUser = allUsers.find(u => u.uid === selectedGroup);
-                if (selectedUser?.group) {
-                    list = list.filter(s => s.groupName?.trim() === selectedUser.group?.trim());
-                } else {
-                    list = list.filter(s => s.ownerId === selectedGroup);
-                }
-            }
+        if (isManagement) {
+            list = filterStudentsByGroup(list, selectedGroup, allUsers);
         }
         return list;
     }, [students, user, isSuperAdmin, isManagement, selectedGroup, allUsers]);
@@ -287,7 +265,10 @@ export function StudentManagement() {
         </Alert>
     );
 
-    if (allStudents.length === 0 && !loading) {
+    const totalStudentsCount = (isSuperAdmin || isManagement) ? (students ?? []).length : (students ?? []).filter(s => s.ownerId === user?.uid).length;
+
+    // حالة عدم وجود أي طلاب على الإطلاق في النظام بأكمله (وليس مجرد تصفية فوج فارغ)
+    if (totalStudentsCount === 0 && !loading) {
         return (
             <div className="space-y-6">
                 <DailyInspiration />
@@ -297,7 +278,13 @@ export function StudentManagement() {
                     <Users className="h-16 w-16 text-muted-foreground/30 mb-4" />
                     <h1 className="text-2xl font-bold mb-2">لا يوجد طلاب بعد</h1>
                     <p className="text-muted-foreground mb-6">ابدأ بإضافة طالب جديد أو استيراد قائمة الطلاب.</p>
-                    {!isSuperAdmin && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
+                    {isManagement && (
+                        <div className="mb-4 flex flex-col sm:flex-row items-center gap-3">
+                            <GroupSelector value={selectedGroup} onChange={setSelectedGroup} className="w-[220px]" />
+                            <Button variant="outline" onClick={() => setSelectedGroup('all')}>عرض كل المدرسة</Button>
+                        </div>
+                    )}
+                    {!isSuperAdmin && !isManagement && <Dialog open={isAddStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
                         <DialogTrigger asChild><Button><PlusCircle className="ml-2 h-4 w-4" />إضافة طالب جديد</Button></DialogTrigger>
                         <DialogContent className="sm:max-w-[600px]">
                             <DialogHeader>

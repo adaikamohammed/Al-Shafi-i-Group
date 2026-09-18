@@ -373,6 +373,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem('cached_user_email');
       localStorage.removeItem('cached_user_role');
       localStorage.removeItem('cached_user_group');
+      localStorage.removeItem('selectedGroup');
     }
     await signOut(auth);
   };

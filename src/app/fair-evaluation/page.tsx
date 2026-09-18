@@ -10,7 +10,7 @@ import { format, parseISO, getMonth, getYear, startOfMonth, endOfMonth, startOfW
 import { ar } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn, arabicCompare, isStudentInMenSheikhs, isStudentInWomenUstadhats, formatGroupName } from '@/lib/utils';
+import { cn, arabicCompare, isStudentInMenSheikhs, isStudentInWomenUstadhats, filterStudentsByGroup, formatGroupName } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/AuthContext';
 import { GroupSelector } from '@/components/management/GroupSelector';
@@ -214,19 +214,8 @@ export default function FairEvaluationPage() {
         const scores: Record<string, StudentEvaluationRow> = {};
         let targetStudents = students.filter(s => s.status === 'نشط');
         
-        if (isManagement && selectedGroup !== 'all') {
-            if (selectedGroup === 'sheikhs_all') {
-                targetStudents = targetStudents.filter(s => isStudentInMenSheikhs(s, allUsers));
-            } else if (selectedGroup === 'ustadhats_all') {
-                targetStudents = targetStudents.filter(s => isStudentInWomenUstadhats(s, allUsers));
-            } else {
-                const selectedSheikh = allUsers.find(u => u.uid === selectedGroup);
-                if (selectedSheikh?.group) {
-                    targetStudents = targetStudents.filter(s => s.groupName?.trim() === selectedSheikh.group?.trim());
-                } else {
-                    targetStudents = targetStudents.filter(s => s.ownerId === selectedGroup);
-                }
-            }
+        if (isManagement) {
+            targetStudents = filterStudentsByGroup(targetStudents, selectedGroup, allUsers);
         } else if (!isManagement && !isSuperAdmin && user) {
             // Regular Sheikh can only see their own group
             if (user.group) {

@@ -70,6 +70,9 @@ export default function LoginPage() {
         case 'auth/too-many-requests':
           description = "محاولات كثيرة خاطئة. يرجى المحاولة لاحقاً.";
           break;
+        case 'auth/network-request-failed':
+          description = "تعذر الاتصال بالخادم. تسجيل الدخول الجديد يتطلب الاتصال بالإنترنت أولاً للتحقق من الحساب. يرجى تفعيل الإنترنت والمحاولة مجدداً (ملاحظة: لست بحاجة لتسجيل الخروج عند العمل أوفلاين، فالنظام يحتفظ بجلسة الدخول مسجلة تلقائياً).";
+          break;
         default:
           description = `حدث خطأ: ${error.message}`;
       }

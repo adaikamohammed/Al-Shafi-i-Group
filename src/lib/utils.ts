@@ -111,6 +111,41 @@ export function isStudentInWomenUstadhats(s: any, allUsers: any[]): boolean {
   return groupNum !== null && ((groupNum >= 10 && groupNum <= 18) || groupNum === 19);
 }
 
+/**
+ * فلترة مرنة وقوية للطلاب حسب الفوج المختار مع مراعاة كافة الحالات (شامل، مشايخ، أستاذات، معرف شيخ، أو اسم الفوج)
+ */
+export function filterStudentsByGroup(students: any[], selectedGroup: string, allUsers: any[]): any[] {
+  if (!students || !Array.isArray(students)) return [];
+  if (!selectedGroup || selectedGroup === 'all' || selectedGroup === 'كل الأفواج' || selectedGroup === 'كل المدرسة') {
+    return students;
+  }
+  if (selectedGroup === 'sheikhs_all') {
+    return students.filter(s => isStudentInMenSheikhs(s, allUsers));
+  }
+  if (selectedGroup === 'ustadhats_all') {
+    return students.filter(s => isStudentInWomenUstadhats(s, allUsers));
+  }
+  // فحص ما إذا كان المحدد هو UID لأحد المستخدمين
+  const selectedUser = (allUsers || []).find(u => u.uid === selectedGroup);
+  if (selectedUser) {
+    if (selectedUser.role === 'management' || selectedUser.role === 'super_admin' || selectedUser.group === 'كل الأفواج') {
+      return students;
+    }
+    if (selectedUser.group) {
+      return students.filter(s => s.groupName?.trim() === selectedUser.group?.trim());
+    }
+    return students.filter(s => s.ownerId === selectedGroup);
+  }
+  // فحص ما إذا كان المحدد هو اسم الفوج مباشرة (مثل "فوج 1")
+  const directMatch = students.filter(s => s.groupName?.trim() === selectedGroup.trim());
+  if (directMatch.length > 0) {
+    return directMatch;
+  }
+  // المطابقة الاحتياطية بمعرف المالك
+  return students.filter(s => s.ownerId === selectedGroup);
+}
+
+
 export const GROUP_SHEIKH_MAPPING: Record<string, string> = {
   "فوج 1": "الشيخ زياد درويش",
   "فوج 2": "الشيخ عبد الحميد",
